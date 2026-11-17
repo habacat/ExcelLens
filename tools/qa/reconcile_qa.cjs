@@ -1,0 +1,71 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{createHash}=require('node:crypto');
+const {launch,pause}=require('./browser_harness.cjs'),config=require('./project_config.cjs');
+const root=path.resolve(__dirname,'../..'),out=path.join(root,'validation',config.validationVersion(),'private','reconcile');fs.mkdirSync(out,{recursive:true});
+const report={version:config.version(),result:'FAIL',desktopManualAcceptance:false,checks:[],errors:[]};
+const csv=rows=>rows.map(row=>row.map(v=>/[",\n\r]/.test(v)?'"'+v.replaceAll('"','""')+'"':v).join(',')).join('\n')+'\n';
+const unsafe='<img src=x onerror="window.qaInjected=1">';
+const leftData=csv([['编号','金额','备注'],['001','9007199254740993.31','多\n行'],['002','0.1','一致'],['left','2',unsafe],['dup','1','D1'],['dup','2','D2'],['','1','无键']]);
+const rightData=csv([['编号','金额','备注'],['001','9007199254740993.30','右文字'],['002','0.10','一致'],['right','3','=2+2'],['dup','3','D3'],['dup','4','D4'],['dup','5','D5'],['','2','无键']]);
+const left=path.join(out,'只读左.csv'),right=path.join(out,'核对右.csv');fs.writeFileSync(left,leftData);fs.writeFileSync(right,rightData);
+const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex'),before=[hash(left),hash(right)];
+let h;
+(async()=>{
+  try{
+    h=await launch({out,errors:report.errors,exe:path.resolve(process.argv[2]||'artifacts/qa/uiprobe.exe')});const p=h.page;
+    await p.run(()=>{window.qaStarts=[];window.qaNav=[];window.qaCancels=[];window.qaOriginalFetch=fetch.bind(window);window.fetch=async(url,options)=>{const name=String(url),response=await window.qaOriginalFetch(url,options);if(name==='/api/reconcile/start'){const data=await response.clone().json();window.qaStarts.push({...data,request:JSON.parse(options.body)});if(window.qaHoldStart)return new Promise(resolve=>window.qaReleaseStart=()=>resolve(response));}if(name==='/api/reconcile/navigate')window.qaNav.push(await response.clone().json());if(name==='/api/reconcile/cancel')window.qaCancels.push(JSON.parse(options.body).id);return response;};});
+    await p.file('#fileInput',left);await p.wait('window.ExcelLensPerformance().hasVisibleCoverage&&!window.ExcelLensPerformance().sheetLoading');
+    const primary=await p.api('/api/status');assert.equal(primary.version,report.version);
+    await p.click('#reconcileOpenBtn');await p.wait('document.querySelector("#reconcileDialog").open&&document.querySelector("#reconcileLeftBook").options.length===1');
+    await p.file('#reconcileFile',right);await p.wait('document.querySelector("#reconcileSourceNotice").textContent.includes("已添加")');
+    assert.equal((await p.api('/api/status')).fileName,primary.fileName);
+    await p.click('#reconcileLoadFields');await p.wait('!document.querySelector("#reconcileRun").disabled');
+    assert.equal(await p.evaluate('document.querySelectorAll("#reconcileKeys>.reconcile-mapping").length'),1);
+    await p.run(()=>{const select=document.querySelector('#reconcileFields .reconcile-mode');select.value='number';select.dispatchEvent(new Event('change'));});
+    await p.click('#reconcileRun');await p.wait('!document.querySelector("#reconcileResults").hidden&&document.querySelector("#reconcileProgress").textContent==="核对完成"');
+    const start=await p.evaluate('window.qaStarts.at(-1)'),status=await p.api('/api/reconcile/status?id='+start.jobId),r=status.result;
+    assert.deepEqual(r.counts,{equal:1,different:1,leftOnly:1,rightOnly:1,duplicate:1,review:0,invalidKeys:2,leftRecords:6,rightRecords:7});assert.equal(r.samples.find(g=>g.status==='different').comparisons[0].delta,'0.01');
+    assert.equal(await p.evaluate('window.qaInjected'),undefined);assert.equal(await p.evaluate('document.querySelectorAll("#reconcileTable img").length'),0);assert((await p.evaluate('document.querySelector("#reconcileTable").textContent')).includes(unsafe));
+    report.checks.push('adding another CSV preserves the primary workbook; actual UI uses exact amounts, leading-zero keys, separate duplicate and invalid-key counts; source markup renders as literal text');
+    await p.shot(path.join(out,'comparison.png'));
+    await p.run(()=>{document.querySelector('#reconcileLeftHeader').value='0';document.querySelector('#reconcileLeftHeader').dispatchEvent(new Event('change'));});
+    assert.match(await p.evaluate('document.querySelector("#reconcileResultSource").textContent'),/上次结果/);
+    await p.run(()=>document.querySelectorAll('#reconcileTable .reconcile-value-pair button')[0].click());await p.wait('!document.querySelector("#reconcileDialog").open');
+    assert.equal((await p.evaluate('window.qaNav.at(-1)')).sameBook,true);
+    await p.click('#reconcileOpenBtn');await p.wait('document.querySelector("#reconcileDialog").open');
+    await p.run(()=>{const button=[...document.querySelectorAll('#reconcileTable .reconcile-value-pair button')].find(button=>button.title.includes('右侧 B2'));button.click();});await p.wait('window.qaNav.at(-1)?.sameBook===false');
+    const navigation=await p.evaluate('window.qaNav.at(-1)');let tab;
+    for(let i=0;i<100;i++){tab=(await h.tabs()).find(tab=>tab.url.includes('sourceRef=B2'));if(tab)break;await pause(50);}assert(tab,'cross-file source tab missing');
+    const other=await h.connect(tab);await other.wait('window.ExcelLensPerformance?.().hasVisibleCoverage&&!window.ExcelLensPerformance().sheetLoading');
+    assert.equal((await other.api('/api/status')).fileName,'核对右.csv');assert.equal(await other.evaluate('document.querySelector("#nameBox").value'),'B2');
+    await p.call('Page.bringToFront');
+    report.checks.push('result navigation retains its original sources after configuration changes; cross-file links open an isolated app session at the exact cell');
+    await p.click('#reconcileExport');await p.wait('document.querySelector("#exportDialog").open&&!document.querySelector("#exportResult").hidden');
+    const label=await p.evaluate('document.querySelector("#exportSnapshot").textContent');assert(label.includes('只读左.csv')&&label.includes('核对右.csv')&&label.includes('完整核对'));
+    const href=await p.evaluate('document.querySelector("#exportDownload").getAttribute("href")');
+    const exported=await p.run(async href=>{const headers=window.ExcelLensSession.apply(new Headers({'X-ExcelLens-Token':document.querySelector('meta[name="app-token"]').content}));return(await fetch(href,{headers})).text();},href);
+    assert(exported.includes('0.01'));assert(exported.includes("'=2+2"));assert(exported.includes('多\n行'));assert(exported.includes('001'));fs.writeFileSync(path.join(out,'protected.csv'),exported);
+    assert(!exported.includes('新配置'));report.checks.push('full streaming CSV keeps multiline literal values, exact differences and provenance; formula-shaped CSV text is protected and labelled');
+    await p.click('#exportDialog .dialog-close');await p.click('#reconcileOpenBtn');await p.wait('document.querySelector("#reconcileDialog").open');
+    await p.call('Emulation.setDeviceMetricsOverride',{width:520,height:900,deviceScaleFactor:1,mobile:false});
+    assert.equal(await p.evaluate('document.querySelector("#reconcileDialog").scrollWidth<=document.querySelector("#reconcileDialog").clientWidth+2'),true);await p.shot(path.join(out,'narrow.png'));
+    await p.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1050,deviceScaleFactor:1,mobile:false});
+    // Saved editor values are an independent source and source navigation must
+    // load the correct page, rather than interpreting source row as UI index.
+    const sheet=await p.api('/api/analysis/sheet/create',{name:'分页来源',columns:['编号','金额']});const saved=await p.api('/api/analysis/sheet?id='+sheet.id);await p.api('/api/analysis/sheet/batch',{id:sheet.id,workbookKey:primary.workbookKey,expectedRevision:saved.revision,changes:Array.from({length:700},(_,row)=>[{row,col:0,value:'K'+row},{row,col:1,value:String(row)}]).flat()});
+    await p.click('#reconcileRefresh');await p.wait('!![...document.querySelector("#reconcileLeftSheet").options].find(option=>option.value.startsWith("scratch:"))');
+    await p.run(id=>{for(const side of ['Left','Right']){const node=document.querySelector('#reconcile'+side+'Book');node.value=document.querySelector('#reconcileLeftBook').value;node.dispatchEvent(new Event('change'));const select=document.querySelector('#reconcile'+side+'Sheet');select.value='scratch:'+id;select.dispatchEvent(new Event('change'));}},sheet.id);
+    await p.click('#reconcileLoadFields');await p.wait('!document.querySelector("#reconcileRun").disabled');
+    await p.run(()=>{document.querySelector('#reconcileIncludeEqual').checked=true;document.querySelector('#reconcileIncludeEqual').dispatchEvent(new Event('change'));});
+    await p.click('#reconcileRun');await p.wait('document.querySelector("#reconcileProgress").textContent==="核对完成"');
+    const editorJob=(await p.evaluate('window.qaStarts.at(-1)')).jobId;assert.equal((await p.api('/api/reconcile/status?id='+editorJob)).result.counts.equal,700);
+    const target=await p.api('/api/reconcile/navigate',{jobId:editorJob,side:'left',row:650,col:2});assert.equal(target.kind,'analysis');await p.run(async id=>{document.querySelector('#reconcileDialog').close();await window.ExcelLensAnalytics.navigateSheet(id,650,2);},sheet.id);
+    assert.equal(await p.evaluate('document.activeElement.dataset.row'),'649');assert.equal(await p.evaluate('document.activeElement.value'),'649');await p.shot(path.join(out,'editor-source.png'));await p.click('#analysisClose');
+    report.checks.push('saved analysis tables participate in reconciliation and source navigation loads and focuses row 650 on its actual editor page');
+    await p.click('#reconcileOpenBtn');await p.wait('document.querySelector("#reconcileDialog").open');await p.run(()=>{window.qaHoldStart=true;window.qaReleaseStart=null;});await p.click('#reconcileRun');await p.wait('typeof window.qaReleaseStart==="function"');const late=await p.evaluate('window.qaStarts.at(-1).jobId');await p.click('#reconcileCancel');await p.evaluate('window.qaReleaseStart();window.qaHoldStart=false');await p.wait('window.qaCancels.includes('+JSON.stringify(late)+')');
+    assert.equal((await p.api('/api/reconcile/status?id='+editorJob)).status,'done');report.checks.push('cancelling a pending start cancels its late owned job and leaves the previous completed result available');
+    await p.click('#reconcileClear');await p.wait('document.querySelector("#reconcileResults").hidden');
+    await p.click('#reconcileDialog .dialog-close');await p.file('#fileInput',right);await p.wait('document.querySelector("#fileBadge").textContent==="核对右.csv"&&window.ExcelLensPerformance().hasVisibleCoverage&&!window.ExcelLensPerformance().sheetLoading');await p.click('#reconcileOpenBtn');await p.wait('document.querySelector("#reconcileDialog").open');assert.equal(await p.evaluate('document.querySelector("#reconcileResults").hidden'),true);
+    assert.deepEqual([hash(left),hash(right)],before);assert.equal(report.errors.length,0);report.sourceSHA256=before;report.sourceUnchanged=true;report.result='PASS';
+  }catch(error){report.error=error.stack;process.exitCode=1;if(h){try{report.ui=await h.page.run(()=>({progress:document.querySelector('#reconcileProgress')?.textContent,notice:document.querySelector('#reconcileSourceNotice')?.textContent,body:document.body.innerText.slice(-3000)}));await h.page.shot(path.join(out,'failure.png'));}catch{}}}
+  finally{if(h)await h.close();fs.writeFileSync(path.join(root,'validation',config.validationVersion(),'reconcile-browser.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));}
+})().catch(error=>{console.error(error);process.exitCode=1;});

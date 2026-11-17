@@ -1,0 +1,22 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+function setup(){
+  const nodes=new Map();class Node{constructor(){this.children=[];this.attrs={};this.dataset={};this.open=false;this.listeners={};this.value='';this.classList={toggle(){}};}append(...children){this.children.push(...children);}replaceChildren(...children){this.children=children;}setAttribute(k,v){this.attrs[k]=v;}addEventListener(k,f){(this.listeners[k]??=[]).push(f);}focus(){}showModal(){this.open=true;}close(){this.open=false;queueMicrotask(()=>{for(const f of this.listeners.close||[])f();});}}
+  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},context={window:{},document:{getElementById:get,createElement:()=>new Node(),body:new Node()}};
+  for(const file of ['composition-model.js','field-picker.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+  const picker=new context.window.ExcelLensFieldPicker({id:'testPicker',pageRows:3}),fields=Array.from({length:8},(_,i)=>({column:i+1,name:'字段'+(i+1)}));return {picker,fields,get};
+}
+test('paged multiselect retains off-page choices, enforces capacity and applies only on confirmation',()=>{
+  const h=setup();let chosen=null;h.picker.open({fields:h.fields,multiple:true,selected:[1],limit:3,onChoose:x=>chosen=x});assert.equal(h.get('testPickerItems').children.length,3);h.picker.select(2);h.picker.page=1;h.picker.render();h.picker.select(4);h.picker.select(5);assert.equal(h.picker.selected.has(5),false);assert.equal(chosen,null);h.picker.apply();assert.deepEqual([...chosen],[1,2,4]);assert.equal(h.get('testPickerItems').children.length,0);
+});
+test('cancel does not mutate input selection and stale field buttons cannot target a newer source',async()=>{
+  const h=setup(),selected=[1];let changes=0;h.picker.open({fields:h.fields,multiple:true,selected,limit:3,onChoose:()=>changes++});const stale=h.get('testPickerItems').children[0];h.picker.select(2);h.picker.close();await Promise.resolve();assert.deepEqual(selected,[1]);h.picker.open({fields:[{column:10,name:'新来源'}],onChoose:()=>changes++});stale.onclick();assert.equal(changes,0);assert.equal(h.picker.dialog.open,true);
+});
+test('repeated empty columns remain selectable while real duplicate source fields are disabled',()=>{
+  const h=setup();let chosen=-1;h.picker.open({fields:h.fields,allowEmpty:true,disabled:[0,1],onChoose:value=>chosen=value});const items=h.get('testPickerItems').children;assert.equal(items[0].disabled,false);assert.equal(items[1].disabled,true);items[0].onclick();assert.equal(chosen,0);
+});
+test('search is paged and per-page clearing preserves other selections',()=>{
+  const h=setup();h.picker.open({fields:h.fields,multiple:true,selected:[1,7],limit:8,onChoose(){}});h.get('testPickerSearch').value='7';h.get('testPickerSearch').oninput();assert.equal(h.get('testPickerItems').children.length,1);const clear=h.get('testPickerTools').children.find(item=>item.textContent==='清空本页');clear.onclick();assert.equal(h.picker.selected.has(1),true);assert.equal(h.picker.selected.has(7),false);
+});
+test('queued native close does not clear an immediately reopened picker',async()=>{
+  const h=setup();h.picker.open({fields:h.fields,onChoose(){}});h.picker.close();h.picker.open({fields:h.fields.slice(0,2),onChoose(){}});await Promise.resolve();assert.equal(h.picker.dialog.open,true);assert.equal(h.get('testPickerItems').children.length,2);
+});

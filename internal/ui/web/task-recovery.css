@@ -1,0 +1,16 @@
+.task-recovery-dialog{width:min(760px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:0;color:var(--reading-ink,#202b37);background:var(--reading-surface,#fff);overflow:hidden}
+.task-recovery-dialog[open]{display:flex;flex-direction:column}
+.task-recovery-dialog .dialog-head{flex:none}
+.task-recovery-toolbar{display:flex;align-items:center;justify-content:flex-end;padding:8px 16px;border-bottom:1px solid var(--reading-line,#dfe4e9);flex:none}
+.task-recovery-list{min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 16px}
+.task-recovery-row{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--reading-line,#dfe4e9)}
+.task-recovery-row:last-child{border-bottom:0}.task-recovery-main{min-width:0;flex:1}
+.task-recovery-heading,.task-recovery-meta,.task-recovery-actions{display:flex;align-items:center;gap:10px}
+.task-recovery-heading{min-width:0;flex-wrap:wrap;gap:5px 10px}.task-recovery-kind{color:var(--reading-accent,#2563a6);font-size:11px;flex:none}
+.task-recovery-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.task-recovery-meta{margin-top:5px;color:var(--reading-muted,#778391);font-size:11px;flex-wrap:wrap;gap:4px 12px}.task-recovery-sheet{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.task-recovery-actions{flex:none;flex-wrap:wrap;gap:6px}.task-recovery-empty{margin:32px 0;text-align:center;color:var(--reading-muted,#778391);font-size:12px}
+.task-recovery-status{flex:none;margin:0;padding:10px 16px;font-size:12px;overflow-wrap:anywhere}.task-recovery-status[hidden]{display:none}
+.task-recovery-error{font-size:12px;line-height:1.5;margin:7px 0 0;overflow-wrap:anywhere}.task-recovery-error,.task-recovery-status.is-error{color:var(--reading-accent,#a34532)}
+.task-progress-choice{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:12px;color:var(--reading-muted,#778391)}
+@media(max-width:520px){.task-recovery-row{align-items:flex-start;flex-direction:column;gap:9px;padding:11px 0}.task-recovery-main{width:100%}.task-recovery-actions{align-self:flex-end}.task-recovery-list{padding:0 12px}.task-recovery-toolbar{padding:8px 12px}}

@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="720" viewBox="0 0 840 720" fill="none" stroke="#000" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+  <desc>Interwoven desk and data illustrations. Each mark belongs to a complete object; there are no loose filler dots or ticks.</desc>
+  <defs>
+    <g id="ledger">
+      <path d="M6 2h28a3 3 0 0 1 3 3v35H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4zM7 2v32M7 34h30M6 34a3 3 0 0 0 0 6M12 9h19M12 15h19M12 21h19M12 27h19M20 9v18M27 9v18"/>
+      <path d="M30 2v6l-3-2-3 2V2M10 37h22"/>
+    </g>
+    <g id="notebook">
+      <path d="M22 6C15 1 8 1 1 3v31c8-2 14-1 21 3 7-4 13-5 21-3V3c-7-2-14-2-21 3v31M1 34v4c8-2 14-1 21 3 7-4 13-5 21-3v-4M6 9c4-1 7 0 11 2M6 15c4-1 7 0 11 2M6 21c4-1 7 0 11 2M6 27c4-1 7 0 11 2M27 11c4-2 7-3 11-2M27 17c4-2 7-3 11-2M27 23c4-2 7-3 11-2"/>
+    </g>
+    <g id="report">
+      <path d="M5 6H1v36h30v-4M5 2h23l10 10v26H5zM28 2v10h10M11 9h10M11 15h10M11 31v-9h5v9M21 31V19h5v12M31 31V16M10 34h23"/>
+      <path d="M12 3V0h10v3"/>
+    </g>
+    <g id="calculator">
+      <rect x="4" y="1" width="32" height="42" rx="5"/>
+      <path d="M9 7h22v9H9zM12 10h10M25 10h3M9 22h5v5H9zM18 22h5v5h-5zM27 22h4v15h-4zM9 32h5v5H9zM18 32h5v5h-5zM11 40h18"/>
+    </g>
+    <g id="loupe">
+      <path d="M28 4h10v30H8v-8M28 10h5M28 16h5M13 29h20M20 23v6M27 23v6"/>
+      <circle cx="14" cy="14" r="12"/><circle cx="14" cy="14" r="8.5"/>
+      <path d="M5 24 0 30a3 3 0 0 0 4 4l6-7M9 14h10M14 9v10M8 22l3 3"/>
+    </g>
+    <g id="database">
+      <ellipse cx="19" cy="7" rx="16" ry="6"/>
+      <path d="M3 7v27c0 8 32 8 32 0V7M3 16c0 8 32 8 32 0M3 25c0 8 32 8 32 0M8 13v3M8 22v3M8 31v3M26 4c3 0 5 1 6 2"/>
+      <path d="M31 40c7-4 11-10 12-18-8 1-12 7-12 13M33 35l5-6"/>
+    </g>
+    <g id="chart-roll">
+      <path d="M8 4h29c5 0 6 8 1 8h-4M8 4c-6 0-6 8 0 8h2V4M10 12v26H2c0 6 8 7 8 0h25V9c0-3 1-5 3-5M15 17h14M15 21h7M15 32l5-5 5 2 5-7M15 35h15"/>
+    </g>
+    <g id="laptop">
+      <path d="M6 2h32a3 3 0 0 1 3 3v24H3V5a3 3 0 0 1 3-3zM7 7h30v18H7zM3 29 0 36h44l-3-7M0 36v3h44v-3M17 30l-1 3h12l-1-3M7 14h30M16 7v18M26 7v18M7 20h30"/>
+    </g>
+    <g id="globe">
+      <circle cx="21" cy="17" r="15"/>
+      <path d="M21 2c-10 8-10 22 0 30 10-8 10-22 0-30M6 17h30M9 8c8 5 16 5 24 0M9 26c8-5 16-5 24 0M3 9C-2 26 14 39 29 32M21 33v7M12 43h18l-3-3H15zM2 6l3 2M30 31l3 3"/>
+    </g>
+    <g id="calendar">
+      <rect x="3" y="5" width="36" height="34" rx="4"/>
+      <path d="M3 14h36M11 2v7M31 2v7M10 20h5v5h-5zM19 20h5v5h-5zM28 20h5v5h-5zM10 29h5v5h-5zM19 29h5v5h-5zM28 31h5M3 35v6h32l4-6"/>
+    </g>
+    <g id="folder">
+      <path d="M4 14V5h13l5 5h17v7M8 12V1h22l5 5v10M30 1v5h5M13 6h10M13 10h12M2 17h37l-5 23H0zM5 22h28M9 35h16M39 17h4l-5 23h-4"/>
+    </g>
+    <g id="compass">
+      <circle cx="21" cy="21" r="19"/><circle cx="21" cy="21" r="15"/>
+      <path d="m28 10-3 15-15 7 7-15zM17 17l8 8M21 2v4M21 36v4M2 21h4M36 21h4M8 8l3 3M31 31l3 3M8 34l3-3M31 11l3-3"/>
+      <circle cx="21" cy="21" r="2"/>
+    </g>
+    <g id="stationery">
+      <path d="m1 35 28-32v32zM10 29l13-15v15zM7 29l3 2M12 23l3 2M17 17l3 2M22 11l3 2M34 7l5-4 5 5-5 4-5-5-3 29 4 5 4-4V12M31 36l8 1M33 16l5 1M34 7l-1 8"/>
+    </g>
+    <g id="scales">
+      <path d="M22 3v36M16 42h12l3-3H13zM4 13l34-5M9 12 2 27h15zM34 9l-7 15h15zM2 27c1 8 14 8 15 0M27 24c1 8 14 8 15 0M6 35h6M30 32h6"/>
+      <circle cx="22" cy="8" r="3"/>
+    </g>
+    <g id="hourglass">
+      <path d="M5 3h28v4H5zM5 39h28v4H5zM8 7c0 10 4 12 9 16-5 4-9 6-9 16M30 7c0 10-4 12-9 16 5 4 9 6 9 16M12 13h14c-1 4-4 5-7 8-3-3-6-4-7-8M12 35l7-6 7 6zM19 24v2"/>
+    </g>
+    <g id="envelope">
+      <path d="M3 15h36v26H3zM3 15l18 14 18-14M3 41l13-16M39 41 26 25M8 18V4h25v15M13 9h15M13 14h11"/>
+      <path d="m26 7 18-7-7 18-3-8zM34 10l10-10"/>
+    </g>
+    <g id="stamp">
+      <path d="M15 24c0-5-5-7-5-13a9 9 0 0 1 18 0c0 6-5 8-5 13M12 24h14v5H12zM8 29h22l4 7H4zM4 36v4h30v-4M14 9c0-3 2-4 5-4M39 21v20M36 21h6M36 41h6"/>
+    </g>
+    <g id="tea">
+      <path d="M5 12h27v15c0 14-27 14-27 0zM32 15h4c10 0 10 14-4 14M5 16h27M0 39h38c0 5-38 5-38 0M12 12V5h8v7M13 5l4-5M12 22h8v9h-8zM12 22l4-4 4 4"/>
+    </g>
+    <g id="plant">
+      <path d="M15 29c0-12 2-19 8-27M17 19C3 20 0 13 1 7c10-1 18 3 16 12zM20 12C17 2 24-1 31 0c2 8-2 14-11 12zM17 25c2-13 11-16 21-14 0 9-8 17-21 14zM6 31h26l-4 12H10zM6 28h26v3H6zM11 10l6 9M23 21l8-5M22 9l4-5M13 35l1 5M25 35l-1 5"/>
+    </g>
+    <g id="binder">
+      <path d="M7 3h29v39H7zM11 3v39M11 9h25M16 14h15v9H16zM17 18h13M16 29h15M16 34h9M3 9h7M3 18h7M3 27h7M3 36h7M3 6v6M3 15v6M3 24v6M3 33v6"/>
+    </g>
+    <g id="quill">
+      <path d="M3 39c9-13 14-18 29-29M10 27C6 11 22 0 42 1c-1 18-11 29-27 26M16 22l-1-9M22 17l-1-10M28 13l1-9M20 21h12M13 27l-2 7-8 5 2-9M25 35h15v7H20v-7h5v-5h10v5M23 39h14"/>
+    </g>
+    <g id="pie-report">
+      <path d="M3 6h5V2h27v35H8V6M3 6v36h27v-5M25 10v9h9a9 9 0 0 0-9-9zM21 11a9 9 0 1 0 9 12h-9zM13 29h17M13 33h10"/>
+    </g>
+    <g id="files">
+      <path d="M4 16 10 1h25l6 15M11 6h23M10 10h25M8 14h29M4 16H0v11h44V16h-4M0 16h14l3 5h10l3-5h14M3 28v11h38V28M3 31h11l3 5h10l3-5h11M8 39v4M36 39v4"/>
+    </g>
+    <g id="map">
+      <path d="m1 7 13-5 14 5 14-5v32l-14 5-14-5-13 5zM14 2v32M28 7v32M5 14l5-2M5 20l5-2M5 26l5-2M18 11l6 2M32 26l6-2"/>
+      <path d="M25 12a6 6 0 0 1 12 0c0 4-6 10-6 10s-6-6-6-10z"/><circle cx="31" cy="12" r="2"/>
+    </g>
+    <g id="abacus">
+      <path d="M2 5h38v31H2zM0 1h42v4H0zM0 36h42v4H0zM9 5v31M21 5v31M33 5v31M2 19h38"/>
+      <path d="m9 10-4 3 4 3 4-3zM17 10l4-3 4 3-4 3zM29 13l4-3 4 3-4 3zM5 26l4-3 4 3-4 3zM17 29l4-3 4 3-4 3zM29 26l4-3 4 3-4 3z"/>
+    </g>
+    <g id="prism">
+      <path d="m21 2 20 11v23L21 47 1 36V13zM1 13l20 11 20-11M21 24v23M11 8l20 11v12l-10 6-10-6V8M1 25l20 12 20-12M11 31l20-12"/>
+    </g>
+    <g id="ribbon">
+      <path d="m21 1 5 4h7l2 7 5 5-3 7v7l-7 2-5 5-6-3-7 1-3-6-6-4 1-7-2-6 6-4 3-6 7 1zM10 31 6 44l9-3 5 5 3-10M29 34l6 11 2-8 7 1-8-13"/>
+      <circle cx="21" cy="19" r="10"/><path d="M15 19h12M21 13v12M17 15l8 8M17 23l8-8"/>
+    </g>
+    <g id="pencil-notes">
+      <path d="M4 4h25v36H4zM9 10h14M9 16h14M9 22h9M9 28h9M9 34h10M32 8l6-6 5 5-6 6-5-5-6 24v7l6-3 5-23M26 32l6 4M33 15l4 1M27 36l2 2"/>
+    </g>
+  </defs>
+  <!-- 88 fixed-size illustrations in loose clusters, with varied spacing
+       and angles. No rows, columns, loose dots or ticks fill the gaps. -->
+  <use href="#compass" transform="translate(103.4 20) rotate(42 22 22) translate(22 22) scale(0.92) translate(-22 -22)"/>
+  <use href="#tea" transform="translate(211.8 21.7) rotate(-39 22 22) translate(22 22) scale(0.98) translate(-22 -22)"/>
+  <use href="#prism" transform="translate(667.7 23.9) rotate(-11 22 22) translate(22 22) scale(0.79) translate(-22 -22)"/>
+  <use href="#binder" transform="translate(553.7 37.2) rotate(-14 22 22) translate(22 22) scale(1.04) translate(-22 -22)"/>
+  <use href="#chart-roll" transform="translate(407.3 51.3) rotate(-4 22 22) translate(22 22) scale(0.72) translate(-22 -22)"/>
+  <use href="#laptop" transform="translate(473.7 55.4) rotate(32 22 22) translate(22 22) scale(1.09) translate(-22 -22)"/>
+  <use href="#abacus" transform="translate(339.6 61.1) rotate(44 22 22) translate(22 22) scale(0.85) translate(-22 -22)"/>
+  <use href="#stamp" transform="translate(766.5 64.8) rotate(43 22 22) translate(22 22) scale(0.89) translate(-22 -22)"/>
+  <use href="#binder" transform="translate(27.2 77.8) rotate(7 22 22) translate(22 22) scale(1.14) translate(-22 -22)"/>
+  <use href="#hourglass" transform="translate(141.5 79.7) rotate(-27 22 22) translate(22 22) scale(1.09) translate(-22 -22)"/>
+  <use href="#globe" transform="translate(524.2 90.4) rotate(18 22 22) translate(22 22) scale(1.14) translate(-22 -22)"/>
+  <use href="#notebook" transform="translate(655.5 94.2) rotate(4 22 22) translate(22 22) scale(1.04) translate(-22 -22)"/>
+  <use href="#files" transform="translate(442.5 105.3) rotate(44 22 22) translate(22 22) scale(0.79) translate(-22 -22)"/>
+  <use href="#loupe" transform="translate(221.4 105.3) rotate(29 22 22) translate(22 22) scale(0.88) translate(-22 -22)"/>
+  <use href="#stationery" transform="translate(572.8 122) rotate(-9 22 22) translate(22 22) scale(1.11) translate(-22 -22)"/>
+  <use href="#report" transform="translate(328.4 128.4) rotate(18 22 22) translate(22 22) scale(1) translate(-22 -22)"/>
+  <use href="#files" transform="translate(54.5 136.7) rotate(46 22 22) translate(22 22) scale(0.98) translate(-22 -22)"/>
+  <use href="#loupe" transform="translate(725.9 137.5) rotate(43 22 22) translate(22 22) scale(0.75) translate(-22 -22)"/>
+  <use href="#folder" transform="translate(492.9 159.3) rotate(-23 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#ribbon" transform="translate(636.8 164.8) rotate(-43 22 22) translate(22 22) scale(0.72) translate(-22 -22)"/>
+  <use href="#laptop" transform="translate(274.5 165.8) rotate(-44 22 22) translate(22 22) scale(1.02) translate(-22 -22)"/>
+  <use href="#stationery" transform="translate(199.3 185.1) rotate(-46 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#plant" transform="translate(385.4 188.1) rotate(-15 22 22) translate(22 22) scale(0.94) translate(-22 -22)"/>
+  <use href="#map" transform="translate(547.1 194.5) rotate(-43 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#scales" transform="translate(777.7 196.2) rotate(-7 22 22) translate(22 22) scale(0.77) translate(-22 -22)"/>
+  <use href="#pencil-notes" transform="translate(694.9 206.3) rotate(8 22 22) translate(22 22) scale(0.99) translate(-22 -22)"/>
+  <use href="#pencil-notes" transform="translate(147.2 212.7) rotate(-9 22 22) translate(22 22) scale(0.8) translate(-22 -22)"/>
+  <use href="#laptop" transform="translate(631.8 222.5) rotate(-18 22 22) translate(22 22) scale(0.78) translate(-22 -22)"/>
+  <use href="#calendar" transform="translate(57.8 233.3) rotate(-9 22 22) translate(22 22) scale(1.11) translate(-22 -22)"/>
+  <use href="#envelope" transform="translate(294.7 239.7) rotate(30 22 22) translate(22 22) scale(1.03) translate(-22 -22)"/>
+  <use href="#scales" transform="translate(459.4 245.3) rotate(5 22 22) translate(22 22) scale(0.96) translate(-22 -22)"/>
+  <use href="#globe" transform="translate(517.8 273.3) rotate(39 22 22) translate(22 22) scale(0.78) translate(-22 -22)"/>
+  <use href="#abacus" transform="translate(183 287.1) rotate(-10 22 22) translate(22 22) scale(0.76) translate(-22 -22)"/>
+  <use href="#quill" transform="translate(302.8 297.8) rotate(16 22 22) translate(22 22) scale(0.82) translate(-22 -22)"/>
+  <use href="#calculator" transform="translate(245 297.9) rotate(-11 22 22) translate(22 22) scale(0.97) translate(-22 -22)"/>
+  <use href="#report" transform="translate(691 298.1) rotate(-17 22 22) translate(22 22) scale(1.14) translate(-22 -22)"/>
+  <use href="#calendar" transform="translate(571.7 298.3) rotate(17 22 22) translate(22 22) scale(0.9) translate(-22 -22)"/>
+  <use href="#loupe" transform="translate(439.2 299) rotate(22 22 22) translate(22 22) scale(0.97) translate(-22 -22)"/>
+  <use href="#folder" transform="translate(363.6 300.5) rotate(-23 22 22) translate(22 22) scale(1.08) translate(-22 -22)"/>
+  <use href="#binder" transform="translate(58.8 328.4) rotate(-46 22 22) translate(22 22) scale(1.02) translate(-22 -22)"/>
+  <use href="#database" transform="translate(135.1 332.1) rotate(-15 22 22) translate(22 22) scale(0.95) translate(-22 -22)"/>
+  <use href="#chart-roll" transform="translate(501.5 335) rotate(-36 22 22) translate(22 22) scale(1.01) translate(-22 -22)"/>
+  <use href="#notebook" transform="translate(754.8 340) rotate(42 22 22) translate(22 22) scale(0.82) translate(-22 -22)"/>
+  <use href="#pie-report" transform="translate(347.2 359.4) rotate(38 22 22) translate(22 22) scale(0.74) translate(-22 -22)"/>
+  <use href="#stationery" transform="translate(415.7 365.5) rotate(26 22 22) translate(22 22) scale(0.75) translate(-22 -22)"/>
+  <use href="#quill" transform="translate(641.9 371.7) rotate(-38 22 22) translate(22 22) scale(0.75) translate(-22 -22)"/>
+  <use href="#hourglass" transform="translate(285 372.5) rotate(37 22 22) translate(22 22) scale(0.96) translate(-22 -22)"/>
+  <use href="#map" transform="translate(580.8 395.2) rotate(-11 22 22) translate(22 22) scale(0.87) translate(-22 -22)"/>
+  <use href="#ledger" transform="translate(44.9 395.4) rotate(12 22 22) translate(22 22) scale(0.95) translate(-22 -22)"/>
+  <use href="#pie-report" transform="translate(160.4 399.2) rotate(9 22 22) translate(22 22) scale(1.01) translate(-22 -22)"/>
+  <use href="#scales" transform="translate(777 401.6) rotate(36 22 22) translate(22 22) scale(0.94) translate(-22 -22)"/>
+  <use href="#compass" transform="translate(695.5 412.2) rotate(40 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#envelope" transform="translate(487 416.4) rotate(42 22 22) translate(22 22) scale(0.94) translate(-22 -22)"/>
+  <use href="#chart-roll" transform="translate(221.9 421.7) rotate(27 22 22) translate(22 22) scale(1.01) translate(-22 -22)"/>
+  <use href="#abacus" transform="translate(352.2 436.6) rotate(43 22 22) translate(22 22) scale(0.74) translate(-22 -22)"/>
+  <use href="#tea" transform="translate(287.9 440.3) rotate(44 22 22) translate(22 22) scale(0.72) translate(-22 -22)"/>
+  <use href="#plant" transform="translate(746.4 451.4) rotate(31 22 22) translate(22 22) scale(0.87) translate(-22 -22)"/>
+  <use href="#ribbon" transform="translate(640.7 460.3) rotate(-7 22 22) translate(22 22) scale(0.98) translate(-22 -22)"/>
+  <use href="#quill" transform="translate(69.4 464) rotate(-48 22 22) translate(22 22) scale(0.79) translate(-22 -22)"/>
+  <use href="#ledger" transform="translate(568.1 478.6) rotate(20 22 22) translate(22 22) scale(0.99) translate(-22 -22)"/>
+  <use href="#calculator" transform="translate(242.6 489.9) rotate(-42 22 22) translate(22 22) scale(0.78) translate(-22 -22)"/>
+  <use href="#plant" transform="translate(437.7 497) rotate(17 22 22) translate(22 22) scale(1.11) translate(-22 -22)"/>
+  <use href="#folder" transform="translate(149.2 498.7) rotate(-37 22 22) translate(22 22) scale(0.85) translate(-22 -22)"/>
+  <use href="#prism" transform="translate(364.5 504.8) rotate(33 22 22) translate(22 22) scale(0.88) translate(-22 -22)"/>
+  <use href="#prism" transform="translate(783.7 511.6) rotate(-3 22 22) translate(22 22) scale(0.85) translate(-22 -22)"/>
+  <use href="#pie-report" transform="translate(490 519.9) rotate(3 22 22) translate(22 22) scale(0.8) translate(-22 -22)"/>
+  <use href="#files" transform="translate(610.6 530.9) rotate(33 22 22) translate(22 22) scale(1.12) translate(-22 -22)"/>
+  <use href="#stamp" transform="translate(701.1 532.7) rotate(-4 22 22) translate(22 22) scale(0.76) translate(-22 -22)"/>
+  <use href="#report" transform="translate(295.3 534.9) rotate(-4 22 22) translate(22 22) scale(0.84) translate(-22 -22)"/>
+  <use href="#globe" transform="translate(50.9 549.1) rotate(-20 22 22) translate(22 22) scale(0.97) translate(-22 -22)"/>
+  <use href="#quill" transform="translate(237.1 549.9) rotate(17 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#database" transform="translate(415.2 578.9) rotate(36 22 22) translate(22 22) scale(1.13) translate(-22 -22)"/>
+  <use href="#compass" transform="translate(533 582.2) rotate(-44 22 22) translate(22 22) scale(0.89) translate(-22 -22)"/>
+  <use href="#map" transform="translate(356.8 583.9) rotate(-5 22 22) translate(22 22) scale(0.81) translate(-22 -22)"/>
+  <use href="#hourglass" transform="translate(765.2 584.8) rotate(21 22 22) translate(22 22) scale(1.05) translate(-22 -22)"/>
+  <use href="#notebook" transform="translate(639.7 594.5) rotate(-33 22 22) translate(22 22) scale(0.81) translate(-22 -22)"/>
+  <use href="#compass" transform="translate(191.6 594.6) rotate(-14 22 22) translate(22 22) scale(0.76) translate(-22 -22)"/>
+  <use href="#database" transform="translate(103.2 603.1) rotate(-9 22 22) translate(22 22) scale(1.08) translate(-22 -22)"/>
+  <use href="#ledger" transform="translate(260.6 614.1) rotate(33 22 22) translate(22 22) scale(0.77) translate(-22 -22)"/>
+  <use href="#plant" transform="translate(710.8 616) rotate(-10 22 22) translate(22 22) scale(1.04) translate(-22 -22)"/>
+  <use href="#envelope" transform="translate(492.3 627.2) rotate(38 22 22) translate(22 22) scale(0.78) translate(-22 -22)"/>
+  <use href="#tea" transform="translate(14.4 633.7) rotate(28 22 22) translate(22 22) scale(0.9) translate(-22 -22)"/>
+  <use href="#calendar" transform="translate(201.7 651.3) rotate(35 22 22) translate(22 22) scale(1.07) translate(-22 -22)"/>
+  <use href="#calculator" transform="translate(587.8 657.4) rotate(29 22 22) translate(22 22) scale(0.8) translate(-22 -22)"/>
+  <use href="#notebook" transform="translate(67.2 657.7) rotate(26 22 22) translate(22 22) scale(0.91) translate(-22 -22)"/>
+  <use href="#ribbon" transform="translate(671.8 658.6) rotate(-2 22 22) translate(22 22) scale(0.96) translate(-22 -22)"/>
+  <use href="#stamp" transform="translate(439.4 660) rotate(37 22 22) translate(22 22) scale(1.04) translate(-22 -22)"/>
+  <use href="#pencil-notes" transform="translate(332.8 661.8) rotate(-43 22 22) translate(22 22) scale(0.92) translate(-22 -22)"/>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "version": "1.8.19",
+  "result": "PASS",
+  "packagedFilesVerified": 74,
+  "exeBytes": 5236224,
+  "exeSHA256": "5ea88a128adeab116a3e8db132f7f0091b97186ef15a9db117465e749f679920",
+  "zipSHA256": "dda0e04e61061798ed2e07f80117d7a3b6c736fbfc0d1f34096340fc28de1eb8",
+  "checks": [
+    "ZIP CRC",
+    "every file equals the release directory",
+    "EXE SHA-256 and PE header",
+    "version",
+    "UPX integrity checked in build"
+  ]
+}

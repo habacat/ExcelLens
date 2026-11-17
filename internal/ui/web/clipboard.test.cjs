@@ -1,0 +1,39 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ctx={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/clipboard.js','utf8'),ctx);
+const clip=ctx.window.ExcelLensClipboard,plain=value=>JSON.parse(JSON.stringify(value));
+test('Excel/WPS quoted TSV round trips literal tabs, CRLF, quotes, empty cells and text identifiers',()=>{
+  const rows=[['000123','1,234.50','line1\r\nline2','"quoted"','\t'],['','tail','','','']];
+  const text=rows.map(row=>row.map(clip.tsvCell).join('\t')).join('\r\n')+'\r\n';
+  assert.deepEqual(plain(clip.parse(text)),rows);
+  assert.deepEqual(plain(clip.parse('"a\nb"\t"q""s"\rx\t\r')),[['a\nb','q"s'],['x','']]);
+  assert.deepEqual(plain(clip.parse('\n\n')),[[''],['']]);
+});
+test('paste planning preserves all values and rejects the entire payload instead of clipping rows or columns',()=>{
+  assert.deepEqual(plain(clip.pasteChanges('"a\nb"\t00042\r\nx\ty\r\n',{startRow:2,startCol:1,rowLimit:10,columns:3})),[
+    {row:2,col:1,value:'a\nb'},{row:2,col:2,value:'00042'},{row:3,col:1,value:'x'},{row:3,col:2,value:'y'}
+  ]);
+  assert.throws(()=>clip.pasteChanges('a\tb\nc\td',{startRow:0,startCol:1,columns:2}),/边界/);
+  assert.throws(()=>clip.pasteChanges('a\nb',{startRow:9999,startCol:0,columns:1}),/边界/);
+});
+test('malformed or excessive clipboard data is refused before building any edits',()=>{
+  for(const text of ['"unterminated','"closed"tail','a'.repeat(4001)])assert.throws(()=>clip.parse(text));
+  assert.throws(()=>clip.parse('a\tb',{maxCols:1}),/1列/);
+  assert.throws(()=>clip.parse('a\nb\nc',{maxRows:2}),/2行/);
+  assert.throws(()=>clip.parse('a\tb\nc\td',{maxCells:3}),/3个单元格/);
+  assert.throws(()=>clip.parse('a'.repeat(2*1024*1024+1)),/2 MiB/);
+});
+test('4000 Unicode characters fit a cell regardless of UTF-8 bytes or UTF-16 pairs',()=>{
+  for(const symbol of ['文','😀']){
+    const value=symbol.repeat(4000);assert.equal(clip.parse(value)[0][0],value);
+    assert.equal(clip.pasteChanges(value,{startRow:0,startCol:0,columns:1})[0].value,value);
+    assert.throws(()=>clip.parse(value+symbol),/4000字符/);assert.equal(clip.characterCount(value),4000);
+    assert.equal(clip.utf8Length(value),Buffer.byteLength(value,'utf8'));
+  }
+});
+test('paste is atomic under UTF-8 and JSON request budgets; explicit retries may form bounded batches',()=>{
+  const unicode=Array(180).fill('文'.repeat(4000)).join('\n');assert(unicode.length<2*1024*1024);assert.throws(()=>clip.parse(unicode),/2 MiB/);
+  const escaped=Array(90).fill('\u0001'.repeat(4000)).join('\n');assert.throws(()=>clip.pasteChanges(escaped,{startRow:0,startCol:0,columns:1}),/请求超过2 MiB/);
+  const changes=Array.from({length:200},(_,row)=>({row,col:0,value:'文'.repeat(4000)})),batches=Array.from(clip.batches(changes));
+  assert.equal(batches.length,2);assert.equal(batches.flat().length,200);
+  for(const batch of batches){clip.validateChanges(batch);assert(Buffer.byteLength(JSON.stringify({id:'sheet',workbookKey:'a'.repeat(64),expectedRevision:1,changes:batch}),'utf8')<=2*1024*1024);}
+});

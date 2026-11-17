@@ -1,0 +1,72 @@
+/* A quiet paper texture for the file chooser. All colors derive from the
+ * reading palette; the decoration has no layout, focus or pointer behavior. */
+body.home-view {min-width:0;}
+#welcome {
+  position:relative;
+  isolation:isolate;
+  background-color:var(--reading-paper,#eef3f1);
+  background-image:
+    radial-gradient(ellipse at 8% 12%,color-mix(in srgb,var(--reading-accent,#76a58c) 13%,transparent),transparent 58%),
+    radial-gradient(ellipse at 95% 88%,color-mix(in srgb,var(--reading-accent,#6f9da9) 10%,transparent),transparent 56%),
+    linear-gradient(135deg,var(--reading-paper,#f0f5ef),var(--reading-inset,#e9eff2));
+}
+#welcome::before,
+#welcome .landing-open-zone::before,
+#welcome .landing-open-zone::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+#welcome::before,
+#welcome .landing-open-zone::before {
+  background-color:var(--reading-muted,#52766b);
+  mask-image:url('/assets/home-texture.svg');
+  /* The shared paper tile mixes sizes without a regular row rhythm. */
+  mask-size:840px 720px;
+  mask-repeat:repeat;
+}
+#welcome::before {z-index:-1;opacity:.065;mask-position:20px 10px;}
+#welcome .landing-shell {position:relative;}
+#welcome .landing-open-zone {
+  background-color:var(--reading-inset,#123740);
+  background-image:
+    radial-gradient(ellipse at 0% 0%,color-mix(in srgb,var(--reading-accent,#9dd4b5) 12%,transparent),transparent 65%),
+    radial-gradient(ellipse at 100% 100%,color-mix(in srgb,var(--reading-accent,#81aeca) 10%,transparent),transparent 70%);
+}
+#welcome .landing-open-zone::before {
+  background-color:var(--reading-muted,#c6e1d7);
+  /* This composition is anchored to the letter strips rather than the page
+   * origin. Its actual placement density rises away from that quiet area. */
+  mask-image:url('/assets/home-opening-texture.svg'),radial-gradient(ellipse 335px 175px at calc(100% - 180px) 85px,transparent 72%,#000 100%);
+  mask-position:right top,0 0;
+  mask-size:900px 810px,100% 100%;
+  mask-repeat:repeat,no-repeat;mask-composite:intersect;
+  opacity:.13;
+}
+/* Let the pattern gather around the edges of the opening action. */
+#welcome .landing-open-zone::after {
+  background:radial-gradient(ellipse at 27% 56%,var(--reading-inset,#123740),transparent 72%);
+}
+/* The original tilted column strip, now in two offset rows. Cell dimensions
+ * retain the old 435px / eight-column rhythm; it is never interactive. */
+#welcome .landing-grid-art {
+  position:absolute;right:-36px;top:26px;width:435px;
+  display:flex;flex-direction:column;gap:12px;
+  transform:rotate(-10deg) skew(-3deg);transform-origin:center;
+  color:var(--reading-muted,#d7f8e9);opacity:.085;pointer-events:none;
+  mask-image:linear-gradient(165deg,#000 26%,#000b 76%,transparent);
+}
+#welcome .landing-grid-row {display:flex;width:max-content;}
+#welcome .landing-grid-row + .landing-grid-row {margin-left:81.5625px;}
+#welcome .landing-grid-row span {
+  box-sizing:border-box;display:flex;align-items:flex-start;justify-content:center;
+  flex:none;width:54.375px;height:70px;padding-top:8px;
+  border:1px solid currentColor;border-left:0;font:600 12px Consolas,monospace;
+}
+#welcome .landing-grid-row span:first-child {border-left:1px solid currentColor;}
+@media(max-width:790px) {
+  #welcome::before {mask-size:700px 600px;}
+  #welcome .landing-open-zone::before {mask-position:calc(100% + 26px) -21px,0 0;opacity:.1;}
+  #welcome .landing-grid-art {top:5px;right:-64px;opacity:.075;}
+}

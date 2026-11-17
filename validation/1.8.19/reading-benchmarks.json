@@ -1,0 +1,282 @@
+{
+  "applicationVersion": "1.8.19",
+  "result": "PASS",
+  "date": "2026-11-17",
+  "createdAt": "2026-11-17T03:53:46.341557+00:00",
+  "tool": "tools/largeprobe",
+  "environment": {
+    "os": "Windows 10 x64 19045",
+    "cpu": "Intel Core i7-9750H",
+    "physicalCores": 6,
+    "logicalProcessors": 12,
+    "installedRAMBytes": 68719476736,
+    "storageBus": "NVMe",
+    "go": "go1.27.3"
+  },
+  "method": {
+    "rounds": 3,
+    "statistic": "median",
+    "cache": "Independent application-cache directory for each round; index reuse within that round",
+    "source": "Generated three-column CSV using the tool fixture; each source hash checked after all operations",
+    "viewport": "100 deterministic random areas, each 80 rows by 3 columns",
+    "timing": "Workbook API phases measured by the probe, including its per-phase GC; operating-system file cache is active"
+  },
+  "cases": [
+    {
+      "id": "csv-1m",
+      "format": "CSV",
+      "totalRowsIncludingHeader": 1000000,
+      "dataRows": 999999,
+      "columns": 3,
+      "sourceBytes": 34997991,
+      "sourceSHA256": "73ee89770f67be66fbabad1e8b05102b277aae945c3c288c1dfd1e24fbf70581",
+      "runs": [
+        {
+          "round": 1,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 711
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 70
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 52
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 1277
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 810
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 26
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 1238
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 1829
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 1016
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 80
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 68
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 1368
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 996
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 33
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 1308
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 1249
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 807
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 73
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 47
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 1259
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 924
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 33
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 1267
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 1165
+            }
+          ]
+        }
+      ],
+      "medianMilliseconds": {
+        "cold-open-index": 807,
+        "cached-reopen-index": 73,
+        "random-viewport-100x80": 52
+      },
+      "sourceUnchanged": true
+    },
+    {
+      "id": "csv-5m",
+      "format": "CSV",
+      "totalRowsIncludingHeader": 5000000,
+      "dataRows": 4999999,
+      "columns": 3,
+      "sourceBytes": 174989991,
+      "sourceSHA256": "ea97d786f4fbf693b62534abb689d19e2083534618b485eb80c745afd74b5e89",
+      "runs": [
+        {
+          "round": 1,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 3034
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 276
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 42
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 5943
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 6812
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 338
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 9765
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 5954
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 3140
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 279
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 44
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 5361
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 3989
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 145
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 5318
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 5032
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "phases": [
+            {
+              "phase": "cold-open-index",
+              "milliseconds": 2812
+            },
+            {
+              "phase": "cached-reopen-index",
+              "milliseconds": 257
+            },
+            {
+              "phase": "random-viewport-100x80",
+              "milliseconds": 47
+            },
+            {
+              "phase": "full-search-tail",
+              "milliseconds": 5040
+            },
+            {
+              "phase": "condition-filter",
+              "milliseconds": 4779
+            },
+            {
+              "phase": "column-distinct",
+              "milliseconds": 294
+            },
+            {
+              "phase": "streaming-group-count",
+              "milliseconds": 6912
+            },
+            {
+              "phase": "complete-streaming-csv-export",
+              "milliseconds": 5583
+            }
+          ]
+        }
+      ],
+      "medianMilliseconds": {
+        "cold-open-index": 3034,
+        "cached-reopen-index": 276,
+        "random-viewport-100x80": 44
+      },
+      "sourceUnchanged": true
+    }
+  ]
+}

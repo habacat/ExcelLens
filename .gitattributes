@@ -1,0 +1,11 @@
+* text=auto eol=lf
+# Preserve validation evidence and the byte hashes stored in its receipts.
+validation/** -text
+*.ico -text
+*.syso -text
+*.db -text
+*.7z -text
+*.zip -text
+*.gz -text
+*.bz2 -text
+*.xz -text

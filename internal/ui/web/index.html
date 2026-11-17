@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="app-token" content="__APP_TOKEN__">
+  <meta name="app-version" content="__APP_VERSION__">
+  <meta name="color-scheme" content="light">
+  <title>ExcelLens</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/calculator.css">
+  <link rel="stylesheet" href="/assets/recovery.css">
+  <link rel="stylesheet" href="/assets/analytics.css">
+  <link rel="stylesheet" href="/assets/composition.css">
+  <link rel="stylesheet" href="/assets/field-picker.css">
+  <link rel="stylesheet" href="/assets/relations.css">
+  <link rel="stylesheet" href="/assets/analysis-clusters.css">
+  <link rel="stylesheet" href="/assets/clipboard.css">
+  <link rel="stylesheet" href="/assets/reconcile.css">
+  <link rel="stylesheet" href="/assets/named-views.css">
+	<link rel="stylesheet" href="/assets/catalogue.css">
+	<link rel="stylesheet" href="/assets/data-rules.css">
+	<link rel="stylesheet" href="/assets/printing.css">
+	<link rel="stylesheet" href="/assets/record-card.css">
+	<link rel="stylesheet" href="/assets/selection-quick.css">
+	<link rel="stylesheet" href="/assets/chart-export.css">
+  <link rel="stylesheet" href="/assets/row-views.css">
+  <link rel="stylesheet" href="/assets/recipes.css">
+  <link rel="stylesheet" href="/assets/themes.css">
+  <link rel="stylesheet" href="/assets/tracing.css">
+  <link rel="stylesheet" href="/assets/home.css">
+  <link rel="stylesheet" href="/assets/task-recovery.css">
+  <link rel="stylesheet" href="/assets/transpose.css">
+  <link rel="stylesheet" href="/assets/snapshots.css">
+</head>
+<body class="home-view">
+  <header class="appbar">
+    <div class="brand-area">
+      <img class="brand-mark" src="/assets/icon.svg" alt="ExcelLens" width="27" height="27">
+      <div class="brand-name">ExcelLens</div>
+      <div id="fileBadge" class="file-badge" title="当前工作簿">未打开工作簿</div>
+    </div>
+    <div class="app-actions">
+      <span id="globalStatus" data-toolbar-priority="4" class="global-status">等待选择文件</span>
+      <button id="archiveBtn" data-toolbar-priority="2" class="tool-button" type="button" hidden title="浏览当前压缩包">压缩包文件</button>
+      <button id="homeBtn" data-toolbar-priority="2" class="tool-button icon-only" title="返回首页 / 最近文件" aria-label="返回首页">⌂</button>
+      <button id="openBtn" data-toolbar-priority="0" class="tool-button primary" title="打开 XLSX / XLS / CSV / TXT / SQLite 文件"><span class="tool-icon">＋</span>打开</button>
+      <button id="historyBackBtn" data-toolbar-priority="4" data-toolbar-when-enabled class="tool-button icon-only" disabled title="返回上一位置 (Alt+←)" aria-label="返回上一位置">←</button>
+      <button id="historyForwardBtn" data-toolbar-priority="4" data-toolbar-when-enabled class="tool-button icon-only" disabled title="前进到下一位置 (Alt+→)" aria-label="前进到下一位置">→</button>
+      <button id="searchOpenBtn" data-toolbar-priority="0" class="tool-button" disabled title="搜索公式或数值"><span class="tool-icon">⌕</span>搜索</button>
+      <button id="filterOpenBtn" data-toolbar-priority="0" class="tool-button" disabled title="选中表头行后开启筛选（Ctrl+Shift+L）" aria-pressed="false"><span class="tool-icon">▽</span>筛选</button>
+      <button id="textHeaderBtn" data-toolbar-priority="1" class="tool-button" type="button" hidden disabled title="识别或更改 TXT 表头">表头</button>
+      <button id="inspectOpenBtn" data-command-only class="tool-button" disabled title="定位条件：公式、常量、错误、空值与缺少缓存的公式"><span class="tool-icon">◎</span>定位条件</button>
+      <button id="duplicateOpenBtn" data-command-only class="tool-button" disabled title="检查重复值并高亮定位"><span class="tool-icon">≋</span>查重</button>
+      <button id="multiSortBtn" data-toolbar-priority="0" class="tool-button" disabled title="按多列优先级排序"><span class="tool-icon">⇅</span>排序</button>
+      <button id="advancedFilterBtn" data-command-only class="tool-button" disabled title="高级筛选：按列组合多个条件"><span class="tool-icon">≡</span>条件</button>
+      <button id="freezeBtn" data-toolbar-priority="2" class="tool-button" disabled title="冻结工作表行和列"><span class="tool-icon">▣</span><span id="freezeBtnLabel">冻结</span></button>
+      <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button export-primary" disabled title="导出工作表、选区、筛选结果或全部 Sheet（Ctrl+Shift+E）"><span class="tool-icon">⇩</span>导出</button>
+      <button id="bookmarkOpenBtn" data-command-only class="tool-button" disabled title="审计标记：对单元格添加本机备注，不修改源文件"><span class="tool-icon">⚑</span>标记</button>
+      <button id="analysisOpenBtn" data-toolbar-priority="0" class="tool-button analysis-toolbar-button" type="button" title="数据分析：透视汇总、图表、可编辑工作表"><span class="tool-icon">▦</span>分析</button>
+	  <button id="printPreviewOpenBtn" data-command-only class="tool-button" type="button" disabled aria-haspopup="dialog" title="源表分页预览（Ctrl+P）"><span class="tool-icon">▤</span>分页</button>
+      <button id="reconcileOpenBtn" data-command-only class="tool-button" type="button" title="按主键核对两个来源，查看差异、未匹配及重复键">对账</button>
+      <button id="relationsOpenBtn" data-command-only class="tool-button" type="button" title="关联与未匹配提取">关联</button>
+      <button id="namedViewOpenBtn" data-command-only class="tool-button" type="button" title="保存和应用命名视图：筛选、排序、冻结和布局">视图</button>
+      <button id="profileOpenBtn" data-toolbar-priority="3" class="tool-button" disabled title="数据洞察：精确统计选区中的数值、公式和异常"><span class="tool-icon">∑</span>统计</button>
+      <button id="calculatorOpenBtn" data-toolbar-priority="3" class="tool-button" type="button" title="公式计算（Ctrl+Alt+C）"><span class="tool-icon">±</span>计算</button>
+      <button id="commandOpenBtn" data-toolbar-priority="0" class="tool-button" title="命令面板 (Ctrl+K)" aria-label="命令面板" aria-haspopup="dialog" aria-controls="commandDialog"><span class="tool-icon" aria-hidden="true">⌘</span>命令</button>
+      <button id="formulaViewBtn" data-command-only class="tool-button" disabled aria-pressed="false" title="显示全部公式（Ctrl+`）"><span class="tool-icon">ƒx</span>公式视图</button>
+      <button id="columnsBtn" data-command-only class="tool-button" disabled type="button" aria-haspopup="menu" aria-expanded="false" title="显示或隐藏列"><span class="tool-icon">▥</span>列 <span class="disclosure">⌄</span></button>
+      <button id="rowsBtn" data-command-only class="tool-button" disabled type="button" aria-haspopup="dialog" title="行显隐、分组大纲和临时显示">行与大纲</button>
+      <button id="imagesBtn" data-command-only class="tool-button picture-button" type="button" aria-pressed="true" hidden title="显示或隐藏图片"><span class="tool-icon">▧</span>图片</button>
+      <button id="formatBtn" data-command-only class="tool-button format-active" disabled aria-pressed="true" title="切换显示原工作簿中的字体、填充色、边框和对齐格式"><span class="tool-icon">◩</span>原格式</button>
+      <button id="clearFilterBtn" data-toolbar-priority="1" data-toolbar-when-enabled class="tool-button" disabled title="清除当前筛选"><span class="tool-icon">×</span>清除筛选</button>
+      <button id="fullscreenBtn" data-command-only class="tool-button" title="全屏显示"><span class="tool-icon">⛶</span>全屏</button>
+      <button id="helpBtn" data-command-only class="tool-button icon-only" title="快捷键和操作帮助" aria-label="帮助">?</button>
+      <button id="exitBtn" data-command-only class="tool-button icon-only" title="退出程序" aria-label="退出程序"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6.35 6.35a8 8 0 1 0 11.3 0"/></svg></button>
+    </div>
+  </header>
+  <div id="sourceIntegrityNotice" class="source-integrity-notice" role="status" hidden></div>
+
+  <input id="fileInput" type="file" accept="__FILE_ACCEPT__" hidden>
+  <script id="fileFormats" type="application/json">__FILE_FORMATS__</script>
+
+  <section id="welcome" class="welcome-screen" aria-label="打开工作簿">
+    <div class="landing-shell">
+      <div class="landing-topline">
+        <span class="landing-product"><img src="/assets/icon.svg" width="25" height="25" alt="">ExcelLens</span>
+        <div class="landing-topright"><button id="homeExitBtn" class="tool-button icon-only" type="button" title="退出程序" aria-label="退出程序"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6.35 6.35a8 8 0 1 0 11.3 0"/></svg></button></div>
+      </div>
+      <div class="landing-main">
+        <div id="dropZone" class="landing-open-zone">
+          <div class="landing-grid-art" aria-hidden="true">
+            <div class="landing-grid-row"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
+            <div class="landing-grid-row"><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span></div>
+          </div>
+          <div class="landing-content">
+            <h1>浏览数据</h1>
+            <p class="landing-subline">浏览Excel、CSV、TXT与SQlite</p>
+            <button id="chooseFileBtn" type="button" class="landing-open-button"><span class="landing-btn-icon">＋</span>选择数据文件 <span class="landing-btn-arrow" aria-hidden="true">↗</span></button>
+            <div id="uploadProgress" class="upload-progress" hidden>
+              <div class="progress-track"><div id="uploadBar" class="progress-fill"></div></div>
+              <div id="uploadText" class="progress-label">正在打开文件…</div>
+            </div>
+            <div id="welcomeError" class="inline-error" hidden role="alert"></div>
+          </div>
+        </div>
+        <aside class="landing-recent" aria-label="最近使用的工作簿">
+          <div class="recent-heading">
+            <div><h2>最近打开</h2></div>
+            <button type="button" id="recentRefreshBtn" class="recent-refresh" aria-label="刷新最近文件" title="刷新最近文件"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+          </div>
+          <div class="recent-search-wrap"><span aria-hidden="true">⌕</span><input id="recentSearch" type="search" placeholder="搜索文件名或路径" autocomplete="off" aria-label="搜索历史文件"></div>
+          <div id="recentList" class="recent-list" aria-live="polite"><div class="recent-empty">读取最近文件…</div></div>
+          <div id="recentSummary" class="recent-summary"></div>
+        </aside>
+      </div>
+      <div class="landing-footer"><button id="taskRecoveryHome" class="mini-button" type="button" aria-haspopup="dialog">任务恢复</button><button id="calculatorHomeDock" class="calculator-dock" type="button" hidden>计算</button><span class="landing-credits">Designed &amp; built by Qiu Sheng</span></div>
+    </div>
+  </section>
+
+  <section id="workspace" class="workspace" hidden>
+    <div class="formula-toolbar">
+      <input id="nameBox" class="name-box" value="A1" title="名称框：输入地址或名称；A1、A1:D50、B:B、3:5 或 Sheet!A1:B9 可直接选择" aria-label="名称框：地址或名称">
+	  <button id="catalogueOpenBtn" class="mini-button catalogue-open" type="button" disabled aria-haspopup="dialog" title="名称与表目录（Ctrl+F3）">名称与表</button>
+	  <button id="dataRulesOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="查看当前单元格或本表保存的数据验证条件">数据规则</button>
+	  <button id="recordCardOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行，适合宽表和长文本">记录卡片</button>
+      <div class="fx-label">fx</div>
+      <div id="formulaText" class="formula-input formula-inspector-input" role="textbox" aria-label="公式栏：点击高亮引用单元格，悬停引用显示保存值和公式" aria-readonly="true" tabindex="0" data-placeholder="选择单元格以查看公式或数值"></div>
+      <button id="formulaExpandBtn" class="formula-expand-button" type="button" aria-label="展开公式栏" aria-controls="formulaText" aria-expanded="false" title="展开公式栏（长公式换行显示）"></button>
+      <div id="formulaValue" class="formula-value" title="Excel 文件中保存的计算结果">-</div>
+      <select id="fontSelect" class="font-picker" title="显示字体：原表字体优先；切换不会更改源 Excel 文件" aria-label="工作表显示字体">
+        <option value="">原表字体</option>
+        <option value="宋体">宋体</option>
+        <option value="新宋体">新宋体</option>
+        <option value="楷体">楷体</option>
+        <option value="仿宋">仿宋</option>
+        <option value="微软雅黑">微软雅黑</option>
+        <option value="等线">等线</option>
+        <option value="黑体">黑体</option>
+        <option value="华文宋体">华文宋体</option>
+        <option value="华文楷体">华文楷体</option>
+        <option value="华文仿宋">华文仿宋</option>
+        <option value="隶书">隶书</option>
+        <option value="Arial">Arial</option>
+        <option value="Calibri">Calibri</option>
+        <option value="Consolas">Consolas</option>
+      </select>
+      <div class="formula-actions">
+        <button id="copyFormulaBtn" class="mini-button" disabled title="复制公式">复制公式</button>
+        <button id="copyValueBtn" class="mini-button" disabled title="复制单元格数值">复制值</button>
+        <button id="tracePrecedentsBtn" class="mini-button" disabled title="查看当前公式引用的单元格">追踪引用</button>
+        <button id="traceDependentsBtn" class="mini-button" disabled title="查找引用当前单元格的公式">追踪从属</button>
+        <button id="cellDetailBtn" class="mini-button icon-mini" disabled title="查看单元格详细信息" aria-label="查看单元格详细信息"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg></button>
+      </div>
+    </div>
+
+    <main class="grid-region">
+      <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
+        <div id="gridCanvas" class="grid-canvas">
+          <div id="columnHeaders" class="column-headers"></div>
+          <div id="rowsLayer" class="rows-layer"></div>
+        </div>
+        <div id="gridEmpty" class="grid-empty">选择一个工作表开始查看</div>
+      </div>
+      <div id="gridBackdrop" class="grid-backdrop" aria-hidden="true" hidden></div>
+      <div id="readingVeil" class="reading-veil" aria-hidden="true" hidden></div>
+      <div id="sheetSwitchStatus" class="sheet-switch-status" role="status" hidden></div>
+      <div id="traceArrival" class="trace-arrival-layer" hidden></div>
+      <div id="pictureOverlay" class="picture-overlay" hidden aria-label="工作表图片">
+        <div id="picturePane-normal" class="picture-pane"></div>
+        <div id="picturePane-top" class="picture-pane"></div>
+        <div id="picturePane-left" class="picture-pane"></div>
+        <div id="picturePane-corner" class="picture-pane"></div>
+      </div>
+      <div id="resizeGuide" class="resize-guide" hidden></div>
+      <canvas id="viewportFallback" class="viewport-fallback" hidden aria-hidden="true"></canvas>
+      <div id="viewportLoading" class="viewport-loading" role="status" aria-live="polite" hidden>正在加载可见区域…</div>
+      <div id="indexOverlay" class="index-overlay" hidden>
+        <div class="index-card">
+          <div id="indexTitle" class="index-title">正在准备工作表</div>
+          <div class="progress-track"><div id="indexBar" class="progress-fill"></div></div>
+          <div id="indexDetail" class="index-detail">首次打开需要建立本机索引。</div>
+          <div class="index-actions">
+            <button id="cancelIndexBtn" class="mini-button">取消</button>
+            <button id="retryIndexBtn" class="mini-button primary-mini" hidden>重试</button>
+            <button id="showRowsRecoveryBtn" class="mini-button" hidden>暂时显示全部行</button>
+          </div>
+        </div>
+      </div>
+      <div id="freezeTop" class="freeze-top" hidden>
+        <div id="freezeRowHeads" class="freeze-row-heads"></div>
+        <div id="freezeTopBody" class="freeze-top-body"><div id="freezeTopCells" class="freeze-top-cells"></div></div>
+      </div>
+      <div id="freezeLeft" class="freeze-left" hidden><div id="freezeLeftCells" class="freeze-left-cells"></div></div>
+      <div id="freezeCorner" class="freeze-corner" hidden></div>
+      <div id="freezeHeader" class="freeze-header" hidden></div>
+    </main>
+
+      <div id="cellMenu" class="cell-context-menu" role="menu" hidden>
+        <button id="menuOpenHyperlink" type="button" role="menuitem" hidden>Open hyperlink</button>
+        <button id="menuCopyValue" type="button" role="menuitem">复制选区（含静态格式）</button>
+        <button id="menuCopyPlain" type="button" role="menuitem">复制选区为纯文本</button>
+        <button id="menuCopySpecial" type="button" role="menuitem">选择性复制…</button>
+        <button id="menuFilterValue" type="button" role="menuitem">按所选单元格值筛选</button>
+        <button id="menuCopyFormula" type="button" role="menuitem">复制公式</button>
+        <button id="menuCopyAddress" type="button" role="menuitem">复制跨 Sheet 单元格地址</button>
+        <button id="menuCopyEvidence" type="button" role="menuitem">复制审计证据摘要</button>
+        <button id="menuSearchValue" type="button" role="menuitem">搜索此值</button>
+        <button id="menuTrace" type="button" role="menuitem">追踪引用</button>
+        <button id="menuInspect" type="button" role="menuitem">定位条件（公式 / 错误 / 空白）</button>
+        <button id="menuDuplicates" type="button" role="menuitem">检查当前列重复值</button>
+		<button id="menuDataRules" type="button" role="menuitem" disabled>查看数据规则</button>
+		<button id="menuRecordCard" type="button" role="menuitem" disabled>查看记录卡片</button>
+		<button id="menuPrintPreview" type="button" role="menuitem" disabled>分页预览</button>
+        <button id="menuFreezeHere" type="button" role="menuitem">冻结到此处</button>
+        <button id="menuExportRange" type="button" role="menuitem">导出当前选区...</button>
+        <button id="menuProfileRange" type="button" role="menuitem">分析当前选区...</button>
+		<button id="menuSelectionQuick" type="button" role="menuitem">选区快速分析（Ctrl+Q）</button>
+		<button id="menuTranspose" type="button" role="menuitem">转置阅读</button>
+        <button id="menuBookmark" type="button" role="menuitem">标记此单元格...</button>
+      </div>
+      <div id="sizeContextMenu" class="cell-context-menu" role="menu" hidden>
+        <button id="sizeContextHideCol" type="button" role="menuitem" hidden>隐藏此列</button>
+        <button id="sizeContextShowCol" type="button" role="menuitem" hidden>显示此列</button>
+        <button id="sizeContextFit" type="button" role="menuitem">按内容自动适应</button>
+        <button id="sizeContextAdjust" type="button" role="menuitem">设置尺寸…</button>
+        <button id="sizeContextReset" type="button" role="menuitem">恢复默认尺寸</button>
+      </div>
+      <div id="cellTooltip" class="cell-tooltip" hidden></div>
+
+    <div id="columnsMenu" class="columns-menu" role="menu" hidden aria-label="列显隐">
+      <label class="columns-menu-heading" id="columnMenuSelection" for="columnTarget">选择列</label>
+      <input id="columnTarget" class="column-target" type="text" spellcheck="false" autocomplete="off" placeholder="列或区域，如 B 或 A:C" aria-label="选择要显示或隐藏的列或区域">
+      <button id="hideSelectedColumnBtn" role="menuitem" type="button">隐藏此列</button>
+      <button id="showSelectedColumnBtn" role="menuitem" type="button">显示此列</button>
+      <div class="menu-divider"></div>
+      <button id="showAllColumnsBtn" role="menuitem" type="button">显示所有列</button>
+      <button id="hideAllColumnsBtn" role="menuitem" type="button">隐藏所有列</button>
+      <button id="restoreColumnsBtn" role="menuitem" type="button">恢复原文件列显隐</button>
+    </div>
+    <footer class="bottom-bar">
+      <div class="sheet-controls">
+        <button id="sheetListBtn" class="sheet-list-button" title="全部工作表">☷</button>
+        <button id="sheetPrevBtn" class="sheet-edge-button" type="button" aria-label="向左切换工作表" title="查看前面的工作表">‹</button>
+        <div id="sheetTabs" class="sheet-tabs" role="tablist" aria-label="工作表"></div>
+        <button id="sheetNextBtn" class="sheet-edge-button" type="button" aria-label="向右切换工作表" title="查看后面的工作表">›</button>
+      </div>
+      <div class="status-strip">
+        <span id="gridStatus">未选择工作表</span>
+        <span id="largeDataStatus" class="large-data-status" hidden>超大数据模式</span>
+        <span id="freezeStatus" class="freeze-status" hidden></span>
+        <button id="selectionStatus" class="selection-status selection-link" type="button" title="打开选区精确统计"></button>
+        <span id="quickStats" class="quick-stats" title="选区即时统计"></span>
+        <span id="filterStatus" class="filter-status" hidden>已筛选</span>
+        <span class="status-spacer"></span>
+        <div id="traceDock" class="trace-dock" hidden><button id="traceRestoreBtn" type="button" title="展开追踪结果">追踪</button><button id="traceOriginBtn" type="button" title="回到追踪起点" aria-label="回到追踪起点">↶</button><button id="traceEndBtn" type="button" title="结束追踪" aria-label="结束追踪">×</button></div>
+        <div class="crosshair-controls"><label class="crosshair-toggle" title="高亮活动单元格所在的行和列"><input id="crosshairToggle" type="checkbox" checked><span>行列高亮</span></label><button id="crosshairColorBtn" class="crosshair-color-button" type="button" title="行列高亮颜色" aria-label="行列高亮颜色" aria-haspopup="dialog" aria-controls="crosshairPanel" aria-expanded="false"><span class="crosshair-current-color" aria-hidden="true"></span><span aria-hidden="true">▾</span></button></div>
+        <button id="readingModeBtn" class="reading-mode-button" type="button" title="护眼模式" aria-label="护眼模式：原色" aria-haspopup="dialog" aria-controls="readingModePanel" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button id="calculatorDock" class="calculator-dock" type="button" hidden>计算</button><button id="zoomOutBtn" class="zoom-button" title="缩小">−</button>
+        <span id="zoomValue" class="zoom-value">100%</span>
+        <button id="zoomInBtn" class="zoom-button" title="放大">＋</button>
+      </div>
+    </footer>
+    <div id="readingModePanel" class="reading-mode-panel" role="dialog" aria-label="护眼模式" hidden>
+      <div class="reading-mode-heading"><strong>护眼模式</strong><button type="button" data-reading-close aria-label="关闭护眼设置">×</button></div>
+      <fieldset><legend class="sr-only">阅读颜色</legend>
+        <label class="reading-option reading-option-original"><input type="radio" name="readingPreset" value="off"><span class="reading-swatch" style="--swatch:#fff"></span><span>原色</span></label>
+        <span class="reading-preset-group">浅色</span>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="warm"><span class="reading-swatch" style="--swatch:#f4eedf"></span><span>暖纸</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="green"><span class="reading-swatch" style="--swatch:#e5f0e4"></span><span>浅绿</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="mist"><span class="reading-swatch" style="--swatch:#e9edf2"></span><span>柔灰</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="blush"><span class="reading-swatch" style="--swatch:#f4e6e3"></span><span>杏粉</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="ice"><span class="reading-swatch" style="--swatch:#e3eef7"></span><span>冰蓝</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="lavender"><span class="reading-swatch" style="--swatch:#eee8f4"></span><span>淡紫</span></label>
+        <span class="reading-preset-group">深色</span>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="graphite"><span class="reading-swatch" style="--swatch:#272b30"></span><span>石墨</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="navy"><span class="reading-swatch" style="--swatch:#202b38"></span><span>深蓝</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="forest"><span class="reading-swatch" style="--swatch:#23312b"></span><span>墨绿</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="warmdark"><span class="reading-swatch" style="--swatch:#2d2927"></span><span>暖灰</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="plum"><span class="reading-swatch" style="--swatch:#282436"></span><span>紫夜</span></label>
+        <label class="reading-option"><input type="radio" name="readingPreset" value="brown"><span class="reading-swatch" style="--swatch:#2d251d"></span><span>深棕</span></label>
+      </fieldset>
+        <label class="reading-texture-option" for="gridTextureToggle">
+          <span><strong>工作表底纹</strong><small id="gridTextureHint">在表格外的空白处显示浅色纹饰</small></span>
+          <input id="gridTextureToggle" type="checkbox" role="switch" aria-describedby="gridTextureHint">
+        </label>
+    </div>
+    <div id="crosshairPanel" class="reading-mode-panel crosshair-panel" role="dialog" aria-label="行列与选区颜色" hidden>
+      <div class="reading-mode-heading"><strong>行列与选区颜色</strong><button type="button" data-highlight-close aria-label="关闭高亮设置">×</button></div>
+      <fieldset><legend class="sr-only">高亮颜色</legend>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="blue"><span class="reading-swatch" style="--swatch:#3c7dc3"></span><span>蓝色</span></label>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="green"><span class="reading-swatch" style="--swatch:#278562"></span><span>绿色</span></label>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="amber"><span class="reading-swatch" style="--swatch:#b77a19"></span><span>琥珀</span></label>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="purple"><span class="reading-swatch" style="--swatch:#8654b6"></span><span>紫色</span></label>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="rose"><span class="reading-swatch" style="--swatch:#b95179"></span><span>玫红</span></label>
+      </fieldset>
+    </div>
+  </section>
+
+  <aside id="calculatorWindow" class="calculator-window" role="dialog" aria-modal="false" aria-label="公式计算" hidden>
+    <div id="calculatorDrag" class="calculator-head" tabindex="0" aria-label="拖动计算">
+      <span class="calculator-grip" aria-hidden="true">⠿</span><strong>计算</strong>
+      <span id="calculatorSaveStatus" class="calculator-save-status" role="status" aria-live="polite"></span><button id="calculatorRecovery" class="calculator-notes-toggle" type="button">恢复</button><button id="calculatorNotes" class="calculator-notes-toggle" type="button" aria-pressed="false" title="备注列">备注</button><button id="calculatorMinimize" class="calculator-icon" type="button" title="收起" aria-label="收起">−</button>
+      <button id="calculatorClose" class="calculator-icon" type="button" title="关闭" aria-label="关闭">×</button>
+    </div>
+    <div id="calculatorScroll" class="calculator-scroll" role="grid" aria-label="计算"><div class="calculator-columns" role="row"><span></span><span role="columnheader">公式</span><span role="columnheader">结果</span><span class="calculator-note-head" role="columnheader">备注</span></div><div id="calculatorRows" class="calculator-rows" role="rowgroup"></div></div>
+  </aside>
+
+  <div id="calculatorCompletion" class="calculator-completion" role="listbox" aria-label="公式补全" hidden></div>
+
+  <dialog id="archiveDialog" class="float-dialog archive-dialog" aria-label="压缩包文件">
+    <form method="dialog" class="dialog-head"><div class="dialog-title" id="archiveTitle">压缩包文件</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body archive-body">
+      <p id="archiveNotice" class="archive-notice" role="status" hidden></p>
+      <input id="archiveSearch" class="field-control" type="search" placeholder="按文件名、目录或扩展名筛选" autocomplete="off" aria-label="筛选压缩包成员">
+      <div class="archive-columns" aria-hidden="true"><span>文件 / 所在目录</span><span>大小</span></div>
+      <div id="archiveList" class="archive-list" role="listbox" aria-label="可打开的成员文件" tabindex="0"></div>
+      <div class="archive-footer"><span id="archiveSummary" class="dialog-summary" aria-live="polite"></span><button type="button" id="archivePrev" class="mini-button">上一页</button><button type="button" id="archiveNext" class="mini-button">下一页</button></div>
+      <div id="archiveProgress" class="archive-progress" hidden><div id="archiveStage" role="status"></div><progress id="archiveBar" max="100"></progress><button type="button" id="archiveCancel" class="mini-button">取消读取</button></div>
+      <p id="archiveError" class="archive-error" role="alert" hidden></p>
+      <label id="archivePartialChoice" class="archive-partial-choice" hidden><input id="archiveAllowPartial" type="checkbox">我知道数据不完整，仅查看现存 TXT 片段（末条未结束记录不纳入表格）</label>
+      <div class="dialog-actions"><span class="dialog-summary">双击或按 Enter 打开；仅缓存选中的文件。</span><span class="status-spacer"></span><button type="button" id="archiveOpen" class="primary-button compact" disabled>打开文件</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="searchDialog" class="float-dialog search-dialog">
+    <form method="dialog" class="dialog-head">
+      <div class="dialog-title">搜索</div>
+      <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
+    </form>
+    <div class="dialog-body">
+      <div class="search-options">
+        <div class="search-option"><label for="searchMode">查找</label>
+          <select id="searchMode" class="field-control">
+            <option value="value" selected>单元格内容</option>
+            <option value="formula">公式</option>
+            <option value="reference">引用当前单元格的公式</option>
+            <option value="advanced">高级查询</option>
+          </select>
+        </div>
+        <div class="search-option"><label for="searchScope">范围</label>
+          <select id="searchScope" class="field-control">
+            <option value="current">当前工作表</option>
+            <option value="all">所有工作表</option>
+          </select>
+        </div>
+      </div>
+      <div id="searchAdvanced" class="search-advanced" hidden>
+        <div class="search-advanced-head"><span>查询表达式</span><button type="button" id="searchSyntaxHelp" class="search-tool-button" title="查看语法">?</button></div>
+        <textarea id="searchAdvancedInput" class="field-control" spellcheck="false" rows="3" placeholder='[机构]:"北京" AND [账面价值]>=1000000' aria-label="高级查询表达式"></textarea>
+        <div id="searchAdvancedFeedback" class="search-advanced-feedback" role="status">多个条件按同一行判断 · 支持括号、排除、数值与日期</div>
+        <div id="searchAdvancedSnippets" class="search-query-snippets" aria-label="查询语法快捷示例"></div>
+        <div id="searchAdvancedFields" class="search-query-fields" aria-label="源工作表字段快捷插入"></div>
+        <div id="searchAdvancedHelp" class="search-advanced-help" hidden>
+          <p><code>AND / OR / NOT</code> 组合条件（也可以直接用括号）。<code>[列名]:关键词</code> 包含；<code>C&gt;=100</code> 原始数值比较；<code>[日期] BETWEEN 2026-01-01 AND 2026-12-31</code> 日期区间。</p>
+          <p><code>B IN ("债券","基金")</code> 多值；<code>A IS EMPTY</code> 空值；<code>A~"^BX[0-9]+$"</code> 正则；<code>formula:SUMIF</code> 查公式；<code>sheet:"投资台账"</code> 限定工作表。</p>
+        </div>
+      </div>
+      <div class="search-entry">
+        <input id="searchInput" class="field-control" placeholder="输入要查找的内容" autocomplete="off" aria-label="查找内容">
+        <button id="searchBtn" class="primary-button compact" type="button">查找</button>
+        <button id="searchHistoryBtn" class="search-tool-button" type="button" title="搜索历史" aria-label="搜索历史" aria-expanded="false"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+      </div>
+      <label class="task-progress-choice"><input id="searchRecoverable" type="checkbox">保留进度</label>
+      <div id="searchHistoryPanel" class="history-panel" hidden>
+        <div class="history-heading">最近搜索 <button id="searchHistoryRefreshBtn" type="button" class="history-refresh" title="刷新搜索记录">刷新</button></div>
+        <div id="searchHistoryList" class="history-list"></div>
+      </div>
+      <div class="search-navigation">
+        <span id="searchSummary" class="dialog-summary" aria-live="polite" hidden></span>
+        <button id="cancelSearchBtn" class="mini-button" hidden type="button">取消</button>
+      </div>
+      <section id="searchResultsPane" class="search-results-pane" hidden aria-label="查找结果">
+        <div class="search-results-toolbar">
+          <span id="searchVisibleCount" class="search-visible-count" hidden></span>
+          <div class="search-results-actions">
+            <button id="searchPrevBtn" class="search-tool-button" disabled type="button" title="上一条 (Shift+F3)" aria-label="上一条结果">↑</button>
+            <button id="searchNextBtn" class="search-tool-button" disabled type="button" title="下一条 (F3)" aria-label="下一条结果">↓</button>
+            <button id="copySearchResultsBtn" class="search-tool-button" type="button" title="复制结果" aria-label="复制结果" disabled><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>
+            <button id="saveSearchResultsBtn" class="search-tool-button" type="button" title="导出为 CSV" aria-label="导出结果" disabled><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></button>
+          </div>
+        </div>
+        <div class="search-local-filters">
+          <input id="searchResultFilter" class="field-control" placeholder="筛选结果" aria-label="在当前结果中筛选" title="仅筛选已找到的结果">
+          <select id="searchResultSheet" class="field-control" title="按工作表筛选搜索结果" aria-label="按工作表筛选搜索结果"><option value="">全部工作表</option></select>
+        </div>
+        <div id="searchResults" class="search-results" role="listbox" aria-label="搜索结果"></div>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="freezeDialog" class="float-dialog freeze-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">冻结窗格</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <div class="freeze-quick">
+        <button id="freezeFirstRowBtn" class="freeze-option" type="button">冻结首行</button>
+        <button id="freezeFirstColBtn" class="freeze-option" type="button">冻结首列</button>
+        <button id="freezeAtCellBtn" class="freeze-option" type="button">冻结至选中单元格</button>
+        <button id="freezeResetBtn" class="freeze-option" type="button">取消冻结</button>
+      </div>
+      <div class="freeze-custom">
+        <div class="field-row"><label for="freezeRowsInput">冻结前几行</label><input id="freezeRowsInput" class="field-control" type="number" min="0" max="30" value="0"></div>
+        <div class="field-row"><label for="freezeColsInput">冻结前几列</label><input id="freezeColsInput" class="field-control" type="number" min="0" max="12" value="0"></div>
+        <div class="dialog-actions"><button id="freezeApplyBtn" class="primary-button compact" type="button">应用</button></div>
+      </div>
+      <div class="freeze-note">冻结设置按工作簿及工作表保存在本机。最多冻结30行、12列；视口过小时自动缩减显示数量。</div>
+    </div>
+  </dialog>
+
+  <dialog id="helpDialog" class="float-dialog help-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">快捷键</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body help-grid">
+      <span>↑ ↓ ← →</span><span>移动当前单元格</span>
+      <span>Shift + 方向键</span><span>扩大或缩小选区</span>
+      <span>Ctrl + 单击 / 拖拽</span><span>追加不连续单元格或矩形选区；底部自动显示精确求和、平均值和计数，点击结果可复制</span>
+      <span>Ctrl + C</span><span>复制值 / 选区，支持表格静态格式；不支持时退回 TSV</span>
+      <span>Ctrl + Shift + C</span><span>复制原始公式</span>
+      <span>Ctrl + G / F5</span><span>聚焦名称框：A1、A1:D50、B:B、3:5</span>
+      <span>Ctrl + O / Ctrl + S</span><span>打开本地文件 / 导出中心（只读）</span>
+      <span>Ctrl + 1 / F2</span><span>查看当前单元格的格式与原始公式（只读）</span>
+      <span>Ctrl + F</span><span>搜索公式或数值</span>
+      <span>Ctrl + `</span><span>公式视图：显示公式 / 保存结果</span>
+      <span>Ctrl + Alt + G</span><span>定位条件：公式、常量、错误、空白</span>
+      <span>Ctrl + Shift + D</span><span>指定列重复值高亮</span>
+      <span>点击公式栏</span><span>彩色高亮公式引用；悬停查看缓存值及原始公式</span>
+      <span>双击公式引用</span><span>定位对应单元格（跨 Sheet 可跳转）</span>
+      <span>F3 / Shift + F3</span><span>下一个 / 上一个搜索结果</span>
+      <span>Alt + ← / Alt + →</span><span>返回 / 前进访问位置</span>
+      <span>Ctrl + Home / Ctrl + End</span><span>工作表起点 / 已用区域终点</span>
+      <span>Shift + Home / Ctrl + Shift + End</span><span>扩选至本行开头 / 有效区域末尾</span>
+      <span>Alt + PageUp / PageDown</span><span>按可视宽度向左 / 向右移动</span>
+      <span>Alt + ↓</span><span>打开选中列的筛选下拉菜单</span>
+      <span>双击行列边界</span><span>按内容自动适应；列宽采用限量抽样</span>
+      <span>Alt → H → O → I / A</span><span>自动调整当前列宽 / 行高；W / H 设置尺寸</span>
+      <span>公式栏右侧箭头</span><span>展开多行查看长公式；默认无可见滚动条</span>
+      <span>Ctrl + Space</span><span>选中当前数据列</span>
+      <span>Shift + Space</span><span>选中当前数据行</span>
+      <span>Ctrl + A</span><span>选中已使用区域</span>
+      <span>Ctrl + PageUp / PageDown</span><span>切换前一个 / 后一个 Sheet</span>
+      <span>Ctrl + Shift + E</span><span>打开多格式导出中心</span>
+      <span>Ctrl + Alt + S</span><span>选区数据洞察</span>
+      <span>Ctrl + Alt + C</span><span>打开公式计算</span>
+      <span>计算</span><span>输入 =，输入数字或点击单元格，Enter 计算</span>
+      <span>Ctrl + Alt + B</span><span>审计标记 / 备注管理</span>
+      <span>Ctrl + K</span><span>快速命令面板</span>
+      <span>Alt + Enter</span><span>查看单元格详细信息</span>
+      <span>Tab / Shift + Tab</span><span>向右 / 向左移动</span>
+    </div>
+  </dialog>
+
+  <dialog id="rowsDialog" class="float-dialog rows-dialog" aria-labelledby="rowsTitle">
+    <form method="dialog" class="dialog-head"><div class="dialog-title" id="rowsTitle">行与大纲</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <div class="rows-tools"><button id="rowsOriginal" class="mini-button" type="button">原始显隐</button><button id="rowsShowAll" class="mini-button" type="button">显示全部</button><label><input id="rowsRemember" type="checkbox" checked>记住设置</label></div>
+      <div class="rows-range"><label>源行 <input id="rowsFirst" class="field-control" type="number" min="1" value="1" aria-label="起始源行"></label><span>至</span><input id="rowsLast" class="field-control" type="number" min="1" value="1" aria-label="结束源行"><button id="rowsHideRange" class="mini-button" type="button">隐藏</button><button id="rowsShowRange" class="mini-button" type="button">显示</button></div>
+      <div class="rows-level"><label>大纲层级 <select id="rowsDepth" class="field-control"><option value="0">仅汇总</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7" selected>全部</option></select></label><button id="rowsDepthApply" class="mini-button" type="button">展开到此级</button></div>
+      <div id="rowsGroupList" class="rows-groups" aria-label="源大纲分组"></div>
+      <div class="rows-pages"><button id="rowsPrevious" class="mini-button" type="button" disabled>上一页</button><span id="rowsPage"></span><button id="rowsNext" class="mini-button" type="button" disabled>下一页</button></div>
+      <p id="rowsStatus" class="rows-status" role="status"></p><button id="rowsCancel" class="mini-button" type="button" hidden>取消更新</button>
+    </div>
+  </dialog>
+  <dialog id="namedViewDialog" class="float-dialog named-view-dialog" aria-label="命名视图">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">命名视图</div><button class="dialog-close" aria-label="关闭视图" value="cancel">×</button></form>
+    <div class="named-view-body"><div class="named-view-row"><label for="namedViewList">已保存</label><select id="namedViewList" class="field-control"></select><button id="namedViewRefresh" class="mini-button" type="button">刷新</button></div><p id="namedViewSummary" class="named-view-summary"></p><div class="named-view-row"><label for="namedViewName">名称</label><input id="namedViewName" class="field-control" maxlength="160" placeholder="例如：月度核对" autocomplete="off"></div><div class="named-view-actions"><button id="namedViewSave" class="mini-button" type="button">保存当前</button><button id="namedViewUpdate" class="mini-button" type="button">更新所选</button><button id="namedViewDelete" class="mini-button" type="button">删除所选</button><span class="status-spacer"></span><button id="namedViewCancel" class="mini-button" type="button" hidden>取消应用</button><button id="namedViewApply" class="primary-button compact" type="button">应用视图</button></div><p id="namedViewStatus" class="named-view-status" role="status"></p></div>
+  </dialog>
+
+  <dialog id="reconcileDialog" class="float-dialog reconcile-dialog" aria-label="双表对账">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">双表对账</div><button class="dialog-close" value="cancel" aria-label="关闭对账">×</button></form>
+    <div class="reconcile-body">
+      <div class="reconcile-source-tools"><button id="reconcileRefresh" type="button" class="mini-button">刷新来源</button><button id="reconcileAddFile" type="button" class="mini-button">添加核对文件</button><button id="reconcileSwap" type="button" class="mini-button">交换左右</button><span id="reconcileSourceNotice" class="reconcile-muted" role="status"></span></div>
+      <input id="reconcileFile" type="file" accept="__FILE_ACCEPT__" hidden>
+      <div class="reconcile-sources">
+        <section class="reconcile-source"><div class="reconcile-source-heading"><strong>左侧来源</strong><button id="reconcileLeftRemove" type="button" class="mini-button" hidden>移除文件</button></div><label>文件<select id="reconcileLeftBook" class="field-control"></select></label><label>工作表<select id="reconcileLeftSheet" class="field-control"></select></label><div class="reconcile-source-bottom"><label>表头行<input id="reconcileLeftHeader" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" class="field-control"></label><span id="reconcileLeftInfo" class="reconcile-muted" role="status">选择来源后读取字段</span></div></section>
+        <section class="reconcile-source"><div class="reconcile-source-heading"><strong>右侧来源</strong><button id="reconcileRightRemove" type="button" class="mini-button" hidden>移除文件</button></div><label>文件<select id="reconcileRightBook" class="field-control"></select></label><label>工作表<select id="reconcileRightSheet" class="field-control"></select></label><div class="reconcile-source-bottom"><label>表头行<input id="reconcileRightHeader" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" class="field-control"></label><span id="reconcileRightInfo" class="reconcile-muted" role="status">选择来源后读取字段</span></div></section>
+      </div>
+      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><span class="reconcile-muted">表头填0表示无表头；编辑表读取已保存内容。</span></div>
+      <datalist id="reconcileLeftOptions"></datalist><datalist id="reconcileRightOptions"></datalist>
+      <div class="reconcile-mapping-title"><strong>主键</strong><span class="reconcile-muted">最多4组；重复键单独列出</span><button id="reconcileAddKey" type="button" class="mini-button">添加主键</button></div><div id="reconcileKeys" class="reconcile-mappings"></div>
+      <div class="reconcile-mapping-title"><strong>比较字段</strong><span class="reconcile-muted">最多8组；数值差额保持精确</span><button id="reconcileAddField" type="button" class="mini-button">添加字段</button></div><div id="reconcileFields" class="reconcile-mappings"></div>
+      <div class="reconcile-run-tools"><label><input id="reconcileIncludeEqual" type="checkbox">包含一致记录</label><span class="status-spacer"></span><button id="reconcileCancel" type="button" class="mini-button" hidden>取消核对</button><button id="reconcileRun" type="button" class="primary-button compact" disabled>开始核对</button></div>
+      <div id="reconcileProgress" class="reconcile-progress" role="status" hidden></div>
+      <section id="reconcileResults" hidden><div class="reconcile-result-heading"><strong>核对结果</strong><button id="reconcileClear" type="button" class="mini-button">清除结果</button><span class="status-spacer"></span><label><input id="reconcileProtectCSV" type="checkbox" checked>CSV文本保护</label><button id="reconcileExport" type="button" class="mini-button">导出完整CSV</button></div><p id="reconcileResultSource" class="reconcile-result-source"></p><div id="reconcileCounts" class="reconcile-counts"></div><div class="reconcile-sample-tools"><select id="reconcileResultFilter" class="field-control" aria-label="筛选核对样例"><option value="">全部样例</option><option value="different">差异</option><option value="left_only">仅左侧</option><option value="right_only">仅右侧</option><option value="duplicate">重复主键</option><option value="review">需核对</option><option value="invalid_key">无效主键</option><option value="equal">一致</option></select><span id="reconcileSampleNote" class="reconcile-muted"></span></div><div class="reconcile-result-scroll"><table id="reconcileTable" class="reconcile-table"></table></div></section>
+    </div>
+  </dialog>
+
+  <dialog id="multiSortDialog" class="float-dialog multi-sort-dialog" aria-label="多级排序">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">多级排序 <span class="dialog-subtle">先按第一条件排序，再比较下一条件</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <label class="sort-header-row">表头行 <input id="sortHeaderRow" class="field-control" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" title="表头行不参与排序"></label>
+      <div id="sortLevels" class="sort-levels"></div>
+      <button id="sortAddLevel" type="button" class="mini-button">＋ 添加排序条件</button>
+      <div class="dialog-actions"><button type="button" id="sortReset" class="mini-button">恢复原始顺序</button><label class="task-progress-choice"><input id="sortRecoverable" type="checkbox">保留进度</label><span class="status-spacer"></span><button type="button" id="sortApply" class="primary-button compact">应用排序</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="textHeaderDialog" class="float-dialog text-header-dialog" aria-label="TXT 表头设置">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">TXT 表头</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <p class="sort-description">字段名固定显示在顶部，可直接筛选和排序。原始行号和文件内容保持不变。</p>
+      <label class="sort-header-row">表头所在行 <input id="textHeaderRow" class="field-control" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1"></label>
+      <div class="dialog-actions"><button id="textHeaderAuto" type="button" class="mini-button">重新自动识别</button><button id="textHeaderPlain" type="button" class="mini-button">普通文本视图</button><span class="status-spacer"></span><button id="textHeaderApply" type="button" class="primary-button compact">应用表头</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="filterDialog" class="float-dialog filter-dialog">
+    <form method="dialog" class="dialog-head">
+      <div class="dialog-title">筛选条件</div>
+      <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
+    </form>
+    <div class="dialog-body">
+      <div id="filterHelp" class="filter-help">多个条件同时满足时才显示该行（AND）。</div>
+      <div id="filterRules" class="filter-rules"></div>
+      <button id="addFilterRuleBtn" class="add-rule-button">＋ 添加条件</button>
+      <div id="filterProgress" class="filter-progress" hidden>
+        <div class="progress-track"><div id="filterBar" class="progress-fill"></div></div>
+        <div id="filterProgressText" class="progress-label">正在筛选…</div>
+      </div>
+      <div class="dialog-actions">
+        <button id="applyFilterBtn" class="primary-button compact">应用筛选</button>
+        <label id="filterProgressChoice" class="task-progress-choice"><input id="filterRecoverable" type="checkbox">保留进度</label>
+        <button id="cancelFilterJobBtn" class="mini-button" hidden>取消任务</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="sheetDialog" class="float-dialog sheet-dialog">
+    <form method="dialog" class="dialog-head">
+      <div class="dialog-title">工作表</div>
+      <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
+    </form>
+    <div class="dialog-body">
+      <input id="sheetPickerSearch" class="field-control" placeholder="搜索工作表名称" autocomplete="off">
+      <div id="sheetPickerList" class="sheet-picker-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="traceDialog" class="float-dialog trace-dialog" aria-labelledby="traceTitle">
+    <form method="dialog" class="dialog-head">
+      <div id="traceTitle" class="dialog-title">公式追踪</div>
+      <div class="trace-window-actions"><button id="traceMinimizeBtn" type="button" class="dialog-close" title="收起到底部" aria-label="收起追踪面板">−</button><button class="dialog-close" value="cancel" aria-label="关闭追踪">×</button></div>
+    </form>
+    <div class="dialog-body">
+      <div id="traceFormula" class="trace-formula"></div>
+      <div class="trace-options"><label id="traceScopeRow" hidden>范围 <select id="traceScope" class="field-control"><option value="current">当前工作表</option><option value="all">所有工作表</option></select></label><button id="traceCancelBtn" type="button" class="mini-button" hidden>取消查找</button></div>
+      <div id="traceSummary" class="trace-summary" role="status" tabindex="-1"></div>
+      <div id="traceList" class="trace-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="detailDialog" class="float-dialog detail-dialog" aria-labelledby="detailTitle">
+    <form method="dialog" class="dialog-head">
+      <div id="detailTitle" class="dialog-title">单元格信息</div>
+      <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
+    </form>
+    <div id="detailBody" class="dialog-body detail-body"></div>
+    <div class="cell-explanation-status"><span id="detailStatus" role="status" aria-live="polite"></span><button id="detailRetry" class="mini-button" type="button" hidden>重试</button></div>
+  </dialog>
+
+
+  <dialog id="exportDialog" class="float-dialog export-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">导出中心 <span class="dialog-subtle">ExcelLens 只读快照</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body export-body">
+        <div class="export-intro">关闭此窗口后，导出任务继续运行。</div>
+      <div class="export-field-grid">
+        <label class="export-field"><span>导出范围</span><select id="exportScope" class="field-control"><option value="sheet">当前工作表</option><option value="selection">当前选区</option><option value="visible">当前可见行</option><option value="filtered">完整筛选结果</option><option value="all">整个工作簿</option></select></label>
+        <label class="export-field"><span>文件格式</span><select id="exportFormat" class="field-control"><option value="xlsx">Excel 工作簿（.xlsx）</option><option value="csv">CSV（Excel 兼容）</option><option value="tsv">制表符分隔（.tsv）</option><option value="jsonl">结构化数据（.jsonl）</option><option value="html">带格式 HTML（.html）</option><option value="zipcsv">全部 Sheet 分文件打包（.zip）</option></select></label>
+        <label class="export-field"><span>内容模式</span><select id="exportMode" class="field-control"><option value="values">原始缓存值（推荐）</option><option value="display">按屏幕显示值</option><option value="formula">保留公式文本</option></select></label>
+        <div class="export-field"><span>当前选区</span><div id="exportRangeLabel" class="export-range-value">尚未选择</div></div>
+      </div>
+      <div class="export-options">
+        <label><input id="exportStyles" type="checkbox" checked> 保留原始单元格格式（XLSX/HTML）</label>
+        <label><input id="exportBOM" type="checkbox" checked> CSV 使用 UTF-8 BOM</label>
+        <label><input id="exportCSVGuard" type="checkbox" checked> 防止文本值被当作公式执行</label>
+        <label><input id="exportHidden" type="checkbox" checked> 导出隐藏的 Sheet</label>
+        <label><input id="exportRecoverable" type="checkbox"> 保留进度</label>
+      </div>
+      <div id="exportAdvisory" class="export-advisory" aria-live="polite"></div>
+      <div id="exportProgress" class="export-progress" hidden>
+        <div class="export-task-line"><strong id="exportStage">准备导出</strong><span id="exportPercent">0%</span></div>
+        <div class="progress-track"><div id="exportBar" class="progress-fill"></div></div>
+        <div id="exportDetails" class="dialog-summary">正在准备数据...</div>
+      </div>
+      <div id="exportResult" class="export-result" hidden><span class="export-success">✓ 文件已生成</span><a id="exportDownload" class="export-download" href="#">下载导出文件</a><span id="exportFileDetails"></span><span id="exportSnapshot" class="export-source"></span></div>
+        <div class="export-actions"><button id="exportFolderBtn" class="mini-button" type="button" title="打开本机导出文件夹">打开导出目录</button><span class="status-spacer"></span><button id="exportRetryBtn" class="mini-button" type="button" hidden>恢复查询</button><button id="exportCancelBtn" class="mini-button" type="button" hidden>取消任务</button><button id="exportStartBtn" class="primary-button compact" type="button">开始导出</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="profileDialog" class="float-dialog profile-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">数据洞察</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <div class="profile-controls"><label>分析范围 <input id="profileStart" class="field-control" placeholder="A1"></label><span class="profile-divider">—</span><input id="profileEnd" class="field-control" aria-label="结束单元格" placeholder="D500"><label class="profile-filter-label"><input id="profileFiltered" type="checkbox">仅筛选行</label><label class="profile-filter-label"><input id="profileDistribution" type="checkbox">分位数与分布</label><button id="profileAnalyzeBtn" class="primary-button compact" type="button">分析</button><button id="profileCancelBtn" class="mini-button" type="button" hidden>取消</button></div>
+      <div id="profilePending" class="dialog-summary" role="status" aria-live="polite" hidden></div>
+	  <button id="profileQuickBtn" class="mini-button" type="button">快速分析</button>
+      <div id="profileSummary" class="profile-summary" hidden></div>
+      <div id="profileDetail" class="profile-detail" hidden></div>
+    </div>
+  </dialog>
+
+  <dialog id="bookmarkDialog" class="float-dialog bookmark-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">审计标记 <span class="dialog-subtle">随工作簿内容识别 · 不写入 Excel</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <div id="bookmarkTarget" class="bookmark-target">请选择单元格</div>
+      <div class="bookmark-entry"><select id="bookmarkTag" class="field-control"><option value="待复核">待复核</option><option value="异常">异常</option><option value="重要">重要</option><option value="已核实">已核实</option><option value="普通">普通</option></select><textarea id="bookmarkNote" rows="2" maxlength="800" placeholder="记录待核事项、证据线索或复核结论（仅保存在本机）"></textarea><button id="bookmarkSaveBtn" class="primary-button compact" type="button">添加标记</button></div>
+      <div class="bookmark-tools"><input id="bookmarkSearch" class="field-control" placeholder="搜索工作表、地址、标记或备注"><button id="bookmarkExportBtn" type="button" class="mini-button">导出标记 CSV</button><button id="bookmarkRefreshBtn" type="button" class="mini-button">刷新</button></div>
+      <div id="bookmarkList" class="bookmark-list"></div>
+      <div id="bookmarkCount" class="dialog-summary"></div>
+    </div>
+  </dialog>
+
+  <dialog id="commandDialog" class="float-dialog command-dialog">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">快速命令 <span class="dialog-subtle">Ctrl+K</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body"><input id="commandSearch" class="field-control command-input" placeholder="查找功能、快捷键、工作表..." autocomplete="off"/><div id="commandList" class="command-list" role="listbox"></div></div>
+  </dialog>
+
+  <div id="autoFilterPopover" class="auto-filter-popover" hidden role="dialog" aria-label="列筛选菜单">
+    <div class="auto-filter-titlebar">
+      <strong id="autoFilterTitle">列筛选</strong>
+      <button type="button" id="autoFilterClose" aria-label="关闭">×</button>
+    </div>
+    <div class="auto-filter-sort">
+      <button type="button" id="autoFilterSortAsc">↑ 升序</button>
+      <button type="button" id="autoFilterSortDesc">↓ 降序</button>
+    </div>
+    <input type="search" id="autoFilterFind" class="field-control" placeholder="搜索列中的值" autocomplete="off" aria-label="搜索筛选值">
+    <div class="auto-filter-selectbar">
+      <label><input type="checkbox" id="autoFilterAll"> 全选当前列表</label>
+      <button type="button" id="autoFilterClear">清除此列</button>
+    </div>
+    <div id="autoFilterOptions" class="auto-filter-options" role="group" aria-label="筛选值选项"></div>
+    <button type="button" id="autoFilterMore" class="auto-filter-more" hidden>显示更多</button>
+    <div id="autoFilterSummary" class="auto-filter-summary" aria-live="polite"></div>
+    <div class="auto-filter-footer">
+      <label class="task-progress-choice"><input id="autoFilterRecoverable" type="checkbox">保留进度</label>
+      <button type="button" id="autoFilterCancel" class="mini-button">取消</button>
+      <button type="button" id="autoFilterApply" class="primary-button compact">确定</button>
+    </div>
+  </div>
+  <div id="formulaRefTooltip" class="formula-ref-tooltip" role="status" aria-live="off" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <aside id="inspectPanel" class="inspect-panel" aria-label="定位条件和重复值检查" hidden>
+    <div class="inspect-titlebar"><div><span class="inspect-overline">DATA INSPECTOR</span><h2>定位与数据检查</h2></div>
+      <button id="inspectClose" class="inspect-close" type="button" aria-label="关闭检查窗口">×</button></div>
+    <div class="inspect-fields">
+      <label>检查类型<select id="inspectMode">
+        <option value="formulas">公式单元格</option><option value="constants">常量单元格</option>
+        <option value="errors">Excel 错误值</option><option value="blanks">空白单元格</option>
+        <option value="missing_cache">公式缺少缓存结果</option><option value="duplicates">重复值高亮</option>
+      </select></label>
+      <label id="inspectScopeWrap">检查范围<select id="inspectScope"><option value="selection">当前选区</option><option value="used">工作表已用区域</option></select></label>
+      <label id="inspectColumnWrap" hidden>检查列<input id="inspectColumn" type="text" maxlength="3" placeholder="例如 D"></label>
+      <label id="inspectSkipHeaderWrap" class="inspect-checkbox" hidden><input id="inspectSkipHeader" type="checkbox" checked> 跳过表头</label>
+      <p id="inspectHint" class="inspect-hint">只读检查，不修改原文件。</p>
+      <div class="inspect-actions"><button id="inspectRun" class="inspect-run" type="button">开始检查</button><button id="inspectCancel" type="button" hidden>取消</button><button id="inspectClear" type="button">清除高亮</button><button id="inspectCopy" type="button" title="复制当前结果地址为文本">复制结果</button></div>
+      <div id="inspectProgress" class="inspect-progress" role="status" aria-live="polite">选择条件后开始检查</div>
+    </div>
+    <div class="inspect-list-header"><span>匹配的单元格</span><div><button id="inspectPrev" type="button" disabled title="上一条">↑</button><button id="inspectNext" type="button" disabled title="下一条">↓</button></div></div>
+    <div id="inspectResultList" class="inspect-results"></div>
+    <button id="inspectMore" class="inspect-more" type="button" hidden>继续显示结果</button>
+  </aside>
+
+  <script src="/assets/display-format.js"></script>
+  <dialog id="taskRecoveryDialog" class="float-dialog task-recovery-dialog" aria-labelledby="taskRecoveryTitle">
+    <div class="dialog-head"><div id="taskRecoveryTitle" class="dialog-title">任务恢复</div><button id="taskRecoveryClose" type="button" class="dialog-close" aria-label="关闭">×</button></div>
+    <div class="task-recovery-toolbar"><button id="taskRecoveryRefresh" class="mini-button" type="button">刷新</button></div>
+    <div id="taskRecoveryList" class="task-recovery-list" aria-label="已保存的任务"></div>
+    <p id="taskRecoveryStatus" class="task-recovery-status" role="status" aria-live="polite" hidden></p>
+  </dialog>
+  <script src="/assets/task-recovery-model.js"></script>
+  <script src="/assets/task-recovery.js"></script>
+  <script src="/assets/session.js"></script>
+  <script src="/assets/grid-borders.js"></script>
+  <script src="/assets/recent.js"></script>
+  <script src="/assets/multisort.js"></script>
+  <script src="/assets/inspect.js"></script>
+  <script src="/assets/multiselection.js"></script>
+  <script src="/assets/selectionstats.js"></script>
+  <script src="/assets/conditional.js"></script>
+  <script src="/assets/richtext.js"></script>
+  <dialog id="copySpecialDialog" class="clipboard-dialog" aria-labelledby="copySpecialTitle">
+    <form id="copySpecialForm">
+      <div class="clipboard-head"><div><h3 id="copySpecialTitle">选择性复制</h3><p id="copySpecialSource"></p></div><button id="copySpecialClose" type="button" class="mini-button">关闭</button></div>
+      <div class="clipboard-options"><label>格式<select id="copySpecialFormat" class="field-control"><option value="tsv">文字表格 · TSV</option><option value="markdown">Markdown表格</option><option value="json">JSON · 源值、类型及坐标</option></select></label><label>内容<select id="copySpecialMode" class="field-control"><option value="display">显示值</option><option value="raw">原始值</option><option value="formula">公式文字，其余保留原值</option></select></label></div>
+      <div class="clipboard-header-option"><label><input id="copySpecialHeader" type="checkbox">附带表头</label><label for="copySpecialHeaderRow">源表头行</label><input id="copySpecialHeaderRow" class="field-control" type="number" min="1" value="1" disabled></div>
+      <label class="clipboard-label" for="copySpecialPreview">复制预览</label><textarea id="copySpecialPreview" class="clipboard-text" rows="10" readonly spellcheck="false"></textarea>
+      <p id="copySpecialStatus" class="clipboard-status" role="status" aria-live="polite"></p>
+      <div class="clipboard-footer"><small id="copySpecialLimits"></small><button id="copySpecialReload" type="button" class="mini-button">重新读取</button><button id="copySpecialWrite" type="submit" class="primary-button compact" disabled>复制</button></div>
+    </form>
+  </dialog>
+  <dialog id="pasteSpecialDialog" class="clipboard-dialog" aria-labelledby="pasteSpecialTitle">
+    <form id="pasteSpecialForm">
+      <div class="clipboard-head"><div><h3 id="pasteSpecialTitle">选择性粘贴</h3><p id="pasteSpecialTarget"></p></div><button id="pasteSpecialClose" type="button" class="mini-button">关闭</button></div>
+      <fieldset id="pasteSpecialFields">
+        <div class="clipboard-options"><label>输入格式<select id="pasteSpecialFormat" class="field-control"><option value="tsv">文字表格 · TSV</option><option value="json">JSON · 文字数组或ExcelLens选区</option></select></label><label>JSON内容<select id="pasteSpecialMode" class="field-control" disabled><option value="raw">原始值</option><option value="display">显示值</option><option value="formula">公式文字，不执行</option></select></label></div>
+        <div class="clipboard-checks"><label><input id="pasteSpecialTranspose" type="checkbox">转置行列</label><label><input id="pasteSpecialSkipBlank" type="checkbox">跳过空白</label><label><input id="pasteSpecialSkipFirst" type="checkbox">跳过首行（表头）</label><label><input id="pasteSpecialHeader" type="checkbox" disabled>包含JSON表头</label></div>
+        <div class="clipboard-input-label"><label for="pasteSpecialText">待粘贴文字</label><button id="pasteSpecialRead" type="button" class="mini-button">读取剪贴板</button></div><textarea id="pasteSpecialText" class="clipboard-text" rows="6" maxlength="2097152" placeholder="在此按Ctrl+V粘贴；不会立即写入编辑表" spellcheck="false"></textarea>
+        <div class="clipboard-table-wrap"><table id="pasteSpecialPreview" aria-label="粘贴预览"></table></div>
+        <button id="pasteSpecialReload" type="button" class="mini-button">重新读取目标</button>
+      </fieldset>
+      <p id="pasteSpecialStatus" class="clipboard-status" role="status" aria-live="polite"></p>
+      <div class="clipboard-footer"><button id="pasteSpecialApply" type="submit" class="primary-button compact" disabled>确认粘贴</button></div>
+    </form>
+  </dialog>
+  <script src="/assets/clipboard.js"></script>
+  <script src="/assets/transpose-model.js"></script>
+  <script src="/assets/transpose.js"></script>
+  <script src="/assets/clipboard-special.js"></script>
+  <script src="/assets/clipboard-panels.js"></script>
+  <script src="/assets/geometry.js"></script>
+  <script src="/assets/images.js"></script>
+  <script src="/assets/freeze.js"></script>
+  <script src="/assets/autofilter.js"></script>
+  <script src="/assets/export.js"></script>
+  <script src="/assets/bookmarks.js"></script>
+  <script src="/assets/profile-model.js"></script>
+  <script src="/assets/profile.js"></script>
+  <script src="/assets/formula_inspector.js"></script>
+
+  <div id="pictureViewer" class="picture-viewer" role="dialog" aria-modal="true" aria-label="查看工作表图片" hidden tabindex="-1">
+    <div class="picture-viewer-bar">
+      <span id="pictureCaption" class="picture-caption"></span>
+      <span id="pictureIndex" class="picture-index"></span>
+      <div class="picture-viewer-controls">
+        <button id="picturePrevious" type="button" title="上一张（←）" aria-label="上一张">‹</button>
+        <button id="pictureNext" type="button" title="下一张（→）" aria-label="下一张">›</button>
+        <span class="picture-separator" aria-hidden="true"></span>
+        <button id="pictureZoomOut" type="button" title="缩小（-）" aria-label="缩小">−</button>
+        <span id="pictureZoomValue" class="picture-zoom-value">100%</span>
+        <button id="pictureZoomIn" type="button" title="放大（+）" aria-label="放大">＋</button>
+        <button id="pictureFit" type="button" title="适合窗口（0）">适应</button>
+        <button id="pictureActual" type="button" title="实际像素（1）">1:1</button>
+        <button id="pictureRotate" type="button" title="顺时针旋转（R）" aria-label="旋转"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+        <span class="picture-separator" aria-hidden="true"></span>
+        <button id="pictureCopy" type="button" title="复制图片" aria-label="复制图片"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>
+        <a id="pictureDownload" href="#" download="ExcelLens-image" title="保存原图" aria-label="保存原图"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></a>
+        <button id="pictureClose" class="picture-close" type="button" title="关闭（Esc）" aria-label="关闭图片">×</button>
+      </div>
+    </div>
+    <div id="pictureStage" class="picture-stage" aria-label="拖动平移图片、滚动鼠标滚轮缩放">
+      <img id="picturePreview" alt="工作表图片预览" draggable="false">
+    </div>
+    <div class="picture-viewer-hint">滚轮缩放 · 拖动平移 · 双击切换原始大小</div>
+  </div>
+  <dialog id="analysisPlanDialog" class="float-dialog analysis-plan-dialog" aria-labelledby="analysisPlanTitle">
+    <form method="dialog" class="dialog-head"><div id="analysisPlanTitle" class="dialog-title">分析方案</div><button class="dialog-close" value="cancel" aria-label="关闭分析方案">×</button></form>
+    <div class="analysis-plan-body">
+      <section class="analysis-plan-section" aria-label="保存本次设置">
+        <h3>保存本次设置</h3>
+        <div class="analysis-plan-row"><label for="analysisPlanName">名称</label><input id="analysisPlanName" class="field-control" maxlength="160" placeholder="例如：月度金额核对"><button id="analysisPlanSave" class="mini-button" type="button">保存方案</button></div>
+        <p id="analysisPlanSaveHint" class="analysis-plan-note"></p>
+      </section>
+      <section class="analysis-plan-section" aria-label="选择方案与目标">
+        <div class="analysis-plan-row"><label for="analysisPlanList">方案</label><select id="analysisPlanList" class="field-control"></select><button id="analysisPlanRefresh" class="mini-button" type="button">刷新</button><button id="analysisPlanDelete" class="mini-button" type="button" disabled>删除</button></div>
+        <p id="analysisPlanSummary" class="analysis-plan-note"></p>
+        <div class="analysis-plan-row analysis-plan-target"><label for="analysisPlanTarget">目标表</label><select id="analysisPlanTarget" class="field-control"></select><label for="analysisPlanHeader">表头行</label><input id="analysisPlanHeader" class="field-control" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1"><label for="analysisPlanScope">目标范围</label><select id="analysisPlanScope" class="field-control"><option value="full">完整源表</option><option value="current">当前分析范围</option></select><button id="analysisPlanPreview" class="mini-button" type="button" disabled>读取字段</button></div>
+      </section>
+      <section id="analysisPlanMapping" hidden aria-label="核对字段映射"><h3>字段映射</h3><p id="analysisPlanSample" class="analysis-plan-note"></p><div id="analysisPlanBindings" class="analysis-plan-bindings"></div></section>
+    </div>
+    <div class="analysis-plan-footer"><p id="analysisPlanStatus" class="analysis-plan-status" role="status" aria-live="polite"></p><div class="analysis-plan-actions"><button id="analysisPlanCancel" class="mini-button" type="button" hidden>取消任务</button><button id="analysisPlanRun" class="primary-button compact" type="button" disabled>运行方案</button></div></div>
+  </dialog>
+  <section id="analysisRoot" class="analysis-root" hidden aria-label="数据分析工作区">
+    <div class="analysis-topbar">
+      <div class="analysis-brand"><span class="analysis-brand-icon">▦</span><strong>分析工作区</strong><span class="analysis-source-label" id="analysisSourceCaption"></span></div>
+      <nav class="analysis-nav" aria-label="分析视图">
+        <button data-analysis-tab="pivot" class="is-active">透视分析</button>
+        <button data-analysis-tab="dashboard">仪表盘</button>
+        <button data-analysis-tab="sheets">编辑工作表</button>
+        <button data-analysis-tab="templates">模板库</button>
+        <button id="analysisSnapshotsOpen" type="button">比较快照</button>
+      </nav>
+      <div class="analysis-top-actions"><button id="analysisSettingsOpen" class="analysis-quiet-button" type="button" aria-haspopup="dialog">设置</button><span id="analysisAutoSave" class="analysis-autosave" role="status" aria-live="polite"></span><button id="analysisRetrySave" class="analysis-quiet-button" type="button" hidden>重试保存</button><button id="analysisBackupExport" class="analysis-quiet-button" type="button" title="导出所有编辑表及报表配置">备份</button><button id="analysisDraftRecovery" class="analysis-quiet-button" type="button">恢复草稿</button><button id="analysisBackupImport" class="analysis-quiet-button" type="button" title="从此前的分析工作区备份恢复">导入备份</button><input id="analysisBackupFile" type="file" accept=".json,application/json" hidden><button id="analysisClose" class="analysis-back" type="button">返回工作簿 <span aria-hidden="true">×</span></button></div>
+    </div>
+    <div class="analysis-layout">
+      <aside id="analysisBuilder" class="analysis-builder">
+        <div class="analysis-side-section analysis-source-config">
+          <div class="analysis-source-heading"><div class="analysis-overline">数据源</div><button id="analysisCompositionOpen" class="analysis-quiet-button" type="button">多表追加</button><button id="analysisPlansOpen" class="analysis-quiet-button" type="button">分析方案</button></div>
+          <label class="analysis-label" for="analysisSourceSelect">数据来源</label>
+          <select id="analysisSourceSelect" class="analysis-control"></select>
+          <label id="analysisScopeLabel" class="analysis-label" for="analysisSourceScope">分析范围</label>
+          <div id="analysisScopeControls" class="analysis-source-range"><select id="analysisSourceScope" class="analysis-control"><option value="full">完整源表</option><option value="filtered">完整筛选结果</option><option value="visible">当前可见行</option><option value="selection">画面选区</option></select><button id="analysisSourceRefresh" class="analysis-quiet-button" type="button" title="按工作簿当前画面重新捕获范围">重新捕获</button></div>
+          <div class="analysis-source-state"><div id="analysisScopeInfo" class="analysis-caption" role="status" aria-live="polite"></div><button id="analysisSourceCancel" class="analysis-quiet-button" type="button" hidden>取消</button></div>
+          <div class="analysis-row-inline"><label id="analysisHeaderLabel" class="analysis-short-label" for="analysisHeaderRow">表头行 <input id="analysisHeaderRow" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1" class="analysis-control"></label><button id="analysisLoadFields" type="button" class="analysis-quiet-button button-with-icon">更新字段 <svg class="button-icon button-icon-small" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button></div>
+          <div id="analysisSourceInfo" class="analysis-caption"></div>
+        </div>
+        <div class="analysis-side-section analysis-fields-section">
+          <div class="analysis-overline">字段 <span id="analysisFieldCount"></span></div>
+          <input id="analysisFieldSearch" type="search" class="analysis-control" placeholder="搜索字段…" aria-label="搜索数据字段">
+          <div id="analysisFields" class="analysis-field-list" aria-label="拖拽字段到汇总区域"></div>
+          <div id="analysisFieldProfile" class="analysis-field-profile" hidden aria-live="polite"></div>
+        </div>
+        <div class="analysis-side-section analysis-pivot-config">
+          <div class="analysis-overline">透视字段</div>
+          <label class="analysis-short-label analysis-layout-choice" for="analysisLayout">布局<select id="analysisLayout" class="analysis-control"><option value="">平铺</option><option value="tree">层级展开</option></select></label>
+          <div class="analysis-dropzone" data-analysis-zone="rows"><div class="analysis-zone-label"><span>行维度</span><span>最多3个</span></div><div id="analysisRowsZone" class="analysis-zone-chips"></div></div>
+          <div class="analysis-dropzone" data-analysis-zone="columns"><div class="analysis-zone-label"><span>列维度</span><span>最多1个</span></div><div id="analysisColumnsZone" class="analysis-zone-chips"></div></div>
+          <div class="analysis-dropzone" data-analysis-zone="values"><div class="analysis-zone-label"><span>汇总指标</span><button id="analysisAddMetric" type="button" class="analysis-quiet-button" title="一次扫描支持最多6个独立指标">＋ 指标</button></div><div id="analysisValuesZone" class="analysis-zone-chips"></div><div id="analysisMetricEditor" class="analysis-metric-editor"></div></div>
+          <div class="analysis-row-inline"><label class="analysis-short-label">汇总方式<select id="analysisAggregate" class="analysis-control"><option value="sum">求和</option><option value="count">计数</option><option value="average">平均值</option><option value="min">最小值</option><option value="max">最大值</option><option value="distinct">去重计数</option></select></label>
+            <label class="analysis-short-label">排序<select id="analysisSort" class="analysis-control"><option value="value_desc">按值降序</option><option value="value_asc">按值升序</option><option value="label_asc">按分类升序</option><option value="label_desc">按分类降序</option></select></label></div>
+          <div class="analysis-row-inline"><label class="analysis-short-label">前 N 项<input id="analysisTop" class="analysis-control" type="number" min="0" max="1000" value="30" title="0表示全部；层级模式对每个父级分别取前N项"></label><label class="analysis-short-label">小数位<input id="analysisPrecision" class="analysis-control" type="number" min="0" max="10" value="2"></label></div>
+        </div>
+        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">筛选条件</span><button id="analysisAddFilter" type="button" class="analysis-symbol-button" title="增加筛选条件">＋</button></div><div id="analysisFilterList" class="analysis-mini-list"></div></div>
+        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">数据加工</span><button id="analysisAddConversion" type="button" class="analysis-quiet-button" title="新增转换列；点击运行分析后才转换，原列保持不变">格式转换</button><button id="analysisAddTransform" type="button" class="analysis-symbol-button" title="添加计算列">＋</button></div><div id="analysisTransformList" class="analysis-mini-list"></div></div>
+        <div class="analysis-builder-footer"><button id="analysisRun" type="button" class="analysis-primary-button">运行分析 <span>↗</span></button><button id="analysisCancel" type="button" class="analysis-quiet-button" hidden>取消任务</button></div>
+      </aside>
+      <main class="analysis-main">
+        <section class="analysis-panel" data-analysis-panel="pivot">
+          <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" disabled title="将筛选及计算列加工后的原始明细提取到独立编辑表（最多1万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" disabled>导出结果</button></div></div></div>
+          <div id="analysisProgress" class="analysis-progress" hidden><div class="analysis-progress-top"><span id="analysisProgressText">正在分析…</span><strong id="analysisProgressPercent"></strong></div><div class="analysis-progress-track"><span id="analysisProgressBar"></span></div></div>
+          <div id="analysisMetrics" class="analysis-metrics" hidden></div>
+          <div class="analysis-chart-card"><div class="analysis-card-header"><div><h3>数据可视化</h3><span id="analysisChartSummary">选择分类和指标后生成图表</span></div><div class="analysis-chart-tools"><button id="analysisSnapshotSave" type="button" class="analysis-outline-button" disabled>保存快照</button><button id="analysisChartImage" type="button" class="analysis-outline-button" disabled>导出图片</button><label for="analysisChartMetric" id="analysisChartMetricLabel" hidden>指标</label><select id="analysisChartMetric" class="analysis-chart-select" hidden aria-label="选择图表指标"></select><label for="analysisChartSelect">类型</label><select id="analysisChartSelect" class="analysis-chart-select"><option value="bar">纵向柱状</option><option value="horizontal">横向条形</option><option value="line">折线</option><option value="area">面积</option><option value="donut">环形</option><option value="pie">饼图</option><option value="scatter">散点</option><option value="stacked">堆叠柱状</option><option value="heatmap">热力矩阵</option></select></div></div>
+          <div class="analysis-plot-wrap"><canvas id="analysisChart" aria-label="交互式汇总图表" role="img"></canvas><div id="analysisChartHint" class="analysis-chart-hint">选择左侧字段，或从模板库选择分析方案。</div><div id="analysisChartTooltip" class="analysis-chart-tooltip" hidden></div></div></div>
+          <div class="analysis-table-card"><div class="analysis-card-header"><div><h3>透视结果</h3><span id="analysisTableSummary">等待生成结果</span></div><span id="analysisTableHint" class="analysis-table-hint">点击数值查看对应明细 ↗</span></div><div id="analysisTreeTools" class="analysis-tree-tools" hidden><button id="analysisTreeCollapse" class="analysis-quiet-button" type="button">收起全部</button><span class="status-spacer"></span><button id="analysisTreePrevious" class="analysis-quiet-button" type="button">上一页</button><span id="analysisTreePage" role="status"></span><button id="analysisTreeNext" class="analysis-quiet-button" type="button">下一页</button></div><div class="analysis-table-scroll"><table id="analysisPivotTable" class="analysis-data-table"></table></div></div>
+        </section>
+        <section class="analysis-panel" data-analysis-panel="dashboard" hidden>
+          <div class="analysis-content-head"><h2>仪表盘</h2><button id="analysisDashboardRefresh" class="analysis-outline-button">刷新数据</button></div>
+          <div id="analysisDashboardCards" class="analysis-dashboard-grid"></div>
+        </section>
+        <section class="analysis-panel" data-analysis-panel="sheets" hidden>
+          <div class="analysis-content-head"><h2>编辑工作表</h2><button id="analysisCreateSheet" class="analysis-primary-button">＋ 新建工作表</button></div>
+          <div class="analysis-sheet-layout"><nav id="analysisSheetList" class="analysis-sheet-list" aria-label="已创建编辑表"></nav><div class="analysis-sheet-editor"><div class="analysis-sheet-tools"><strong id="analysisSheetTitle">选择编辑表</strong><div><button id="analysisPasteSpecial" class="analysis-quiet-button" disabled title="选择性粘贴 Ctrl+Shift+V">选择性粘贴</button><button id="analysisUndo" class="analysis-quiet-button" disabled title="撤销最近一次已保存的编辑 Ctrl+Z">↶ 撤销</button><button id="analysisRedo" class="analysis-quiet-button" disabled title="重做 Ctrl+Y">↷ 重做</button><button id="analysisAddColumn" class="analysis-quiet-button" disabled>＋列</button><button id="analysisAddRows" class="analysis-quiet-button" disabled>＋10行</button><button id="analysisDeleteSheet" class="analysis-quiet-button danger" disabled>删除</button></div></div><div id="analysisEditableGrid" class="analysis-edit-grid"></div><div id="analysisSheetPagination" class="analysis-pagination"></div></div></div>
+        </section>
+        <section class="analysis-panel" data-analysis-panel="templates" hidden>
+          <div class="analysis-content-head"><h2>模板库</h2><input id="analysisTemplateSearch" type="search" class="analysis-control analysis-template-search" placeholder="搜索模板…"></div>
+          <div id="analysisTemplateCategories" class="analysis-category-list"></div><div id="analysisTemplateGrid" class="analysis-template-grid"></div>
+        </section>
+      </main>
+    </div>
+    <aside id="analysisDrill" class="analysis-drill" role="dialog" aria-label="源数据下钻" hidden>
+      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="保留当前分组原始行号，另存到可编辑工作表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭">×</button></div></div>
+      <div id="analysisDrillTable" class="analysis-drill-table"></div><div id="analysisDrillPaging" class="analysis-pagination"></div>
+    </aside>
+    <div id="analysisToast" class="analysis-toast" role="status" hidden></div>
+  </section>
+  <script src="/assets/formats.js"></script>
+  <script src="/assets/wire.js"></script>
+  <script src="/assets/virtualscroll.js"></script>
+  <script src="/assets/tableheaders.js"></script>
+  <script src="/assets/merges.js"></script>
+  <script src="/assets/cellview.js"></script>
+  <script src="/assets/motion.js"></script>
+  <script src="/assets/tracing.js"></script>
+  <script src="/assets/readingmode.js"></script>
+  <script src="/assets/highlightmode.js"></script>
+  <script src="/assets/calculator-model.js"></script>
+  <script src="/assets/recovery.js"></script>
+  <script src="/assets/calculator.js"></script>
+  <script src="/assets/archives.js"></script>
+  <script src="/assets/analysis-jobs.js"></script>
+  <script src="/assets/reconcile.js"></script>
+  <script src="/assets/named-views.js"></script>
+	<script src="/assets/catalogue.js"></script>
+	<script src="/assets/data-rules.js"></script>
+	<script src="/assets/printing-model.js"></script>
+	<script src="/assets/printing-render.js"></script>
+	<script src="/assets/printing.js"></script>
+	<script src="/assets/record-card-model.js"></script>
+	<script src="/assets/record-card.js"></script>
+	<script src="/assets/selection-quick-model.js"></script>
+	<script src="/assets/selection-quick.js"></script>
+  <script src="/assets/row-visibility.js"></script>
+  <script src="/assets/row-views.js"></script>
+  <script src="/assets/cell-explanation.js"></script>
+  <script src="/assets/composition-model.js"></script>
+  <script src="/assets/composition-tasks.js"></script>
+  <script src="/assets/field-picker.js"></script>
+  <script src="/assets/relations-model.js"></script>
+  <script src="/assets/relations.js"></script>
+  <script src="/assets/toolbar.js"></script>
+  <script src="/assets/app.js"></script>
+  <script src="/assets/analytics-templates.js"></script>
+  <script src="/assets/analysis-numbers.js"></script>
+  <script src="/assets/analysis-comparisons.js"></script>
+  <script src="/assets/analytics-charts.js"></script>
+  <script src="/assets/analysis-drafts.js"></script>
+  <script src="/assets/analysis-results.js"></script>
+	<script src="/assets/chart-export-model.js"></script>
+	<script src="/assets/chart-export-surface.js"></script>
+	<script src="/assets/chart-export.js"></script>
+  <script src="/assets/analysis-tree.js"></script>
+  <script src="/assets/analysis-sources.js"></script>
+  <script src="/assets/composition.js"></script>
+  <dialog id="analysisIssuesDialog" class="analysis-issues-dialog" aria-labelledby="analysisIssuesTitle">
+    <div class="analysis-issues-head"><div><h3 id="analysisIssuesTitle">异常与排除项目</h3><p id="analysisIssuesSummary"></p></div><button id="analysisIssuesClose" type="button" class="analysis-outline-button">关闭</button></div>
+    <div class="analysis-issues-tools"><button id="analysisIssuesExtract" class="analysis-outline-button" type="button">提取编辑表</button><button id="analysisIssuesExport" class="analysis-primary-button" type="button">导出完整CSV</button><label><input id="analysisIssuesCSVGuard" type="checkbox" checked title="为公式形式的文本加单引号；需要逐字保留原文时取消勾选">CSV文本保护</label></div>
+    <p id="analysisIssuesTextNote" class="analysis-issues-note"></p>
+    <div class="analysis-issues-scroll"><table id="analysisIssuesTable" class="analysis-data-table"></table></div>
+  </dialog>
+  <script src="/assets/analysis-issues.js"></script>
+  <script src="/assets/recipes.js"></script>
+  <dialog id="analysisSettingsDialog" class="analysis-settings-dialog" aria-labelledby="analysisSettingsTitle">
+    <form id="analysisSettingsForm">
+      <div class="analysis-settings-head"><h3 id="analysisSettingsTitle">分析显示设置</h3><button id="analysisSettingsClose" type="button" class="analysis-outline-button" aria-label="关闭显示设置">关闭</button></div>
+      <fieldset id="analysisSettingsFields">
+        <label class="analysis-settings-toggle"><input id="analysisGroupThousands" type="checkbox" checked><span>显示千分位分隔符</span></label>
+        <label class="analysis-settings-toggle"><input id="analysisScientific" type="checkbox" checked><span>大数使用科学计数法</span></label>
+        <div class="analysis-settings-threshold"><label for="analysisScientificExponent">大数门槛（绝对值）</label><select id="analysisScientificExponent" class="analysis-control"><option value="9">十亿 · 10⁹</option><option value="12" selected>万亿 · 10¹²</option><option value="15">千万亿 · 10¹⁵</option></select></div>
+        <div class="analysis-settings-preview" aria-label="显示预览"><span>普通数值</span><output id="analysisNumberPreview"></output><span>大数</span><output id="analysisLargePreview"></output></div>
+        <button id="analysisSettingsDefaults" class="analysis-quiet-button" type="button">恢复默认</button>
+      </fieldset>
+      <p id="analysisSettingsStatus" class="analysis-settings-status" role="status" aria-live="polite"></p>
+      <div class="analysis-settings-actions"><button id="analysisSettingsReload" type="button" class="analysis-outline-button">重新载入</button><button id="analysisSettingsSave" type="submit" class="analysis-primary-button" disabled>保存设置</button></div>
+    </form>
+  </dialog>
+  <script src="/assets/analysis-settings.js"></script>
+  <dialog id="analysisClustersDialog" class="analysis-clusters-dialog" aria-labelledby="analysisClustersTitle">
+    <div class="analysis-clusters-head"><h3 id="analysisClustersTitle">疑似重复</h3><button id="analysisClustersClose" type="button" class="analysis-outline-button">关闭</button></div>
+    <div class="analysis-clusters-tools"><fieldset id="analysisClustersOptions" aria-label="候选比较规则"><label><input id="analysisClustersCase" type="checkbox">忽略大小写</label><label title="比较全角ASCII字母、数字、符号及全角空格；不转换假名等其他文字"><input id="analysisClustersWidth" type="checkbox">忽略英数符号全半角</label><label>空白<select id="analysisClustersSpace" class="analysis-control"><option value="">保留原样</option><option value="trim">去除首尾</option><option value="collapse">整理连续空白</option><option value="remove">忽略全部空白</option></select></label><label><input id="analysisClustersPunctuation" type="checkbox">忽略标点</label></fieldset><button id="analysisClustersRun" type="button" class="analysis-primary-button">检查</button><button id="analysisClustersCancel" type="button" class="analysis-outline-button" hidden>取消检查</button></div>
+    <p class="analysis-clusters-note">原始文本 · 未应用分析条件</p>
+    <p id="analysisClustersSummary" class="analysis-clusters-note"></p>
+    <div class="analysis-clusters-main"><section class="analysis-clusters-master" aria-label="候选组"><div id="analysisClustersGroups" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClustersPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClustersPage">尚未检查</span><button id="analysisClustersNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section><section class="analysis-clusters-detail" aria-label="候选原文"><h4 id="analysisClusterDetailTitle">选择候选组查看原文</h4><div id="analysisClusterDetailKey" class="analysis-clusters-key"></div><div id="analysisClusterVariants" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClusterVariantsPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClusterVariantsPage">源位置为有限样例</span><button id="analysisClusterVariantsNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section></div>
+    <div class="analysis-clusters-footer"><p id="analysisClustersStatus" class="analysis-clusters-status" role="status" aria-live="polite"></p><button id="analysisClustersConfirm" type="button" class="analysis-primary-button" disabled>添加文本映射</button><button id="analysisClustersExport" type="button" class="analysis-outline-button" disabled>导出候选CSV</button><label><input id="analysisClustersCSVGuard" type="checkbox" checked>CSV文本保护</label></div>
+  </dialog>
+  <script src="/assets/analysis-clusters.js"></script>
+  <script src="/assets/snapshot-model.js"></script>
+  <script src="/assets/snapshots.js"></script>
+  <script src="/assets/analytics.js"></script>
+</body>
+</html>

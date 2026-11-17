@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="ExcelLens">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#146956"/><stop offset="1" stop-color="#09382f"/>
+    </linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#d7f7e6"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="27" fill="url(#b)"/>
+  <rect x="26" y="21" width="72" height="84" rx="9" fill="url(#g)"/>
+  <path d="M26 30a9 9 0 0 1 9-9h54a9 9 0 0 1 9 9v11H26Z" fill="#48b78f"/>
+  <path d="M39 53h46M39 66h46M39 79h46M53 41v52M69 41v52" stroke="#b5decf" stroke-width="3"/>
+  <path d="M40 54h13v12H40zM54 67h15v12H54z" fill="#6bc8a0" opacity=".65"/>
+  <circle cx="81" cy="80" r="24" fill="#0d5449" stroke="#f3fff7" stroke-width="6"/>
+  <circle cx="81" cy="80" r="13" fill="#e7fff0"/>
+  <path d="m97 97 14 14" stroke="#f3fff7" stroke-width="8" stroke-linecap="round"/>
+  <path d="m74 79 5 5 10-12" fill="none" stroke="#15936b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

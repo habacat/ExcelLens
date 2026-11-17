@@ -1,0 +1,41 @@
+// Generated fixtures for read-only catalogue QA. No production runtime uses JS.
+const {zip}=require('./generated_workbook.cjs');
+const xml=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+function ooxml(){
+  const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main',rel='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const name=(name,definition,attrs='')=>`<definedName name="${xml(name)}"${attrs}>${xml(definition)}</definedName>`;
+  const names=[name('金额范围',"'明细'!$B$2:$B$4"),name('同名',"'汇总'!$D$7"),name('同名',"'明细'!$A$2",' localSheetId="0" hidden="1"'),name('多区域',"'明细'!$A$2:$A$4,'汇总'!$D$7"),name('结构化','汇总表[数值]'),name('常量','"000123"'),name('<img src=x onerror="window.badCatalogue=1">','"<b>原文</b>"'),...Array.from({length:125},(_,i)=>name('条目'+String(i).padStart(3,'0'),"'明细'!$A$2"))].join('');
+  return zip({
+    'xl/workbook.xml':`<workbook xmlns="${ns}" xmlns:r="${rel}"><sheets><sheet name="明细" sheetId="1" r:id="s1"/><sheet name="汇总" sheetId="2" r:id="s2"/></sheets><definedNames>${names}</definedNames></workbook>`,
+    'xl/_rels/workbook.xml.rels':`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="s1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="s2" Type="${rel}/worksheet" Target="worksheets/sheet2.xml"/></Relationships>`,
+    'xl/worksheets/sheet1.xml':`<worksheet xmlns="${ns}" xmlns:r="${rel}"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>编号</t></is></c><c r="B1" t="inlineStr"><is><t>金额</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>001</t></is></c><c r="B2" t="n"><v>9007199254740993.31</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>002</t></is></c><c r="B3" t="n"><v>0</v></c></row><row r="4"><c r="B4"><f>SUM(B2:B3)</f></c></row></sheetData><tableParts count="1"><tablePart r:id="t1"/></tableParts></worksheet>`,
+    'xl/worksheets/sheet2.xml':`<worksheet xmlns="${ns}" xmlns:r="${rel}"><sheetData><row r="6"><c r="D6" t="inlineStr"><is><t>字段</t></is></c><c r="E6" t="inlineStr"><is><t>数值</t></is></c></row><row r="7"><c r="D7" t="n"><v>8</v></c><c r="E7" t="n"><v>0</v></c></row><row r="8"><c r="D8" t="inlineStr"><is><t>001</t></is></c><c r="E8" t="n"><v>1</v></c></row><row r="9"><c r="E9"><f>SUM(E7:E8)</f></c></row></sheetData><tableParts count="1"><tablePart r:id="t2"/></tableParts></worksheet>`,
+    'xl/worksheets/_rels/sheet1.xml.rels':`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="t1" Type="${rel}/table" Target="../tables/table1.xml"/><Relationship Id="orphan" Type="${rel}/table" Target="../tables/orphan.xml"/></Relationships>`,
+    'xl/worksheets/_rels/sheet2.xml.rels':`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="t2" Type="${rel}/table" Target="../tables/table2.xml"/></Relationships>`,
+    'xl/tables/table1.xml':`<table xmlns="${ns}" id="1" name="账表" displayName="账表" ref="A1:B4"><tableColumns count="2"><tableColumn id="1" name="编号"/><tableColumn id="2" name="金额"/></tableColumns></table>`,
+    'xl/tables/table2.xml':`<table xmlns="${ns}" id="2" name="汇总表" displayName="汇总表" ref="D6:E9"><tableColumns count="2"><tableColumn id="1" name="字段"/><tableColumn id="2" name="数值"/></tableColumns></table>`,
+    'xl/tables/orphan.xml':`<table xmlns="${ns}" id="3" name="孤立表" displayName="孤立表" ref="A1:B4"><tableColumns count="2"><tableColumn id="1" name="编号"/><tableColumn id="2" name="金额"/></tableColumns></table>`
+  });
+}
+const u16=value=>{const text=Buffer.from(value,'utf16le'),head=Buffer.alloc(3);head.writeUInt16LE(text.length/2);head[2]=1;return Buffer.concat([head,text]);};
+const record=(id,data=Buffer.alloc(0))=>{const h=Buffer.alloc(4);h.writeUInt16LE(id);h.writeUInt16LE(data.length,2);return Buffer.concat([h,data]);};
+function biff({formulas=false,dataRules=false}={}){
+  const bound=Buffer.alloc(8);bound[6]=2;bound[7]=1;let bounds=Buffer.concat([bound,Buffer.from('旧表','utf16le')]);
+  const nameText=Buffer.from('金额范围','utf16le'),label=Buffer.alloc(15);label[3]=nameText.length/2;label.writeUInt16LE(11,4);label[14]=1;
+  const tokens=Buffer.from([0x3b,0,0,1,0,3,0,1,0,1,0]);
+  const globals=[record(0x0809,Buffer.from([0,6,5,0])),record(0x01ae,Buffer.from([1,0,1,4])),record(0x0017,Buffer.from([1,0,0,0,0,0,0,0])),record(0x0018,Buffer.concat([label,nameText,tokens]))];
+  const offset=globals.reduce((sum,b)=>sum+b.length,0)+4+bounds.length+4;bounds.writeUInt32LE(offset);
+  const fields=['编号','金额'].map((s,i)=>{const fixed=Buffer.alloc(36);fixed.writeUInt32LE(i+1);return Buffer.concat([fixed,u16(s),u16(s)]);});
+  const feature=Buffer.alloc(99);feature.writeUInt16LE(0x0872);feature.writeUInt16LE(5,12);feature.writeUInt16LE(1,19);feature.writeUInt16LE(3,29);feature.writeUInt16LE(1,33);feature.writeUInt32LE(1,39);feature.writeUInt32LE(1,43);feature.writeUInt32LE(3,51);feature.writeUInt32LE(64,55);feature.writeUInt32LE(12<<16,63);
+  const count=Buffer.from([2,0]),table=Buffer.concat([feature,u16('旧表'),count,...fields]);table.writeUInt32LE(table.length-35,21);
+  const text=(row,col,value)=>{const head=Buffer.alloc(6);head.writeUInt16LE(row);head.writeUInt16LE(col,2);return record(0x0204,Buffer.concat([head,u16(value)]));};
+  const number=(row,col,value)=>{const b=Buffer.alloc(14);b.writeUInt16LE(row);b.writeUInt16LE(col,2);b.writeDoubleLE(value,6);return record(0x0203,b);};
+  const body=[record(0x0809,Buffer.from([0,6,0x10,0])),record(0x0809,Buffer.from([0,6,0x20,0])),record(0x000a),text(0,0,'编号'),text(0,1,'金额'),text(1,0,'001'),number(1,1,1234.5),text(2,0,'002'),number(2,1,0),text(3,0,'003'),number(3,1,-2),record(0x0872,table),record(0x000a)];
+  if(formulas){const formula=(row,value,tokens)=>{const h=Buffer.alloc(22);h.writeUInt16LE(row);h.writeUInt16LE(1,2);h.writeDoubleLE(value,6);h.writeUInt16LE(tokens.length,20);return record(0x0006,Buffer.concat([h,Buffer.from(tokens)]));};body.splice(body.length-2,0,number(4,1,1),formula(6,Math.SQRT2,[0x44,4,0,1,0xc0,0x1e,2,0,0x05,0x41,0x14,0]),formula(7,1234.5,[0x45,0,0,2,0,0,0,1,0xc0,0x22,1,4,0]),formula(8,Math.SQRT2,[0x4c,0xfe,0xff,1,0x80]),formula(9,0,[0x44,0,0,0,1]));}
+  if(dataRules){const flags=Buffer.alloc(4);flags.writeUInt32LE(3|0x80|0x100|0x40000|0x80000);const text='001\0\0中文',tokens=Buffer.concat([Buffer.from([0x17,text.length,1]),Buffer.from(text,'utf16le')]),formula=Buffer.alloc(4);formula.writeUInt16LE(tokens.length);const area=Buffer.alloc(10);area.writeUInt16LE(1);area.writeUInt16LE(1,2);area.writeUInt16LE(65535,4);const data=Buffer.concat([flags,u16('编号'),u16('核对'),u16('保留前导零'),u16('请选择编号'),formula,tokens,Buffer.alloc(4),area]),head=Buffer.alloc(18);head.writeUInt32LE(1,14);body.splice(body.length-1,0,record(0x01b2,head),record(0x01be,data.subarray(0,9)),record(0x003c,Buffer.concat([Buffer.from([1]),data.subarray(9)])));}
+  const wb=Buffer.concat([...globals,record(0x0085,bounds),record(0x000a),...body]);if(wb.length>4096)throw Error('BIFF QA fixture exceeds regular 4KiB stream');
+  const out=Buffer.alloc(5632),h=out.subarray(0,512);Buffer.from('d0cf11e0a1b11ae1','hex').copy(h);h.writeUInt16LE(0x3e,24);h.writeUInt16LE(3,26);h.writeUInt16LE(0xfffe,28);h.writeUInt16LE(9,30);h.writeUInt16LE(6,32);h.writeUInt32LE(1,44);h.writeUInt32LE(8,48);h.writeUInt32LE(4096,56);h.writeUInt32LE(0xfffffffe,60);h.writeUInt32LE(0xfffffffe,68);for(let i=0;i<109;i++)h.writeUInt32LE(0xffffffff,76+4*i);h.writeUInt32LE(9,76);wb.copy(out,512);
+  const dir=out.subarray(4608,5120),entry=(at,name,type,first,size)=>{const d=dir.subarray(at,at+128),text=Buffer.from(name+'\0','utf16le');text.copy(d);d.writeUInt16LE(text.length,64);d[66]=type;d[67]=1;for(const off of [68,72,76])d.writeUInt32LE(0xffffffff,off);d.writeUInt32LE(first,116);d.writeBigUInt64LE(BigInt(size),120);};entry(0,'Root Entry',5,0xfffffffe,0);dir.writeUInt32LE(1,76);entry(128,'Workbook',2,0,4096);
+  const fat=out.subarray(5120);for(let i=0;i<128;i++)fat.writeUInt32LE(0xffffffff,4*i);for(let i=0;i<7;i++)fat.writeUInt32LE(i+1,4*i);fat.writeUInt32LE(0xfffffffe,28);fat.writeUInt32LE(0xfffffffe,32);fat.writeUInt32LE(0xfffffffd,36);return out;
+}
+module.exports={ooxml,biff};

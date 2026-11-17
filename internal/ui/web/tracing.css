@@ -1,0 +1,32 @@
+/* Both tracing directions share the same panel, dock and arrival cue. */
+:root {--trace-accent:#c5841c;--trace-soft:#f2b02b2b;--trace-halo:#fff;--trace-label-bg:#fff6df;--trace-label-ink:#714b10;}
+:root[data-reading-tone="dark"] {--trace-accent:#efbd61;--trace-soft:#f2bd5430;--trace-halo:#18232b;--trace-label-bg:#45391f;--trace-label-ink:#f4d79d;}
+.trace-dialog[open] {position:fixed;inset:100px 14px auto auto;width:min(520px,calc(100vw - 28px));max-height:calc(100vh - 150px);margin:0;z-index:65;animation:none;}
+.trace-dialog .dialog-body {max-height:calc(100vh - 195px);overflow:auto;}
+.trace-dialog .dialog-title {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.trace-window-actions {display:flex;flex:none;gap:3px;}
+.trace-formula {background:var(--reading-inset,#f5f7f9);color:var(--reading-ink,#53687d);}
+.trace-options {display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.trace-options label {display:flex;align-items:center;gap:8px;color:var(--reading-muted,#687a88);font-size:11px;}
+.trace-options select {width:140px;height:28px;}
+.trace-summary {margin:9px 0;min-height:17px;color:var(--reading-muted,#687a88);font-size:11px;line-height:1.5;outline:none;}
+.trace-item {grid-template-columns:minmax(110px,1.05fr) minmax(0,1.5fr) 52px;background:var(--reading-paper,#fff);border-color:var(--reading-line,#e0e7ec);}
+.trace-ref {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--reading-accent,#2b6398);font-size:11px;}
+.trace-value {color:var(--reading-muted,#65778a);font-size:11px;}
+.trace-go {color:var(--reading-ink,#3c6e9c);background:var(--reading-surface,#fff);border-color:var(--reading-line,#dce5ed);font-size:11px;transition:background-color var(--motion-fast) var(--motion-ease),border-color var(--motion-fast) var(--motion-ease);}
+.trace-go:hover {background:var(--reading-active,#eef5fb);border-color:var(--reading-accent,#8bb0cc);}
+.trace-more {width:100%;min-height:29px;}
+.trace-dock {display:inline-flex;align-items:center;flex:none;border:1px solid var(--reading-line,#dcc79f);border-radius:3px;background:var(--trace-label-bg);overflow:hidden;}
+.trace-dock button {height:17px;min-width:18px;padding:0 4px;border:0;background:transparent;color:var(--trace-label-ink);font-size:10px;white-space:nowrap;cursor:pointer;}
+.trace-dock button:hover {background:var(--reading-active,#f3e7ce);}
+.trace-dock button+button {border-left:1px solid var(--reading-line,#dcc79f);}
+.trace-go:focus-visible,.trace-dock button:focus-visible {outline:2px solid var(--reading-accent,#3679ad);outline-offset:-2px;}
+.trace-arrival-layer {position:absolute;inset:0;z-index:34;pointer-events:none;overflow:hidden;contain:strict;}
+.trace-arrival-box {position:absolute;box-sizing:border-box;border:3px solid var(--trace-accent);outline:2px solid var(--trace-halo);outline-offset:-5px;background:var(--trace-soft);box-shadow:0 0 0 1px var(--trace-halo),0 0 12px #e2ad4a80;animation:trace-arrive 220ms ease-out;}
+.trace-arrival-label {position:absolute;max-width:min(380px,calc(100% - 16px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 8px;border:1px solid var(--trace-accent);border-radius:4px;background:var(--trace-label-bg);color:var(--trace-label-ink);box-shadow:0 2px 8px #20344425;font:600 11px "Segoe UI","Microsoft YaHei UI",sans-serif;}
+@keyframes trace-arrive {from{opacity:.35;box-shadow:0 0 0 4px var(--trace-halo),0 0 18px #e2ad4a90}to{opacity:1;box-shadow:0 0 0 1px var(--trace-halo),0 0 12px #e2ad4a80}}
+/* Consistent lightweight reveals for frequently used controls. Sheet tiles
+ * and worksheet geometry keep their immediate rendering path. */
+.reading-mode-panel:not([hidden]),.calculator-completion:not([hidden]),#analysisRoot:not([hidden]),.toast:not([hidden]),.analysis-toast:not([hidden]) {animation:ui-reveal var(--motion-normal) var(--motion-ease);}
+.calculator-dock:not([hidden]),.trace-dock:not([hidden]) {animation:ui-reveal var(--motion-fast) var(--motion-ease);}
+@media(prefers-reduced-motion:reduce){.trace-arrival-box,.trace-dialog[open],.reading-mode-panel:not([hidden]),.calculator-completion:not([hidden]),#analysisRoot:not([hidden]),.calculator-dock:not([hidden]),.trace-dock:not([hidden]),.toast:not([hidden]),.analysis-toast:not([hidden]){animation:none!important}.trace-go{transition:none!important}}

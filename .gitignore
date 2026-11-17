@@ -1,0 +1,8 @@
+/release/
+/release.stage.*/
+/release.previous.*/
+/artifacts/
+/fortest/
+/validation/*/private/
+*.test
+*.prof
