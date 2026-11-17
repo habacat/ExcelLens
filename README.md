@@ -1,12 +1,14 @@
-# ExcelLens 1.8.19
+# ExcelLens 1.8.20
 
 ExcelLens 是面向高性能阅读设计的 Windows 表格与数据查看工具。它适合打开大型明细表、财务台账和数据库导出文件，在同一个界面里完成浏览、查找、核对与分析。
 
 程序围绕大表阅读组织数据：首次打开时建立索引，滚动和定位时按显示区域读取，重新打开文件时复用缓存。原文件保持原样，批注、计算表和分析设置保存在独立的本机工作区。
 
+1.8.20修复长表上下滚动时部分行重叠、画面间歇空白的问题。
+
 ## 下载与使用
 
-1. 从[当前版本 Release](https://github.com/habacat/ExcelLens/releases/tag/v1.8.19)下载 `ExcelLens_1.8.19_Windows_x64_Full.zip` 并解压。
+1. 解压完整包 `ExcelLens_1.8.20_Windows_x64_Full.zip`；已公开的版本可从[发行页](https://github.com/habacat/ExcelLens/releases)下载。
 2. 运行 `ExcelLens.exe`，选择文件或将文件拖入首页。
 3. 选择工作表，索引完成后即可浏览、搜索、筛选和分析。
 

@@ -1,0 +1,70 @@
+{
+  "result": "PASS",
+  "scope": "O08 scroll geometry development validation; public packaging and CI tracked separately",
+  "releaseVersion": "1.8.20",
+  "developmentVersionUnderBrowserTest": "1.8.19",
+  "assetSHA256": {
+    "app.js": "42bd57a9843ca773b78d9ed9497b1c10a5c491e7c43450d27894c59e96450ade",
+    "virtualscroll.js": "7981a39b521fac696cab422fe73ce2ed33578c835517c43db28673c9cd60aa0d",
+    "style.css": "73d286f461cf08ee3ddf08d30a2c72bba7d346ff612a4026186e94ff39630f3c"
+  },
+  "rootCause": "CSSOM top serialization rounds large coordinates; incremental reuse collapsed distinct rows",
+  "negativeControl": {
+    "actualProductionFollowerUnitFailed": true,
+    "realTXTBrowserFailed": true,
+    "firstFailureStep": 2,
+    "minGap": -25,
+    "maxGap": 75,
+    "sourceValueMismatches": []
+  },
+  "unit": {
+    "tests": 7,
+    "passed": 7,
+    "deepScrollSteps": 720,
+    "zoom": [
+      70,
+      100,
+      125
+    ],
+    "modes": [
+      "unfiltered",
+      "filtered with frozen prefix"
+    ]
+  },
+  "browser": {
+    "product": "Chrome/157.0.8103.79",
+    "fixture": "generated UTF-8 delimited TXT; four text columns and leading-zero identifiers",
+    "rows": 2907951,
+    "fileBytes": 109391036,
+    "checks": 24,
+    "combinations": 6,
+    "cachedWheelEvents": 360,
+    "zoom": [
+      70,
+      100,
+      125
+    ],
+    "frozenModes": [
+      false,
+      true
+    ],
+    "checksInclude": [
+      "per-row geometry and hit testing",
+      "exact source text and type",
+      "empty cells beyond used extent",
+      "native scroll endpoints",
+      "zero extra tile requests during fine scrolling"
+    ],
+    "sourceUnchanged": true,
+    "fixtureSHA256": "b4f68e2427f0732fd64488e085ef17f180ac3f88bb68a90e40e0520a28d77c25",
+    "errors": []
+  },
+  "screenshotsReviewed": [
+    "before wheel collapse",
+    "after fixed wheel scrolling"
+  ],
+  "goConcurrencyChanged": false,
+  "userOriginalTXTTested": false,
+  "desktopManualAcceptance": false,
+  "officeWpsManualAcceptance": false
+}

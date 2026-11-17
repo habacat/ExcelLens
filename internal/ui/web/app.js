@@ -1844,8 +1844,13 @@
     // Browser scroll alone only moves physical pixels, while the row geometry
     // must move by logical pixels. Each row stays near the visible scrollport.
     if(physical===S.renderedScrollTop)return;
-    const delta=(getVirtualScrollTop()-virtualScroll.logical(S.renderedScrollTop))-(physical-S.renderedScrollTop);
-    for(const row of S.renderedRows.values()) row.style.top=`${parseFloat(row.style.top)-delta}px`;
+    // CSSOM serializes large top values to about six significant digits:
+    // neighboring rows near 15 million pixels can read back identically.
+    // Always derive positions from numeric geometry, as renderGrid does;
+    // feeding serialized CSS back into the next scroll collapses those rows.
+    const frozenHeight=S.filtered?sourceRowTop(frozenPanes.effective().rows+1):0;
+    for(const [visual,row] of S.renderedRows)
+      row.style.top=`${virtualScroll.rowPosition(rowTop(visual)+frozenHeight,physical)}px`;
     S.renderedScrollTop=physical;
   }
 

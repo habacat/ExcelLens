@@ -30,7 +30,7 @@
 | [user/functions.md](user/functions.md) | 从引擎生成的函数清单 |
 | [development/architecture.md](development/architecture.md) | 包职责、依赖规则和格式接入方式 |
 | [development/reading-benchmarks.md](development/reading-benchmarks.md) | 当前版阅读用时、测试环境及复现方法 |
-| [development/ui-stability.md](development/ui-stability.md) | 右键菜单层级、冻结请求归属与小屏工具栏 |
+| [development/ui-stability.md](development/ui-stability.md) | 长表滚动行坐标、右键菜单层级、冻结请求归属与小屏工具栏 |
 | [development/windows-race.md](development/windows-race.md) | Windows竞态错误87的复现、原因和检查配置 |
 | [development/improvement-progress.md](development/improvement-progress.md) | 调研改进的实际完成状态与后续阶段 |
 | [development/row-order-and-sort.md](development/row-order-and-sort.md) | 第二阶段行序、外部排序和实际规模验证 |
@@ -62,8 +62,9 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
-| [releases/1.8.19.md](releases/1.8.19.md) | 当前版本的功能汇总、验证及构建结果 |
-| releases/ | 当前1.8.19版本说明 |
+| [releases/1.8.19.md](releases/1.8.19.md) | 1.8.19的功能汇总、验证及构建结果 |
+| [releases/1.8.20.md](releases/1.8.20.md) | 长表滚动根因修复及验证结果 |
+| releases/ | 各发布版本的说明 |
 | [CHANGELOG.md](CHANGELOG.md) | 当前版本变更 |
 | validation/（源码仓库） | 当前自动检查的必要摘要，不含原始日志或私有资料 |
 

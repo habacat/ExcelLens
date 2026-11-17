@@ -10,7 +10,7 @@
   "docs/README.md",
   "docs/development/architecture.md",
   "docs/development/reading-benchmarks.md",
-  "validation/{version}/reading-benchmarks.json",
+  "validation/1.8.19/reading-benchmarks.json",
   "docs/development/ui-stability.md",
   "docs/development/row-order-and-sort.md",
   "docs/development/reconciliation.md",
