@@ -1,5 +1,5 @@
 /* ExcelLens formula inspector. Read-only A1-reference lexer and interactive
- * preview. No formula evaluation and no workbook mutation. No dependencies.
+ * preview. No formula evaluation and no workbook mutation. Uses shared column labels.
  */
 (() => {
   'use strict';
@@ -8,11 +8,7 @@
   const wordChar = c => Boolean(c) && /[\p{L}\p{N}_.]/u.test(c);
   const letter = c => Boolean(c) && /[A-Za-z]/.test(c);
   const number = c => Boolean(c) && c >= '0' && c <= '9';
-  const pretty = n => {
-    let s = '';
-    for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
-    return s;
-  };
+  const pretty = window.ExcelLensAddress.columnName;
   const address = (row, col) => `${pretty(col)}${row}`;
 
   function skipString(s, i) {
@@ -60,8 +56,7 @@
     while (letter(s[p]) && p-start < 4) p++;
     const letters=s.slice(start,p);
     if (letters.length > 0 && letters.length <= 3) {
-      let col=0;
-      for(const l of letters.toUpperCase()) col=col*26+l.charCodeAt(0)-64;
+      const col = window.ExcelLensAddress.columnNumber(letters);
       if(col<1 || col>MAX_COL) return null;
       if(s[p]==='$') p++;
       const rs=p;

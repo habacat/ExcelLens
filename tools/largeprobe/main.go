@@ -132,7 +132,7 @@ func run(count int, output string) error {
 	}); err != nil {
 		return err
 	}
-	if len(idx.Rows) != 0 && count > 262144 {
+	if len(idx.ResidentRows) != 0 && count > 262144 {
 		return fmt.Errorf("large offsets remained resident")
 	}
 	indexStat, _ := os.Stat(idx.IndexPath)
@@ -277,7 +277,7 @@ func run(count int, output string) error {
 	if before != after {
 		return fmt.Errorf("source changed")
 	}
-	report := map[string]any{"version": buildinfo.Version, "result": "PASS", "rows": count + 1, "columns": 3, "sourceSHA256": before, "sourceUnchanged": true, "indexBytes": indexStat.Size(), "rowCacheBytes": dataStat.Size(), "residentOffsets": len(idx.Rows), "phases": results, "billionRecordBenchmark": false, "desktopManualAcceptance": false}
+	report := map[string]any{"version": buildinfo.Version, "result": "PASS", "rows": count + 1, "columns": 3, "sourceSHA256": before, "sourceUnchanged": true, "indexBytes": indexStat.Size(), "rowCacheBytes": dataStat.Size(), "residentOffsets": len(idx.ResidentRows), "phases": results, "billionRecordBenchmark": false, "desktopManualAcceptance": false}
 	data, _ := json.MarshalIndent(report, "", "  ")
 	return os.WriteFile(filepath.Join(output, "result.json"), append(data, '\n'), 0600)
 }

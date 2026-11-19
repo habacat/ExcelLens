@@ -13,7 +13,7 @@ import (
 	"excellens/internal/formats"
 )
 
-const sourceLayoutCacheVersion = 6
+const sourceLayoutCacheVersion = 7
 
 // SourceLayout is the common display contract for OOXML, BIFF and HTML.
 // User overrides are stored separately and always take precedence.

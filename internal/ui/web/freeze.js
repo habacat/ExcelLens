@@ -156,7 +156,11 @@
       s.frozenCellMap.clear();
       // Border resolution may need a later covered cell of a merged range.
       // Make every fetched model available before painting the first anchor.
-      for(const part of [corner,top,left])for(const row of part?.rows||[])for(const cell of row.cells||[])s.frozenCellMap.set(`${this.o.colName(cell.col)}${row.number}`,cell);
+      const borderRows=new Map();
+      for(const part of [corner,top,left])for(const row of part?.rows||[]){
+        borderRows.set(row.number,row);
+        for(const cell of row.cells||[])s.frozenCellMap.set(`${this.o.colName(cell.col)}${row.number}`,cell);
+      }
       // The independent frozen-pane painter follows the same visible-column
       // spill rule as the scrolling grid, including originally hidden columns.
       const topCols=req.selectedCols||Array.from({length:req.cols},(_,i)=>topCol+i);
@@ -166,6 +170,7 @@
       const pinnedPositions=new Map(pinnedLayouts.map((c,i)=>[c.col,i]));
       const following=layouts=>new Map(layouts.map((part,i)=>[part.col,layouts[i+1]?.col||0]));
       const topNext=following(topLayouts),pinnedNext=following(pinnedLayouts);
+      const borderColumns=[...pinnedLayouts,...topLayouts].map(layout=>layout.col);
       const rowColumns=new WeakMap();
       const cellByColumn=data=>{
         if(!data)return null;
@@ -176,7 +181,8 @@
       const make = (data, col, row, visual, x, y, type='body', nextData=null, nextCol=0, outerLeft=false) => {
         const el = document.createElement('div');
         const ref = `${this.o.colName(col)}${row}`;
-        const cell = cellByColumn(data)?.[col];
+        const base = cellByColumn(data)?.[col];
+        const cell = this.o.projectCell ? this.o.projectCell(ref,base) : base;
         const selectedColumns=s.columnSelection;
         const highlighted=selectedColumns&&col>=Math.min(selectedColumns.start,selectedColumns.end)&&col<=Math.max(selectedColumns.start,selectedColumns.end);
         el.className = 'grid-cell pinned-cell' + (highlighted?' column-range-cell':'');
@@ -184,10 +190,11 @@
         el.style.width = `${colWidth(col)}px`;el.style.height = `${type==='left'?rowHeight(visual):sourceHeight(row)}px`;
         el.dataset.ref = ref; el.dataset.row = String(row);
         el.dataset.col = String(col); el.dataset.visualIndex = String(visual);
-        this.o.paintCell(el,cell,data);if(cell)s.frozenCellMap.set(ref,cell);
+        this.o.paintCell(el,cell,data);if(base)s.frozenCellMap.set(ref,base);
         const rightCell=cellByColumn(data)?.[nextCol];
         const belowCell=cellByColumn(nextData)?.[col];
-        this.o.updateSharedBorders(el,cell,data,rightCell,data,belowCell,nextData,{outerLeft,outerTop:row===1});
+        this.o.updateSharedBorders(el,cell,data,rightCell,data,belowCell,nextData,{
+          nextCol,columns:borderColumns,rows:borderRows,lastRow:type==='left'?req.displayEnd:nr,outerLeft,outerTop:sourceTop(row)===0});
         this.o.decorateMergedCell?.(el,row,col);
         if(cell && this.o.extendTextIntoBlanks){
           const pinned=type==='corner'||type==='left';

@@ -203,14 +203,11 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, "找不到指定工作表")
 		return
 	}
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-r.Context().Done():
+	release, err := a.lockQueryRead(r.Context())
+	if err != nil {
 		return
 	}
-	a.cacheMu.RLock()
-	defer a.cacheMu.RUnlock()
+	defer release()
 	if a.currentWorkbook() != wb {
 		writeError(w, 409, "工作簿已切换")
 		return

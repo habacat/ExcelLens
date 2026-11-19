@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const h={window:{}};for(const n of ['conditional','richtext','clipboard','wire'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+n+'.js','utf8'),h);
+const h={window:{}};for(const n of ['cell-address','conditional','richtext','clipboard','wire'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+n+'.js','utf8'),h);
 h.window.ExcelLensClipboard.configure({rows:10,columns:10,cells:100,textBytes:10000,htmlBytes:20000});
 test('conditional display and clipboard keep exact source text, false font flags and known/pending effects',()=>{
   const cell={col:1,raw:'9007199254740993.31',display:'source display',style:0,valueColor:'#008800',conditional:{style:{font:{bold:false}},visual:{bold:false,color:'#FF0033',background:'#FFFF00'},display:'derived display',valueColor:'',notice:'一条规则尚未求值'}},before=JSON.stringify(cell);

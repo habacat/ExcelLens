@@ -8,13 +8,41 @@ function setup(){
     close(){this.open=false;for(const fn of this.listeners.close||[])fn();}focus(){}
   }
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
-  const ctx={window:{},document:{getElementById:node,createElement:tag=>Object.assign(new Node(),{tag}),createDocumentFragment:()=>Object.assign(new Node(),{fragment:true})},AbortController,Intl};
+  const timers=new Map();let timerID=0;
+  const ctx={window:{},document:{getElementById:node,createElement:tag=>Object.assign(new Node(),{tag}),createDocumentFragment:()=>Object.assign(new Node(),{fragment:true})},AbortController,Intl,
+    setTimeout:fn=>{timers.set(++timerID,fn);return timerID;},clearTimeout:id=>timers.delete(id)};
   for(const file of ['task-recovery-model.js','task-recovery.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),ctx);
   const s={opened:true,book:'book',workbookKey:'hash',sheetEpoch:1},calls=[],adopted=[],notices=[];
   const item={id:'a'.repeat(32),revision:'9007199254740993',driver:'source-search',kind:'query',file:'账目.csv',path:'C:/source/账目.csv',book:'book',workbookKey:'hash',sheet:'数据',query:'金额',mode:'value',scope:'current',updated:'2026-11-17T00:00:00Z',busy:false,complete:false,backup:false,error:''};
   const center=new ctx.window.ExcelLensTaskRecovery({state:s,maximum:32,api:async(url,opts)=>{calls.push({url,body:opts?.body&&JSON.parse(opts.body)});return url==='/api/tasks'?{items:[item]}:{jobId:'own-job',operation:'search'};},toast:x=>notices.push(x),openDialog:id=>node(id).open=true,context:()=>JSON.stringify(s),openSource:async()=>{},canResume:()=>true,adopt:async(...args)=>{adopted.push(args);return true;}});
-  return {center,s,calls,adopted,notices,node,item,model:ctx.window.ExcelLensTaskRecoveryModel};
+  node('welcome').hidden=true;
+  return {center,s,calls,adopted,notices,node,item,timers,model:ctx.window.ExcelLensTaskRecoveryModel};
 }
+test('home shows only actionable checkpoints and rechecks a running task when it settles',async()=>{
+  const h=setup(),button=h.node('taskRecoveryHome');
+  h.node('welcome').hidden=false;button.hidden=true;
+  let items=[];
+  h.center.api=async url=>{assert.equal(url,'/api/tasks');return {items};};
+  for(const row of [null,{error:'记录损坏',revision:'0'},{driver:'unknown'}]){
+    items=row?[{...h.item,...row}]:[];
+    await h.center.refreshHome();assert.equal(button.hidden,true);assert.equal(h.timers.size,0);
+  }
+  items=[{...h.item,busy:true}];await h.center.refreshHome();
+  assert.equal(button.hidden,true);assert.equal(h.timers.size,1);
+  items=[{...h.item,backup:false}];await [...h.timers.values()][0]();
+  assert.equal(button.hidden,false);assert.equal(h.timers.size,0);
+  items=[{...h.item,complete:true,driver:'source-export'}];await h.center.refreshHome();assert.equal(button.hidden,false);
+  h.center.api=async()=>{throw Error('unavailable');};await h.center.refreshHome();assert.equal(button.hidden,true);
+  assert.equal(h.node('taskRecoveryDialog').open,false);assert.equal(h.adopted.length,0);
+});
+test('late home reads cannot resurrect the button after the last recoverable task is removed',async()=>{
+  const h=setup(),gate=deferred(),button=h.node('taskRecoveryHome');h.node('welcome').hidden=false;
+  h.center.api=()=>gate.promise;const first=h.center.refreshHome();
+  h.center.api=async()=>({items:[h.item,{...h.item,id:'b'.repeat(32),error:'不可恢复'}]});
+  await h.center.open();assert.equal(button.hidden,false);
+  await h.center.run(h.center.items[0],'remove');assert.equal(button.hidden,true);
+  gate.resolve({items:[h.item]});await first;assert.equal(button.hidden,true);
+});
 test('opening the task directory only lists metadata and preserves precise revisions',async()=>{
   const h=setup();await h.center.open();assert.deepEqual(h.calls.map(x=>x.url),['/api/tasks']);
   await h.center.run(h.center.items[0],'resume');assert.equal(h.calls[1].body.revision,'9007199254740993');assert.equal(h.calls[1].body.book,'book');assert.equal(h.adopted.length,1);

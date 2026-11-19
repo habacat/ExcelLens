@@ -6,21 +6,21 @@ function setup(){
   const black='0.667px solid #000000',style={borderTop:black,borderBottom:black,borderLeft:black,borderRight:black};
   const S={showStyles:true,styles:[{},style],cellMap:new Map(),frozenCellMap:new Map()},colName=c=>String.fromCharCode(64+c);
   const source=read('app.js'),a=source.indexOf('  const visualForBorder='),b=source.indexOf('  function toggleOriginalFormat(',a);
-  Object.assign(context,{S,activeMerge:(r,c)=>merge.at(r,c),colName});vm.runInNewContext(source.slice(a,b)+';this.paint=updateSharedBorders;',context);
+  Object.assign(context,{S,activeMerge:(r,c)=>merge.at(r,c),colName,nextVisibleRow:r=>r,rowTop:r=>(r-1)*25,colLeft:c=>(c-1)*80});vm.runInNewContext(source.slice(a,b)+';this.paint=updateSharedBorders;',context);
   const node=(row,col)=>({dataset:{row:String(row),col:String(col)},style:{removeProperty(k){delete this[k];delete this[k.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];}}});
   const row={number:8,cells:[{col:6,style:1},{col:8,style:1},{col:10,style:1},{col:5,style:1},{col:11,style:1}]};
   return {context,S,node,row,black};
 }
-test('merged headers own full top/left borders while covered blanks do not leave gaps',()=>{
+test('all preceding cells draw a merged header edge at the same trailing pixel as ordinary cells',()=>{
   const {context,node,row,black}=setup(),anchor=node(8,6);context.paint(anchor,row.cells[0],row,null,row,{style:1},{number:9});
-  assert.equal(anchor.style.borderTop,black);assert.equal(anchor.style.borderLeft,undefined);
-  for(const col of [6,7]){const above=node(7,col);context.paint(above,null,{number:7},null,null,col===6?row.cells[0]:null,row);assert.equal(above.style.borderBottom,'0px','covered column '+col+' must defer to full merged border');}
+  assert.equal(anchor.style.borderTop,undefined);assert.equal(anchor.style.borderLeft,undefined);
+  for(const col of [6,7]){const above=node(7,col);context.paint(above,null,{number:7},null,null,col===6?row.cells[0]:null,row);assert.equal(above.style.borderBottom,black,'covered column '+col+' must borrow the merged border');}
 });
 test('adjacent merged headers choose their real outer seam and frozen anchors resolve identically',()=>{
   const {context,S,node,row,black}=setup();
-  const left=node(8,6);context.paint(left,row.cells[0],row,null,row,null,{number:9});assert.equal(left.style.borderRight,'0px');
-  S.frozenCellMap.set('J8',row.cells[2]);const below=node(9,9);context.paint(below,{style:1},{number:9},null,{number:9},null,null);assert.equal(below.style.borderRight,'0px');
-  const frozen=node(8,10);context.paint(frozen,row.cells[2],row,null,row,null,{number:9});assert.equal(frozen.style.borderLeft,black);assert.equal(frozen.style.borderTop,black);
+  const left=node(8,6);context.paint(left,row.cells[0],row,null,row,null,{number:9});assert.equal(left.style.borderRight,black);
+  S.frozenCellMap.set('J8',row.cells[2]);const below=node(9,9);context.paint(below,null,{number:9},null,{number:9},null,null);assert.equal(below.style.borderRight,black);
+  const frozen=node(8,10);context.paint(frozen,row.cells[2],row,null,row,null,{number:9});assert.equal(frozen.style.borderLeft,undefined);assert.equal(frozen.style.borderTop,undefined);
 });
 
 test('two-row currency and direction headers retain the entire right border next to one-row merges',()=>{
@@ -34,7 +34,7 @@ test('two-row currency and direction headers retain the entire right border next
 test('merged XLS/XLSX perimeter reads borders from styled covered corners',()=>{
   const {context,S,node,row,black}=setup();S.styles.push({borderTop:black,borderLeft:black});S.styles.push({borderBottom:black,borderRight:black});
   S.cellMap.set('E9',{col:5,style:3});const anchor=node(8,5);context.paint(anchor,{col:5,style:2},row,null,row,null,{number:9});assert.equal(anchor.style.borderBottom,black);assert.equal(anchor.style.borderRight,black);
-  S.cellMap.clear();S.frozenCellMap.set('G8',{col:7,style:3});const wide=node(8,6);context.paint(wide,{col:6,style:2},row,null,row,null,{number:9});assert.equal(wide.style.borderBottom,black);assert.equal(wide.style.borderRight,'0px');
+  S.cellMap.clear();S.frozenCellMap.set('G8',{col:7,style:3});const wide=node(8,6);context.paint(wide,{col:6,style:2},row,null,row,null,{number:9});assert.equal(wide.style.borderBottom,black);assert.equal(wide.style.borderRight,black);
 });
 
 test('conditional borders use the same seam and merged-perimeter model and clear when absent or disabled',()=>{
@@ -45,4 +45,24 @@ test('conditional borders use the same seam and merged-perimeter model and clear
   S.cellMap.set('E9',{col:5,style:1,conditional:{visual:{borderRight:red,borderBottom:blue}}});S.styles.push({borderTop:black,borderLeft:black});
   const anchor=node(8,5);context.paint(anchor,{col:5,style:2},row,null,null,null,null);assert.equal(anchor.style.borderRight,red);assert.equal(anchor.style.borderBottom,blue);
   S.showStyles=false;context.paint(anchor,{col:5,style:2},row,null,null,null,null);assert.equal(anchor.style.borderRight,undefined);assert.equal(anchor.style.borderBottom,undefined);
+});
+
+test('a long shared edge preserves partial neighbor styles and removes segments when its node is reused',()=>{
+  const {context,black}=setup(),borders=context.window.ExcelLensGridBorders;
+  const element=()=>({
+    style:{removeProperty(key){delete this[key.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];}},
+    children:[],setAttribute(){},appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+    remove(){this.parentNode.children.splice(this.parentNode.children.indexOf(this),1);},get lastChild(){return this.children.at(-1);}
+  });
+  context.document={createElement:element};
+  const red='2px dashed #FF0000';
+  const runs=borders.runs(2,6,5,n=>n,n=>n<4?black:n===4?red:'','');
+  assert.deepEqual(Array.from(runs,part=>[part.start,part.end,part.style]),[[2,4,black],[4,5,red],[5,7,'']]);
+  const cell=element(),offset=c=>c*31;
+  borders.paint(cell,'bottom',runs,offset);
+  assert.equal(cell.style.borderBottom,'0px');
+  assert.deepEqual(cell.children[0].children.map(line=>[line.style.left,line.style.width,line.style.borderBottom]),
+    [['0px','62px',black],['62px','31px',red],['93px','62px','var(--grid-default-seam)']]);
+  borders.paint(cell,'bottom',black,offset);
+  assert.equal(cell.children.length,0);assert.equal(cell.style.borderBottom,black);
 });

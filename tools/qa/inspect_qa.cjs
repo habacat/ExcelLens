@@ -60,7 +60,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  };
 })();`;
  await ev(mock);
- for(const f of ['recent.js','multisort.js','selectionstats.js','inspect.js','clipboard.js','geometry.js','freeze.js','autofilter.js','export.js','bookmarks.js','profile.js','formula_inspector.js','app.js'])await ev(fs.readFileSync(path.join(root,f),'utf8'));
+ for(const f of ['cell-address.js','recent.js','multisort.js','selectionstats.js','inspect.js','clipboard.js','geometry.js','freeze.js','autofilter.js','export.js','bookmarks.js','profile.js','formula_inspector.js','viewport-cache.js','command-palette.js','app.js'])await ev(fs.readFileSync(path.join(root,f),'utf8'));
  await eventually('document.querySelector("#indexOverlay").hidden && document.querySelector("#workspace").hidden === false && document.querySelector(".grid-cell[data-ref=B2]")');
  await wait(250);
  const base=await ev('({cell:document.querySelector(".grid-cell[data-ref=B2]").textContent,sheets:window.__inspectTest.sheets})');

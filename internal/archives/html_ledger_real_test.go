@@ -66,8 +66,8 @@ func TestProvidedHTMLLedgerArchive(t *testing.T) {
 	canonical := sha256.New()
 	formulas := 0
 	var initial []workbook.RowData
-	for start := 0; start < len(idx.Rows); start += 1024 {
-		rows, err := wb.ReadRows(idx, start, min(1024, len(idx.Rows)-start), 1, 14)
+	for start := 0; start < idx.RowCount(); start += 1024 {
+		rows, err := wb.ReadRows(idx, start, min(1024, idx.RowCount()-start), 1, 14)
 		if err != nil {
 			t.Fatal(err)
 		}

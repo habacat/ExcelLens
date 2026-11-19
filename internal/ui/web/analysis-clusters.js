@@ -2,7 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id);
   const interrupted=()=>Object.assign(Error('疑似重复检查已取消'),{name:'AbortError'});
-  const colName=n=>{let text='';while(n>0){n--;text=String.fromCharCode(65+n%26)+text;n=Math.floor(n/26);}return text;};
+  const colName = window.ExcelLensAddress.columnName;
   const model={
     identity:(c,scopeKey)=>JSON.stringify([c.bookKey,c.book,c.opened,c.source,c.headerRow,scopeKey(c.sourceScope)]),
     owner(data,c,job,field,scopeKey){

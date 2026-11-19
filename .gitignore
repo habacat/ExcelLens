@@ -4,5 +4,6 @@
 /artifacts/
 /fortest/
 /validation/*/private/
+/tools/qa/__pycache__/
 *.test
 *.prof

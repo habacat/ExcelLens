@@ -74,9 +74,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  await evaluate(fs.readFileSync(ROOT+'export.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'bookmarks.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'profile.js','utf8'));
+ await evaluate(fs.readFileSync(ROOT+'cell-address.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'formula_inspector.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'formula_inspector.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'app.js','utf8'));
+ for(const asset of ['viewport-cache.js','command-palette.js','app.js']) await evaluate(fs.readFileSync(ROOT+asset,'utf8'));
 
  console.log('loaded scripts');
  await waitFor('document.querySelector("#globalStatus")?.textContent.includes("已打开")');

@@ -15,7 +15,17 @@ async function close(p,id){await p.run(id=>document.querySelector(id).close(),id
 async function shot(p,name){const file=path.join(out,name+'.png');await p.evaluate('Promise.all(document.getAnimations().filter(a=>Number.isFinite(a.effect?.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{})))');await p.shot(file);report.screenshots.push(path.relative(root,file).replaceAll('\\','/'));}
 async function upload(p,file){await p.file('#fileInput',file);await p.wait(ready+'&&document.querySelector("#fileBadge").textContent==='+JSON.stringify(path.basename(file)));}
 async function catalog(p){return (await p.api('/api/tasks')).items;}
-async function openTasks(p){await p.click('#taskRecoveryHome');await p.wait('document.querySelector("#taskRecoveryDialog").open&&document.querySelector("#taskRecoveryStatus").hidden');}
+async function openTasks(p){
+  if(await p.evaluate('!document.querySelector("#welcome").hidden')){
+    await p.wait('document.querySelector(".recent-heading #taskRecoveryHome").getClientRects().length>0');
+    await p.click('#taskRecoveryHome');
+  }else{
+    await p.click('#commandOpenBtn');
+    await p.run(()=>{const field=document.querySelector('#commandSearch');field.value='任务恢复';field.dispatchEvent(new Event('input',{bubbles:true}));});
+    await p.click('#commandList .command-entry');
+  }
+  await p.wait('document.querySelector("#taskRecoveryDialog").open&&document.querySelector("#taskRecoveryStatus").hidden');
+}
 function unzip(data){
   let end=data.length-22;while(end>=Math.max(0,data.length-65557)&&data.readUInt32LE(end)!==0x06054b50)end--;assert(end>=0,'missing zip directory');
   const count=data.readUInt16LE(end+10),result={};let offset=data.readUInt32LE(end+16);
@@ -26,8 +36,17 @@ function unzip(data){
   return result;
 }
 async function download(p,name){
-  const folder=fs.mkdtempSync(path.join(out,name+'-'));await p.call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:folder});await p.click('#exportDownload');
-  for(let n=0;n<400;n++){const files=fs.readdirSync(folder);if(files.length===1&&!files[0].endsWith('.crdownload')){const file=path.join(folder,files[0]),data=fs.readFileSync(file);if(data.length)return {file,data};}await pause(50);}throw Error('Download timeout '+name);
+  const folder=fs.mkdtempSync(path.join(out,name+'-'));
+  const link=await p.run(()=>{const a=document.querySelector('#exportDownload');return {id:new URL(a.href).searchParams.get('id'),name:a.download};});
+  const status=await p.api('/api/export/status?id='+encodeURIComponent(link.id));
+  assert.equal(status.status,'done');assert.equal(link.name,status.fileName);assert.equal(path.basename(link.name),link.name);
+  const file=path.join(folder,link.name);
+  await p.call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:folder});await p.click('#exportDownload');
+  for(let n=0;n<400;n++){
+    if(fs.existsSync(file)&&fs.statSync(file).size===status.size)return {file,data:fs.readFileSync(file)};
+    await pause(50);
+  }
+  throw Error('Download timeout '+name);
 }
 async function monitor(p){await p.run(()=>{
   const original=window.fetch.bind(window);window.__taskQA={calls:[],starts:[],lastFilter:null,holds:[],holdResume:false};
@@ -57,8 +76,10 @@ try{
     report.checks.push('eight served production assets match current disk SHA256; bootstrap version and injected checkpoint capacity match their single Go sources');report.result='PASS';return;
   }
   await monitor(p);
-  await openTasks(p);assert.equal((await p.api('/api/status')).opened,false);assert.deepEqual(await catalog(p),[]);await p.click('#taskRecoveryClose');
-  report.checks.push('home directory opens with no source, index or automatically resumed task');
+  await p.wait('performance.getEntriesByType("resource").some(entry=>new URL(entry.name).pathname==="/api/tasks")');
+  assert.equal((await p.api('/api/status')).opened,false);assert.deepEqual(await catalog(p),[]);
+  assert.ok(await p.evaluate('document.querySelector("#taskRecoveryHome").hidden && !document.querySelector("#editCopyHome") && !document.querySelector("#taskRecoveryDialog").open'));
+  report.checks.push('empty home has no task or edit action and does not open a source or start a job');
   stage='opt-in query';await upload(p,source);const originalStatus=await p.api('/api/status'),sheet=originalStatus.sheets[0].name;
   await p.click('#searchOpenBtn');await set(p,'#searchInput','000001000');await p.click('#searchBtn');await p.wait('!document.querySelector("#searchBtn").disabled');assert.equal((await catalog(p)).length,0);
   await set(p,'#searchRecoverable',true);await p.click('#searchBtn');await p.wait('!document.querySelector("#searchBtn").disabled');
@@ -83,6 +104,11 @@ try{
   assert.equal((await catalog(p)).length,9);
   report.checks.push('all six original export formats opt in through the existing export center and download real files with source leading-zero IDs and exact amount text');
   stage='real restart and catalog';const address=await h.restart();await p.call('Page.navigate',{url:address});await p.wait('document.readyState==="complete"&&!!window.ExcelLensWorkbookReady');await p.evaluate('window.ExcelLensWorkbookReady');await monitor(p);assert.equal((await p.api('/api/status')).opened,false);
+  await p.wait('document.querySelector(".recent-heading #taskRecoveryHome").getClientRects().length>0');
+  await p.call('Emulation.setDeviceMetricsOverride',{width:420,height:780,deviceScaleFactor:1,mobile:false});
+  assert.ok(await p.run(()=>{const button=document.querySelector('#taskRecoveryHome').getBoundingClientRect(),header=document.querySelector('.recent-heading').getBoundingClientRect();return button.width>0&&button.left>=header.left&&button.right<=header.right&&header.right<=innerWidth;}));
+  await shot(p,'home-recovery-420px');
+  await p.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1050,deviceScaleFactor:1,mobile:false});
   await openTasks(p);assert.equal((await catalog(p)).length,9);assert.equal((await p.api('/api/status')).opened,false);
   await shot(p,'tasks-desktop');await p.call('Emulation.setDeviceMetricsOverride',{width:420,height:780,deviceScaleFactor:1,mobile:false});
   const layout=()=>{const dialog=document.querySelector('#taskRecoveryDialog'),list=document.querySelector('#taskRecoveryList'),rect=dialog.getBoundingClientRect();return {left:rect.left,right:rect.right,bottom:rect.bottom,width:innerWidth,height:innerHeight,scroll:list.scrollHeight>list.clientHeight,dialogOverflow:dialog.scrollHeight>dialog.clientHeight+1,listOverflow:list.scrollWidth>list.clientWidth+1,buttons:[...dialog.querySelectorAll('button')].every(x=>{const b=x.getBoundingClientRect();return b.left>=rect.left&&b.right<=rect.right;})};};
@@ -124,6 +150,13 @@ try{
   assert.equal(await p.evaluate('document.body.classList.contains("home-view")'),false);assert.equal(await p.evaluate('document.querySelector("#filterRules").hidden&&document.querySelector("#applyFilterBtn").hidden'),true);assert.equal((await p.evaluate('window.__taskQA.lastFilter')).matchedRows,10287);
   await close(p,'#filterDialog');await p.click('#advancedFilterBtn');assert.equal(await p.evaluate('document.querySelector("#filterRules").hidden||document.querySelector("#applyFilterBtn").hidden'),false);await close(p,'#filterDialog');
   report.checks.push('resume from home reveals the workspace; recovered multi-value predicates remain exact and use progress/cancel controls; a newly opened advanced query restores its normal editor');
+  stage='last recoverable task';await p.click('#homeBtn');await openTasks(p);
+  for(const item of await catalog(p)){
+    await taskAction(p,item.id,'remove');await p.wait(`!document.querySelector('[data-task-id="${item.id}"]')`);
+  }
+  await p.click('#taskRecoveryClose');await p.wait('document.querySelector("#taskRecoveryHome").hidden');
+  assert.deepEqual(await catalog(p),[]);
+  report.checks.push('discarding the last usable checkpoint hides the home action immediately');
   assert.equal(digest(fs.readFileSync(source)),before);assert.equal(digest(fs.readFileSync(copy)),before);assert.deepEqual(report.errors,[]);
   report.sourceSHA256=before;report.sourceUnchanged=true;report.result='PASS';
 }catch(error){report.failure=error.stack||String(error);report.failedStage=stage;if(h){try{report.diagnostic=await h.page.run(()=>({file:document.querySelector('#fileBadge')?.textContent,status:document.querySelector('#taskRecoveryStatus')?.textContent,search:document.querySelector('#searchSummary')?.textContent,filter:document.querySelector('#filterProgressText')?.textContent,export:document.querySelector('#exportStage')?.textContent,starts:window.__taskQA?.starts.slice(-3),calls:window.__taskQA?.calls.slice(-15)}));await h.page.shot(path.join(out,'failure.png'));}catch(e){report.diagnosticError=e.message;}}process.exitCode=1;

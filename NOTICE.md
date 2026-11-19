@@ -1,8 +1,8 @@
-ExcelLens is a read-only local data viewer built with Go and a native web frontend. It has no CGO, Office, Oracle-client, or external archive-program runtime requirement.
+ExcelLens is a local data viewer and editing-copy tool built with Go and a native web frontend. The Windows application runs without CGO, Office, an Oracle client, or an external archive program.
 
 ExcelLens source code is licensed under the MIT License; see LICENSE. Third-party dependencies retain their own licenses as listed in THIRD_PARTY_NOTICES.txt.
 
-The workbook readers implement read-only subsets of OOXML, BIFF8 XLS, and Office/WPS HTML tables, plus CSV/TSV/Oracle text and SQLite. They do not execute Microsoft Excel, WPS, VBA, source formulas, or external resources. External rows are indexed in an independent binary cache; source data is never rewritten.
+The workbook readers support subsets of OOXML, BIFF8 XLS, Office/WPS HTML tables, CSV/TSV/Oracle text and SQLite. External rows are indexed in an independent binary cache. In an explicit editing copy, the Go calculation engine evaluates supported formulas and writes confirmed changes to a separate file. Original source files remain read-only.
 
 SQLite uses Windows' built-in winsqlite3.dll. GB18030 uses Windows APIs on Windows. Native archive and portable text decoding use pinned pure-Go dependencies, including github.com/bodgit/sevenzip, github.com/ulikunitz/xz, golang.org/x/text and their transitive dependencies. All vendored license notices and exact versions are included in THIRD_PARTY_NOTICES.txt and vendor/modules.txt in the source distribution.
 

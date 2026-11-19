@@ -61,6 +61,9 @@ func Functions() []FunctionSpec {
 }
 
 func (e *formulaEval) function(n *formulaNode) (FormulaValue, error) {
+	if n.op == "SUBTOTAL" && e.worksheet {
+		return e.worksheetSubtotal(n)
+	}
 	spec := formulaFunctions[n.op]
 	if len(n.args) < spec.min || len(n.args) > spec.max {
 		return FormulaValue{}, fmt.Errorf("#VALUE! %s 参数数量不正确", n.op)
@@ -396,10 +399,19 @@ func (e *formulaEval) scalarFunction(n *formulaNode) (FormulaValue, error) {
 }
 func (e *formulaEval) aggregate(n *formulaNode) (FormulaValue, error) {
 	sum := new(big.Rat)
+	var nativeSum float64
+	addSum := func(value *big.Rat) {
+		if e.worksheet {
+			n, _ := value.Float64()
+			nativeSum += n
+		} else {
+			sum.Add(sum, value)
+		}
+	}
 	var low, high *big.Rat
 	count, nonempty := int64(0), int64(0)
 	add := func(v *big.Rat) {
-		sum.Add(sum, v)
+		addSum(v)
 		if low == nil || v.Cmp(low) < 0 {
 			low = new(big.Rat).Set(v)
 		}
@@ -428,7 +440,7 @@ func (e *formulaEval) aggregate(n *formulaNode) (FormulaValue, error) {
 				nonempty += rv.Count
 			}
 			if rv.Count > 0 && rv.Sum != nil {
-				sum.Add(sum, rv.Sum)
+				addSum(rv.Sum)
 				if rv.Min != nil && (low == nil || rv.Min.Cmp(low) < 0) {
 					low = new(big.Rat).Set(rv.Min)
 				}
@@ -500,6 +512,10 @@ func (e *formulaEval) aggregate(n *formulaNode) (FormulaValue, error) {
 			return FormulaValue{}, errors.New("#DIV/0! 没有数值")
 		}
 		sum.Quo(sum, big.NewRat(count, 1))
+		nativeSum /= float64(count)
+	}
+	if e.worksheet {
+		return worksheetNumber(nativeSum)
 	}
 	return NumberValue(sum), nil
 }

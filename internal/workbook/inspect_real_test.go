@@ -32,7 +32,7 @@ func TestRealInspectLargeSheet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("index %s, actual rows=%d, used=%d x %d, XML %.0f MB", time.Since(started), len(idx.Rows), idx.MaxRow, idx.MaxCol, float64(idx.XMLSize)/1e6)
+	t.Logf("index %s, actual rows=%d, used=%d x %d, XML %.0f MB", time.Since(started), idx.RowCount(), idx.MaxRow, idx.MaxCol, float64(idx.XMLSize)/1e6)
 	for _, opt := range []InspectOptions{
 		{Mode: "duplicates", FirstRow: 2, LastRow: idx.MaxRow, FirstCol: 2, LastCol: 2, Limit: 800},
 		{Mode: "formulas", FirstRow: 1, LastRow: idx.MaxRow, FirstCol: 1, LastCol: idx.MaxCol, Limit: 800},

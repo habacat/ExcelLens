@@ -283,7 +283,7 @@ func lookupFunction(e *formulaEval, node *formulaNode) (FormulaValue, error) {
 		if err != nil {
 			return FormulaValue{}, err
 		}
-		rows, cols, err := rangeShape(v)
+		rows, cols, err := indexedShape(v)
 		if err != nil {
 			return FormulaValue{}, err
 		}
@@ -327,7 +327,7 @@ func lookupFunction(e *formulaEval, node *formulaNode) (FormulaValue, error) {
 	if err != nil {
 		return FormulaValue{}, err
 	}
-	rows, cols, err := rangeShape(table)
+	rows, cols, err := indexedShape(table)
 	if err != nil {
 		return FormulaValue{}, err
 	}

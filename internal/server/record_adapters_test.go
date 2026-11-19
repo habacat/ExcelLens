@@ -92,12 +92,12 @@ func TestRecordUsesRealTextHTMLAndBIFFAdapters(t *testing.T) {
 }
 
 func TestRecordSourceCapacityIsCheckedBeforeOpeningTheRowCache(t *testing.T) {
-	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.RecordCardSourceBytes + 1, MaxRow: 2, MaxCol: 1, Rows: []workbook.RowOffset{{Number: 2, Start: 0, End: formats.RecordCardSourceBytes + 1}}}
+	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.RecordCardSourceBytes + 1, MaxRow: 2, MaxCol: 1, ResidentRows: []workbook.RowOffset{{Number: 2, Start: 0, End: formats.RecordCardSourceBytes + 1}}}
 	_, err := readRecord(context.Background(), &workbook.Workbook{}, idx, recordRequest{Row: 2, FirstColumn: 1, Columns: 1})
 	if !errors.Is(err, errRecordCapacity) {
 		t.Fatal("oversized row reached cache IO", err)
 	}
-	idx.Rows[0].End = idx.XMLSize + 1
+	idx.ResidentRows[0].End = idx.XMLSize + 1
 	_, err = readRecord(context.Background(), &workbook.Workbook{}, idx, recordRequest{Row: 2, FirstColumn: 1, Columns: 1})
 	if err == nil || errors.Is(err, errRecordCapacity) || !strings.Contains(err.Error(), "缓存范围") {
 		t.Fatal("bad descriptor disguised as capacity", err)

@@ -78,14 +78,9 @@ func (s *compositionSnapshot) scan(ctx context.Context, columns []int, visit fun
 	return borrowed.data.plan.Scan(ctx, columns, visit)
 }
 
-// Caller holds cacheMu.RLock. All source books are pinned before any index or
-// scope work starts. Scope reconstruction takes its own query slot; callers
-// must not already hold a query slot during this preparation step.
+// Caller holds a query slot and cacheMu.RLock. All source books are pinned
+// before any index or scope work starts.
 func (a *App) captureComposition(ctx context.Context, input sourceview.Append) (*compositionSnapshot, error) {
-	return a.captureCompositionWithQuerySlot(ctx, input, false)
-}
-
-func (a *App) captureCompositionWithQuerySlot(ctx context.Context, input sourceview.Append, ownsQuerySlot bool) (*compositionSnapshot, error) {
 	definition, err := input.Normalized()
 	if err != nil {
 		return nil, err
@@ -113,7 +108,7 @@ func (a *App) captureCompositionWithQuerySlot(ctx context.Context, input sourcev
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		source, info, release, weight, err := a.compositionSourceWithQuerySlot(ctx, wb, definition.Inputs[i].Ref, ownsQuerySlot)
+		source, info, release, weight, err := a.compositionSource(ctx, wb, definition.Inputs[i].Ref)
 		if err != nil {
 			return nil, err
 		}
@@ -157,10 +152,6 @@ func (a *App) captureCompositionWithQuerySlot(ctx context.Context, input sourcev
 // header/stamp model is shared; its reduced Value representation is not used
 // for composition, because it cannot carry complete formula/cache state.
 func (a *App) compositionSource(ctx context.Context, wb *workbook.Workbook, ref sourceview.TableRef) (composition.Source, compositionSourceInfo, func(), int64, error) {
-	return a.compositionSourceWithQuerySlot(ctx, wb, ref, false)
-}
-
-func (a *App) compositionSourceWithQuerySlot(ctx context.Context, wb *workbook.Workbook, ref sourceview.TableRef, ownsQuerySlot bool) (composition.Source, compositionSourceInfo, func(), int64, error) {
 	if wb == nil || sourceBookID(wb) != ref.Book || wb.Fingerprint != ref.Fingerprint {
 		return composition.Source{}, compositionSourceInfo{}, nil, 0, errors.New("多表来源身份不一致")
 	}
@@ -207,7 +198,7 @@ func (a *App) compositionSourceWithQuerySlot(ctx context.Context, wb *workbook.W
 	var release func()
 	if ref.Scope != nil {
 		maxRow = max(maxRow, ref.Scope.FrozenThrough)
-		captured, err := a.restoreAnalysisSourceWithQuerySlot(ctx, wb, ref.Source, *ref.Scope, ownsQuerySlot)
+		captured, err := a.restoreAnalysisSource(ctx, wb, ref.Source, *ref.Scope)
 		if err != nil {
 			return composition.Source{}, info, nil, 0, err
 		}

@@ -12,6 +12,18 @@ import (
 	"time"
 )
 
+func TestJSONErrorSendsMediaTypeBeforeStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+	methodNotAllowed(rec)
+	response := rec.Result()
+	defer response.Body.Close()
+	var body struct{ Error string }
+	if response.StatusCode != http.StatusMethodNotAllowed || response.Header.Get("Content-Type") != "application/json; charset=utf-8" ||
+		json.NewDecoder(response.Body).Decode(&body) != nil || body.Error == "" {
+		t.Fatalf("error response: %d %v %+v", response.StatusCode, response.Header, body)
+	}
+}
+
 func TestInitialPageClearlyExplainsHowToStart(t *testing.T) {
 	app, err := New()
 	if err != nil {

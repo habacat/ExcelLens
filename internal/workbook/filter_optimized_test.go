@@ -16,7 +16,7 @@ func syntheticIndex(t *testing.T, rows ...string) *SheetIndex {
 	for i, row := range rows {
 		from := int64(b.Len())
 		b.WriteString(row)
-		idx.Rows = append(idx.Rows, RowOffset{Number: i + 1, Start: from, End: int64(b.Len())})
+		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: i + 1, Start: from, End: int64(b.Len())})
 	}
 	idx.XMLSize = int64(b.Len())
 	if err := os.WriteFile(f, []byte(b.String()), 0600); err != nil {

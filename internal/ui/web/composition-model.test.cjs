@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const ctx={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/composition-model.js','utf8'),ctx);const m=ctx.window.ExcelLensCompositionModel;
+const ctx={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/cell-address.js','utf8'),ctx);vm.runInNewContext(fs.readFileSync(__dirname+'/composition-model.js','utf8'),ctx);const m=ctx.window.ExcelLensCompositionModel;
 const field=(column,name,hash)=>({column,name,headerHash:hash,headerLoaded:true,headerUnique:true});
 test('only complete unique original headers suggest alignment; display names and positions cannot substitute',()=>{
   const expected=[field(1,'甲','a'),field(2,'乙','b'),{...field(3,'重复','c'),headerUnique:false},field(4,'截取','d')];expected[3].truncated=true;
@@ -25,7 +25,7 @@ test('sample type conflicts distinguish numeric-eligible amounts from native tex
   assert.equal(m.typeConflict(row,inputs),true);inputs[0].info.fields[0].sampleType='number';assert.equal(m.typeConflict(row,inputs),false);inputs[0].info.fields[0].sampleType='unknown';assert.equal(m.typeConflict(row,inputs),false);assert.equal(m.typeWarning(row,inputs),'类型未确认');inputs[0].info.fields[0].sampleType='mixed';assert.equal(m.typeConflict(row,inputs),true);
 });
 test('wide exact-header matching stays bounded when every field is reversed',()=>{
-  const context={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/composition-model.js','utf8'),context);const size=4096;let reads=0;
+  const context={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/cell-address.js','utf8'),context);vm.runInNewContext(fs.readFileSync(__dirname+'/composition-model.js','utf8'),context);const size=4096;let reads=0;
   const actual=Array.from({length:size},(_,i)=>({column:i+1,headerLoaded:true,headerUnique:true,truncated:false,get headerHash(){if(++reads>size*12)throw Error('wide field matching repeated the full candidate scan');return 'hash-'+i;}})),expected=actual.map((_,i)=>({headerHash:'hash-'+(size-i-1),headerLoaded:true,headerUnique:true,truncated:false}));
   const result=context.window.ExcelLensCompositionModel.suggest(expected,actual);assert.equal(result[0],size);assert.equal(result.at(-1),1);assert(reads<=size*12);
 });

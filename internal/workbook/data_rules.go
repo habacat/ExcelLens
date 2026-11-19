@@ -47,6 +47,12 @@ type SourceDataRule struct {
 	Attributes       map[string]string `json:"attributes,omitempty"`
 }
 
+// RequiresListLookup distinguishes a well-formed list expression from a rule
+// that the source reader marked ambiguous for another reason.
+func (r SourceDataRule) RequiresListLookup() bool {
+	return r.Type == "list" && r.ListSource == "expression" && r.Status == "unresolved" && r.Reason == unresolvedListReference
+}
+
 type DataRuleSummary struct {
 	Rules               int                 `json:"rules"`
 	Ranges              int                 `json:"ranges"`

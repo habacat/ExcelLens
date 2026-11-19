@@ -4,6 +4,9 @@
 
 | 目录 / 文件 | 用途 |
 | --- | --- |
+| [user/editing.md](user/editing.md) | 网格编辑、公式、保护表及透视布局 |
+| [development/xlsx-grid-editing.md](development/xlsx-grid-editing.md) | 工作表写出、计算与结构编辑设计 |
+| [releases/1.9.0.md](releases/1.9.0.md) | 最新公开版本的升级及验收范围 |
 | [user/formats.md](user/formats.md) | 当前格式、精度、缓存、压缩包及导出边界 |
 | [user/interface.md](user/interface.md) | 自适应工具栏、命令面板与功能查找 |
 | [user/calculator.md](user/calculator.md) | 计算器语义、用法及限制 |

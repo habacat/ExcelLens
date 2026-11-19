@@ -33,6 +33,8 @@
   <link rel="stylesheet" href="/assets/task-recovery.css">
   <link rel="stylesheet" href="/assets/transpose.css">
   <link rel="stylesheet" href="/assets/snapshots.css">
+  <link rel="stylesheet" href="/assets/edit-copy.css">
+  <link rel="stylesheet" href="/assets/dialog-controls.css">
 </head>
 <body class="home-view">
   <header class="appbar">
@@ -57,6 +59,7 @@
       <button id="advancedFilterBtn" data-command-only class="tool-button" disabled title="高级筛选：按列组合多个条件"><span class="tool-icon">≡</span>条件</button>
       <button id="freezeBtn" data-toolbar-priority="2" class="tool-button" disabled title="冻结工作表行和列"><span class="tool-icon">▣</span><span id="freezeBtnLabel">冻结</span></button>
       <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button export-primary" disabled title="导出工作表、选区、筛选结果或全部 Sheet（Ctrl+Shift+E）"><span class="tool-icon">⇩</span>导出</button>
+      <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden>编辑副本</button>
       <button id="bookmarkOpenBtn" data-command-only class="tool-button" disabled title="审计标记：对单元格添加本机备注，不修改源文件"><span class="tool-icon">⚑</span>标记</button>
       <button id="analysisOpenBtn" data-toolbar-priority="0" class="tool-button analysis-toolbar-button" type="button" title="数据分析：透视汇总、图表、可编辑工作表"><span class="tool-icon">▦</span>分析</button>
 	  <button id="printPreviewOpenBtn" data-command-only class="tool-button" type="button" disabled aria-haspopup="dialog" title="源表分页预览（Ctrl+P）"><span class="tool-icon">▤</span>分页</button>
@@ -75,6 +78,19 @@
       <button id="fullscreenBtn" data-command-only class="tool-button" title="全屏显示"><span class="tool-icon">⛶</span>全屏</button>
       <button id="helpBtn" data-command-only class="tool-button icon-only" title="快捷键和操作帮助" aria-label="帮助">?</button>
       <button id="exitBtn" data-command-only class="tool-button icon-only" title="退出程序" aria-label="退出程序"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6.35 6.35a8 8 0 1 0 11.3 0"/></svg></button>
+    </div>
+    <div id="editGridBar" class="edit-grid-bar" role="toolbar" aria-label="副本编辑" hidden>
+      <div class="edit-grid-state"><span>副本编辑</span><output id="editGridStatus" role="status" aria-live="polite"></output></div>
+      <div class="edit-grid-actions">
+        <button id="editGridUndo" class="tool-button" type="button" title="撤销（Ctrl+Z）">撤销</button>
+        <button id="editGridRedo" class="tool-button" type="button" title="重做（Ctrl+Y）">重做</button>
+        <button id="editGridMore" class="tool-button" type="button" aria-haspopup="dialog">更多编辑</button>
+        <button id="editGridRefresh" class="tool-button" type="button" hidden>刷新修订</button>
+        <button id="editGridRetry" class="tool-button" type="button" hidden>核对提交</button>
+        <button id="editGridSave" class="tool-button primary" type="button" title="生成副本（Ctrl+S）">生成副本</button>
+        <a id="editGridDownload" class="tool-button" hidden>下载副本</a>
+        <button id="editGridExit" class="tool-button" type="button">退出编辑</button>
+      </div>
     </div>
   </header>
   <div id="sourceIntegrityNotice" class="source-integrity-notice" role="status" hidden></div>
@@ -107,29 +123,34 @@
         </div>
         <aside class="landing-recent" aria-label="最近使用的工作簿">
           <div class="recent-heading">
-            <div><h2>最近打开</h2></div>
-            <button type="button" id="recentRefreshBtn" class="recent-refresh" aria-label="刷新最近文件" title="刷新最近文件"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+            <h2>最近打开</h2>
+            <div class="recent-heading-actions">
+              <button id="taskRecoveryHome" class="mini-button" type="button" aria-haspopup="dialog" aria-controls="taskRecoveryDialog" hidden>任务恢复</button>
+              <button type="button" id="recentRefreshBtn" class="recent-refresh" aria-label="刷新最近文件" title="刷新最近文件"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+            </div>
           </div>
           <div class="recent-search-wrap"><span aria-hidden="true">⌕</span><input id="recentSearch" type="search" placeholder="搜索文件名或路径" autocomplete="off" aria-label="搜索历史文件"></div>
           <div id="recentList" class="recent-list" aria-live="polite"><div class="recent-empty">读取最近文件…</div></div>
           <div id="recentSummary" class="recent-summary"></div>
         </aside>
       </div>
-      <div class="landing-footer"><button id="taskRecoveryHome" class="mini-button" type="button" aria-haspopup="dialog">任务恢复</button><button id="calculatorHomeDock" class="calculator-dock" type="button" hidden>计算</button><span class="landing-credits">Designed &amp; built by Qiu Sheng</span></div>
+      <div class="landing-footer"><button id="calculatorHomeDock" class="calculator-dock" type="button" hidden>计算</button><span class="landing-credits">Designed &amp; built by Qiu Sheng</span></div>
     </div>
   </section>
 
   <section id="workspace" class="workspace" hidden>
     <div class="formula-toolbar">
-      <input id="nameBox" class="name-box" value="A1" title="名称框：输入地址或名称；A1、A1:D50、B:B、3:5 或 Sheet!A1:B9 可直接选择" aria-label="名称框：地址或名称">
+      <input id="nameBox" class="toolbar-field name-box edit-toolbar-control" value="A1" title="名称框：输入地址或名称；A1、A1:D50、B:B、3:5 或 Sheet!A1:B9 可直接选择" aria-label="名称框：地址或名称">
 	  <button id="catalogueOpenBtn" class="mini-button catalogue-open" type="button" disabled aria-haspopup="dialog" title="名称与表目录（Ctrl+F3）">名称与表</button>
 	  <button id="dataRulesOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="查看当前单元格或本表保存的数据验证条件">数据规则</button>
 	  <button id="recordCardOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行，适合宽表和长文本">记录卡片</button>
-      <div class="fx-label">fx</div>
-      <div id="formulaText" class="formula-input formula-inspector-input" role="textbox" aria-label="公式栏：点击高亮引用单元格，悬停引用显示保存值和公式" aria-readonly="true" tabindex="0" data-placeholder="选择单元格以查看公式或数值"></div>
-      <button id="formulaExpandBtn" class="formula-expand-button" type="button" aria-label="展开公式栏" aria-controls="formulaText" aria-expanded="false" title="展开公式栏（长公式换行显示）"></button>
+      <div class="fx-label edit-toolbar-control">fx</div>
+      <textarea id="editGridFormula" class="toolbar-field formula-input edit-toolbar-control" rows="1" aria-label="编辑栏" spellcheck="false" hidden></textarea>
+      <div id="formulaText" class="toolbar-field formula-input formula-inspector-input" role="textbox" aria-label="公式栏：点击高亮引用单元格，悬停引用显示保存值和公式" aria-readonly="true" tabindex="0" data-placeholder="选择单元格以查看公式或数值"></div>
+      <button id="formulaExpandBtn" class="formula-expand-button edit-toolbar-control" type="button" aria-label="展开公式栏" aria-controls="formulaText editGridFormula" aria-expanded="false" title="展开公式栏（长公式换行显示）"></button>
+      <select id="editGridKind" class="toolbar-field toolbar-select edit-toolbar-control" aria-label="输入类型" hidden><option value="auto">自动类型</option><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option></select>
       <div id="formulaValue" class="formula-value" title="Excel 文件中保存的计算结果">-</div>
-      <select id="fontSelect" class="font-picker" title="显示字体：原表字体优先；切换不会更改源 Excel 文件" aria-label="工作表显示字体">
+      <select id="fontSelect" class="toolbar-field toolbar-select font-picker" title="显示字体：原表字体优先；切换不会更改源 Excel 文件" aria-label="工作表显示字体">
         <option value="">原表字体</option>
         <option value="宋体">宋体</option>
         <option value="新宋体">新宋体</option>
@@ -156,6 +177,7 @@
     </div>
 
     <main class="grid-region">
+      <textarea id="editGridInput" aria-label="单元格内编辑" spellcheck="false" rows="1" autocomplete="off" hidden></textarea>
       <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
         <div id="gridCanvas" class="grid-canvas">
           <div id="columnHeaders" class="column-headers"></div>
@@ -324,9 +346,9 @@
     </div>
   </dialog>
 
-  <dialog id="searchDialog" class="float-dialog search-dialog">
+  <dialog id="searchDialog" class="float-dialog workbook-tool-dialog search-dialog" aria-labelledby="searchDialogTitle">
     <form method="dialog" class="dialog-head">
-      <div class="dialog-title">搜索</div>
+      <div id="searchDialogTitle" class="dialog-title">搜索</div>
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
     </form>
     <div class="dialog-body">
@@ -364,7 +386,7 @@
       </div>
       <label class="task-progress-choice"><input id="searchRecoverable" type="checkbox">保留进度</label>
       <div id="searchHistoryPanel" class="history-panel" hidden>
-        <div class="history-heading">最近搜索 <button id="searchHistoryRefreshBtn" type="button" class="history-refresh" title="刷新搜索记录">刷新</button></div>
+        <div class="history-heading">最近搜索 <button id="searchHistoryRefreshBtn" type="button" class="mini-button history-refresh" title="刷新搜索记录">刷新</button></div>
         <div id="searchHistoryList" class="history-list"></div>
       </div>
       <div class="search-navigation">
@@ -503,25 +525,25 @@
     </div>
   </dialog>
 
-  <dialog id="filterDialog" class="float-dialog filter-dialog">
+  <dialog id="filterDialog" class="float-dialog workbook-tool-dialog filter-dialog" aria-labelledby="filterDialogTitle">
     <form method="dialog" class="dialog-head">
-      <div class="dialog-title">筛选条件</div>
+      <div id="filterDialogTitle" class="dialog-title">筛选条件</div>
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
     </form>
     <div class="dialog-body">
-      <div id="filterHelp" class="filter-help">多个条件同时满足时才显示该行（AND）。</div>
+      <div id="filterHelp" class="filter-help">显示满足全部条件的行</div>
       <div id="filterRules" class="filter-rules"></div>
       <button id="addFilterRuleBtn" class="add-rule-button">＋ 添加条件</button>
       <div id="filterProgress" class="filter-progress" hidden>
         <div class="progress-track"><div id="filterBar" class="progress-fill"></div></div>
         <div id="filterProgressText" class="progress-label">正在筛选…</div>
       </div>
-      <div class="dialog-actions">
-        <button id="applyFilterBtn" class="primary-button compact">应用筛选</button>
-        <label id="filterProgressChoice" class="task-progress-choice"><input id="filterRecoverable" type="checkbox">保留进度</label>
-        <button id="cancelFilterJobBtn" class="mini-button" hidden>取消任务</button>
-      </div>
     </div>
+    <footer class="filter-footer">
+      <label id="filterProgressChoice" class="task-progress-choice"><input id="filterRecoverable" type="checkbox">保留进度</label>
+      <button id="cancelFilterJobBtn" class="mini-button" hidden>取消任务</button>
+      <button id="applyFilterBtn" class="primary-button compact">应用筛选</button>
+    </footer>
   </dialog>
 
   <dialog id="sheetDialog" class="float-dialog sheet-dialog">
@@ -538,7 +560,7 @@
   <dialog id="traceDialog" class="float-dialog trace-dialog" aria-labelledby="traceTitle">
     <form method="dialog" class="dialog-head">
       <div id="traceTitle" class="dialog-title">公式追踪</div>
-      <div class="trace-window-actions"><button id="traceMinimizeBtn" type="button" class="dialog-close" title="收起到底部" aria-label="收起追踪面板">−</button><button class="dialog-close" value="cancel" aria-label="关闭追踪">×</button></div>
+      <div class="trace-window-actions"><button id="traceMinimizeBtn" type="button" class="dialog-close dialog-minimize" title="收起到底部" aria-label="收起追踪面板">−</button><button class="dialog-close" value="cancel" aria-label="关闭追踪">×</button></div>
     </form>
     <div class="dialog-body">
       <div id="traceFormula" class="trace-formula"></div>
@@ -660,6 +682,127 @@
     <button id="inspectMore" class="inspect-more" type="button" hidden>继续显示结果</button>
   </aside>
 
+  <dialog id="editCopyDialog" class="float-dialog workbook-tool-dialog edit-copy-dialog" aria-labelledby="editCopyTitle">
+    <div class="dialog-head">
+      <div class="edit-copy-heading"><strong id="editCopyTitle" class="dialog-title">编辑副本</strong><span id="editCopyName"></span></div>
+      <button id="editCopyClose" class="dialog-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="edit-copy-scroll">
+      <section id="editCopyListView" hidden><div class="edit-copy-line"><button id="editCopyListRefresh" type="button" class="mini-button">刷新列表</button></div><div id="editCopyList" class="edit-copy-list"></div></section>
+      <section id="editCopyWork" hidden>
+        <div class="edit-copy-context">
+          <span class="edit-copy-origin" aria-label="起始位置"><span id="editCopyOriginSheet"></span><b id="editCopyOriginRef"></b></span>
+          <button id="editCopyHistory" type="button" class="mini-button edit-copy-quiet">已保存的编辑</button>
+        </div>
+        <form id="editCopyAddressForm" class="edit-copy-line edit-copy-coordinate">
+          <label for="editCopySheet">工作表</label><select id="editCopySheet"></select>
+          <label for="editCopyAddress">单元格</label><input id="editCopyAddress" autocapitalize="characters" spellcheck="false" maxlength="16" required>
+          <button id="editCopyRead" type="submit" class="mini-button">读取</button>
+        </form>
+        <div id="editCopyCellPanel" hidden>
+          <div class="edit-copy-line edit-copy-cell-head"><label id="editCopyValueLabel" for="editCopyValue">单元格内容</label><select id="editCopyKind" aria-label="单元格类型"><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option><option value="blank">空白</option></select><output id="editCopyCellState"></output></div>
+          <textarea id="editCopyValue" rows="4" spellcheck="false" aria-describedby="editCopyTextHint"></textarea>
+          <p id="editCopyTextHint" class="edit-copy-muted" hidden>\r 表示回车，\\ 表示反斜线。</p>
+          <div id="editCopyRulePick" class="edit-copy-line edit-copy-rule-pick" hidden><button id="editCopyReadChoices" type="button" class="mini-button" hidden>读取选项</button><label id="editCopyChoiceLabel" for="editCopyChoice">下拉选项</label><select id="editCopyChoice"></select><button id="editCopyApplyChoice" type="button" class="mini-button">应用选项</button></div>
+          <details id="editCopyBase" hidden><summary>查看原值</summary><pre id="editCopyBaseText"></pre></details>
+          <div class="edit-copy-line edit-copy-commit"><button id="editCopyDiscardInput" type="button" class="mini-button" hidden>放弃输入</button><button id="editCopyApply" type="button" class="tool-button primary">应用修改</button></div>
+        </div>
+        <section id="editCopyBatch" aria-label="编辑工具" hidden>
+          <div class="edit-copy-navigation">
+            <div id="editCopyTools" class="edit-copy-tabs" role="tablist" aria-label="编辑工具">
+              <button id="editCopyTabCopy" type="button" role="tab" aria-selected="true" aria-controls="editCopyPaneCopy">复制</button>
+              <button id="editCopyTabPaste" type="button" role="tab" aria-selected="false" aria-controls="editCopyPanePaste" tabindex="-1">粘贴</button>
+              <button id="editCopyTabFill" type="button" role="tab" aria-selected="false" aria-controls="editCopyPaneFill" tabindex="-1">填充</button>
+              <button id="editCopyTabRules" type="button" role="tab" aria-selected="false" aria-controls="editCopyRules" tabindex="-1" hidden>数据规则</button>
+              <button id="editCopyTabStructure" type="button" role="tab" aria-selected="false" aria-controls="editCopyStructure" tabindex="-1" hidden>工作表与行列</button>
+              <button id="editCopyTabObjects" type="button" role="tab" aria-selected="false" aria-controls="editCopyObjects" tabindex="-1" hidden>透视表与图表</button>
+            </div>
+            <label class="edit-copy-tool-select">编辑工具<select id="editCopyToolSelect"></select></label>
+          </div>
+          <div id="editCopyPaneCopy" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabCopy">
+            <div class="edit-copy-fields">
+              <label class="edit-copy-field" for="editCopyCopyEnd">复制至<input id="editCopyCopyEnd" class="edit-copy-ref" maxlength="16" spellcheck="false" placeholder="当前格"></label>
+              <button id="editCopyCopy" type="button" class="mini-button">复制有类型数据</button>
+            </div>
+          </div>
+          <div id="editCopyPanePaste" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabPaste" hidden>
+            <div class="edit-copy-fields">
+              <label class="edit-copy-field" for="editCopyPasteMode">粘贴方式<select id="editCopyPasteMode"><option value="plain">表格文本</option><option value="values">仅值</option><option value="formulas">仅公式</option><option value="styles">仅格式</option></select></label>
+              <label class="edit-copy-check"><input id="editCopySkipBlank" type="checkbox">跳过空白</label>
+            </div>
+            <label class="edit-copy-field" for="editCopyBatchText">粘贴内容<textarea id="editCopyBatchText" rows="3" spellcheck="false"></textarea></label>
+            <button id="editCopyPreviewPaste" type="button" class="mini-button">预览粘贴</button>
+          </div>
+          <div id="editCopyPaneFill" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabFill" hidden>
+            <div class="edit-copy-fields">
+              <label class="edit-copy-field" for="editCopyFillEnd">填充至<input id="editCopyFillEnd" class="edit-copy-ref" spellcheck="false" maxlength="16" placeholder="B10"></label>
+              <label class="edit-copy-field" for="editCopyFillMode">填充方式<select id="editCopyFillMode"><option value="constant">当前值</option><option value="number">等差数列</option><option value="date">日期序列</option><option value="time">时间序列</option><option value="formula-fill">公式序列</option></select></label>
+              <div class="edit-copy-field"><label id="editCopyStepLabel" for="editCopyFillStep" hidden>步长</label><input id="editCopyFillStep" inputmode="decimal" maxlength="80" value="1" hidden></div>
+            </div>
+            <button id="editCopyPreviewFill" type="button" class="mini-button">预览填充</button>
+          </div>
+          <div id="editCopyRules" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabRules" hidden>
+            <div class="edit-copy-fields">
+              <label class="edit-copy-field">起始位置<input id="editCopyRuleStart" class="edit-copy-ref" maxlength="16" spellcheck="false"></label>
+              <label class="edit-copy-field">结束位置<input id="editCopyRuleEnd" class="edit-copy-ref" maxlength="16" spellcheck="false"></label>
+              <label class="edit-copy-field">规则类型<select id="editCopyRuleType"><option value="list">文字列表</option><option value="list-reference">引用列表</option><option value="whole">整数</option><option value="decimal">小数</option><option value="date">日期</option><option value="textLength">文本长度</option></select></label>
+            </div>
+            <div id="editCopyRuleNumeric" class="edit-copy-fields" hidden><label class="edit-copy-field">比较方式<select id="editCopyRuleOperator"><option value="between">介于</option><option value="notBetween">不介于</option><option value="equal">等于</option><option value="notEqual">不等于</option><option value="greaterThan">大于</option><option value="lessThan">小于</option><option value="greaterThanOrEqual">大于等于</option><option value="lessThanOrEqual">小于等于</option></select></label><label class="edit-copy-field">条件值<input id="editCopyRuleFirst" maxlength="128"></label><label class="edit-copy-field">第二个条件值<input id="editCopyRuleSecond" maxlength="128"></label></div>
+            <label class="edit-copy-field">列表选项<textarea id="editCopyRuleList" rows="3" placeholder="每行一项" maxlength="1024" spellcheck="false"></textarea></label>
+            <label id="editCopyRuleReferenceField" class="edit-copy-field" hidden>同表列表来源<input id="editCopyRuleReference" placeholder="$D$2:$D$8" maxlength="32" spellcheck="false"></label>
+            <div class="edit-copy-fields"><label class="edit-copy-check"><input id="editCopyAllowBlank" type="checkbox" checked>允许空白</label><button id="editCopyPreviewRule" type="button" class="mini-button">预览规则</button></div>
+          </div>
+          <div id="editCopyStructure" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabStructure" hidden>
+            <div class="edit-copy-fields">
+              <label class="edit-copy-field">操作<select id="editCopyStructureKind">
+                <option value="renameSheet">重命名工作表</option><option value="insertRows">插入整行</option><option value="deleteRows">删除整行</option><option value="moveRows">移动整行</option>
+                <option value="insertColumns">插入整列</option><option value="deleteColumns">删除整列</option><option value="moveColumns">移动整列</option>
+              </select></label>
+              <label class="edit-copy-field" id="editCopyNewNameField">新表名<input id="editCopyNewName" maxlength="31"></label>
+              <label class="edit-copy-field" id="editCopyAtField" hidden><span id="editCopyAtLabel">起始行号</span><input id="editCopyAt" type="number" min="1" step="1"></label>
+              <label class="edit-copy-field" id="editCopyCountField" hidden>数量<input id="editCopyCount" type="number" min="1" step="1" value="1"></label>
+              <label class="edit-copy-field" id="editCopyBeforeField" hidden>移至此序号之前<input id="editCopyBefore" type="number" min="1" step="1"></label>
+            </div>
+            <button id="editCopyApplyStructure" type="button" class="mini-button">重命名工作表</button>
+          </div>
+          <div id="editCopyObjects" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabObjects" hidden>
+            <div id="editCopyPivotTools" class="edit-copy-fields" hidden>
+              <label class="edit-copy-field">透视表<select id="editCopyPivot"></select></label>
+              <button id="editCopyPivotRefresh" type="button" class="mini-button">刷新透视表</button>
+            </div>
+            <p id="editCopyPivotReason" class="edit-copy-muted" hidden></p>
+            <fieldset id="editCopyPivotFields" class="edit-pivot-layout" aria-label="透视字段布局" hidden>
+              <div id="editCopyPivotAxes" class="edit-pivot-axes"></div>
+              <div class="edit-copy-fields">
+              <label class="edit-copy-field">值字段<select id="editCopyPivotData"></select></label>
+              <label class="edit-copy-field">汇总方式<select id="editCopyPivotAggregate"><option value="sum">求和</option><option value="count">计数</option><option value="average">平均值</option><option value="min">最小值</option><option value="max">最大值</option></select></label>
+              <label class="edit-copy-field">行项目<select id="editCopyPivotFilter"><option value="keep">沿用当前筛选</option><option value="all">显示全部</option><option value="item">只显示指定项</option></select></label>
+              <label class="edit-copy-field">指定项目<input id="editCopyPivotItem" maxlength="255" hidden></label>
+              </div>
+            </fieldset>
+            <button id="editCopyCharts" type="button" class="mini-button" hidden>刷新图表数据</button>
+          </div>
+          <div id="editCopyBatchPreview" class="edit-copy-line edit-copy-preview" hidden><output id="editCopyBatchSummary"></output><button id="editCopyApplyBatch" type="button" class="mini-button">应用此批</button></div>
+        </section>
+        <div class="edit-copy-results">
+            <div id="editCopyTextOptions" class="edit-copy-line" hidden><label for="editCopyEncoding">编码</label><select id="editCopyEncoding"><option value="source">源编码</option><option value="utf8">UTF-8</option><option value="utf8-bom">UTF-8 BOM</option></select><label><input id="editCopyProtect" type="checkbox" checked> 添加公式文本保护前缀</label></div>
+          <div id="editCopyOutputs" class="edit-copy-list"></div>
+        </div>
+      </section>
+    </div>
+    <footer class="edit-copy-status">
+      <div class="edit-copy-feedback"><output id="editCopyRevision"></output><p id="editCopyStatus" role="status" aria-live="polite"></p></div>
+      <div class="edit-copy-history" role="group" aria-label="修订操作">
+        <button id="editCopyUndo" type="button" class="mini-button edit-copy-quiet">撤销</button>
+        <button id="editCopyRedo" type="button" class="mini-button edit-copy-quiet">重做</button>
+        <button id="editCopyRefresh" type="button" class="mini-button edit-copy-quiet">刷新修订</button>
+      </div>
+      <button id="editCopyCancel" class="mini-button" type="button" hidden>取消</button>
+      <button id="editCopySave" type="button" class="primary-button compact">生成副本</button>
+      <button id="editCopyPivotApply" type="button" class="primary-button compact" hidden>应用字段布局</button>
+    </footer>
+  </dialog>
+  <script src="/assets/cell-address.js"></script>
   <script src="/assets/display-format.js"></script>
   <dialog id="taskRecoveryDialog" class="float-dialog task-recovery-dialog" aria-labelledby="taskRecoveryTitle">
     <div class="dialog-head"><div id="taskRecoveryTitle" class="dialog-title">任务恢复</div><button id="taskRecoveryClose" type="button" class="dialog-close" aria-label="关闭">×</button></div>
@@ -833,6 +976,11 @@
     <div id="analysisToast" class="analysis-toast" role="status" hidden></div>
   </section>
   <script src="/assets/formats.js"></script>
+  <script src="/assets/edit-copy-model.js"></script>
+  <script src="/assets/edit-grid.js"></script>
+  <script src="/assets/edit-pivot.js"></script>
+  <script src="/assets/edit-tools.js"></script>
+  <script src="/assets/edit-copy.js"></script>
   <script src="/assets/wire.js"></script>
   <script src="/assets/virtualscroll.js"></script>
   <script src="/assets/tableheaders.js"></script>
@@ -867,6 +1015,8 @@
   <script src="/assets/relations-model.js"></script>
   <script src="/assets/relations.js"></script>
   <script src="/assets/toolbar.js"></script>
+  <script src="/assets/command-palette.js"></script>
+  <script src="/assets/viewport-cache.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>
   <script src="/assets/analysis-numbers.js"></script>

@@ -130,7 +130,7 @@ func TestNativeExportPreservesNumberFormatsAndDate1904(t *testing.T) {
 		t.Fatal(err)
 	}
 	wb := &workbook.Workbook{Format: "xls", Date1904: true, Styles: []workbook.StyleInfo{{}, {NumFmtID: 164}, {NumFmtID: 10}, {NumFmtID: 14}}, NumFmts: map[int]string{164: `0.0000 "CNY"`}, VisualStyles: []workbook.VisualStyle{{}, {Bold: true, Background: "#aabbcc"}}}
-	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(row)), MaxRow: 1, MaxCol: 3, Rows: []workbook.RowOffset{{Number: 1, Start: 0, End: int64(len(row))}}}
+	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(row)), MaxRow: 1, MaxCol: 3, ResidentRows: []workbook.RowOffset{{Number: 1, Start: 0, End: int64(len(row))}}}
 	s := Selection{Sheet: workbook.SheetMeta{Name: "Data"}, Index: idx, FirstRow: 1, LastRow: 1, FirstCol: 1, LastCol: 3}
 	got, rows := exportReopen(t, wb, s, true, filepath.Join(root, "numeric.xlsx"))
 	if !got.Date1904 || len(got.Styles) != 4 || got.NumFmts[164] != wb.NumFmts[164] || rows[0].Cells[0].Raw != "1.25" || rows[0].Cells[0].Display != "1.2500 CNY" || rows[0].Cells[1].Display != "25.00%" || rows[0].Cells[2].Display != "1904-01-02" {

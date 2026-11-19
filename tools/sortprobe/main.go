@@ -174,7 +174,7 @@ func run(count int, output string) error {
 			return err
 		}
 		idx, err = wb.BuildIndex(wb.Sheets[0], nil, nil)
-		if err == nil && (idx.RowCount() != count+1 || idx.MaxRow != count+1 || count > 262144 && len(idx.Rows) != 0) {
+		if err == nil && (idx.RowCount() != count+1 || idx.MaxRow != count+1 || count > 262144 && len(idx.ResidentRows) != 0) {
 			return errors.New("index shape or residency mismatch")
 		}
 		return err

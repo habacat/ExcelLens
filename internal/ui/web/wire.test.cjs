@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
 const sandbox={window:{}};
-vm.runInNewContext(fs.readFileSync(__dirname+'/wire.js','utf8'),sandbox);
+vm.runInNewContext(fs.readFileSync(__dirname+'/cell-address.js','utf8'),sandbox);vm.runInNewContext(fs.readFileSync(__dirname+'/wire.js','utf8'),sandbox);
 const unpack=rows=>JSON.parse(JSON.stringify(sandbox.window.ExcelLensWire.unpack(rows)));
 
 test('compact viewport reconstructs exact identifiers, display and metadata',()=>{

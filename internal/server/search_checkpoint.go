@@ -20,8 +20,14 @@ import (
 
 // Bump when search interpretation, presentation or the resumable cursor changes.
 // This is independent of disposable completed-search caches and source caches.
-const searchCheckpointSemantics = 1
 const searchCheckpointDriver = "source-search"
+
+func searchCheckpointSemantics(format string) uint32 {
+	if format == "xlsx" {
+		return 2 // Stored hits include translated shared formulas, including on earlier sheets.
+	}
+	return 1
+}
 
 type searchRequest struct {
 	Sheet       string `json:"sheet"`
@@ -106,7 +112,8 @@ func searchTaskDefinition(wb *workbook.Workbook, req searchRequest) (checkpoint.
 	if len(spec.Sheets) == 0 {
 		return checkpoint.Definition{}, checkpoint.ErrBinding
 	}
-	stampData, err := json.Marshal([]any{searchCheckpointSemantics, wb.Fingerprint, wb.Format, wb.Date1904, wb.SourceInfo, spec.Sheets})
+	semantics := searchCheckpointSemantics(wb.Format)
+	stampData, err := json.Marshal([]any{semantics, wb.Fingerprint, wb.Format, wb.Date1904, wb.SourceInfo, spec.Sheets})
 	if err != nil {
 		return checkpoint.Definition{}, err
 	}
@@ -123,7 +130,7 @@ func searchTaskDefinition(wb *workbook.Workbook, req searchRequest) (checkpoint.
 	if err != nil {
 		return checkpoint.Definition{}, err
 	}
-	return checkpoint.Definition{Kind: "query", Driver: searchCheckpointDriver, Semantics: searchCheckpointSemantics,
+	return checkpoint.Definition{Kind: "query", Driver: searchCheckpointDriver, Semantics: semantics,
 		Title: checkpointTitle("搜索", bound.Path), FileName: workbookDisplayName(wb), Sources: []checkpoint.Source{bound}, Payload: payload}, nil
 }
 
@@ -198,7 +205,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 
 func searchCheckpointSpecFor(m checkpoint.Manifest) (searchCheckpointSpec, error) {
 	var spec searchCheckpointSpec
-	if m.Definition.Kind != "query" || m.Definition.Driver != searchCheckpointDriver || m.Definition.Semantics != searchCheckpointSemantics || len(m.Definition.Sources) != 1 || decodeSavedConfig(m.Definition.Payload, &spec) != nil || spec.Limit != formats.CheckpointSearchHits || len(spec.Sheets) == 0 {
+	if m.Definition.Kind != "query" || m.Definition.Driver != searchCheckpointDriver || len(m.Definition.Sources) != 1 || m.Definition.Semantics != searchCheckpointSemantics(m.Definition.Sources[0].Format) || decodeSavedConfig(m.Definition.Payload, &spec) != nil || spec.Limit != formats.CheckpointSearchHits || len(spec.Sheets) == 0 {
 		return spec, checkpoint.ErrBinding
 	}
 	return spec, nil

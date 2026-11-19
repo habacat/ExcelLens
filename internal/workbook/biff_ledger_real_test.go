@@ -48,7 +48,7 @@ func TestProvidedBIFFLedger2025Layout(t *testing.T) {
 		}
 	}
 	positions := iter.Seq[int](func(yield func(int) bool) {
-		for i := range idx.Rows {
+		for i := range idx.RowCount() {
 			if !yield(i) {
 				return
 			}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"net/http"
@@ -17,6 +18,8 @@ type occupiedRun struct{ lo, hi int }
 
 const navigationCacheBudget = 64 << 20
 
+var errNavigationSourceChanged = errors.New("工作簿已切换或索引已变化，请重新定位")
+
 // A dense column is represented by one run. A cold scan uses one descriptor;
 // cached jumps search runs rather than walking every cell of a dense region.
 func (a *App) columnOccupied(ctx context.Context, wb *workbook.Workbook, idx *workbook.SheetIndex, column int) ([]occupiedRun, error) {
@@ -30,13 +33,13 @@ func (a *App) columnOccupied(ctx context.Context, wb *workbook.Workbook, idx *wo
 	if found, ok := lookup(); ok {
 		return found, nil
 	}
-	if a.querySem != nil {
-		select {
-		case a.querySem <- struct{}{}:
-			defer func() { <-a.querySem }()
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+	release, err := a.lockQueryRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if a.currentWorkbook() != wb || wb.GetCachedIndex(idx.SheetPath) != idx {
+		return nil, errNavigationSourceChanged
 	}
 	if found, ok := lookup(); ok {
 		return found, nil
@@ -50,9 +53,9 @@ func (a *App) columnOccupied(ctx context.Context, wb *workbook.Workbook, idx *wo
 	}
 	var occupied []occupiedRun
 	scanned := 0
-	err := wb.VisitRowsContext(ctx, idx, positions, column, column, func(row workbook.RowData) error {
+	err = wb.VisitRowsContext(ctx, idx, positions, column, column, func(row workbook.RowData) error {
 		if scanned&255 == 0 && a.currentWorkbook() != wb {
-			return fmt.Errorf("工作簿已切换，请重新定位")
+			return errNavigationSourceChanged
 		}
 		scanned++
 		for _, cell := range row.Cells {
@@ -207,8 +210,8 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "方向无效")
 		return
 	}
-	a.cacheMu.RLock()
-	defer a.cacheMu.RUnlock()
+	releaseCache := a.lockCacheRead()
+	defer releaseCache()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		writeError(w, 409, "请先打开该工作表建立索引")
@@ -220,9 +223,14 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "超大数据模式关闭纵向 Ctrl+方向键扫描；请使用地址框或 Ctrl+Home / Ctrl+End 定位")
 			return
 		}
+		releaseCache()
 		occupied, err := a.columnOccupied(r.Context(), wb, idx, col)
 		if err != nil {
 			if r.Context().Err() != nil {
+				return
+			}
+			if errors.Is(err, errNavigationSourceChanged) {
+				writeError(w, http.StatusConflict, err.Error())
 				return
 			}
 			writeError(w, 500, "定位列数据失败："+err.Error())

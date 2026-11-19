@@ -39,12 +39,17 @@ type RangeValue struct {
 	Rows, Cols, FirstRow, FirstCol int
 	Visit                          func(func(int, FormulaValue) error) error
 	At                             func(int) (FormulaValue, error)
+	// Slice lets a sparse worksheet resolve only the lookup vector or return
+	// column, without evaluating unrelated formulas in the rectangular table.
+	Slice         func(row, col, rows, cols int) RangeValue
+	VisitSubtotal func(skipHidden bool, visit func(int, FormulaValue) error) error
 	// Ordered promises increasing source positions from Visit.
 	Ordered bool
 }
 type FormulaResolver func(sheet, start, end string) (RangeValue, error)
 type formulaNode struct {
 	rows, cols int
+	refOffset  int
 	kind, op   string
 	value      FormulaValue
 	ref        formulaReference
@@ -54,6 +59,9 @@ type formulaParser struct {
 	ctx               context.Context
 	text              string
 	pos, nodes, depth int
+	strictNames       bool
+	preserveSingle    bool
+	sourceNames       bool
 }
 type formulaEval struct {
 	names       map[string]FormulaValue
@@ -63,6 +71,7 @@ type formulaEval struct {
 	steps       int
 	textBytes   int
 	approximate bool
+	worksheet   bool
 	now         time.Time
 	date1904    bool
 }
@@ -192,6 +201,12 @@ func (p *formulaParser) newNode(n *formulaNode) (*formulaNode, error) {
 		return nil, errors.New("#NUM! 公式过于复杂")
 	}
 	return n, nil
+}
+
+func (p *formulaParser) referenceNode(ref formulaReference) (*formulaNode, error) {
+	start := p.pos
+	p.pos += ref.length
+	return p.newNode(&formulaNode{kind: "ref", ref: ref, refOffset: start})
 }
 func (p *formulaParser) expression(min int) (*formulaNode, error) {
 	p.depth++
@@ -347,8 +362,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 	}
 	if digit(ch) || ch == '.' {
 		if ref, ok := reference(p.text[p.pos:]); ok && ref.end != "" {
-			p.pos += ref.length
-			return p.newNode(&formulaNode{kind: "ref", ref: ref})
+			return p.referenceNode(ref)
 		}
 		start := p.pos
 		p.pos++
@@ -370,17 +384,33 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 		}
 		return p.newNode(&formulaNode{kind: "value", value: NumberValue(n)})
 	}
-	if ref, ok := reference(p.text[p.pos:]); ok {
-		p.pos += ref.length
-		return p.newNode(&formulaNode{kind: "ref", ref: ref})
+	if p.sourceNames {
+		if length := structuredToken(p.text[p.pos:]); length > 0 {
+			start := p.pos
+			p.pos += length
+			return p.newNode(&formulaNode{kind: "name", op: p.text[start:p.pos], refOffset: start})
+		}
 	}
-	if letter(ch) || ch == '_' {
+	if ref, ok := reference(p.text[p.pos:]); ok {
+		return p.referenceNode(ref)
+	}
+	if letter(ch) || ch == '_' || p.sourceNames && (ch >= utf8.RuneSelf || ch == '\\') {
 		start := p.pos
-		for p.pos < len(p.text) && (letter(p.text[p.pos]) || digit(p.text[p.pos]) || p.text[p.pos] == '_' || p.text[p.pos] == '.') {
-			p.pos++
+		for p.pos < len(p.text) {
+			r, n := utf8.DecodeRuneInString(p.text[p.pos:])
+			if !(r < utf8.RuneSelf && (letter(byte(r)) || digit(byte(r)) || r == '_' || r == '.') ||
+				p.sourceNames && (unicode.IsLetter(r) || unicode.IsDigit(r) || r == '\\' && p.pos == start)) {
+				break
+			}
+			p.pos += n
+		}
+		if p.pos == start {
+			return nil, p.fail("名称无效")
 		}
 		name := strings.ToUpper(p.text[start:p.pos])
-		name = strings.TrimPrefix(strings.TrimPrefix(name, "_XLFN."), "_XLWS.")
+		if !p.strictNames {
+			name = strings.TrimPrefix(strings.TrimPrefix(name, "_XLFN."), "_XLWS.")
+		}
 		p.space()
 		if p.pos >= len(p.text) || p.text[p.pos] != '(' {
 			if name == "TRUE" || name == "FALSE" {
@@ -388,7 +418,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 			}
 			return p.newNode(&formulaNode{kind: "name", op: name})
 		}
-		if _, ok := formulaFunctions[name]; !ok {
+		if _, ok := formulaFunctions[name]; !ok && !(p.preserveSingle && (name == "_XLFN.SINGLE" || name == "SUBTOTAL")) {
 			return nil, fmt.Errorf("#NAME? %s", name)
 		}
 		p.pos++
@@ -478,6 +508,10 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 	}
 	switch n.kind {
 	case "value":
+		if e.worksheet && n.value.Kind == "number" {
+			number, _ := n.value.Number.Float64()
+			return worksheetNumber(number)
+		}
 		return n.value, valueFault(n.value)
 	case "array":
 		values := make([]FormulaValue, len(n.args))
@@ -498,6 +532,9 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 		}
 		return FormulaValue{}, fmt.Errorf("#NAME? %s", n.op)
 	case "ref":
+		if n.ref.start == "#REF!" {
+			return FormulaValue{}, errors.New("#REF!")
+		}
 		rv, err := e.get(n.ref)
 		if err != nil {
 			return FormulaValue{}, err
@@ -519,7 +556,15 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 		}
 		return NumberValue(rv.Sum), nil
 	case "function":
-		return e.function(n)
+		v, err := e.function(n)
+		if e.worksheet && err == nil && v.Kind == "error" {
+			return v, valueFault(v)
+		}
+		if e.worksheet && err == nil && v.Kind == "number" {
+			number, _ := v.Number.Float64()
+			return worksheetNumber(number)
+		}
+		return v, err
 	case "unary":
 		v, err := e.eval(n.args[0])
 		if err != nil {
@@ -536,6 +581,10 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 			number.Neg(number)
 		}
 		if n.op == "%" {
+			if e.worksheet {
+				number, _ := number.Float64()
+				return worksheetNumber(number / 100)
+			}
 			number.Quo(number, big.NewRat(100, 1))
 		}
 		if err := bounded(number); err != nil {
@@ -566,11 +615,11 @@ func (e *formulaEval) binaryValue(op string, a, b FormulaValue) (FormulaValue, e
 		return FormulaValue{}, err
 	}
 	if op == "&" {
-		s, err := formulaText(a)
+		s, err := e.operandText(a)
 		if err != nil {
 			return FormulaValue{}, err
 		}
-		t, err := formulaText(b)
+		t, err := e.operandText(b)
 		if err != nil {
 			return FormulaValue{}, err
 		}
@@ -608,6 +657,9 @@ func (e *formulaEval) binaryValue(op string, a, b FormulaValue) (FormulaValue, e
 	y, err := formulaNumber(b)
 	if err != nil {
 		return FormulaValue{}, err
+	}
+	if e.worksheet {
+		return worksheetArithmetic(op, x, y)
 	}
 	if op == "^" {
 		return formulaPower(e, x, y)

@@ -370,6 +370,16 @@ func (s *Store) Create(ctx context.Context, definition Definition, stage string,
 }
 
 func (s *Store) Acquire(ctx context.Context, id, binding string) (*Lease, error) {
+	return s.acquire(ctx, id, binding, true)
+}
+
+// AcquireCurrent refuses a damaged primary manifest before opening or trimming
+// its blocks. Confirmed document edits cannot be rolled back to a backup slot.
+func (s *Store) AcquireCurrent(ctx context.Context, id, binding string) (*Lease, error) {
+	return s.acquire(ctx, id, binding, false)
+}
+
+func (s *Store) acquire(ctx context.Context, id, binding string, allowBackup bool) (*Lease, error) {
 	if !validHash(binding) {
 		return nil, ErrBinding
 	}
@@ -395,6 +405,9 @@ func (s *Store) Acquire(ctx context.Context, id, binding string) (*Lease, error)
 		return nil, err
 	}
 	m, backup, err := s.load(id)
+	if err == nil && backup && !allowBackup {
+		err = ErrCorrupt
+	}
 	if err == nil && m.DefinitionHash != binding {
 		err = ErrBinding
 	}

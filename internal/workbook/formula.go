@@ -1,8 +1,14 @@
 package workbook
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
+
+var sharedAxisPair = regexp.MustCompile(`^(?:\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}|\$?[1-9][0-9]{0,6}:\$?[1-9][0-9]{0,6})`)
 
 func translateSharedFormula(formula, anchorRef, targetRef string) string {
 	anchorCol, anchorRow, err := ParseCellRef(anchorRef)
@@ -78,10 +84,51 @@ func translateSharedFormula(formula, anchorRef, targetRef string) string {
 			i = end
 			continue
 		}
+		if (i == 0 || !isNameChar(formula[i-1])) && (isNameChar(formula[i]) || formula[i] == '$') {
+			if pair := sharedAxisPair.FindString(formula[i:]); pair != "" {
+				end := i + len(pair)
+				if end == len(formula) || !isNameChar(formula[end]) && !strings.ContainsRune("!$(", rune(formula[end])) {
+					left, right, _ := strings.Cut(pair, ":")
+					a, okA := shiftSharedAxis(left, deltaCol, deltaRow)
+					b, okB := shiftSharedAxis(right, deltaCol, deltaRow)
+					if okA && okB {
+						out.WriteString(a + ":" + b)
+						i = end
+						continue
+					}
+				}
+			}
+		}
 		out.WriteByte(formula[i])
 		i++
 	}
 	return out.String()
+}
+
+func shiftSharedAxis(raw string, deltaCol, deltaRow int) (string, bool) {
+	label := strings.TrimPrefix(raw, "$")
+	column := label[0] > '9'
+	n, limit, delta := 0, formats.ExcelRows, deltaRow
+	if column {
+		n, _, _ = ParseCellRef(label + "1")
+		limit, delta = formats.ExcelColumns, deltaCol
+	} else {
+		n, _ = strconv.Atoi(label)
+	}
+	if n < 1 || n > limit {
+		return "", false
+	}
+	if raw != label || delta == 0 {
+		return raw, true
+	}
+	n += delta
+	if n < 1 || n > limit {
+		return "#REF!", true
+	}
+	if column {
+		return ColumnName(n), true
+	}
+	return strconv.Itoa(n), true
 }
 
 func parseFormulaCellRef(s string, start, deltaCol, deltaRow int) (string, int, bool) {
@@ -132,7 +179,7 @@ func parseFormulaCellRef(s string, start, deltaCol, deltaRow int) (string, int, 
 	for j := rowStart; j < i; j++ {
 		row = row*10 + int(s[j]-'0')
 	}
-	if col < 1 || col > 16384 || row < 1 || row > 1048576 {
+	if col < 1 || col > formats.ExcelColumns || row < 1 || row > formats.ExcelRows {
 		return "", start, false
 	}
 	newCol, newRow := col, row
@@ -142,7 +189,7 @@ func parseFormulaCellRef(s string, start, deltaCol, deltaRow int) (string, int, 
 	if !absRow {
 		newRow += deltaRow
 	}
-	if newCol < 1 || newCol > 16384 || newRow < 1 || newRow > 1048576 {
+	if newCol < 1 || newCol > formats.ExcelColumns || newRow < 1 || newRow > formats.ExcelRows {
 		return "#REF!", i, true
 	}
 	colText := s[colStart : colStart+colLen]
@@ -164,7 +211,7 @@ func parseFormulaCellRef(s string, start, deltaCol, deltaRow int) (string, int, 
 }
 
 func isNameChar(c byte) bool {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.'
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '\\' || c >= 0x80
 }
 
 func itoa(n int) string {

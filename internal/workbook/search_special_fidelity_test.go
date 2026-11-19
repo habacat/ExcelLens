@@ -7,7 +7,7 @@ import (
 
 func TestSearchInfersMissingCellAddressesIncludingEmptyCells(t *testing.T) {
 	idx := syntheticIndex(t, `<row r="7"><c r="A7" t="str"><v>first</v></c><c r="D7" s="1"/><c t="inlineStr"><is><t>account 00123</t></is></c><c><f>LEN(A7)</f><v>5</v></c></row>`)
-	idx.Rows[0].Number = 7
+	idx.ResidentRows[0].Number = 7
 	wb := &Workbook{NumFmts: map[int]string{}}
 	cases := []struct{ query, mode, want string }{
 		{"account 00123", "value", "E7"},
@@ -35,7 +35,7 @@ func TestCDATAIsIndexedAndSearchableWithoutMarkup(t *testing.T) {
 		t.Fatalf("CDATA-only cell disappeared: rows=%v extent=%d/%d", offsets, maxRow, maxCol)
 	}
 	idx := syntheticIndex(t, `<row r="7"><c r="J7" t="inlineStr"><is><t><![CDATA[<客户>&需要核查]]></t></is></c></row>`)
-	idx.Rows[0].Number = 7
+	idx.ResidentRows[0].Number = 7
 	wb := &Workbook{NumFmts: map[int]string{}}
 	got, _, err := wb.SearchSheet(idx, "Sheet1", "<客户>&", "value", 25, nil, nil)
 	if err != nil {

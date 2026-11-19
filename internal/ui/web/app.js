@@ -9,6 +9,9 @@
   const BASE_ROW = 25;
   const MAX_BROWSER_SCROLL_PIXELS = 15000000;
   const sourceRowLimit = () => fileFormats.source(S.source?.format).maxRows;
+  const colName = window.ExcelLensAddress.columnName;
+  const parseColumn = text => window.ExcelLensAddress.parseColumn(text, fileFormats.maxColumns);
+  const parseRef = text => window.ExcelLensAddress.parseRef(text, sourceRowLimit(), fileFormats.maxColumns);
   // The DOM cannot represent the full external row capacity in CSS. Scale only the
   // scrollbar distance; virtualized row geometry stays true to cell heights.
   const virtualScroll = new window.ExcelLensVirtualScroll(MAX_BROWSER_SCROLL_PIXELS);
@@ -28,6 +31,8 @@
   const MAX_ROWS_PER_REQUEST = 150;
   const MAX_COLS_PER_REQUEST = 80;
   const VIEWPORT_CACHE_BUDGET = 24 * 1024 * 1024;
+  const viewport = window.ExcelLensViewport;
+  const tiles = new viewport.TileCache(VIEWPORT_CACHE_BUDGET);
 
   const geometry = new window.ExcelLensGeometry(fileFormats.maxRows,fileFormats.maxColumns);
   const mergedCells = new window.ExcelLensMergedCells(fileFormats.maxRows,fileFormats.maxColumns);
@@ -60,8 +65,6 @@
     viewportRetryTimer: 0,
     viewportRetryAttempt: 0,
     viewportData: null,
-    viewportCache: new Map(),
-    viewportCacheBytes: 0,
     renderedRows: new Map(),
     renderedScrollTop: 0,
     renderedHeadersKey: "",
@@ -141,6 +144,7 @@
   const frozenPresenter = new window.ExcelLensCellView.Presenter(cellPresenter.o);
   let frozenPanes, pictures;
   let autoFilterUI;
+  let editCopy;
   let exportCenter, profileCenter, bookmarkCenter, formulaInspector, recentManager, multiSort, selectionStats, selectionInspector, archiveCenter, calculator, readingMode, highlightMode, traceUI, reconcileCenter, relationsCenter, namedViews, rowViews, copySpecial, catalogueCenter, dataRulesCenter, printingCenter, recordCardCenter, selectionQuick, cellExplanation, taskRecovery, transposeCenter;
 
   const OPERATORS = [
@@ -194,33 +198,6 @@
   const colTotal = (count) => colLeft(count+1);
   const fmtBytes = value => window.ExcelLensDisplayFormat.bytes(value);
 
-  function colName(n) {
-    let out = "";
-    while (n > 0) { n--; out = String.fromCharCode(65 + n % 26) + out; n = Math.floor(n / 26); }
-    return out;
-  }
-
-  function parseColumn(value) {
-    const text = String(value || "").trim().replaceAll("$", "").toUpperCase();
-    if (/^\d+$/.test(text)) {
-      const n = Number(text);
-      return Number.isSafeInteger(n) && n >= 1 && n <= 16384 ? n : 0;
-    }
-    if (!/^[A-Z]{1,3}$/.test(text)) return 0;
-    let n = 0;
-    for (const c of text) n = n * 26 + c.charCodeAt(0) - 64;
-    return n >= 1 && n <= 16384 ? n : 0;
-  }
-
-  function parseRef(value) {
-    const match = String(value || "").trim().replaceAll("$", "").match(/^([A-Za-z]{1,3})([1-9][0-9]*)$/);
-    if (!match) return null;
-    const col = parseColumn(match[1]);
-    const row = Number(match[2]);
-    if (!col || !Number.isSafeInteger(row) || row > sourceRowLimit()) return null;
-    return { col, row, ref: `${colName(col)}${row}` };
-  }
-
   // The Name Box is a range selector, not merely a single-cell jump.
   // Whole-row/column shortcuts are bounded to the used area in this read-only
   // viewer; Excel's one-million-row selection is not instantiated in the DOM.
@@ -261,7 +238,7 @@
     }
     const multiple=parsed.start.ref!==parsed.end.ref;
     if(S.filtered&&sheet===S.sheet&&multiple){toast('筛选视图请按可见行拖选；名称框矩形范围使用源行号','warning');return;}
-    await navigateToCell(sheet,parsed.start.ref);
+    if(!await navigateToCell(sheet,parsed.start.ref))return;
     if(sheet!==S.sheet || !S.selected || S.selected.ref!==parsed.start.ref)return;
     if(multiple){
       if(S.filtered){toast('筛选视图不支持直接按源行号选中矩形；请清除筛选后重试','warning');return;}
@@ -314,14 +291,19 @@
     $("bookmarkOpenBtn").disabled = false;
     $("columnsBtn").disabled = false;
     $('rowsBtn').disabled=false;
+    editCopy?.availability(true);
   }
 
   function showWelcome() {
+    if (editCopy?.grid.active) editCopy.grid.leave();
+    editCopy?.availability(false);
     $("sourceIntegrityNotice").hidden = true;
     pictures?.close();
     document.body.classList.add("home-view");
     $("workspace").hidden = true;
     $("welcome").hidden = false;
+    $('taskRecoveryHome').hidden = true;
+    taskRecovery?.refreshHome();
     $("searchOpenBtn").disabled = true;
     $("filterOpenBtn").disabled = true;
     $("textHeaderBtn").disabled = true;
@@ -372,7 +354,8 @@
     "隶书": '"LiSu", "隶书", "SimSun", serif',
     "Arial": 'Arial, "Microsoft YaHei", sans-serif',
     "Microsoft Sans Serif": '"Microsoft Sans Serif", "SimSun", "宋体", sans-serif',
-    "Calibri": 'Calibri, "Microsoft YaHei", sans-serif',
+    "Carlito": 'Carlito, Calibri, "Microsoft YaHei", sans-serif',
+    "Calibri": 'Calibri, Carlito, "Microsoft YaHei", sans-serif',
     "Consolas": 'Consolas, "Microsoft YaHei", monospace'
   });
   const FONT_ALIASES = Object.freeze({SimSun:"宋体", NSimSun:"新宋体", KaiTi:"楷体", FangSong:"仿宋", DengXian:"等线", SimHei:"黑体", "Microsoft YaHei":"微软雅黑", "Microsoft YaHei UI":"微软雅黑", STKaiti:"华文楷体", STSong:"华文宋体", STFangsong:"华文仿宋", LiSu:"隶书"});
@@ -454,34 +437,42 @@
   }
   function updateSharedBorders(node,cell,row,rightCell,rightRow,belowCell,belowRow,edge={}){
     const r=Number(node.dataset.row),c=Number(node.dataset.col),merge=activeMerge(r,c),anchor=merge&&merge.row===r&&merge.col===c;
+    if (merge && !anchor) return;
+    const borders=window.ExcelLensGridBorders;
+    if (!S.showStyles) {
+      borders.paint(node,'right','',rowTop);
+      borders.paint(node,'bottom','',colLeft);
+      if (node._xlOuterLeft) { node.style.removeProperty('border-left'); node._xlOuterLeft=''; }
+      if (node._xlOuterTop) { node.style.removeProperty('border-top'); node._xlOuterTop=''; }
+      return;
+    }
     const own=anchor?mergedVisualBorder(visualForBorder(cell,row),merge):visualForBorder(cell,row);
-    const right=visualForBorder(rightCell,rightRow);
-    const below=visualForBorder(belowCell,belowRow);
-    const seams=window.ExcelLensGridBorders.resolve(own,right,below);
-    const anchorStyle=(range,data)=>{
-      const anchor=data?.number===range.row?data.cells?.find(cell=>cell.col===range.col):null;
-      const ref=colName(range.col)+range.row;
-      return mergedVisualBorder(visualForBorder(anchor||S.cellMap.get(ref)||S.frozenCellMap.get(ref),data),range);
+    const endRow=merge?.endRow??r,endCol=merge?.endCol??c;
+    const rightCol=anchor ? (edge.columns?.find(col=>col>endCol) ?? endCol+1) : (edge.nextCol||c+1);
+    const under=!anchor&&belowRow ? belowRow.number : (nextVisibleRow(endRow+1)||endRow+1);
+    const opposite=(nr,nc,side,data,direct)=>{
+      const range=activeMerge(nr,nc);
+      if (!range && direct!==undefined) return visualForBorder(direct,data)[side];
+      const row=range?.row??nr,col=range?.col??nc,ref=colName(col)+row;
+      const record=data?.number===row ? data : edge.rows?.get(row);
+      const model=(row===nr&&col===nc?direct:null)||S.cellMap.get(ref)||S.frozenCellMap.get(ref)||record?.cells?.find(cell=>cell.col===col);
+      const visual=visualForBorder(model,record);
+      return (range?mergedVisualBorder(visual,range):visual)[side];
     };
-    // A merged rectangle owns its complete top/left perimeter. Its covered
-    // cells carry no styles, so borrowing only from the next single cell
-    // leaves one-column holes. Suppress the neighboring duplicate stroke.
-    const rightColumn=anchor?merge.endCol+1:c+1,belowRowNumber=anchor?merge.endRow+1:r+1;
-    const rightMerge=activeMerge(r,rightColumn),belowMerge=activeMerge(belowRowNumber,c);
-    const endRow=anchor?merge.endRow:r,endCol=anchor?merge.endCol:c;
-    if(rightMerge&&rightMerge.col===rightColumn&&rightMerge.row<=r&&rightMerge.endRow>=endRow&&anchorStyle(rightMerge,rightRow).borderLeft)seams.right='0px';
-    if(belowMerge&&belowMerge.row===belowRowNumber&&belowMerge.col<=c&&belowMerge.endCol>=endCol&&anchorStyle(belowMerge,belowRow).borderTop)seams.bottom='0px';
-    // Updating recycled nodes only when the seam changes avoids layout churn.
-    if(node._xlSeamRight!==seams.right){node._xlSeamRight=seams.right;
-      if(seams.right)node.style.borderRight=seams.right;else node.style.removeProperty('border-right');}
-    if(node._xlSeamBottom!==seams.bottom){node._xlSeamBottom=seams.bottom;
-      if(seams.bottom)node.style.borderBottom=seams.bottom;else node.style.removeProperty('border-bottom');}
-    // At the outermost sheet edge there is no preceding cell to own the seam.
-    const leftMerge=anchor?activeMerge(r,c-1):null,aboveMerge=anchor?activeMerge(r-1,c):null;
-    const leftOwned=leftMerge&&leftMerge.endCol===c-1&&leftMerge.row<=r&&leftMerge.endRow>=endRow&&(leftMerge.row<r||leftMerge.endRow>endRow)&&anchorStyle(leftMerge,row).borderRight;
-    const topOwned=aboveMerge&&aboveMerge.endRow===r-1&&aboveMerge.col<=c&&aboveMerge.endCol>=endCol&&(aboveMerge.col<c||aboveMerge.endCol>endCol)&&anchorStyle(aboveMerge,row).borderBottom;
-    const left=(edge.outerLeft||anchor)&&!leftOwned?own.borderLeft||'':'';
-    const top=(edge.outerTop||anchor)&&!topOwned?own.borderTop||'':'';
+    // Always paint an interior seam on the trailing edge of its predecessor.
+    // Painting inside the next merge's leading edge shifts it a device pixel.
+    const directRight=endCol===c&&edge.nextCol ? (rightCell??null) : undefined;
+    const directBelow=endRow===r&&belowRow ? (belowCell??null) : undefined;
+    const rightAt=rr=>borders.choose(own.borderRight,opposite(rr,rightCol,'borderLeft',
+      rr===r?rightRow:null,rr===r?directRight:undefined));
+    const bottomAt=cc=>borders.choose(own.borderBottom,opposite(under,cc,'borderTop',
+      belowRow,cc===c?directBelow:undefined));
+    const right=endRow===r?rightAt(r):borders.runs(r,endRow,edge.lastRow??endRow,nextVisibleRow,rightAt,own.borderRight||'');
+    const bottom=endCol===c?bottomAt(c):borders.runs(c,endCol,edge.columns?.at(-1)??endCol,i=>i,bottomAt,own.borderBottom||'');
+    borders.paint(node,'right',right,rowTop);
+    borders.paint(node,'bottom',bottom,colLeft);
+    const left=edge.outerLeft&&colLeft(c)===0?own.borderLeft||'':'';
+    const top=edge.outerTop?own.borderTop||'':'';
     if(node._xlOuterLeft!==left){node._xlOuterLeft=left;
       if(left)node.style.borderLeft=left;else node.style.removeProperty('border-left');}
     if(node._xlOuterTop!==top){node._xlOuterTop=top;
@@ -639,6 +630,9 @@
   }
 
   function canOpenWorkbook(action='切换文件'){
+    if (editCopy?.grid.active && editCopy.grid.blocked) {
+      toast('请先确认当前单元格的输入'); return false;
+    }
     if(window.ExcelLensAnalytics?.hasUnsaved()){
       toast(`分析表仍有未保存内容，请先在分析中重试保存，再${action}`,'warning');return false;
     }
@@ -706,6 +700,7 @@
   }
 
   async function acceptOpenedWorkbook(data, fallbackName = data.fileName || "", fallbackSize = data.fileSize || 0) {
+      if (editCopy?.grid.active) editCopy.grid.leave();
       archiveCenter?.use(data.archive);
       if(data.archiveOnly){finishOpening();$("uploadProgress").hidden=true;archiveCenter.present(data.archive);setStatus("请选择压缩包内的文件");return;}
       S.opened = true;
@@ -795,6 +790,7 @@
 
   const sheetPresentationKey=()=>[S.zoom,S.showStyles,S.showFormulas,window.devicePixelRatio||1].join('|');
   function rememberSheetView(){
+    if (editCopy?.grid.active) return;
     if(!S.sheet||!S.indexReady||!S.sheetLayout||!S.viewportData||S.filterJob)return;
     const layout={...S.sheetLayout,rows:S.rowSizes,cols:S.columnWidths,font:S.fontOverride,
       columnMode:S.columnMode,columnVisibility:S.columnOverrides};
@@ -826,21 +822,23 @@
     clearTimeout(S.sheetOverlayTimer);S.sheetOverlayTimer=0;S.sheetLoadingEpoch=0;
     $('grid').inert=!ready;$('sheetSwitchStatus').hidden=true;
     $('grid').parentElement.classList.remove('sheet-switching');
+    editCopy?.grid.controls();
+    if (ready && editCopy?.grid.active) { editCopy.grid.selection(); editCopy.grid.focus(); }
 	if(typeof catalogueCenter!=='undefined')catalogueCenter?.controls();
 	if(typeof dataRulesCenter!=='undefined')dataRulesCenter?.controls();if(typeof printingCenter!=='undefined')printingCenter?.controls();recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
   }
 
   async function selectSheet(name, targetRef = "", preserveTrace = false, navigationGuard = null) {
+    if (editCopy?.grid.active && editCopy.grid.draft && !await editCopy.grid.act()) return false;
     if(navigationGuard&&!navigationGuard())return;
     if (!name || !S.opened) return;
     if (S.sheet === name && S.indexReady) {
-      if (targetRef) await navigateToCell(name, targetRef, preserveTrace, navigationGuard);
-      return;
+      return targetRef ? navigateToCell(name, targetRef, preserveTrace, navigationGuard) : true;
     }
 	if(typeof dataRulesCenter!=='undefined')dataRulesCenter?.resetBook();if(typeof printingCenter!=='undefined')printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();profileCenter?.resetBook();
     if (S.sheet && S.indexReady) {
       const grid=$('grid');
-      S.positionsBySheet.set(S.sheet,{top:getVirtualScrollTop(),left:grid.scrollLeft,ref:S.selected?.ref||'A1',visual:S.selectedVisualIndex});
+      S.positionsBySheet.set(S.sheet,{top:getVirtualScrollTop(),left:grid.scrollLeft,ref:S.selected?.ref||'A1',visual:S.selectedVisualIndex,frozenThrough:S.selectedFrozenThrough});
       rememberSheetView();
     }
     const previousView=S.positionsBySheet.get(name);
@@ -859,6 +857,7 @@
     const epoch = ++S.sheetEpoch;
     rowViews?.cancel();S.rowView=null;S.rowVisibility=null;S.rowViewFailure=false;geometry.rows.setHidden?.([]);
     S.sheetLoadingEpoch=epoch;
+    editCopy?.grid.controls();
     $('grid').inert=true;$('grid').parentElement.classList.add('sheet-switching');
     $('sheetSwitchStatus').textContent=`正在打开：${name}`;$('sheetSwitchStatus').hidden=false;
     clearTimeout(S.sheetOverlayTimer);
@@ -1000,7 +999,7 @@
       }
       if(warm&&(!S.rowView||warm.entry.request.viewId===S.rowView.id)){
         for(const [key,data]of warm.frozen)frozenPanes.cachePart(key,data);
-        cacheViewport(viewportKey(warm.entry.request),warm.entry.data,warm.entry.request);
+        tiles.store(viewportKey(warm.entry.request),warm.entry.data,warm.entry.request);
       }
       try {
         await loadViewport(true, epoch, true);
@@ -1021,10 +1020,22 @@
       clearTimeout(S.sheetOverlayTimer);S.sheetOverlayTimer=0;
       $("indexOverlay").hidden = true;
       setStatus(`已打开 · ${name}`);
-      if (targetRef) await navigateToCell(name, targetRef, preserveTrace, navigationGuard);
-      else if(previousView && previousView.ref){
+      let arrived=true;
+      if (targetRef) {
+        try {
+          arrived=await navigateToCell(name, targetRef, preserveTrace, navigationGuard);
+        } catch(error) {
+          if(epoch!==S.sheetEpoch)return false;
+          toast(error.message,'error');
+          arrived=false;
+        }
+        if(epoch!==S.sheetEpoch)return false;
+        if(!arrived&&!S.selected)selectInitialCell();
+      } else if(previousView && previousView.ref){
         const ref=parseRef(previousView.ref);
-        if(ref&&rowVisible(ref.row)){
+        if(ref&&rowVisible(ref.row)&&S.filtered&&(!previousView.visual||previousView.frozenThrough!==frozenPanes.effective().rows)){
+          if(!await navigateToCell(name,ref.ref)&&epoch===S.sheetEpoch&&!S.selected)selectInitialCell();
+        }else if(ref&&rowVisible(ref.row)){
           const cell=S.cellMap.get(ref.ref)||S.frozenCellMap.get(ref.ref)||(warm?.selected?.ref===ref.ref?warm.selected:null)||await getCell(name,ref.ref).catch(()=>cellAt(ref.row,ref.col));
           if(epoch!==S.sheetEpoch)return;
           selectCell(cell,ref.row,ref.col,ref.ref,previousView.visual||ref.row);
@@ -1034,6 +1045,7 @@
       if(warm)await frozenPanes.refresh(true);else frozenPanes.schedule(true);
       if(epoch!==S.sheetEpoch)return;
       finishSheetSwitch(epoch);
+      return arrived;
     } catch (error) {
       if (epoch !== S.sheetEpoch) return;
 	  S.previewAbort?.abort();S.previewOnly=false;$("indexOverlay").classList.remove('previewing');
@@ -1479,7 +1491,7 @@
     if(S.filtered){
       const offset=Math.max(0,visibleStart-1-OVERSCAN_ROWS);
       const alignedOffset=Math.floor(offset/4)*4;
-      return {...shared,filtered:true,filterId:S.filterId,offset:alignedOffset,
+      return {...shared,filtered:true,filterId:S.filterId,excludeThroughRow:pinned.rows,offset:alignedOffset,
         displayStart:alignedOffset+1,displayEnd:Math.min(S.filterTotal,alignedOffset+limit)};
     }
     const startRow=S.rowVisibility?(advanceVisibleRow(visibleRow,-OVERSCAN_ROWS)||nextVisibleRow(1)||1):Math.max(1,Math.floor((visibleRow-OVERSCAN_ROWS-1)/4)*4+1);
@@ -1487,101 +1499,13 @@
       displayStart:startRow,displayEnd:Math.min(S.maxRow,S.rowVisibility?(advanceVisibleRow(startRow,limit-1)||previousVisibleRow(S.maxRow)):startRow+limit-1)};
   }
 
-  function viewportBounds(data,request){
-    const columns=Array.isArray(data.columns)&&data.columns.length?data.columns:null;
-    return {filtered:request.filtered,filterId:request.filterId,viewId:request.viewId||'',
-      displayStart:request.displayStart,
-      displayEnd:request.filtered?request.displayStart+data.rows.length-1:request.displayEnd,
-      startCol:data.startCol,
-      endCol:columns?columns[columns.length-1]:data.startCol+data.colCount-1,
-      columns};
-  }
-  function hasRequestedColumns(bounds,request,visibleOnly){
-    if(request.visibleColEnd<request.visibleColStart)return true;
-    if(!request.selectedCols) {
-      return bounds.startCol<=(visibleOnly?request.visibleColStart:request.startCol) &&
-        bounds.endCol>=(visibleOnly?request.visibleColEnd:request.startCol+request.cols-1);
-    }
-    // Sparse, hidden-column windows are checked repeatedly on every scroll
-    // frame. Reuse a membership set instead of rebuilding it for each probe.
-    const available=bounds.columns?(bounds.columnSet||(bounds.columnSet=new Set(bounds.columns))):null;
-    for(const col of request.selectedCols){
-      if(visibleOnly && (col<request.visibleColStart || col>request.visibleColEnd))continue;
-      if(available?!available.has(col):(col<bounds.startCol||col>bounds.endCol))return false;
-    }
-    return true;
-  }
-  function viewportCoversVisible(bounds,request){
-    if(!bounds||bounds.filtered!==request.filtered||bounds.filterId!==request.filterId||(bounds.viewId||'')!==(request.viewId||''))return false;
-    if(request.visibleEnd<request.visibleStart)return true;
-    return bounds.displayStart<=request.visibleStart&&bounds.displayEnd>=request.visibleEnd&&
-      hasRequestedColumns(bounds,request,true);
-  }
-  function viewportHasHeadroom(bounds,request){
-    if(!viewportCoversVisible(bounds,request))return false;
-    const rowMin=Math.max(1,request.visibleStart-3),rowMax=Math.min(
-      request.filtered?S.filterTotal:S.maxRow,request.visibleEnd+3);
-    if(request.selectedCols)return bounds.displayStart<=rowMin&&bounds.displayEnd>=rowMax&&
-      hasRequestedColumns(bounds,request,false);
-    const colMin=Math.max(1,request.visibleColStart-1),colMax=Math.min(S.maxCol,request.visibleColEnd+1);
-    return bounds.displayStart<=rowMin&&bounds.displayEnd>=rowMax&&
-      bounds.startCol<=colMin&&bounds.endCol>=colMax;
-  }
-  function viewportCoversRequest(bounds,request){
-    if(!bounds||bounds.filtered!==request.filtered||bounds.filterId!==request.filterId||(bounds.viewId||'')!==(request.viewId||''))return false;
-    return bounds.displayStart<=request.displayStart&&bounds.displayEnd>=request.displayEnd&&
-      hasRequestedColumns(bounds,request,false);
-  }
-  function windowContains(request){return viewportCoversRequest(S.window,request);}
-  function viewportKey(request){
-    return [S.sheetEpoch,request.filtered,request.filterId,request.viewId||'',request.displayStart,request.limit,
-      request.startCol,request.cols,request.selectedCols?.join(',')||'',
-      frozenPanes.effective().rows].join('|');
-  }
-
-  function estimateViewportBytes(data) {
-    // Cost is linear in the ACTUAL received tile, never the million-row
-    // worksheet extent. Include duplicated raw/display/formula strings and
-    // per-cell JS object overhead; this is a conservative memory estimate.
-    let size=256;
-    for(const row of data.rows||[]){
-      size+=64+2*(row.presentationNotice?.length||0);
-      for(const cell of row.cells||[]){
-        size+=176+2*((cell.raw?.length||0)+(cell.display?.length||0)+
-          (cell.formula?.length||0)+(cell.ref?.length||0))+window.ExcelLensRichText.estimate(cell.richText)+(window.ExcelLensConditional?.estimate(cell.conditional)||0);
-      }
-    }
-    return size;
-  }
-  function cacheViewport(key, data, request) {
-    const old=S.viewportCache.get(key);
-    if(old)S.viewportCacheBytes-=old.bytes;
-    S.viewportCache.delete(key);
-    const bytes=estimateViewportBytes(data);
-    S.viewportCache.set(key,{data,request,bounds:viewportBounds(data,request),bytes});
-    S.viewportCacheBytes+=bytes;
-    // Keep the newest (visible) tile even when its long formulas exceed the
-    // budget; evict older tiles to prevent multi-hundred-MiB retained JSON.
-    while(S.viewportCache.size>1 &&
-      (S.viewportCache.size>8||S.viewportCacheBytes>VIEWPORT_CACHE_BUDGET)){
-      const oldest=S.viewportCache.keys().next().value;
-      S.viewportCacheBytes-=S.viewportCache.get(oldest).bytes;
-      S.viewportCache.delete(oldest);
-    }
-  }
-
-  function cachedViewport(request) {
-    const key = viewportKey(request);
-    if (S.viewportCache.has(key)) {
-      const cached = S.viewportCache.get(key);
-      S.viewportCache.delete(key); S.viewportCache.set(key,cached);
-      return cached;
-    }
-    for (const cached of [...S.viewportCache.values()].reverse()) {
-      if (viewportCoversRequest(cached.bounds,request)) return cached;
-    }
-    return null;
-  }
+  const {viewportCoversVisible, sameViewportRows} = viewport;
+  const estimateViewportBytes = viewport.estimateViewportBytes;
+  const viewportKey = request => viewport.viewportKey(S.sheetEpoch,request);
+  const windowContains = request => viewport.viewportCoversRequest(S.window,request);
+  const viewportHasHeadroom = (bounds,request) => viewport.viewportHasHeadroom(
+    bounds,request,request.filtered ? S.filterTotal : S.maxRow,S.maxCol);
+  const cachedViewport = request => tiles.find(viewportKey(request),request);
 
   // The fallback is rendered in a single viewport-sized Canvas, never a
   // millions-of-cells DOM. It shows gridlines/row labels only where the
@@ -1608,7 +1532,7 @@
       S.fallbackFrame=0;
       if(!S.indexReady || !S.sheet){canvas.hidden=true;return;}
       const req=getViewportRequest();
-      const bounds=S.window;
+      const bounds=sameViewportRows(S.window,req)?S.window:null;
       if(viewportCoversVisible(bounds,req)){canvas.hidden=true;return;}
       const grid=$("grid"),rh=rowHeight(),cw=colWidth(),hh=headerHeight();
       const w=Math.max(1,grid.clientWidth),h=Math.max(1,grid.clientHeight);
@@ -1627,7 +1551,7 @@
       const minVisual=Math.max(1,rowAtOffset(getVirtualScrollTop()));
       const maxVisual=Math.min(S.filtered?S.filterTotal:S.maxRow,rowAtOffset(getVirtualScrollTop()+h)+4);
       const colsToPaint=req.selectedCols||Array.from({length:Math.min(85,S.maxCol)},(_,i)=>i+Math.max(1,colAtOffset(grid.scrollLeft)));
-    const bufferedColumns=bounds?.columns?(bounds.columnSet||(bounds.columnSet=new Set(bounds.columns))):null;
+      const bufferedColumns=bounds?.columns?(bounds.columnSet||(bounds.columnSet=new Set(bounds.columns))):null;
 
       ctx.font="10px Consolas, monospace";
       const reading=document.documentElement?.getAttribute('data-reading-tone')==='dark'?getComputedStyle(document.documentElement):null;
@@ -1643,8 +1567,7 @@
           const cellW=colWidth(c);
           const x=ROW_HEAD+colLeft(c)-grid.scrollLeft;
           if(x+cellW<=left||x>=w)continue;
-          if(bounds&&bounds.filtered===req.filtered&&bounds.filterId===req.filterId&&(bounds.viewId||'')===(req.viewId||'')&&
-             r>=bounds.displayStart&&r<=bounds.displayEnd&&c>=bounds.startCol&&c<=bounds.endCol&&
+          if(bounds&&r>=bounds.displayStart&&r<=bounds.displayEnd&&c>=bounds.startCol&&c<=bounds.endCol&&
              (!bufferedColumns||bufferedColumns.has(c)))continue;
           rowMissing=true;
           ctx.fillStyle=fallbackColor('--reading-paper',"#f8fafc");ctx.fillRect(Math.max(left,x),Math.max(top,y),
@@ -1690,8 +1613,7 @@
     S.viewportAbort = null;
     ++S.viewportRequest;
     S.viewportData = null;
-    S.viewportCache.clear();
-    S.viewportCacheBytes=0;
+    tiles.clear();
     S.window = null;
     if(!preserveDOM)resetGridDOM();
     const indicator = $("viewportLoading");
@@ -1706,6 +1628,7 @@
     S.viewportData = entry;
     if (entry.request.filtered) S.filterTotal = entry.data.totalRows;
     renderGrid(entry.data,entry.request);
+    if(entry.request.filtered)syncFilteredSelection(entry.request.excludeThroughRow);
     frozenPanes.schedule();
     // New/reused main cells are already decorated by renderGrid. A second
     // document-wide query here would add avoidable work to every scroll.
@@ -1770,10 +1693,10 @@
     if (request.filtered) {
       params.set("offset",String(request.offset));
       params.set("filterId",S.filterId);
-      if (S.freeze.rows) params.set("excludeThroughRow",String(frozenPanes.effective().rows));
+      params.set("excludeThroughRow",String(request.excludeThroughRow));
     } else params.set("row",String(request.row));
     const pending = {controller,request,bounds:{
-      filtered:request.filtered, filterId:request.filterId,viewId:request.viewId||'',
+      filtered:request.filtered, filterId:request.filterId,viewId:request.viewId||'',excludeThroughRow:request.excludeThroughRow,
       displayStart:request.displayStart,displayEnd:request.displayEnd,
       startCol:request.startCol,endCol:request.selectedCols?.at(-1)??Math.min(16384,request.startCol+request.cols-1),
       columns:request.selectedCols
@@ -1786,8 +1709,7 @@
       try {
         const data = await api('/api/sheet?'+params.toString(),{signal:controller.signal});
         if (controller.signal.aborted || ticket !== S.viewportRequest || expectedEpoch !== S.sheetEpoch) return;
-        cacheViewport(key,data,request);
-        const entry = S.viewportCache.get(key);
+        const entry = tiles.store(key,data,request);
         const latest = getViewportRequest();
         // CRITICAL: never paint a response that cannot cover the viewport at
         // the moment it arrives. A scrolled-back user otherwise sees blanks.
@@ -2094,6 +2016,7 @@
       // arrow-function allocations when a tile contains thousands of cells.
       const byColumn=Object.create(null);
       for (const c of rowData?.cells||[]) byColumn[c.col]=c;
+      if (editCopy?.grid.active) for (const {col,letter} of columnLayouts) byColumn[col]=editCopy.grid.project(S.sheet,letter+rowNumber,byColumn[col]);
       const belowRow=S.filtered?visualRows.get(visual+1):rowDataByNumber.get(nextVisibleRow(rowNumber+1));
       const belowColumns=Object.create(null);
       for(const c of belowRow?.cells||[])belowColumns[c.col]=c;
@@ -2105,7 +2028,6 @@
         const col=layout.col;
         const cellData=byColumn[col];
         const ref=`${layout.letter}${rowNumber}`;
-        if(cellData) S.cellMap.set(ref,cellData);
         let cell=cells.get(col);
         const replaced=Boolean(cell && (!sameRenderedCell(cell._xlModel,cellData)||cell._xlRowStyle!==(rowData?.style||0)||cellPresenter.needsPaint(cell,cellData,rowData)));
         if(replaced){
@@ -2125,7 +2047,7 @@
         updateGridCellGeometry(cell,layout);
         const nextCol=columnLayouts[layoutIndex+1]?.col;
         updateSharedBorders(cell,cellData,rowData,nextCol?byColumn[nextCol]:null,rowData,
-          belowColumns[col],belowRow,{outerLeft:layoutIndex===0&&col>1,outerTop:rowNumber===1});
+          belowColumns[col],belowRow,{nextCol,columns:visibleColumns,lastRow:lastVisual,rows:rowDataByNumber,outerLeft:layoutIndex===0&&col>1,outerTop:rowTop(visual)===0});
         // For column A, the row header is the single owner of A's left edge.
         if(layoutIndex===0&&col===1){
           const border=visualForBorder(cellData,rowData).borderLeft||'';
@@ -2158,6 +2080,7 @@
     $("gridEmpty").hidden=hasVisibleRows;
     if(!hasVisibleRows) $("gridEmpty").textContent=S.filtered?"没有可见的筛选记录；可在「行与大纲」中显示全部":"没有可见行；可在「行与大纲」中显示全部";
     updateGridStatus(data);
+    editCopy?.grid.schedulePosition();
     traceUI?.refreshPulse();
     updateSearchNavButtons();
     S.renderMetrics={commits:S.renderMetrics.commits+1,reusedRows,createdRows,createdCells,
@@ -2261,6 +2184,7 @@
     const areas=window.ExcelLensMultiSelection.areas(S);
     const pinnedCells=document.querySelectorAll('.grid-region .pinned-cell');
     for(const node of pinnedCells){
+      node.classList.toggle('selected',node.dataset.ref===selectedRef);
       node.classList.toggle('crosshair-row',Number(node.dataset.row)===selectedRow);
       node.classList.toggle('active-column',Number(node.dataset.col)===selectedCol);
     }
@@ -2285,7 +2209,8 @@
     const normalizedRef = ref || cell?.ref || `${colName(colNumber)}${rowNumber}`;
     const col = colNumber || cell?.col || parseRef(normalizedRef)?.col || 1;
     const row = rowNumber || parseRef(normalizedRef)?.row || 1;
-    const normalized = cell || { ref: normalizedRef, col, raw: "", display: "", hasFormula: false };
+    const source = cell || { ref: normalizedRef, col, raw: "", display: "", hasFormula: false };
+    const normalized = editCopy?.grid.active ? editCopy.grid.project(S.sheet,normalizedRef,source) : source;
     if(!preserveTrace&&(!S.selected||S.selected.ref!==normalizedRef||S.selected.sheet!==S.sheet))traceUI?.selectionChanged();
     if (!preserveTrace && S.traceRefs.length && (!S.selected || S.selected.ref !== normalizedRef || S.selected.sheet !== S.sheet)) {
       S.traceRefs = [];
@@ -2297,6 +2222,7 @@
     S.rangeAnchor = {row,col,visual:visualIndex||row};
     $("selectionStatus").textContent = "";
     S.selectedVisualIndex = visualIndex || row;
+    S.selectedFrozenThrough=S.filtered?frozenPanes.effective().rows:0;
     $("nameBox").value = normalizedRef;
     formulaInspector?.show(normalized,S.sheet);
     $("formulaValue").textContent = normalized.cacheMissing ? "无缓存" : (normalized.display ?? "");
@@ -2309,6 +2235,7 @@
     applySelectionClasses();
     selectionStats?.schedule();
     recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
+    editCopy?.grid.selection();
   }
 
   function selectCellByAddress(ref, visualIndex) {
@@ -2340,57 +2267,104 @@
     return S.cellMap.get(ref) || S.frozenCellMap.get(ref) || { ref, col, raw: "", display: "", hasFormula: false };
   }
 
+  function syncFilteredSelection(through) {
+    if(!S.selected)return;
+    const changed=S.selectedFrozenThrough!==through;
+    if(!changed&&S.selectedVisualIndex)return;
+    const {row,col}=S.selected;
+    let visual=row<=through?row:0;
+    if(!visual){
+      for(const [position,source] of S.rowNumberByVisual){
+        if(source===row){visual=position;break;}
+      }
+    }
+    S.selectedVisualIndex=visual;
+    S.selectedFrozenThrough=through;
+    S.rangeAnchor={row,col,visual};
+    if(changed&&(S.range||S.multiRanges.length||S.wholeRowSelected)){
+      S.range=null;S.multiRanges=[];S.wholeRowSelected=false;
+      $('selectionStatus').textContent='';
+      selectionStats?.clear();
+      applySelectionClasses();
+    }
+  }
+
+  function beginGridNavigation(pinnedRows) {
+    const intent={}, origin=S.selected, sheet=S.sheet, epoch=S.sheetEpoch;
+    const book=S.book, key=S.workbookKey, filterId=S.filterId, viewId=S.rowView?.id;
+    S.gridNavigation=intent;
+    return ()=>S.gridNavigation===intent&&S.selected===origin&&sheet===S.sheet&&epoch===S.sheetEpoch&&
+      book===S.book&&key===S.workbookKey&&filterId===S.filterId&&viewId===S.rowView?.id&&
+      (!S.filtered||pinnedRows===frozenPanes.effective().rows);
+  }
+
+  // A row of zero is an unresolved position in the filtered body. Use its
+  // visual index for scrolling, then resolve the source row from the tile.
+  function scrollCellIntoView(row,col,visual,pinned) {
+    ensureExtent(row||1,col);
+    const grid=$('grid'),viewTop=getVirtualScrollTop(),viewLeft=grid.scrollLeft;
+    let top=viewTop,left=viewLeft;
+    if(!row||row>pinned.rows){
+      const header=headerHeight(),frozenHeight=sourceRowTop(pinned.rows+1);
+      const cellTop=header+rowTop(visual)+(S.filtered?frozenHeight:0),height=rowHeight(visual);
+      if(cellTop<viewTop+header+frozenHeight)top=Math.max(0,cellTop-header-frozenHeight-height*2);
+      else if(cellTop+height>viewTop+grid.clientHeight)top=cellTop-grid.clientHeight+height*2;
+    }
+    if(col>pinned.cols){
+      const cellLeft=ROW_HEAD+colLeft(col),width=colWidth(col);
+      if(cellLeft<viewLeft+ROW_HEAD+colLeft(pinned.cols+1))left=Math.max(0,cellLeft-ROW_HEAD-colLeft(pinned.cols+1)-width);
+      else if(cellLeft+width>viewLeft+grid.clientWidth)left=cellLeft-grid.clientWidth+width*2;
+    }
+    if(top!==viewTop||left!==viewLeft)grid.scrollTo({top:scrollTopToPhysical(top),left,behavior:'auto'});
+  }
+
+  async function locateFilteredVisual(row,through) {
+    if(row<=through)return row;
+    const params=new URLSearchParams({sheet:S.sheet,filterId:S.filterId,row:String(row),excludeThroughRow:String(through)});
+    if(S.rowView)params.set('viewId',S.rowView.id);
+    const match=await api('/api/filter/locate?'+params);
+    return match.found&&match.row===row?match.visualIndex:0;
+  }
+
   async function navigateToCell(sheet, ref, preserveTrace = false, guard = null) {
-    const book=S.workbookKey,current=()=>book===S.workbookKey&&(!guard||guard());
+    const book=S.book,key=S.workbookKey,current=()=>book===S.book&&key===S.workbookKey&&(!guard||guard());
     if(!current())return false;
     let parsed = parseRef(ref);
-    if (!parsed) { toast(`无法定位单元格：${ref}`,'error'); return; }
+    if (!parsed) { toast(`无法定位单元格：${ref}`,'error'); return false; }
     if (S.selected && !S.historyNavigating) recordVisit(S.selected.sheet, S.selected.ref);
-    if (sheet !== S.sheet) {
-      await selectSheet(sheet, parsed.ref, preserveTrace, guard);
-      return;
-    }
+    if (sheet !== S.sheet) return selectSheet(sheet, parsed.ref, preserveTrace, current);
     const epoch=S.sheetEpoch;
     if(S.rowVisibility&&!rowVisible(parsed.row)){
       if(!rowViews||!await rowViews.reveal(parsed.row,()=>current()&&epoch===S.sheetEpoch))return false;
       if(!current()||epoch!==S.sheetEpoch)return false;
       toast(`已临时显示第 ${parsed.row} 行`,'info');
     }
-    const viewId=S.rowView?.id||'',viewCurrent=()=>current()&&epoch===S.sheetEpoch&&viewId===(S.rowView?.id||'');
     const merged=activeMerge(parsed.row,parsed.col);
     if(merged)parsed=parseRef(`${colName(merged.col)}${merged.row}`);
-    if (S.filtered && parsed.row > frozenPanes.effective().rows) {
-      const match = await api(`/api/filter/locate?${new URLSearchParams({sheet:S.sheet,filterId:S.filterId,...(S.rowView?{viewId:S.rowView.id}:{}),row:String(parsed.row),excludeThroughRow:String(frozenPanes.effective().rows)})}`);
+    const pinned=frozenPanes.effective(),readCurrent=beginGridNavigation(pinned.rows);
+    const viewCurrent=()=>current()&&readCurrent();
+    const filteredBody=S.filtered&&parsed.row>pinned.rows;
+    let visual=parsed.row;
+    try{
+      if(filteredBody){
+        visual=await locateFilteredVisual(parsed.row,pinned.rows);
+        if(!viewCurrent())return false;
+        if(!visual){toast('该单元格所在行被筛选条件隐藏；可清除筛选后定位','warning');return false;}
+      }
+      scrollCellIntoView(parsed.row,parsed.col,visual,pinned);
+      await loadViewport(true);
       if(!viewCurrent())return false;
-      if (!match.found) { toast("该单元格所在行被筛选条件隐藏；可清除筛选后定位",'warning'); return; }
-      S.selectedVisualIndex = match.visualIndex;
+      if(filteredBody&&S.rowNumberByVisual.get(visual)!==parsed.row){toast('尚未读取目标行，请重试定位','warning');return false;}
+      const cell=S.cellMap.get(parsed.ref)||S.frozenCellMap.get(parsed.ref)||await getCell(sheet,parsed.ref);
+      if(!viewCurrent())return false;
+      selectCell(cell,parsed.row,parsed.col,parsed.ref,visual,preserveTrace);
+      recordVisit(sheet,parsed.ref);
+      $('grid').focus({preventScroll:true});
+      return true;
+    }catch(error){
+      if(viewCurrent())throw error;
+      return false;
     }
-    const grid = $("grid");
-    const pinned = frozenPanes.effective();
-    ensureExtent(parsed.row,parsed.col);
-    const top = headerHeight() + (S.filtered?rowTop(S.selectedVisualIndex)+sourceRowTop(pinned.rows+1):rowTop(parsed.row));
-    const left = ROW_HEAD + colLeft(parsed.col);
-    const viewTop = getVirtualScrollTop(), viewBottom = viewTop + grid.clientHeight;
-    const viewLeft = grid.scrollLeft, viewRight = viewLeft + grid.clientWidth;
-    let scrollTop = viewTop;
-    let scrollLeft = viewLeft;
-    const frozenHeight=sourceRowTop(pinned.rows+1), frozenWidth=colLeft(pinned.cols+1);
-    if (parsed.row > pinned.rows && top < viewTop + headerHeight() + frozenHeight) scrollTop = Math.max(0, top-headerHeight()-frozenHeight-rowHeight()*2);
-    else if (parsed.row > pinned.rows && top + rowHeight(parsed.row) > viewBottom) scrollTop = top-grid.clientHeight+rowHeight(parsed.row)*2;
-    if (parsed.col > pinned.cols && left < viewLeft+ROW_HEAD+frozenWidth) scrollLeft=Math.max(0,left-ROW_HEAD-frozenWidth-colWidth(parsed.col));
-    else if (parsed.col > pinned.cols && left+colWidth(parsed.col)>viewRight) scrollLeft=left-grid.clientWidth+colWidth(parsed.col)*2;
-    grid.scrollTo({ top: scrollTopToPhysical(scrollTop), left: Math.max(0, scrollLeft), behavior: "auto" });
-    await loadViewport(true);
-    if(!viewCurrent()||sheet!==S.sheet)return false;
-    const visual = S.filtered ? S.selectedVisualIndex : parsed.row;
-    const actualRow = S.filtered ? (parsed.row <= pinned.rows ? parsed.row : S.rowNumberByVisual.get(visual)) : parsed.row;
-    if (!actualRow) { toast("当前筛选结果中找不到该行",'warning'); return; }
-    const cell = S.cellMap.get(parsed.ref) || S.frozenCellMap.get(parsed.ref) || await getCell(S.sheet, parsed.ref).catch(() => cellAt(actualRow, parsed.col));
-    if(!viewCurrent()||sheet!==S.sheet)return false;
-    selectCell(cell, actualRow, parsed.col, parsed.ref, visual, preserveTrace);
-    recordVisit(S.sheet, parsed.ref);
-    $("grid").focus({ preventScroll: true });
-    return true;
   }
 
   async function getCell(sheet, ref) {
@@ -2419,10 +2393,6 @@
   }
 
   async function moveSelection(rowDelta, colDelta, extend = false) {
-    const sheet=S.sheet,epoch=S.sheetEpoch,book=S.workbookKey,viewId=S.rowView?.id||'';
-    const current=()=>sheet===S.sheet&&epoch===S.sheetEpoch&&book===S.workbookKey&&viewId===(S.rowView?.id||'');
-    const preceding=extend?S.multiRanges.slice():[];
-    const anchor = extend ? (S.rangeAnchor || (S.selected && {row:S.selected.row,col:S.selected.col,visual:S.selectedVisualIndex})) : null;
     if (!S.selected) {
       selectInitialCell();
       return;
@@ -2430,27 +2400,32 @@
     let targetRow = S.selected.row;
     let targetVisual = S.selectedVisualIndex;
     const pinned = frozenPanes.effective();
-    let pinnedTarget=S.filtered&&targetRow<=pinned.rows;
+    const current=beginGridNavigation(pinned.rows);
+    let preceding=extend?S.multiRanges.slice():[];
+    let anchor=extend?(S.rangeAnchor||{row:targetRow,col:S.selected.col,visual:targetVisual}):null;
+    if(S.filtered&&(S.selectedFrozenThrough!==pinned.rows||!targetVisual)){
+      targetVisual=await locateFilteredVisual(targetRow,pinned.rows);
+      if(!current()||!targetVisual)return;
+      preceding=[];
+      if(extend)anchor={row:targetRow,col:S.selected.col,visual:targetVisual};
+    }
+    const originVisual=targetVisual;
     let targetCol = Math.max(1, Math.min(16384, S.selected.col + colDelta));
     const fromMerge=activeMerge(S.selected.row,S.selected.col);
-    if(fromMerge&&colDelta===1)targetCol=fromMerge.endCol+1;
-    if (S.filtered && rowDelta !== 0) {
-      if(pinnedTarget){
-        const header=advanceVisibleRow(targetRow,rowDelta);
-        if(header&&header<=pinned.rows){targetRow=header;targetVisual=header;}
-        else if(rowDelta>0){pinnedTarget=false;targetVisual=1;}
-      }else if(targetVisual+rowDelta<1&&previousVisibleRow(pinned.rows)){
-        pinnedTarget=true;targetRow=previousVisibleRow(pinned.rows);targetVisual=targetRow;
-      }else targetVisual=Math.max(1,Math.min(S.filterTotal,targetVisual+rowDelta));
-      if(!pinnedTarget){
-        const known = S.rowNumberByVisual.get(targetVisual);
-        if (known) targetRow = known;
-        else {
-          const top = headerHeight() + rowTop(targetVisual)+sourceRowTop(pinned.rows+1);
-          setVirtualScrollTop(Math.max(0, top - rowHeight() * 2));
-          await loadViewport(true);
-          if(!current())return;
-          targetRow = S.rowNumberByVisual.get(targetVisual) || targetRow;
+    if(fromMerge&&colDelta===1)targetCol=Math.min(16384,fromMerge.endCol+1);
+    if (S.filtered) {
+      if(rowDelta){
+        if(targetRow<=pinned.rows){
+          const header=advanceVisibleRow(targetRow,rowDelta);
+          if(header&&header<=pinned.rows){targetRow=header;targetVisual=header;}
+          else if(rowDelta>0&&S.filterTotal){targetRow=0;targetVisual=1;}
+        }else{
+          const header=previousVisibleRow(pinned.rows);
+          if(targetVisual+rowDelta<1&&header){targetRow=header;targetVisual=header;}
+          else{
+            targetVisual=Math.max(1,Math.min(S.filterTotal,targetVisual+rowDelta));
+            if(targetVisual!==originVisual)targetRow=S.window?.excludeThroughRow===pinned.rows?S.rowNumberByVisual.get(targetVisual)||0:0;
+          }
         }
       }
     } else {
@@ -2460,22 +2435,13 @@
       if(destination){targetRow=destination.row;targetCol=destination.col;}
       targetVisual=targetRow;
     }
-    const grid = $("grid");
-    ensureExtent(targetRow,targetCol);
-    const targetTop=headerHeight()+(pinnedTarget?sourceRowTop(targetRow):S.filtered?rowTop(targetVisual)+sourceRowTop(pinned.rows+1):rowTop(targetRow));
-    const targetLeft=ROW_HEAD+colLeft(targetCol);
-    if(targetRow>pinned.rows&&(targetTop<getVirtualScrollTop()+headerHeight()+sourceRowTop(pinned.rows+1)||targetTop+rowHeight(targetVisual)>getVirtualScrollTop()+grid.clientHeight)) {
-      setVirtualScrollTop(Math.max(0,targetTop-rowHeight(targetVisual)*2));
-    }
-    if(targetCol>pinned.cols&&(targetLeft<grid.scrollLeft+ROW_HEAD+colLeft(pinned.cols+1)||targetLeft+colWidth(targetCol)>grid.scrollLeft+grid.clientWidth)) {
-      grid.scrollLeft=Math.max(0,targetLeft-ROW_HEAD-colWidth(targetCol)*2);
-    }
-    if (!S.window || !windowContains(getViewportRequest())) await loadViewport(true);
+    scrollCellIntoView(targetRow,targetCol,targetVisual,pinned);
+    if (!targetRow || !S.window || !windowContains(getViewportRequest())) await loadViewport(true);
     if(!current())return;
-    if (S.filtered&&!pinnedTarget) targetRow = S.rowNumberByVisual.get(targetVisual) || targetRow;
+    if(!targetRow&&S.window?.excludeThroughRow===pinned.rows)targetRow=S.rowNumberByVisual.get(targetVisual);
+    if(!targetRow)return;
     const targetRef = `${colName(targetCol)}${targetRow}`;
-    const cell = S.cellMap.get(targetRef) || S.frozenCellMap.get(targetRef) || cellAt(targetRow, targetCol);
-    selectCell(cell, targetRow, targetCol, `${colName(targetCol)}${targetRow}`, targetVisual);
+    selectCell(cellAt(targetRow,targetCol),targetRow,targetCol,targetRef,targetVisual);
     if (extend){S.multiRanges=preceding;extendRange(anchor,targetRow,targetCol,targetVisual);}
   }
 
@@ -2566,8 +2532,7 @@
     const item = S.history[next];
     S.historyNavigating = true;
     try {
-      await navigateToCell(item.sheet,item.ref);
-      S.historyIndex = next;
+      if(await navigateToCell(item.sheet,item.ref))S.historyIndex=next;
     } catch(error) {toast(error.message,'error');}
     finally {S.historyNavigating = false; updateHistoryButtons();}
   }
@@ -3178,9 +3143,17 @@
     remove.className = "remove-rule";
     remove.textContent = "×";
     remove.title = "删除条件";
+    remove.setAttribute("aria-label", "删除条件");
     remove.addEventListener("click", () => row.remove());
     op.addEventListener("change", () => { val.disabled = ["blank", "notBlank"].includes(op.value); val.placeholder = val.disabled ? "无需填写" : "筛选值"; });
-    row.append(colInput, op, val, remove);
+    for (const [caption, control] of [["列", colInput], ["条件", op], ["筛选值", val]]) {
+      const label = document.createElement("label");
+      const text = document.createElement("span");
+      text.textContent = caption;
+      label.append(text, control);
+      row.appendChild(label);
+    }
+    row.appendChild(remove);
     $("filterRules").appendChild(row);
     op.dispatchEvent(new Event("change"));
   }
@@ -3732,7 +3705,7 @@
   function renderGridFromCurrentWindow() {
     // Always re-render from the complete cached payload. Reconstructing a
     // viewport from the DOM loses off-screen values and can cause blank bands.
-    if (!S.viewportData) return;
+    if (!S.viewportData||!sameViewportRows(S.viewportData.bounds,getViewportRequest())) return;
     renderGrid(S.viewportData.data,S.viewportData.request);
   }
 
@@ -3767,6 +3740,7 @@
 
   let hoverRef = "";
   function showTooltip(event) {
+    if (editCopy?.grid.active) return;
     const cellEl=event.target.closest?.(".grid-cell");
     const tooltip=$("cellTooltip");
     if(!cellEl) {tooltip.hidden=true;hoverRef="";return;}
@@ -3981,11 +3955,7 @@
   }
 
   // Keyboard-first command palette keeps the main toolbar compact.
-  function buttonCommand(name,button,tags='',shortcut=''){
-    return {name,button,tags,shortcut,run:()=>{const node=$(button);if(node&&!node.disabled&&!node.hidden)node.click();}};
-  }
-  function commandUnavailable(action){const node=action?.button?$(action.button):null;return Boolean(action?.button&&(!node||node.disabled||node.hidden));}
-  function commandWindow(total,index,limit){return Math.max(0,Math.min(index-Math.floor(limit/2),total-limit));}
+  const {buttonCommand, CommandPalette} = window.ExcelLensCommands;
   const ACTIONS = [
     buttonCommand('打开文件','openBtn','工作簿 选择 文件'),
     buttonCommand('数据分析','analysisOpenBtn','透视 汇总 图表 分析表'),
@@ -4010,6 +3980,7 @@
     {name:'任务恢复',shortcut:'',tags:'继续 查询 筛选 排序 导出 下载 中断',run:()=>taskRecovery.open()},
     buttonCommand('公式计算','calculatorOpenBtn','加减乘除 金额 公式 计算','Ctrl+Alt+C'),
     buttonCommand('导出中心','exportOpenBtn','保存 CSV XLSX PDF 数据','Ctrl+Shift+E'),
+    buttonCommand('编辑副本','editCopyOpen','改值 粘贴 另存 撤销'),
     {name:'导出当前选区',shortcut:'',tags:'区域 导出',run:()=>exportCenter.open('selection')},
     {name:'导出整个工作簿',shortcut:'',tags:'全部 Sheet',run:()=>exportCenter.open('all')},
     buttonCommand('数据洞察 · 精确统计','profileOpenBtn','汇总 求和 公式 异常 计数','Ctrl+Alt+S'),
@@ -4047,27 +4018,11 @@
     buttonCommand('公式追踪','tracePrecedentsBtn','引用 上游'),
     buttonCommand('全屏','fullscreenBtn','窗口','F11'),
   ];
-  let commandIndex=0, visibleCommands=[];
-  function renderCommands(){
-    const q=$('commandSearch').value.toLocaleLowerCase().trim();
-    visibleCommands=ACTIONS.filter(action=>!q||(action.name+' '+action.tags+' '+action.shortcut).toLocaleLowerCase().includes(q));
-    if(q)S.sheets.forEach(sheet=>{if(sheet.name.toLocaleLowerCase().includes(q))visibleCommands.push({name:'打开 Sheet：'+sheet.name,tags:'工作表',shortcut:'',run:()=>selectSheet(sheet.name)})});
-    commandIndex=Math.min(commandIndex,Math.max(0,visibleCommands.length-1));
-    const frag=document.createDocumentFragment();
-    const limit=Math.max(60,ACTIONS.length),start=commandWindow(visibleCommands.length,commandIndex,limit);
-    visibleCommands.slice(start,start+limit).forEach((action,offset)=>{
-      const i=start+offset;
-      const item=document.createElement('button');item.type='button';item.className='command-entry'+(i===commandIndex?' active':'');item.setAttribute('role','option');
-      item.disabled=commandUnavailable(action);item.setAttribute('aria-selected',String(i===commandIndex));if(action.button)item.dataset.commandButton=action.button;
-      const left=document.createElement('span');left.textContent=action.name;
-      const shortcut=document.createElement('span');shortcut.className='command-shortcut';shortcut.textContent=action.shortcut||'';
-      item.append(left,shortcut);item.addEventListener('click',()=>runCommand(action));frag.append(item);
-    });
-    $('commandList').replaceChildren(frag);
-    $('commandList').querySelector('.active')?.scrollIntoView({block:'nearest'});
-  }
-  function runCommand(action){if(!action||commandUnavailable(action))return;closeDialog('commandDialog');Promise.resolve().then(()=>action.run()).catch(error=>toast(error.message,'error'));}
-  function openCommandPalette(){if(!S.opened)return;commandIndex=0;$('commandSearch').value='';renderCommands();openDialog('commandDialog');$('commandSearch').focus({preventScroll:true});}
+  const commandPalette = new CommandPalette(ACTIONS, {
+    node:$, sheets:() => S.sheets, selectSheet, canOpen:() => S.opened, openDialog, closeDialog, toast
+  });
+  const openCommandPalette = () => commandPalette.open();
+
   function selectNativeRange(kind){
     if(!S.indexReady||!S.selected)return;
     const row=S.selected.row,col=S.selected.col;
@@ -4120,6 +4075,7 @@
   // modal dialog controls. Only the grid receives caret/navigation keys;
   // read-only application commands also work after toolbar clicks.
   function handleSpreadsheetKeydown(event){
+    if (editCopy?.grid.active && !document.querySelector('dialog:modal')) return;
     const key=event.key.toLowerCase();
     const ctrl=event.ctrlKey||event.metaKey;
     const alt=event.altKey;
@@ -4249,19 +4205,18 @@
   }
 
   function bindEvents() {
-    $('commandSearch').addEventListener('input',()=>{commandIndex=0;renderCommands();});
-    $('commandSearch').addEventListener('keydown',event=>{
-      if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();commandIndex=Math.max(0,Math.min(visibleCommands.length-1,commandIndex+(event.key==='ArrowDown'?1:-1)));renderCommands();return;}
-      if(event.key==='Enter'){event.preventDefault();runCommand(visibleCommands[commandIndex]);}
-    });
+    commandPalette.bind();
     $("openBtn").addEventListener("click", chooseFile);
-    $("homeBtn").addEventListener("click",()=>{showWelcome();recentManager.load();});
+    $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});
     $("chooseFileBtn").addEventListener("click", chooseFile);
     $("fileInput").addEventListener("change", event => uploadFile(event.target.files?.[0]));
     $("nameBox").addEventListener("keydown", event => {
       if (event.key === "Enter") {
         event.preventDefault();
-        navigateNameBox($("nameBox").value).then(()=>$('grid').focus({preventScroll:true})).catch(err=>toast(err.message,'error'));
+        const address = $("nameBox").value;
+        const navigate = () => navigateNameBox(address).then(()=>editCopy?.grid.active ? editCopy.grid.focus() : $('grid').focus({preventScroll:true}));
+        if (editCopy?.grid.active) editCopy.grid.act(navigate);
+        else navigate().catch(err=>toast(err.message,'error'));
       } else if (event.key === "Escape") {
         $("nameBox").value = S.selected?.ref || "";
         $("nameBox").blur();
@@ -4519,6 +4474,25 @@
   readingMode=new window.ExcelLensReadingMode({button:$('readingModeBtn'),panel:$('readingModePanel'),veil:$('readingVeil'),textureToggle:$('gridTextureToggle'),onTextureChange:syncGridBackdrop});
   highlightMode=new window.ExcelLensHighlightMode({toggle:$('crosshairToggle'),button:$('crosshairColorBtn'),panel:$('crosshairPanel'),onChange:applySelectionClasses});
   recentManager=new window.ExcelLensRecentWorkbooks({api,open:acceptOpenedWorkbook,toast,canOpen:canOpenWorkbook});
+  if (window.ExcelLensEditCopy && fileFormats.editing && $('editCopyDialog')) {
+    editCopy = new window.ExcelLensEditCopy({api, openDialog, adopt: acceptOpenedWorkbook, canOpen: canOpenWorkbook,
+      context: () => ({book: S.book, fileName: S.fileName, source: S.source, sheet: S.sheet, ref: S.selected?.ref}),
+      grid: {
+        selected:()=>S.selected, ready:()=>S.indexReady && !S.sheetLoadingEpoch, filtered:()=>S.filtered,
+        move:moveSelection, select:selectCellByAddress,
+        bounds:ref=>{
+          for(const node of document.querySelectorAll(`.grid-region .grid-cell[data-ref="${ref}"]`)){
+            const rect=traceVisibleRect(node); if(rect)return {rect,node};
+          }
+          return null;
+        },
+        redraw:()=>{
+          ++S.decorVersion; renderGridFromCurrentWindow(); frozenPanes?.schedule(true);
+          if(S.selected) selectCellByAddress(S.selected.ref,S.selectedVisualIndex);
+        }
+      },
+      limits: fileFormats.editing, colName, fmtBytes});
+  }
   // A bounded read-only bridge; the analysis workspace cannot mutate grid
   // state or capture unfinished controls as if they were successful results.
   window.ExcelLensAnalysisSourceContext=(mode)=>{
@@ -4562,10 +4536,11 @@
     sourceRowTop,sourceRowHeight,
     getVirtualScrollTop,
     updateSharedBorders,
-    isPrecedent, isSearchMatch, applyCellStyle, onRender:()=>{applySelectionClasses();traceUI?.refreshPulse();},
+    isPrecedent, isSearchMatch, applyCellStyle, onRender:()=>{applySelectionClasses();traceUI?.refreshPulse();editCopy?.grid.schedulePosition();},
     decorateFormulaRef:(element,row,col,sheet)=>{formulaInspector?.decorateCell(element,row,col,sheet);selectionInspector?.decorateCell(element,element.dataset.ref,sheet);},
     beforePaint:rows=>frozenPresenter.prepare(rows),
     paintCell:frozenPresenter.paint.bind(frozenPresenter),extendTextIntoBlanks:frozenPresenter.overflow.bind(frozenPresenter),
+    projectCell:(ref,cell)=>editCopy?.grid.active ? editCopy.grid.project(S.sheet,ref,cell) : cell,
     estimateBytes:estimateViewportBytes,cacheBudget:VIEWPORT_CACHE_BUDGET,
     decorateMergedCell,
     decorateColumnHeader:decorateTableColumnHeader,
@@ -4599,6 +4574,8 @@
     context:()=>[S.workbookKey,S.book,S.sheetEpoch,S.searchRequestID,S.filterRequest,exportCenter.serial].join('|'),
     canResume:(item,action)=>{if(action==='open')return !S.opening&&canOpenWorkbook();if(S.opening||S.sheetLoadingEpoch){toast('请先完成文件加载','warning');return false;}if(item.kind==='export'?(exportCenter.running||exportCenter.busy):!!(S.searchJob||S.filterJob)){toast('请先完成或取消当前任务','warning');return false;}return true;}});
   $('taskRecoveryHome').addEventListener('click',()=>taskRecovery.open());
+  $('recentRefreshBtn').addEventListener('click',()=>taskRecovery.refreshHome());
+  window.addEventListener('focus',()=>taskRecovery.refreshHome());
   copySpecial = new window.ExcelLensCopySpecial({capture:captureClipboardSelection,copy:content=>content.html?writeClipboardPayload(content):copyText(content.text),toast,limits:fileFormats.clipboard});
   transposeCenter=new window.ExcelLensTranspose({capture:captureClipboardSelection,copy:copyText,toast,navigate:navigateToCell,colName,fontStack,limits:fileFormats.transpose,richLimits:fileFormats.richText});
   window.ExcelLensExportIssues=(jobId,protectCSV)=>exportCenter.startGenerated('/api/analysis/issues/export',{jobId,protectCSV},'异常核对清单（完整）');
@@ -4622,8 +4599,8 @@
     ...S.renderMetrics,
     currentRows:S.renderedRows.size,
     visibleNodes:$("rowsLayer").querySelectorAll(".grid-cell").length,
-    bufferedTiles:S.viewportCache.size,
-    bufferedApproxBytes:S.viewportCacheBytes,
+    bufferedTiles:tiles.size,
+    bufferedApproxBytes:tiles.bytes,
     cachedSheetViews:S.sheetViews.size,
     cachedSheetBytes:S.sheetViewsBytes,
     sheetLoading:Boolean(S.sheetLoadingEpoch),

@@ -248,9 +248,20 @@ func (a *App) handleAnalysisSourceRestore(w http.ResponseWriter, r *http.Request
 		writeError(w, 409, "工作簿已切换，未恢复分析范围")
 		return
 	}
+	releaseSlot, err := a.acquireAnalysisQuerySlot(r.Context(), req.Source, req.Scope.Filter != nil)
+	if err != nil {
+		return
+	}
+	defer releaseSlot()
 	a.cacheMu.RLock()
+	if a.currentWorkbook() != wb {
+		a.cacheMu.RUnlock()
+		writeError(w, 409, "工作簿已切换，未恢复分析范围")
+		return
+	}
 	snapshot, err := a.restoreAnalysisSource(r.Context(), wb, req.Source, req.Scope)
 	a.cacheMu.RUnlock()
+	releaseSlot()
 	if err != nil {
 		writeError(w, 409, err.Error())
 		return
@@ -293,15 +304,9 @@ func (a *App) analysisSourceSnapshot(id string, wb *workbook.Workbook) (*analysi
 	return snapshot.retain()
 }
 
-// Caller holds cacheMu.RLock. Rebuild only declarative rules; no UI view or
-// saved preference is changed. A missing runtime token never means full data.
+// Caller holds cacheMu.RLock and has acquired a query slot if input.Filter
+// is set. The rebuilt row order belongs to the returned source snapshot.
 func (a *App) restoreAnalysisSource(ctx context.Context, wb *workbook.Workbook, source string, input sourceview.Scope) (*analysisSourceSnapshot, error) {
-	return a.restoreAnalysisSourceWithQuerySlot(ctx, wb, source, input, false)
-}
-
-// A caller that already owns querySem must not acquire a second slot while
-// reconstructing a saved filter. Other callers keep the original limit path.
-func (a *App) restoreAnalysisSourceWithQuerySlot(ctx context.Context, wb *workbook.Workbook, source string, input sourceview.Scope, ownsQuerySlot bool) (*analysisSourceSnapshot, error) {
 	scope, err := normalizedAnalysisScope(wb, source, input)
 	if err != nil {
 		return nil, err
@@ -329,17 +334,7 @@ func (a *App) restoreAnalysisSourceWithQuerySlot(ctx context.Context, wb *workbo
 		if err = workbook.ValidateFilterSpec(idx, spec.Rules, spec.options()); err != nil {
 			return nil, err
 		}
-		if !ownsQuerySlot {
-			select {
-			case a.querySem <- struct{}{}:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
 		order, buildErr := wb.FilterRowOrder(ctx, idx, spec.Rules, spec.options(), nil)
-		if !ownsQuerySlot {
-			<-a.querySem
-		}
 		if buildErr != nil {
 			return nil, buildErr
 		}

@@ -15,6 +15,7 @@ const (
 	xmDataRulesNamespace     = "http://schemas.microsoft.com/office/excel/2006/main"
 	x12DataRuleListNamespace = "http://schemas.microsoft.com/office/spreadsheetml/2011/1/ac"
 	x14DataRulesExtensionURI = "{CCE6A557-97BC-4B89-ADB6-D9C93CAAB3DF}"
+	unresolvedListReference  = "列表来自引用或无法完整展开的表达式，仅保留定义，未读取候选值"
 )
 
 func sourceDataRuleAttributes(start xml.StartElement) SourceDataRule {
@@ -267,7 +268,7 @@ func readSourceDataRule(ctx context.Context, d *xml.Decoder, start xml.StartElem
 			rule.InlineList, rule.ListSource = values, "inline"
 		} else {
 			rule.ListSource = "expression"
-			dataRuleIssue(&rule, "unresolved", "列表来自引用或无法完整展开的表达式，仅保留定义，未读取候选值")
+			dataRuleIssue(&rule, "unresolved", unresolvedListReference)
 		}
 	}
 	if extended {

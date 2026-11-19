@@ -59,7 +59,7 @@ func BenchmarkNativeViewportRead(b *testing.B) {
 	if err := f.Close(); err != nil {
 		b.Fatal(err)
 	}
-	idx := &SheetIndex{XMLPath: path, Rows: w.offsets.rows, XMLSize: w.count, MaxRow: w.rows, MaxCol: w.cols}
+	idx := &SheetIndex{XMLPath: path, ResidentRows: w.offsets.rows, XMLSize: w.count, MaxRow: w.rows, MaxCol: w.cols}
 	wb := &Workbook{}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -96,7 +96,7 @@ func makeNativeScanBenchmark(b *testing.B) (*Workbook, *SheetIndex) {
 	if err := f.Close(); err != nil {
 		b.Fatal(err)
 	}
-	return &Workbook{}, &SheetIndex{XMLPath: f.Name(), XMLSize: w.count, Rows: w.offsets.rows, MaxRow: w.rows, MaxCol: w.cols}
+	return &Workbook{}, &SheetIndex{XMLPath: f.Name(), XMLSize: w.count, ResidentRows: w.offsets.rows, MaxRow: w.rows, MaxCol: w.cols}
 }
 
 func BenchmarkNativeColdFilter(b *testing.B) {

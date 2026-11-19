@@ -3,6 +3,7 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 function setup(){
   const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id);};
   const ctx={window:{},document:{getElementById:get},AbortController};
+  vm.runInNewContext(fs.readFileSync(__dirname+'/cell-address.js','utf8'),ctx);
   vm.runInNewContext(fs.readFileSync(__dirname+'/reconcile.js','utf8'),ctx);
   return {ctx,model:ctx.window.ExcelLensReconcileModel,prototype:ctx.window.ExcelLensReconcile.prototype,get};
 }

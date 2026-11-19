@@ -65,7 +65,8 @@ func scanWorkbookAnalysisRows(ctx context.Context, wb *workbook.Workbook, idx *w
 
 // A supplied runtime snapshot is an optimization over the durable scope, not
 // an alternative source identity. A mismatch is rejected rather than widened.
-// Caller holds cacheMu.RLock for the lifetime of the returned source.
+// Caller holds cacheMu.RLock for the lifetime of the returned source. Rebuilding
+// a saved filter without a borrowed snapshot also requires a query slot.
 func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis.Query, observer sourceCellObserver, borrowed *analysisSourceSnapshot) (analysisSource, error) {
 	if err := analysis.ValidateSource(q); err != nil {
 		return analysisSource{}, err
@@ -115,12 +116,7 @@ func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis
 			names[field.Name] = true
 		}
 		for column := len(base.fields) + 1; column <= selection.EndColumn; column++ {
-			name := excelColName(column) + " 列"
-			if names[name] {
-				name += " · " + excelColName(column)
-			}
-			names[name] = true
-			base.fields = append(base.fields, analysis.Field{ID: "C" + strconv.Itoa(column), Column: column, Name: name})
+			base.fields = append(base.fields, workbookAnalysisField(column, "", names))
 		}
 		base.fields = base.fields[selection.StartColumn-1 : selection.EndColumn]
 		base.truncatedFields = false

@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"excellens/internal/separated"
+	"excellens/internal/workbook"
 	"fmt"
 	"io"
 	"iter"
@@ -16,10 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
-
-	"excellens/internal/workbook"
 )
 
 type Options struct {
@@ -364,21 +362,11 @@ func textOf(c workbook.CellData, mode string) string {
 	}
 	return c.Raw
 }
-func dangerousCSVText(value string) bool {
-	if value == "" {
-		return false
-	}
-	s := strings.TrimLeft(value, "\t\r\n ")
-	return strings.HasPrefix(s, "=") || strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "@")
-}
 
 // ProtectCSVText prefixes formula-like text when the caller explicitly enables
 // CSV text protection. Numeric source cells and requested formulas bypass it.
 func ProtectCSVText(value string) string {
-	if dangerousCSVText(value) {
-		return "'" + value
-	}
-	return value
+	return separated.ProtectText(value)
 }
 func safeTabularValue(c workbook.CellData, opts Options) string {
 	value := textOf(c, opts.Mode)
@@ -415,34 +403,7 @@ func writeSeparatedRecord(out *bufio.Writer, fields []string, comma byte) error 
 				return err
 			}
 		}
-		first, _ := utf8.DecodeRuneInString(field)
-		quoted := strings.IndexByte(field, comma) >= 0 || strings.ContainsAny(field, "\"\r\n") || unicode.IsSpace(first) || field == `\.`
-		if !quoted {
-			if _, err := out.WriteString(field); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := out.WriteByte('"'); err != nil {
-			return err
-		}
-		for {
-			at := strings.IndexByte(field, '"')
-			if at < 0 {
-				if _, err := out.WriteString(field); err != nil {
-					return err
-				}
-				break
-			}
-			if _, err := out.WriteString(field[:at+1]); err != nil {
-				return err
-			}
-			if err := out.WriteByte('"'); err != nil {
-				return err
-			}
-			field = field[at+1:]
-		}
-		if err := out.WriteByte('"'); err != nil {
+		if err := separated.WriteField(out, field, comma, false); err != nil {
 			return err
 		}
 	}

@@ -13,6 +13,10 @@ internal/analysis          精确十进制、透视、独立分析工作区
 internal/calculator        有类型的公式语义与运算
 internal/recovery          有界、校验及持久化确认的页面恢复日志
 internal/checkpoint        独立任务的来源/规则绑定、完整块及确认游标；F21基础
+internal/editdoc           有类型稀疏变更、编辑修订、持久撤销与重试收据
+internal/editfile          编辑源全量预检、按源坐标读值及验证新副本
+internal/opc               ZIP 部件的原压缩复制、流式替换和完整性核验
+internal/separated        保留格内换行的分隔文本转义及文字保护
 internal/reconcile         双来源精确核对、重复组与完整明细
                            显式关联完整预检、保留行序及有界配对提取
 internal/recipe            声明式分析步骤、字段绑定与匹配规则
@@ -35,20 +39,51 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
 | sourceview | formats |
 | checkpoint | formats |
+| editdoc | checkpoint、formats |
+| editfile | workbook、editdoc、formats、separated、calculator、opc |
+| opc | Go 标准库 |
+| separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
 | workbook | formats、searchdsl、sourceview |
 | archives | formats、workbook |
 | calculator | analysis、valueconv、formats（统一地址容量） |
 | reconcile | analysis、workbook、formats |
 | recipe | analysis、sourceview |
-| export | workbook、formats（统一快照样式容量） |
+| export | workbook、formats（统一快照样式容量）、separated |
 | printing | workbook、formats（源打印快照及统一分页容量） |
 | clustering | workbook、formats（公共投影排序及统一候选容量） |
 | composition | workbook、sourceview、formats（只读联合来源及逐格追溯，不拥有源生命周期或持久化） |
 | ui | formats、buildinfo |
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
-| server | 格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint和 UI；不反向依赖 tray/shellmenu |
+| server | 格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+
+### 服务入口和前端组件
+
+工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
+
+界面的 A1 坐标转换由 `cell-address.js` 提供，调用方传入来源容量。命令检索、键盘选择及可用性判断由 `command-palette.js` 管理，操作回调由应用装配。视口的覆盖范围、字节估计和缓存淘汰由 `viewport-cache.js` 管理。网格请求直接持有写入或复用的条目，缓存总量由同一组件维护。
+
+### 从一次格内编辑到一个可下载的副本
+
+1. `server/edits.go` 负责 HTTP 路由、请求解码和错误映射。`edit_session.go` 持有底稿绑定、租约和恢复，`edit_cells.go` 将读格、候选选项和提交接入当前修订。`editdoc` 确认一批变更并维护撤销和重做。
+2. `workbook` 将标准数据验证和 Office 扩展验证解码为同一个源规则，解析工作表名称和绝对区域。`editfile` 按目标坐标取出规则，使用底稿、当前修订和整批拟议输入核对下拉来源。工作表保护、合并、数组和透视结果各自提供覆盖区域。
+3. `editfile/xlsx_parts.go` 登记部件路径、内容类型和关系。`xlsx_styles.go` 读取实际单元格样式索引及锁定状态。`xlsx_tables.go` 沿工作表关系绑定表格范围和字段，`table_edits.go` 将用户输入展开为经过保护和数据规则检查的单一事务。普通表可完整扫描，大型表通过 `xlsx_window.go` 将目标和共享公式锚点映回源部件的字节偏移。
+4. 两种扫描路径都将按源偏移计算的修改交给 `xlsx_parts_write.go`。`opc` 按部件流式复制或替换，重读输出核对条目、CRC 和 SHA-256。`editfile` 随后重读坐标核对实际值和类型，`Outputs` 发布通过核对的副本和修订收据。
+
+生产包与 `cmd/excellens`、`cmd/perfprobe` 的导入边界由 `tools/project/architecture.go` 检查。生产代码只能导入登记的仓内包，`opc` 的依赖必须来自 Go 标准库。添加部件时，在 `xlsx_parts.go` 登记识别与关系约束，在对应语义模块处理它对可编辑区域和重算的影响。
+
+#### 修订、底稿与生成件
+
+`editdoc` 在 `edit-documents` 中记录单元格值、样式、矩形规则和计算列模板的前后状态，复用 `checkpoint` 的系统租约、块摘要和确认记录。新建文档采用编辑语义 7，版本 1～6 的已确认记录可重放。旧布局按绑定底稿重新识别可写坐标。操作按修订提交，重试可取回已有结果。底稿从只读句柄按 SHA-256 绑定，独立生成件和收据保存在 `edit-files` 中。打开生成件会走公共工作簿读取入口。
+
+整行列、表名和透视图表操作共用 `server/edit_structure.go` 的文档租约。`editfile` 先合并当前修订，再按 OPC 关系重写有关部件，核验后以修订号保存到 `edit-revisions`。日志记录新底稿的身份、摘要及布局，撤销时切回前一底稿及其稀疏输入。服务重启后从同一份日志恢复。`edit-tools.js` 负责工具选择和表单，网格、生成与恢复沿用同一个编辑控制器。
+
+透视字段布局和分页选择由 `editdoc.PivotAxes` 表示，原始类型随选项保留。`editfile/pivot_schema.go` 匹配当前源标题和缓存字段，`pivot_items.go` 管理字段项的序号、顺序及筛选，`pivot_axis.go` 聚合两轴祖先的交叉点。`pivot_matrix.go` 决定单元格结果，`pivot_layout.go` 将对应的轴定义写入同一副本。浏览器的 `edit-pivot.js` 只在打开筛选时读取绑定到当前修订的候选，网络响应不会覆盖新布局。服务端从同一个修订快照取得源索引、输入覆盖和公式结果。分页游标最多保留该修订最近使用的一列，读取到下一页的首个项目即停。搜索复用已读的带类型项目，修订或字段变化时更换游标。中文排序使用 go.mod 固定的 golang.org/x/text。
+
+`EditBatch` 将底稿、当前修订和本批拟变更合并校验，下拉候选按来源坐标排序，因此同批新增选项与选用该值可以一次提交。`/api/edits/choices` 按需返回当前修订的文本选项。剪贴板版本 1 可接收文字，版本 2 可携带类型及样式。样式、格式与规则的预览签名绑定进程和对应修订。
+
+修订内计算由 `calculator` 解析公式，`editfile` 维护依赖和结果。普通报表按依赖传播缓存失效。公式结构变化时移除旧计算链及其关系与内容类型声明。大型台账的按坐标写出路径保留宿主公式和计算设置，发生编辑时标记 Excel 重算，需要在重算后刷新的透视缓存单独记入生成收据。数据规则和既有验证信息保留在各自的工作表。 [计算过程及边界](xlsx-grid-editing.md)
 
 F21的`server/search_checkpoint.go`将既有普通/公式/引用/高级搜索接入独立`task-checkpoints`目录，来源路径/内容/解析及规则版本与精确索引/行缓存签名分开绑定。全簿按源表顺序确认阶段，每4096条完整记录保存小游标，仅新增命中进入完整块；`workbook/search_resume.go`在保留命中前计入独立恢复容量，普通搜索不套用该容量。`task_checkpoint.go`只列有界元数据，恢复要求预期修订与相同来源；丢弃在OS租约和目录锁内原子核对修订。任务沿用共享查询/索引槽和源固定/取消/关闭生命周期，目录准入仅对未改变持久状态的锁忙做可取消短重试，不重试不确定写入。可靠文件修订直接绑定缓存，不具备可靠修订时流式SHA256回退；来源及缓存变化拒绝恢复，不隐式重扫。查询、六格式公共导出及紧凑恢复界面均已接通；实际验证边界见[恢复记录](task-recovery.md)。
 
@@ -66,7 +101,7 @@ F17/F18的字段选择统一由`field-picker.js/css`负责单选、多选、搜�
 
 `server/persistence.go`按持久化文件路径提供读写锁，标记及分析工作区的读改写跨浏览器会话串行化；先取得App自身的锁，再取得文件锁。选区的源行映射由`server/selection_rows.go`拥有，复制、即时统计及选区导出共同调用；前端保留端点与可视行号配对。TSV编解码和粘贴边界验证统一在`ui/web/clipboard.js`，解析及验证全部成功后才创建编辑请求。
 
-F10的`clipboard-special.js`只将公共读取的CellData转为TSV/Markdown/版本1 JSON，以及生成独立编辑表的文字变更计划；不读文件、不改变源类型、不执行公式。`clipboard-panels.js`拥有读取/取消/迟到意图、有限预览和显式保存。复制行列/格数及字节预算由formats统一注入；`/api/range`可在同一来源及有界读取中附带一个源表头行，表头计入容量，不通过筛选/显隐扩大数据选区。开始及发布前核对工作簿/路径、Sheet、选区、筛选及可见视图；纯TSV、HTML及新表示复用同一捕获链路。粘贴沿用草稿、修订号与一次ApplyEdits，排队执行前再次核对目标身份和预览修订；失败不部分写入。源缓存和工作区版本不变，格式/有类型公式粘贴留在第四阶段。
+F10的`clipboard-special.js`将公共读取的CellData转为TSV/Markdown/版本1 JSON，并生成独立编辑表的文字变更计划。`clipboard-panels.js`负责读取、取消、迟到请求处理、有限预览和显式保存。复制行列、格数和字节预算由`formats`统一注入。`/api/range`可在同一来源的有界读取中附带一个源表头行，表头计入容量。开始及发布前核对工作簿、工作表、选区、筛选及可见视图。独立编辑表粘贴沿用草稿、修订号与一次`ApplyEdits`。编辑副本的有类型值、公式和普通样式走单独的修订绑定接口。
 
 `server/saved_config.go`拥有供命名视图、分析方案、行显隐及分析显示偏好使用的用户配置封套，提供有界读取、严格结构、版本/校验和、Sync及保留旧文件的替换。命名视图从成功的`FilterResult.Spec`捕获规则，按源内容和字段签名验证后重新使用公共筛选链路；查询失败不覆盖当前网格，不持久化整表或临时行序。配置路径不参与缓存维护，跨页面保存需预期修订号；详见[实现与验证](named-views.md)。`server/analysis_display.go`单独维护跨工作簿的显示偏好；`ui/web/analysis-numbers.js`仅格式化聚合单元格，以十进制文本/BigInt处理千分位及科学计数法，保留原始Cell与精确提示，不参与源值解释、查询身份或导出。
 
@@ -155,6 +190,10 @@ F24的`analysis/snapshot.go`从完成结果投影一个显式指标，保留原�
 数值、文本、布尔、错误及缺少公式缓存必须分开。源格式能力明确决定文本金额是否可用于隐式统计；原生 Excel 按源类型处理。显式公式转换和排序转换继续由对应功能负责。
 
 格式转换复用已存在的分析计算列链路，只在用户运行带转换规则的查询时执行；不写回源、源缓存或字段类型。公式建议只解析当前计算返回的最多256字符文本，不新增源读取，不参与打开文件、索引或视口滚动。按钮把转换写进本行公式，不能隐藏地改变后续引用语义。
+
+筛选视口的请求、缓存及在途覆盖都绑定筛选、可见行视图和实际冻结前缀。地址定位和键盘移动共用滚动几何，提交前核对工作簿、工作表、视图及操作意图。前缀改变后，新视口按源行重绑活动格，并清除仍基于旧行序的范围；离屏活动格由既有定位接口按需解析。
+
+`server/query_admission.go`统一可取消的跨页面查询准入。需要提前捕获的请求在短读锁下保留来源，释放读锁后等待查询槽，读取前再核对快照。分析范围重建由入口先拿槽，联合来源直接借用该槽，冷列导航占槽扫描，已有列定位缓存继续直接命中。
 
 ## 大数据索引与扫描
 

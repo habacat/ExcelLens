@@ -41,18 +41,13 @@ func (a *App) borrowCompositionAnalysisSource(wb *workbook.Workbook, source, id 
 	return owner, nil
 }
 
-// Every independent append scan takes the shared query slot before cacheMu.
-// A prepared source already owns its scope; scans never restore it again.
-func (a *App) acquireCompositionAnalysisSlot(ctx context.Context, source string) (func(), error) {
-	if !strings.HasPrefix(source, "append:") {
-		return func() {}, nil
+// Append scans and saved filter reconstruction need a shared query slot.
+// Acquire it before the cache read lock; lower-level readers borrow it.
+func (a *App) acquireAnalysisQuerySlot(ctx context.Context, source string, rebuildFilter bool) (func(), error) {
+	if rebuildFilter || strings.HasPrefix(source, "append:") {
+		return a.acquireQuerySlot(ctx)
 	}
-	select {
-	case a.querySem <- struct{}{}:
-		return func() { <-a.querySem }, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return func() {}, nil
 }
 
 func compositionAnalysisDefinition(q analysis.Query, captured *analysisSourceSnapshot) (analysis.Query, error) {

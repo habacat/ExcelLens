@@ -13,6 +13,8 @@
   --blue: #2563a6;
   --blue-dark: #194f88;
   --blue-soft: #eaf3fc;
+  --toolbar-font-size: 12px;
+  --toolbar-gap: 5px;
   --row-height: 25px;
   --header-height: 27px;
   --row-header-width: 26px;
@@ -78,14 +80,15 @@ button { -webkit-tap-highlight-color: transparent; }
 .brand-name { flex: none; color: #26384b; font-size: 13px; font-weight: 750; letter-spacing: .1px; }
 .file-badge { min-width: 0; max-width: min(35vw, 520px); margin-left: 8px; padding-left: 13px; overflow: hidden; border-left: 1px solid var(--line); color: #7a8795; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .appbar > .brand-area { min-width:180px; }
-.app-actions { flex: none; gap: 5px; max-width:100%; }
+.app-actions { flex: none; gap: var(--toolbar-gap); max-width:100%; }
 .app-actions > .tool-button {flex:none;white-space:nowrap;}
 .app-actions > [data-command-only],.app-actions > [data-toolbar-overflow],.app-actions > [data-toolbar-when-enabled]:disabled {display:none;}
 .appbar[data-toolbar-rows="2"] {flex-wrap:wrap;row-gap:5px;}
 .appbar[data-toolbar-rows="2"] > .brand-area {flex-basis:100%;}
 .appbar[data-toolbar-rows="2"] > .app-actions {flex:1 1 100%;flex-wrap:wrap;}
 .global-status { max-width: 190px; margin-right: 7px; overflow: hidden; color: #8793a0; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.tool-button { height: 29px; padding: 0 9px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: #536274; font-size: 11px; cursor: pointer; }
+.tool-button { height: 29px; padding: 0 9px; display: inline-flex; align-items: center; gap: var(--toolbar-gap); border: 1px solid transparent; border-radius: 5px; background: transparent; color: #536274; font-size: var(--toolbar-font-size); cursor: pointer; }
+.tool-button:focus-visible, .toolbar-field:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .tool-button:hover:not(:disabled) { border-color: #e3e8ed; background: #f5f7f9; color: #1e4f80; }
 .tool-button:disabled { opacity: .35; cursor: not-allowed; }
 .tool-button.primary { border-color: var(--blue); background: var(--blue); color: #fff; }
@@ -117,14 +120,22 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* Workbook workspace */
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-rows: 39px minmax(0, 1fr) 43px; background: #fff; }
-.formula-toolbar { min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 9px; border-bottom: 1px solid var(--line); background: #fff; container:formula-tools / inline-size; }
-.name-box { width: 78px; height: 27px; flex: none; padding: 0 7px; border: 1px solid #dce3e9; border-radius: 4px; outline: none; background: #fbfcfd; color: #315a7f; font-family: Consolas, monospace; font-size: 11px; font-weight: 650; text-align: center; }
+.formula-toolbar { --field-height: 27px; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 9px; border-bottom: 1px solid var(--line); background: #fff; container:formula-tools / inline-size; }
+.toolbar-field {
+  min-width: 0; height: var(--field-height); padding: 0 7px;
+  border: 1px solid var(--reading-line, #dce3e9); border-radius: 4px;
+  background: var(--reading-inset, #fbfcfd); color: var(--reading-ink, #344d64);
+  font: inherit; font-size: var(--toolbar-font-size);
+}
+.name-box { width: 78px; flex: none; font-family: Consolas, monospace; font-weight: 650; text-align: center; }
 .fx-label { width: 20px; flex: none; color: #728296; font-family: Georgia, serif; font-size: 14px; font-style: italic; font-weight: 700; text-align: center; }
-.formula-input { min-width: 0; height: 27px; flex: 1; padding: 0 8px; border: 1px solid #e1e6eb; border-radius: 4px; outline: none; background: #fcfdfe; color: #283a4e; font-family: Consolas, "Microsoft YaHei UI", monospace; font-size: 11px; }
-.formula-input:focus { border-color: #9ab7d4; }
+.formula-input {
+  flex: 1; padding-inline: 8px; font-family: Consolas, "Microsoft YaHei UI", monospace;
+  line-height: calc(var(--field-height) - 2px); white-space: pre;
+}
 .formula-value { width: min(20vw, 210px); min-width: 65px; overflow: hidden; color: #68798b; font-family: Consolas, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.font-picker { width:110px;min-width:85px;max-width:110px; height:27px; flex:none; padding:0 6px; border:1px solid #dce3e9; border-radius:4px; outline:none; background:#fff; color:#344d64; font-size:11px; cursor:pointer; }
-.font-picker:focus-visible{outline:2px solid #81aed4;outline-offset:1px;}
+.toolbar-select { flex: none; padding-inline: 6px; cursor: pointer; }
+.font-picker { width: 110px; min-width: 85px; max-width: 110px; }
 @media(max-width:1040px){.font-picker{width:88px}.formula-value{max-width:85px}}
 @container formula-tools (max-width:1120px){#dataRulesOpenBtn,#recordCardOpenBtn,#copyFormulaBtn,#traceDependentsBtn{display:none;}}
 @container formula-tools (max-width:900px){#catalogueOpenBtn,#copyValueBtn,#tracePrecedentsBtn{display:none;}.formula-value{display:none;}}
@@ -250,7 +261,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .sheet-tab:hover { background: #f0f4f8; color: #315f8b; }
 .sheet-tab.active { border-top-color: #347bb8; background: #fff; color: #245b8e; font-weight: 700; }
 .sheet-tab.hidden-sheet { opacity: .55; }
-.status-strip { display: flex; align-items: center; gap: 9px; padding: 0 9px; color: #8994a0; font-size: 9px; }
+.status-strip { display: flex; min-width: 0; align-items: center; gap: 9px; padding: 0 9px; color: #8994a0; font-size: 9px; }
 .status-spacer { flex: 1; }
 .filter-status { padding: 1px 5px; border-radius: 3px; background: #fff3d8; color: #9a6c20; }
 .zoom-button { width: 18px; height: 16px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: #6e7d8e; font-size: 13px; cursor: pointer; }
@@ -262,7 +273,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .float-dialog::backdrop { background: rgba(25, 39, 54, .22); backdrop-filter: blur(1px); }
 .dialog-head { height: 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border-bottom: 1px solid #e8edf1; }
 .dialog-title { color: #2c4055; font-size: 12px; font-weight: 750; }
-.dialog-close { width: 25px; height: 25px; border: 0; border-radius: 4px; background: transparent; color: #8793a0; font-size: 20px; line-height: 1; cursor: pointer; }
+.dialog-close { position:relative; flex:0 0 25px; width:25px; height:25px; border:0; border-radius:4px; background:transparent; color:#738395; font-size:0; cursor:pointer; }
+.dialog-close::before,.dialog-close::after {content:"";position:absolute;width:12px;height:1.5px;border-radius:1px;background:currentColor;transform:rotate(45deg);pointer-events:none;}
+.dialog-close::after {transform:rotate(-45deg);}
+.dialog-minimize::before {transform:none;}
+.dialog-minimize::after {display:none;}
+.dialog-head .dialog-close:focus-visible {outline:2px solid var(--reading-accent,var(--blue));outline-offset:-2px;}
 .dialog-close:hover { background: #f0f3f6; color: #43576b; }
 .dialog-body { max-height: calc(78vh - 43px); padding: 13px; overflow: auto; }
 .field-row { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 9px; margin-bottom: 10px; }
@@ -533,15 +549,15 @@ button { -webkit-tap-highlight-color: transparent; }
  * Scrolling remains possible (trackpad and Shift+wheel), but the track is
  * hidden so it cannot overlay a formula token on Windows/Chromium. */
 .formula-inspector-input{
-  display:block;line-height:25px;overflow-x:auto;overflow-y:hidden;
-  white-space:pre;scrollbar-width:none;-ms-overflow-style:none;
+  display:block;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-ms-overflow-style:none;
   user-select:text;cursor:text;overscroll-behavior:contain;
 }
 .formula-inspector-input::-webkit-scrollbar{display:none;width:0;height:0;}
 .formula-expand-button{
-  width:22px;height:27px;flex:none;display:grid;place-items:center;
-  padding:0;border:1px solid #e1e6eb;border-radius:4px;
-  background:#fcfdfe;color:#617488;cursor:pointer;
+  width:22px;height:var(--field-height);flex:none;display:grid;place-items:center;
+  padding:0;border:1px solid var(--reading-line,#dce3e9);border-radius:4px;
+  background:var(--reading-inset,#fbfcfd);color:var(--reading-muted,#617488);cursor:pointer;
 }
 .formula-expand-button::after{
   content:"";width:6px;height:6px;border-right:1.5px solid currentColor;
@@ -551,7 +567,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .formula-expand-button:focus-visible{outline:2px solid #71a6ce;outline-offset:1px;}
 .workspace.formula-expanded{grid-template-rows:auto minmax(0,1fr) 43px;}
 .formula-toolbar.formula-expanded{align-items:flex-start;}
-.formula-toolbar.formula-expanded .formula-inspector-input{
+.formula-toolbar.formula-expanded .formula-input{
   height:auto;min-height:62px;max-height:min(32vh,220px);
   padding:4px 8px;line-height:1.55;white-space:pre-wrap;
   overflow-x:hidden;overflow-y:auto;overflow-wrap:anywhere;
@@ -613,7 +629,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .landing-open-zone .inline-error{margin:17px 0 0; max-width:100%;width:100%; background:#442d31;color:#ffd5d8;border-color:#93545d;}
 .landing-bottomnote {margin:0 34px 30px;padding-top:14px;border-top:1px solid rgba(222,246,239,.14);color:#80a6aa;font-size:10px;letter-spacing:.01em;}
 .landing-recent {display:flex;min-width:0;min-height:0;flex-direction:column;background:#fff;padding:34px 32px 22px;}
-.recent-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:22px;}
+.recent-heading {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:22px;}
+.recent-heading-actions {display:flex;align-items:center;gap:6px;}
 .recent-heading h2{margin:0;color:#1e3541;font-size:22px;font-weight:760;letter-spacing:-.55px;line-height:1.2}
 .recent-heading p{margin:7px 0 0;color:#87959c;font-size:11px;}
 .recent-refresh {width:30px;height:30px;flex:none;border:1px solid #e3e9ed;border-radius:7px;background:#fff;color:#607681;cursor:pointer;}
@@ -643,7 +660,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .recent-empty strong{font-size:14px;color:#526c72;font-weight:600}
 .recent-summary{min-height:28px;padding-top:13px;border-top:1px solid #e7edef;color:#8c9da0;font-size:11px;}
 .landing-footer {min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:0 32px;border-top:1px solid #e9edef;background:#fbfcfb;color:#9caaae;font:10px "Segoe UI",sans-serif;letter-spacing:.04em;}
-.landing-credits{color:#b0b9bb;font-size:10px;letter-spacing:0}
+.landing-credits{margin-inline-start:auto;color:#b0b9bb;font-size:10px;letter-spacing:0}
 .quick-stats {display:flex;align-items:center;gap:15px;color:#46515a;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px;}
 .quick-stat{display:inline-flex;align-items:center;gap:0;padding:0;}
 .quick-stat:first-child{border:0;padding-left:0}
@@ -739,7 +756,9 @@ body.home-view .landing-content h1 { letter-spacing: -1px; }
 .grid-row { border-bottom:.5px solid #e9edf1; }
 .grid-cell { border-right:.5px solid #e9edf1; }
 .column-head { border-right:.5px solid #dce3e9; }
-.row-head { border-right:.5px solid #dce3e9; }
+.row-head { border-right:.5px solid #dce3e9; z-index:8; }
+/* Fractional row heights can leave a subpixel seam between sticky headers. */
+.row-head::before {content:"";position:absolute;inset:-1px -.5px -1px 0;z-index:-1;background:inherit;border-right:inherit;pointer-events:none;}
 /* Non-auto standard scrollbar properties override the WebKit rules in modern
    Chromium, including the thumb minimum. Keep both auto for these rules. */
 .grid-scroll { scrollbar-width:auto;scrollbar-color:auto; }
@@ -903,6 +922,10 @@ body:not(.home-view) .file-badge {display:block;flex:1 1 auto;max-width:none;min
    Fractional CSS borders stay one device pixel on common panels; a slightly
    softer color keeps default seams light without fading source borders. */
 :root {--grid-line-color:#edf0f2;}
+.grid-region {--grid-default-seam:.4px solid var(--grid-line-color);}
+.source-no-gridlines .grid-region {--grid-default-seam:0px;}
+.grid-border-segments {position:absolute;inset:0;pointer-events:none;}
+.grid-border-segments > i {position:absolute;pointer-events:none;}
 .grid-row {border-bottom:0!important;}
 .grid-cell {border-left:0;border-top:0;border-right:.4px solid var(--grid-line-color);border-bottom:.4px solid var(--grid-line-color);}
 .pinned-cell {border-bottom:.4px solid var(--grid-line-color);}

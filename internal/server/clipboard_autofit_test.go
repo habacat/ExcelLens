@@ -40,7 +40,7 @@ func TestAutofitSamplingIsStrictlyBoundedAndDistributed(t *testing.T) {
 }
 
 func TestFilteredClipboardMatchesVisualSortOrder(t *testing.T) {
-	idx := &workbook.SheetIndex{Rows: []workbook.RowOffset{
+	idx := &workbook.SheetIndex{ResidentRows: []workbook.RowOffset{
 		{Number: 1}, {Number: 2}, {Number: 3}, {Number: 5}, {Number: 8},
 	}}
 	// First row is a fixed header; remaining indexes reflect a desc sort.
@@ -114,8 +114,8 @@ func TestClipboardJSONEndpointPreservesFilteredVisualOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(idx.Rows) != 4 {
-		t.Fatalf("test workbook indexed %d rows", len(idx.Rows))
+	if len(idx.ResidentRows) != 4 {
+		t.Fatalf("test workbook indexed %d rows", len(idx.ResidentRows))
 	}
 	app.mu.Lock()
 	app.filterResults["sort-test"] = &FilterResult{ID: "sort-test", Sheet: "Data", SheetPath: meta.Path,

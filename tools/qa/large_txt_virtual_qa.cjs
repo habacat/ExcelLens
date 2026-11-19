@@ -72,6 +72,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  await evaluate(fs.readFileSync(ROOT+'export.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'bookmarks.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'profile.js','utf8'));
+ await evaluate(fs.readFileSync(ROOT+'cell-address.js','utf8'));
  await evaluate(fs.readFileSync(ROOT+'formula_inspector.js','utf8'));
  let appSource=fs.readFileSync(ROOT+'app.js','utf8');
  appSource=appSource.replace('  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false) {','  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false) { window.__selcalls=(window.__selcalls||[]);window.__selcalls.push({row:rowNumber,ref:ref,source:(new Error()).stack?.slice(0,260)});');

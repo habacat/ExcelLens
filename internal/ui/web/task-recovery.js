@@ -8,9 +8,15 @@
       $('taskRecoveryRefresh').addEventListener('click',()=>this.load());
       $('taskRecoveryClose').addEventListener('click',()=>this.close());
       $('taskRecoveryDialog').addEventListener('cancel',event=>{event.preventDefault();this.close();});
-      $('taskRecoveryDialog').addEventListener('close',()=>{if($('taskRecoveryDialog').open)return;++this.serial;++this.listSerial;this.pending?.abort();});
+      $('taskRecoveryDialog').addEventListener('close',()=>{if($('taskRecoveryDialog').open)return;++this.serial;++this.listSerial;this.pending?.abort();this.refreshHome();});
     }
     async open(){this.openDialog('taskRecoveryDialog');return this.load();}
+    refreshHome(){
+      if(!document.hidden && !$('welcome').hidden && !$('taskRecoveryDialog').open)return this.load();
+    }
+    updateHome(){
+      $('taskRecoveryHome').hidden=!this.items.some(item=>model.action(item,this.s));
+    }
     close(){if(this.opening)return;$('taskRecoveryDialog').close();}
     status(text,error=false){$('taskRecoveryStatus').textContent=text;$('taskRecoveryStatus').classList.toggle('is-error',error);$('taskRecoveryStatus').hidden=!text;}
     controls(){
@@ -20,13 +26,23 @@
     }
     async load(){
       if(this.busy)return;
+      const dialog=$('taskRecoveryDialog'),inDialog=dialog.open;
+      clearTimeout(this.homeTimer);
       const ticket=++this.listSerial;this.pending?.abort();const controller=new AbortController();this.pending=controller;
-      this.status('正在读取…');
+      if(inDialog)this.status('正在读取…');
       try{
         const data=await this.api('/api/tasks',{signal:controller.signal});
-        if(ticket!==this.listSerial||!$('taskRecoveryDialog').open)return;
-        this.items=model.items(data,this.maximum);this.render();this.status('');
-      }catch(error){if(ticket===this.listSerial&&error.name!=='AbortError')this.status(error.message,true);}
+        if(ticket!==this.listSerial || inDialog!==dialog.open || !inDialog && $('welcome').hidden)return;
+        this.items=model.items(data,this.maximum);
+        this.updateHome();
+        if(inDialog){this.render();this.status('');}
+        else if(this.items.some(item=>item.busy))this.homeTimer=setTimeout(()=>this.refreshHome(),5000);
+      }catch(error){
+        if(ticket===this.listSerial && error.name!=='AbortError'){
+          $('taskRecoveryHome').hidden=true;
+          if(inDialog)this.status(error.message,true);
+        }
+      }
       finally{if(this.pending===controller)this.pending=null;}
     }
     render(){
@@ -79,7 +95,7 @@
         if(action==='remove'){
           await this.api('/api/tasks/discard',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
           if(!current())return;
-          this.items=this.items.filter(x=>x!==item);this.render();this.status('');return;
+          this.items=this.items.filter(x=>x!==item);this.updateHome();this.render();this.status('');return;
         }
         // Keep the mutation response: aborting after server acceptance could
         // hide the returned job ID and prevent ownership-aware cleanup.
@@ -92,6 +108,7 @@
       finally{
         if(started&&!claimed)await this.cancelOwned(started,item);
         this.busy=false;this.opening=false;this.controls();
+        if(action==='remove'&&!$('taskRecoveryDialog').open)this.refreshHome();
       }
     }
   }

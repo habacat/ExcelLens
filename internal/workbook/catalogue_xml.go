@@ -133,7 +133,8 @@ func catalogueNamesXML(data []byte, original []workbookSheetXML) (Catalogue, err
 	}
 }
 
-func catalogueTableXML(data []byte, sheet, part, relationship string) (CatalogueItem, error) {
+// ParseTableDefinition reads the source table identity, geometry and column IDs.
+func ParseTableDefinition(data []byte, sheet, part, relationship string) (CatalogueItem, error) {
 	item := CatalogueItem{Kind: "table", Sheet: sheet, Status: "unresolved", Table: &CatalogueTable{Part: part, RelationID: relationship, HeaderRows: 1}}
 	d := xml.NewDecoder(bytes.NewReader(data))
 	depth, rootNS, container := 0, "", ""

@@ -1,12 +1,7 @@
 (() => {
   'use strict';
-  const labels=[];
   const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
-  function label(col){
-    if(labels[col])return labels[col];
-    let n=col,text='';while(n>0){n--;text=String.fromCharCode(65+n%26)+text;n=Math.floor(n/26);}
-    return labels[col]=text;
-  }
+  const label = window.ExcelLensAddress.columnName;
   function unpack(rows){
     return rows.map(row=>{
       const suffix=String(row.n),out={number:row.n,cells:row.c.map(value=>{

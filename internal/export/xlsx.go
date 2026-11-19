@@ -156,15 +156,6 @@ func xmlText(s string) string {
 	xml.EscapeText(&b, []byte(s))
 	return b.String()
 }
-func colName(n int) string {
-	var out string
-	for n > 0 {
-		n--
-		out = string(rune('A'+n%26)) + out
-		n /= 26
-	}
-	return out
-}
 func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s Selection, opts Options, report Tick, palette *xlsxStylePalette) error {
 	out := bufio.NewWriterSize(dst, 256<<10)
 	if _, err := io.WriteString(out, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`); err != nil {
@@ -188,7 +179,7 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 			if col < 1 || col > 16384 {
 				continue
 			}
-			ref := colName(col) + strconv.Itoa(outRow)
+			ref := workbook.ColumnName(col) + strconv.Itoa(outRow)
 			style := ""
 			styleID := c.Style
 			derived := false
@@ -322,7 +313,7 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 				c1 -= s.FirstCol - 1
 				c2 -= s.FirstCol - 1
 			}
-			refs = append(refs, colName(c1)+strconv.Itoa(r1)+":"+colName(c2)+strconv.Itoa(r2))
+			refs = append(refs, workbook.ColumnName(c1)+strconv.Itoa(r1)+":"+workbook.ColumnName(c2)+strconv.Itoa(r2))
 		}
 		if len(refs) > 0 {
 			if _, err := fmt.Fprintf(out, `<mergeCells count="%d">`, len(refs)); err != nil {

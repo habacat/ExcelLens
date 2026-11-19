@@ -273,7 +273,7 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 		var info compositionSourceInfo
 		var input composition.Source
 		var release func()
-		input, info, release, _, err = a.compositionSourceWithQuerySlot(job.ctx, wb, ref, true)
+		input, info, release, _, err = a.compositionSource(job.ctx, wb, ref)
 		if release != nil {
 			defer release()
 		}
@@ -289,7 +289,7 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 		check = input.Check
 		payload.Info, payload.Source, rows = &info, info.Ref.Source, info.Rows
 	} else {
-		source, err = a.captureCompositionWithQuerySlot(job.ctx, *job.Definition, true)
+		source, err = a.captureComposition(job.ctx, *job.Definition)
 		if err != nil {
 			return
 		}

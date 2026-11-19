@@ -44,6 +44,7 @@ func Index(token string) ([]byte, error) {
 		ChartExport     formats.ChartExportLimits      `json:"chartExport"`
 		Transpose       formats.TransposeLimits        `json:"transpose"`
 		Snapshots       formats.SnapshotLimits         `json:"snapshots"`
+		Editing         formats.EditLimits             `json:"editing"`
 		RelationExports []formats.RelationExportOption `json:"relationExports"`
 		TaskRecovery    struct {
 			Tasks int `json:"tasks"`
@@ -77,6 +78,7 @@ func Index(token string) ([]byte, error) {
 		ChartExport:     formats.ChartExport(),
 		Transpose:       formats.Transpose(),
 		Snapshots:       formats.Snapshots(),
+		Editing:         formats.Editing(),
 		RelationExports: formats.RelationExports(),
 		TaskRecovery: struct {
 			Tasks int `json:"tasks"`

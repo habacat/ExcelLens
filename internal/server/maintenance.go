@@ -96,6 +96,13 @@ func (a *App) ClearUnusedUploads() (string, error) {
 	for _, wb := range rootApp.referencedWorkbooks() {
 		active[filepath.Clean(wb.Path)] = struct{}{}
 	}
+	editPaths, err := editBasePaths()
+	if err != nil {
+		return "", err
+	}
+	for _, path := range editPaths {
+		active[path] = struct{}{}
+	}
 	root := workbook.UploadRoot()
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
@@ -120,7 +127,7 @@ func (a *App) ClearUnusedUploads() (string, error) {
 		}
 		count++
 	}
-	info := fmt.Sprintf("已清理 %d 个临时文件；跳过当前打开的 %d 个文件。", count, skipped)
+	info := fmt.Sprintf("已清理 %d 个临时文件；保留正在使用的 %d 个文件。", count, skipped)
 	if failed > 0 {
 		return info, fmt.Errorf("另外 %d 个文件无法删除（可能被其他程序占用）", failed)
 	}

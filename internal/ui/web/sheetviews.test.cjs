@@ -5,12 +5,12 @@ function harness(override){
   const node=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{hidden:true,disabled:false,inert:false,scrollTop:0,scrollLeft:0,clientHeight:625,clientWidth:1200,style:{},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)},focus(){}});}return nodes.get(id);};
   node('grid').parentElement=node('region');
   const ctx={transposeCenter:{resetBook(){},changed(){}},profileCenter:{resetBook(){},changed(){}},window:{ExcelLensTableHeaders:{fromHeader:()=>null}},traceUI:null,rowViews:null,cellExplanation:{resetBook:()=>detailResets.push(ctx.S.sheet),changed(){}},selectionQuick:{resetBook:()=>quickResets.push(ctx.S.sheet),changed(){}},recordCardCenter:{resetBook:()=>cardResets.push(ctx.S.sheet),controls(){}},geometry:{rows:{setHidden(){}}},Map,Set,Math,AbortController,URLSearchParams,encodeURIComponent,
-    $:node,setTimeout:()=>++timer,clearTimeout(){},cancelAnimationFrame(){},FONT_STACKS:{},
+    $:node,editCopy:null,setTimeout:()=>++timer,clearTimeout(){},cancelAnimationFrame(){},FONT_STACKS:{},
     sourceRowLimit:()=>50000000,rowVisible:()=>true,colName:n=>String.fromCharCode(64+n),getVirtualScrollTop:()=>node('grid').scrollTop,setVirtualScrollTop:v=>node('grid').scrollTop=v,
     frozenPanes:{cache:new Map(),cachePart(key,data){this.cache.set(key,data);},reset(){this.cache.clear();},schedule(){},async refresh(){}},pictures:{reset(){},load:async()=>{},schedule(){}},mergedCells:{load(){}},
     selectionStats:{clear(){}},formulaInspector:{clear(){}},cancelIndex(){},updateSourceAppearance(){},updateAutoFilterButton(){},updateFreezeUI(){},updateGeometryBase(){},updateCanvasSize(){},applyColumnVisibility(){},renderSheetTabs(){},setStatus(){},toast:(...args)=>notices.push(args),
-    invalidateViewport(options){assert.equal(options.preserveDOM,true);ctx.S.viewportCache.clear();ctx.S.viewportData=null;ctx.S.window=null;},
-    viewportKey:()=>ctx.S.sheet,cacheViewport(key,data,request){ctx.S.viewportCache.set(key,{data,request,bounds:{}});},
+    invalidateViewport(options){assert.equal(options.preserveDOM,true);ctx.tiles.clear();ctx.S.viewportData=null;ctx.S.window=null;},
+    viewportKey:()=>ctx.S.sheet,
     async api(path,options={}){const url=new URL(path,'http://qa'),sheet=options.body?JSON.parse(options.body).sheet:url.searchParams.get('sheet');calls.push({path:url.pathname,sheet});const custom=override?.(url.pathname,sheet);if(custom!==undefined)return custom;
       if(url.pathname==='/api/index/start')return {ready:true,maxRow:80,maxCol:4,sheet};
       if(url.pathname==='/api/layout')return {rows:{2:sheet==='A'?40:55},cols:{1:110},font:'',sourceMerges:[],sourceRows:[],sourceCols:{}};
@@ -18,16 +18,18 @@ function harness(override){
       if(url.pathname==='/api/sheet')return {sheet,rows:[{number:1,cells:[{col:1,ref:'A1',raw:sheet,display:sheet}]}]};
       throw Error('unexpected API '+path);
     },
-    async loadViewport(force,epoch,strict){assert.equal(strict,true);const key=ctx.S.sheet;let entry=ctx.S.viewportCache.get(key);if(!entry){const data=await ctx.api('/api/sheet?sheet='+key);entry={data,request:{},bounds:{}};ctx.S.viewportCache.set(key,entry);}ctx.S.viewportData=entry;ctx.S.cellMap.set('A1',entry.data.rows[0].cells[0]);},
+    async loadViewport(force,epoch,strict){assert.equal(strict,true);const key=ctx.S.sheet;let entry=ctx.tiles.entries.get(key);if(!entry){const data=await ctx.api('/api/sheet?sheet='+key);entry={data,request:{},bounds:{}};ctx.tiles.entries.set(key,entry);}ctx.S.viewportData=entry;ctx.S.cellMap.set('A1',entry.data.rows[0].cells[0]);},
     selectInitialCell(){ctx.S.selected={...ctx.S.cellMap.get('A1'),row:1,col:1,sheet:ctx.S.sheet};},selectCell(cell,row,col,ref){ctx.S.selected={...cell,row,col,ref,sheet:ctx.S.sheet};},async getCell(sheet){return {raw:sheet,ref:'A1'};},cellAt:()=>({}),parseRef:()=>({row:1,col:1,ref:'A1'}),navigateToCell:async()=>{}
   };
   vm.runInNewContext(fs.readFileSync(__dirname+'/richtext.js','utf8'),ctx);
   const stateBegin=source.indexOf('  const S = {'),stateEnd=source.indexOf('\n  const cellPresenter',stateBegin);
   vm.runInNewContext(source.slice(stateBegin,stateEnd)+';this.S=S;',ctx);ctx.S.opened=true;ctx.S.source={format:'xlsx'};ctx.S.workbookKey='qa-book';
-  const estimate=source.indexOf('  function estimateViewportBytes('),estimateEnd=source.indexOf('  function cacheViewport(',estimate);
+  vm.runInNewContext(fs.readFileSync(__dirname+'/viewport-cache.js','utf8'),ctx);
+  ctx.estimateViewportBytes=ctx.window.ExcelLensViewport.estimateViewportBytes;
+  ctx.tiles=new ctx.window.ExcelLensViewport.TileCache(24*1024*1024);
   const start=source.indexOf('  function rememberSheetView('),end=source.indexOf('  async function paintInitialPreview(',start);
   ctx.sheetPresentationKey=()=>[ctx.S.zoom,ctx.S.showStyles,ctx.S.showFormulas,1].join('|');
-  vm.runInNewContext(source.slice(estimate,estimateEnd)+source.slice(start,end)+';this.open=selectSheet;this.remember=rememberSheetView;',ctx);
+  vm.runInNewContext(source.slice(start,end)+';this.open=selectSheet;this.remember=rememberSheetView;',ctx);
   return {ctx,S:ctx.S,calls,nodes,notices,cardResets,quickResets,detailResets,open:ctx.open};
 }
 

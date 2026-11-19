@@ -286,14 +286,12 @@ type searchMatcher struct {
 
 func newSearchMatcher(sheetName, query, mode string) (searchMatcher, error) {
 	m := searchMatcher{mode: mode, query: query, refSheet: sheetName, currentSheet: sheetName}
-	// Shared relative references can change across cells; formula substrings
-	// containing digits must inspect the translated formula, not just anchors.
-	for _, c := range query {
-		if c >= '0' && c <= '9' {
-			m.relativeDependent = true
-			break
-		}
-	}
+	// A translated address can change even a one-letter or a whole-column
+	// substring. Only a function token ending in '(' is invariant under fill.
+	function, call := strings.CutSuffix(query, "(")
+	m.relativeDependent = !call || function == "" || strings.IndexFunc(function, func(c rune) bool {
+		return !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c == '_' || c == '.')
+	}) >= 0
 	if mode != "reference" {
 		return m, nil
 	}

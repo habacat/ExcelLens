@@ -14,11 +14,50 @@ class Client{
   async shot(file){await this.call('Page.bringToFront');await this.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');const r=await this.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(file,Buffer.from(r.data,'base64'));}
   close(){for(const item of this.pending.values()){clearTimeout(item.timer);item.reject(Error('QA browser closed'));}this.pending.clear();this.socket.close();}
 }
-async function launch({out,errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe')}){
-  const profile=fs.mkdtempSync(path.join(out,'chrome-')),storage=fs.mkdtempSync(path.join(os.tmpdir(),'excellens-ui-qa-')),clients=[];
+async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe')}){
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'excellens-ui-qa-'));
+  const profile = path.join(storage, 'chrome');
+  const clients = [];
   let server,browser,port;
-  const stop=async child=>{if(child&&child.exitCode===null)await new Promise(resolve=>{child.once('exit',resolve);child.kill();});};
-  const harness={storage,async tabs(){return(await fetch('http://127.0.0.1:'+port+'/json/list')).json();},async connect(tab){const socket=new WebSocket(tab.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});const c=new Client(socket,errors);clients.push(c);await c.call('Runtime.enable');await c.call('Page.enable');return c;},async close(){for(const client of clients)client.close();await stop(browser);await stop(server);const resolved=path.resolve(storage);if(path.dirname(resolved)===path.resolve(os.tmpdir())&&path.basename(resolved).startsWith('excellens-ui-qa-'))fs.rmSync(resolved,{recursive:true,force:true});}};
+  const stop = async child => {
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+    await new Promise(resolve => {
+      child.once('exit', resolve);
+      child.kill();
+    });
+  };
+  async function close() {
+    // Let Chrome stop its renderer and storage processes before removing the profile.
+    if (clients.length && browser?.exitCode === null && browser.signalCode === null) {
+      await new Promise(resolve => {
+        const done = () => {
+          clearTimeout(timer);
+          browser.off('exit', done);
+          resolve();
+        };
+        const timer = setTimeout(done, 4000);
+        browser.once('exit', done);
+        // Chrome can close the CDP socket before its profile has been flushed.
+        // Only process exit (or the timeout) ends the graceful shutdown wait.
+        clients[0].call('Browser.close').catch(() => {});
+      });
+    }
+    for (const client of clients.splice(0)) client.close();
+    await stop(browser);
+    await stop(server);
+    const resolved = path.resolve(storage);
+    if (path.dirname(resolved) === path.resolve(os.tmpdir()) && path.basename(resolved).startsWith('excellens-ui-qa-')) {
+      // Retry the whole profile, so a locked file cannot trigger nested retries at every directory level.
+      for (let attempt = 0; ; attempt++) {
+        try { fs.rmSync(resolved, {recursive:true, force:true}); break; }
+        catch (error) {
+          if (attempt === 3 || !['EBUSY','ENOTEMPTY','EPERM'].includes(error.code)) throw error;
+          await pause(300);
+        }
+      }
+    }
+  }
+  const harness={storage,close,async tabs(){return(await fetch('http://127.0.0.1:'+port+'/json/list')).json();},async connect(tab){const socket=new WebSocket(tab.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});const c=new Client(socket,errors);clients.push(c);await c.call('Runtime.enable');await c.call('Page.enable');return c;}};
   const startServer=async()=>{
     server=spawn(exe,['-duration',duration,'-storage',storage],{cwd:path.resolve(__dirname,'../..'),windowsHide:true,stdio:['ignore','pipe','pipe']});
     harness.address=await new Promise((resolve,reject)=>{let text='',errors='';server.stderr.on('data',x=>errors+=x);server.stdout.on('data',x=>{text+=x;if(text.includes('\n')){try{resolve(JSON.parse(text.split('\n')[0]).url);}catch(e){reject(e);}}});server.once('error',reject);server.once('exit',code=>reject(Error('uiprobe exited '+code+' '+errors)));});
@@ -27,7 +66,24 @@ async function launch({out,errors=[],duration='8m',exe=process.env.QA_UIPROBE||p
   try{
     await startServer();
     browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
-    const active=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(active);i++)await pause(100);port=fs.readFileSync(active,'utf8').split('\n')[0];
+    await new Promise((resolve, reject) => {
+      browser.once('spawn', resolve);
+      browser.once('error', reject);
+    });
+    const active = path.join(profile, 'DevToolsActivePort');
+    const deadline = Date.now() + 45000;
+    while (!port) {
+      if (browser.exitCode !== null || browser.signalCode !== null) throw Error('Chrome exited before opening its debugging port');
+      try {
+        const firstLine = fs.readFileSync(active, 'utf8').split('\n')[0];
+        if (/^\d+$/.test(firstLine.trim())) port = Number(firstLine);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      if (port) break;
+      if (Date.now() >= deadline) throw Error('Chrome debugging port was unavailable after 45 seconds');
+      await pause(100);
+    }
     harness.page=await harness.connect((await harness.tabs()).find(tab=>tab.type==='page'));
     await harness.page.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1050,deviceScaleFactor:1,mobile:false});await harness.page.call('Page.navigate',{url:harness.address});
     await harness.page.wait('document.readyState==="complete"&&!!window.ExcelLensSession');await harness.page.evaluate('window.ExcelLensSession.ready');return harness;

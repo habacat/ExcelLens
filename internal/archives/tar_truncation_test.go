@@ -229,12 +229,12 @@ func TestProvidedTruncatedTAR(t *testing.T) {
 	// Every field, empty position and original row coordinate is checked
 	// against an independently computed Python digest below.
 	digest := sha256.New()
-	for start := 0; start < len(idx.Rows); start += 4096 {
-		rows, err := wb.ReadRows(idx, start, min(4096, len(idx.Rows)-start), 1, 39)
+	for start := 0; start < idx.RowCount(); start += 4096 {
+		rows, err := wb.ReadRows(idx, start, min(4096, idx.RowCount()-start), 1, 39)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != min(4096, len(idx.Rows)-start) {
+		if len(rows) != min(4096, idx.RowCount()-start) {
 			t.Fatal("row range was shortened")
 		}
 		for j, row := range rows {

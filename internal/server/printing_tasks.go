@@ -162,27 +162,18 @@ func (a *App) printAction(w http.ResponseWriter, r *http.Request, clear bool) {
 func (a *App) handlePrintCancel(w http.ResponseWriter, r *http.Request) { a.printAction(w, r, false) }
 func (a *App) handlePrintClear(w http.ResponseWriter, r *http.Request)  { a.printAction(w, r, true) }
 
-// Keep both the cache read lock and a source pin until the request has finished
-// reading and validating. Replacing a tab can invalidate the task concurrently;
-// it cannot remove the old source while this request still owns its pin.
+// Capture and pin under the cache read lock. A queued page retains the source
+// without holding the lock. The task and source are checked again before use.
 func (a *App) printSnapshotFor(r *http.Request) (*printTask, *printSnapshot, func(), error) {
 	a.cacheMu.RLock()
+	defer a.cacheMu.RUnlock()
 	a.mu.RLock()
+	defer a.mu.RUnlock()
 	job := a.printJobs[r.URL.Query().Get("id")]
 	if job == nil || job.Status != "done" || job.Snapshot == nil || job.discarded || a.wb != job.Workbook {
-		a.mu.RUnlock()
-		a.cacheMu.RUnlock()
 		return nil, nil, nil, errors.New("打印预览结果已失效，请重新准备")
 	}
-	snapshot := job.Snapshot
-	unpin := a.pinWorkbooks(job.Workbook)
-	a.mu.RUnlock()
-	release := func() { unpin(); a.cacheMu.RUnlock() }
-	if err := snapshot.plan.Validate(r.Context()); err != nil {
-		release()
-		return nil, nil, nil, err
-	}
-	return job, snapshot, release, nil
+	return job, job.Snapshot, a.pinWorkbooks(job.Workbook), nil
 }
 
 func (a *App) printSnapshotCurrent(ctx context.Context, job *printTask, snapshot *printSnapshot) error {
@@ -246,12 +237,17 @@ func (a *App) handlePrintPage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	stop := context.AfterFunc(job.ctx, cancel)
 	defer func() { stop(); cancel() }()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-ctx.Done():
+	releaseQuery, err := a.lockQueryRead(ctx)
+	if err != nil {
 		if r.Context().Err() == nil {
 			writeError(w, 409, "打印预览任务已取消，请重新准备")
+		}
+		return
+	}
+	defer releaseQuery()
+	if err = a.printSnapshotCurrent(ctx, job, snapshot); err != nil {
+		if r.Context().Err() == nil {
+			writeError(w, 409, err.Error())
 		}
 		return
 	}

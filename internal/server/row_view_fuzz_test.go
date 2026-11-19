@@ -37,7 +37,7 @@ func FuzzRowViewSelectionMatchesLiteralVisibleSheet(f *testing.F) {
 				layout.RowStates = append(layout.RowStates, workbook.SourceAxisRange{Min: row, Max: row, Hidden: true, HiddenSet: true})
 			}
 			if row == 1 || row == n || at(row+4)&2 == 0 {
-				idx.Rows = append(idx.Rows, workbook.RowOffset{Number: row})
+				idx.ResidentRows = append(idx.ResidentRows, workbook.RowOffset{Number: row})
 			}
 		}
 		axis, err := layout.BuildAxisVisibility(context.Background(), "row", n, workbook.AxisViewSettings{})

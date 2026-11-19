@@ -167,6 +167,13 @@ func (w *Workbook) formatNumeric(raw string, style int) string {
 	return formatCustomNumber(v, format, w.Date1904)
 }
 
+// PresentNumeric applies the workbook's number format and color to a draft
+// value without changing the source model or its row cache.
+func (w *Workbook) PresentNumeric(cell *CellData) {
+	cell.Display = w.formatNumeric(cell.Raw, cell.Style)
+	cell.ValueColor = w.numericTextColor(cell.Raw, cell.Style)
+}
+
 // isDecimalZero tests the literal OOXML mantissa rather than the float64
 // result. For example, -1e-999 is mathematically nonzero even when parsing
 // it to float64 would underflow; it must never be silently changed to zero.
@@ -581,6 +588,7 @@ func formatCustomDate(serial float64, format string, date1904 bool) string {
 		return strconv.FormatFloat(serial, 'f', -1, 64)
 	}
 	base := excelSerialTime(serial, date1904)
+	fakeLeapDay := !date1904 && serial >= 60 && serial < 61 && base.Day() == 28
 	hasDatePart := formatHasToken(format, 'y') || formatHasToken(format, 'd')
 	timeStart := firstFormatToken(format, 'h')
 	has12Hour := strings.Contains(strings.ToUpper(format), "AM/PM") || strings.Contains(strings.ToUpper(format), "A/P")
@@ -664,6 +672,8 @@ func formatCustomDate(serial float64, format string, date1904 bool) string {
 					out.WriteString(base.Format("Monday"))
 				} else if len(token) == 3 {
 					out.WriteString(base.Format("Mon"))
+				} else if fakeLeapDay {
+					out.WriteString("29")
 				} else if len(token) == 2 {
 					out.WriteString(base.Format("02"))
 				} else {
@@ -781,10 +791,17 @@ func formatExcelDate(serial float64, date1904 bool, fmtID int) string {
 		return strconv.FormatFloat(serial, 'f', -1, 64)
 	}
 	t := excelSerialTime(serial, date1904)
+	fakeLeapDay := !date1904 && serial >= 60 && serial < 61 && t.Day() == 28
 	switch fmtID {
 	case 15:
+		if fakeLeapDay {
+			return "29-" + t.Format("Jan-06")
+		}
 		return t.Format("2-Jan-06")
 	case 16:
+		if fakeLeapDay {
+			return "29-" + t.Format("Jan")
+		}
 		return t.Format("2-Jan")
 	case 17:
 		return t.Format("Jan-06")
@@ -797,6 +814,9 @@ func formatExcelDate(serial float64, date1904 bool, fmtID int) string {
 	case 21:
 		return t.Format("15:04:05")
 	case 22:
+		if fakeLeapDay {
+			return "1900-02-29 " + t.Format("15:04")
+		}
 		return t.Format("2006-01-02 15:04")
 	case 45:
 		return t.Format("15:04")
@@ -805,6 +825,9 @@ func formatExcelDate(serial float64, date1904 bool, fmtID int) string {
 	case 47:
 		return t.Format("15:04:05.000")
 	default:
+		if fakeLeapDay {
+			return "1900-02-29"
+		}
 		return t.Format("2006-01-02")
 	}
 }

@@ -75,7 +75,7 @@ func (a *App) runIssuesExport(job *ExportJob, snapshot issueSnapshot, protect bo
 		job.fail(job.ctx.Err())
 		return
 	}
-	release, err := a.acquireCompositionAnalysisSlot(job.ctx, snapshot.query.Source)
+	release, err := a.acquireAnalysisQuerySlot(job.ctx, snapshot.query.Source, false)
 	if err != nil {
 		job.fail(err)
 		return
@@ -229,7 +229,7 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 		writeError(w, 408, "异常明细提取已取消")
 		return
 	}
-	release, err := a.acquireCompositionAnalysisSlot(r.Context(), snapshot.query.Source)
+	release, err := a.acquireAnalysisQuerySlot(r.Context(), snapshot.query.Source, false)
 	if err != nil {
 		writeError(w, 408, "异常明细提取已取消")
 		return

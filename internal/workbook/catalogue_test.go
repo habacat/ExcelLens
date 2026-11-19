@@ -110,7 +110,7 @@ func indexCatalogueName(items []CatalogueItem, name string) int {
 
 func TestCatalogueTableColumnsAndExplicitSlicesUseOnlyConfirmedSourceDefinition(t *testing.T) {
 	data := []byte(`<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="账表" displayName="账表" ref="B3:D9" headerRowCount="1" totalsRowCount="1"><tableColumns count="3"><tableColumn id="20" name="编号"/><tableColumn id="5" name="金额"/><tableColumn id="99" name="备注"/></tableColumns></table>`)
-	item, err := catalogueTableXML(data, "原表", "xl/tables/table1.xml", "rTable")
+	item, err := ParseTableDefinition(data, "原表", "xl/tables/table1.xml", "rTable")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestCatalogueTableColumnsAndExplicitSlicesUseOnlyConfirmedSourceDefinition(
 		t.Fatal("qualified table reference ignored the source sheet", wrong)
 	}
 	for _, bad := range []string{strings.Replace(string(data), `count="3"`, `count="2"`, 1), strings.Replace(string(data), `id="5"`, `id="20"`, 1), strings.Replace(string(data), `ref="B3:D9"`, `ref="B3:E9"`, 1), strings.Replace(string(data), `headerRowCount="1"`, `headerRowCount="2"`, 1), string(data) + `<table/>`} {
-		if _, err := catalogueTableXML([]byte(bad), "原表", "p", "r"); err == nil {
+		if _, err := ParseTableDefinition([]byte(bad), "原表", "p", "r"); err == nil {
 			t.Fatal("invalid table accepted", bad)
 		}
 	}
@@ -169,7 +169,7 @@ func TestCatalogueMalformedXMLDuplicateAttributesAndDepthCannotManufactureSource
 		strings.Replace(base, `</table>`, `<tableColumns count="2"/></table>`, 1),
 		base + "tail",
 	} {
-		if _, err := catalogueTableXML([]byte(data), "原表", "p", "r"); err == nil {
+		if _, err := ParseTableDefinition([]byte(data), "原表", "p", "r"); err == nil {
 			t.Fatal("invalid source table XML accepted", data)
 		}
 	}

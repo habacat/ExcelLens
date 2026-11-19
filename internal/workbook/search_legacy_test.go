@@ -46,8 +46,8 @@ func (w *Workbook) searchSheetLegacy(idx *SheetIndex, sheetName, query, mode str
 	}
 	defer f.Close()
 	matches := make([]SearchResult, 0, minInt(limit, 64))
-	total := len(idx.Rows)
-	for i := range idx.Rows {
+	total := len(idx.ResidentRows)
+	for i := range idx.ResidentRows {
 		if i&15 == 0 {
 			select {
 			case <-cancel:

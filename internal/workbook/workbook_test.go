@@ -55,8 +55,8 @@ func TestOpenBuildIndexReadRowsAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(idx.Rows) != 3 {
-		t.Fatalf("want 3 indexed rows, got %d", len(idx.Rows))
+	if len(idx.ResidentRows) != 3 {
+		t.Fatalf("want 3 indexed rows, got %d", len(idx.ResidentRows))
 	}
 	rows, err := wb.ReadRows(idx, 0, 3, 1, 3)
 	if err != nil {
@@ -108,7 +108,7 @@ func TestOpenBuildIndexReadRowsAndSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	cached := wb2.GetCachedIndex(meta.Path)
-	if cached == nil || len(cached.Rows) != 3 {
+	if cached == nil || len(cached.ResidentRows) != 3 {
 		t.Fatal("expected reusable local index cache")
 	}
 }
@@ -198,6 +198,14 @@ func TestTranslateSharedFormulaOutOfBounds(t *testing.T) {
 	got := translateSharedFormula("=A1", "B1", "A1")
 	if got != "=#REF!" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestTranslateSharedFormulaWholeAxes(t *testing.T) {
+	formula := `SUM('Q1'!$A:B,$1:2,Sheet1!b:b,"A:B",Table1[Q1:Q2],Jan:Mar!B3)+费率A1`
+	want := `SUM('Q1'!$A:E,$1:4,Sheet1!E:E,"A:B",Table1[Q1:Q2],Jan:Mar!E5)+费率A1`
+	if got := translateSharedFormula(formula, "B2", "E4"); got != want {
+		t.Fatalf("got %s, want %s", got, want)
 	}
 }
 

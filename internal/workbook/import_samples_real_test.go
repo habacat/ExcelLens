@@ -81,8 +81,8 @@ func verifyProvidedImport(t *testing.T, variable string, rows, cols int, sourceS
 	if err != nil {
 		t.Fatal(err)
 	}
-	if idx.MaxRow != rows || len(idx.Rows) != rows || idx.MaxCol != cols {
-		t.Fatalf("shape %d x %d, %d indexed rows; want %d x %d", idx.MaxRow, idx.MaxCol, len(idx.Rows), rows, cols)
+	if idx.MaxRow != rows || idx.RowCount() != rows || idx.MaxCol != cols {
+		t.Fatalf("shape %d x %d, %d indexed rows; want %d x %d", idx.MaxRow, idx.MaxCol, idx.RowCount(), rows, cols)
 	}
 	t.Logf("cold open + index: %s; %d x %d; native cache %d bytes", time.Since(started), rows, cols, idx.XMLSize)
 	f, err := os.Open(idx.XMLPath)
@@ -90,7 +90,7 @@ func verifyProvidedImport(t *testing.T, variable string, rows, cols int, sourceS
 		t.Fatal(err)
 	}
 	defer f.Close()
-	position := idx.Rows[0].Start
+	position := idx.RowAt(0).Start
 	if _, err := f.Seek(position, io.SeekStart); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func verifyProvidedImport(t *testing.T, variable string, rows, cols int, sourceS
 	buffer, record := make([]byte, 0, 4096), make([]byte, 0, 4096)
 	fields := make([]string, cols)
 	h := sha256.New()
-	for i, offset := range idx.Rows {
+	for i, offset := range idx.RowOffsets() {
 		if offset.Number != i+1 || offset.Start != position || offset.End <= offset.Start {
 			t.Fatalf("noncontiguous index at row %d: %+v", i+1, offset)
 		}

@@ -450,6 +450,85 @@ func (w *Workbook) readStyles(f *zip.File) error {
 	return nil
 }
 
+// XLSXCalendarStyle recognizes single-section date and time-of-day number
+// formats, with the same cell style inheritance as ordinary workbook reads.
+func XLSXCalendarStyle(data []byte, index int) (string, error) {
+	var styles stylesXML
+	if err := xml.Unmarshal(data, &styles); err != nil {
+		return "", err
+	}
+	if index < 0 || index >= len(styles.CellXfs) {
+		return "", nil
+	}
+	xf := inheritSourceXF(styles.CellXfs[index], styles.CellStyleXfs)
+	for _, fmt := range styles.NumFmts.Items {
+		if fmt.ID != xf.NumFmtID {
+			continue
+		}
+		code := fmt.Code
+		if strings.ContainsAny(code, ";[]") || !isDateFormat(code) {
+			return "", nil
+		}
+		if formatHasToken(code, 'y') || formatHasToken(code, 'd') {
+			return "date", nil
+		}
+		if formatHasToken(code, 'h') || formatHasToken(code, 's') {
+			return "time", nil
+		}
+		return "", nil
+	}
+	switch xf.NumFmtID {
+	case 14, 15, 16, 17, 22:
+		return "date", nil
+	case 18, 19, 20, 21, 45, 47:
+		return "time", nil
+	}
+	return "", nil
+}
+
+// CalendarNumberFormat is a source style whose numbers Excel can put into a
+// date-valued pivot cache. The worksheet itself still stores a number.
+type CalendarNumberFormat struct {
+	ID   int
+	Code string
+}
+
+func (f CalendarNumberFormat) Display(serial float64, date1904 bool) string {
+	if f.Code != "" {
+		return formatCustomDate(serial, f.Code, date1904)
+	}
+	return formatExcelDate(serial, date1904, f.ID)
+}
+
+// XLSXCalendarFormats resolves the cell XFs once for an edit calculation.
+// A text cell with the same style retains its original text type.
+func XLSXCalendarFormats(data []byte) (map[string]CalendarNumberFormat, error) {
+	var styles stylesXML
+	if err := xml.Unmarshal(data, &styles); err != nil {
+		return nil, err
+	}
+	formats := map[int]string{}
+	for _, f := range styles.NumFmts.Items {
+		formats[f.ID] = f.Code
+	}
+	out := map[string]CalendarNumberFormat{}
+	for i, xf := range styles.CellXfs {
+		id := inheritSourceXF(xf, styles.CellStyleXfs).NumFmtID
+		code := formats[id]
+		if code != "" {
+			section, _, _ := strings.Cut(code, ";")
+			if !isDateFormat(section) {
+				continue
+			}
+			code = section
+		} else if !(id >= 14 && id <= 22 || id >= 27 && id <= 36 || id >= 45 && id <= 47 || id >= 50 && id <= 58) {
+			continue
+		}
+		out[strconv.Itoa(i)] = CalendarNumberFormat{id, code}
+	}
+	return out, nil
+}
+
 // An explicit false delegates that attribute group to the named cell style.
 // Missing flags retain the source cell XF, as ordinary Excel files require.
 func inheritSourceXF(xf styleXFXML, parents []styleXFXML) styleXFXML {

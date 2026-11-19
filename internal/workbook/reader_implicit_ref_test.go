@@ -12,7 +12,7 @@ import (
 func TestImplicitCellReferencesStrictAndFastParity(t *testing.T) {
 	row := `<row r="7"><c r="A7"><v>100</v></c><c t="inlineStr"><is><t>00123</t></is></c><c r="D7"><f>SUM(A7,B7)</f><v>100</v></c><c t="inlineStr"><is><t>&amp;x</t></is></c><c r="G7"><v>3</v></c><c><v>4</v></c></row>`
 	idx := syntheticIndex(t, row)
-	idx.Rows[0].Number = 7
+	idx.ResidentRows[0].Number = 7
 	w := &Workbook{NumFmts: map[int]string{}}
 	f, err := os.Open(idx.XMLPath)
 	if err != nil {

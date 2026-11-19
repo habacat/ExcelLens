@@ -190,7 +190,7 @@ func (a *App) runAnalysisTree(job *analysisTreeTask) {
 	job.mu.Lock()
 	job.Status = "running"
 	job.mu.Unlock()
-	release, err := a.acquireCompositionAnalysisSlot(job.ctx, job.Query.Source)
+	release, err := a.acquireAnalysisQuerySlot(job.ctx, job.Query.Source, false)
 	if err != nil {
 		a.finishAnalysisTree(job, analysis.Result{}, err)
 		return

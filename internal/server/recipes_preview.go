@@ -83,7 +83,7 @@ func (a *App) recipeTargetSchema(ctx context.Context, wb *workbook.Workbook, ref
 		if area := out.Scope.Selection; area != nil {
 			for column := len(out.Fields) + 1; column <= area.EndColumn; column++ {
 				out.Info.Fields = append(out.Info.Fields, sourceField(column, "", false))
-				out.Fields = append(out.Fields, recipe.Field{ID: "C" + strconv.Itoa(column), Column: column, Name: excelColName(column) + " 列"})
+				out.Fields = append(out.Fields, recipe.Field{ID: "C" + strconv.Itoa(column), Column: column, Name: workbook.ColumnName(column) + " 列"})
 			}
 		}
 		fields := out.Fields[:0:0]

@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const path=require('node:path');
 global.window=global;
+require(path.resolve(__dirname,'../../internal/ui/web/cell-address.js'));
 require(path.resolve(__dirname,'../../internal/ui/web/formula_inspector.js'));
 const parse=window.ExcelLensFormulaInspector.parseFormula;
 const labels=(formula,sheet='主表')=>parse(formula,sheet).map(x=>x.label);

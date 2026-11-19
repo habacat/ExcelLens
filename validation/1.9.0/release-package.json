@@ -1,0 +1,14 @@
+{
+  "version": "1.9.0",
+  "result": "PASS",
+  "packagedFilesVerified": 77,
+  "exeBytes": 6143488,
+  "exeSHA256": "223b8165996eae4348a1b4c0d2c7a800588e1fda6a12e6c207dcf77158901f2b",
+  "zipSHA256": "adb2601860eed65d39acc47c235ddd00da0c0b9b17c56007865e82308686533c",
+  "checks": [
+    "ZIP CRC",
+    "every file equals the release directory",
+    "EXE SHA-256 and PE header",
+    "version"
+  ]
+}

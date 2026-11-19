@@ -8,15 +8,12 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -24,27 +21,6 @@ import (
 	"excellens/internal/buildinfo"
 	"excellens/internal/ui"
 )
-
-// These dependencies are intentional. New packages require an ownership and
-// dependency decision here, rather than silently growing a cross-layer import.
-var layers = map[string][]string{
-	"buildinfo": {}, "formats": {}, "valueconv": {}, "sourceview": {"formats"}, "analysis": {"valueconv", "sourceview", "formats"}, "searchdsl": {}, "branding": {}, "instance": {},
-	"calculator":  {"analysis", "valueconv", "formats"},
-	"workbook":    {"formats", "searchdsl", "sourceview"},
-	"archives":    {"formats", "workbook"},
-	"export":      {"workbook", "formats"},
-	"printing":    {"workbook", "formats"},
-	"clustering":  {"workbook", "formats"},
-	"composition": {"workbook", "sourceview", "formats"},
-	"ui":          {"formats", "buildinfo"},
-	"shellmenu":   {"formats"},
-	"tray":        {"branding", "formats", "workbook", "buildinfo"},
-	"server":      {"analysis", "archives", "calculator", "export", "printing", "clustering", "composition", "formats", "searchdsl", "ui", "workbook", "buildinfo", "valueconv", "recovery", "checkpoint", "reconcile", "recipe", "sourceview"},
-	"recovery":    {},
-	"checkpoint":  {"formats"},
-	"reconcile":   {"analysis", "workbook", "formats"},
-	"recipe":      {"analysis", "sourceview"},
-}
 
 type step struct {
 	Name       string `json:"name"`
@@ -297,33 +273,8 @@ func audit(files []string) error {
 		if !bytes.Equal(bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n")), formatted) {
 			return fmt.Errorf("%s needs gofmt; run go run ./tools/project fmt", name)
 		}
-		path := filepath.ToSlash(name)
-		if !strings.HasPrefix(path, "internal/") || strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-		owner := strings.Split(path, "/")[1]
-		allowed, ok := layers[owner]
-		if !ok {
-			return fmt.Errorf("package %s has no ownership/dependency rule in tools/project", owner)
-		}
-		parsed, err := parser.ParseFile(token.NewFileSet(), name, data, parser.ImportsOnly)
-		if err != nil {
+		if err := checkPackageImports(name, data); err != nil {
 			return err
-		}
-		for _, imp := range parsed.Imports {
-			value, err := strconv.Unquote(imp.Path.Value)
-			if err != nil {
-				return err
-			}
-			if value == "C" {
-				return fmt.Errorf("%s introduces CGO into the production application", name)
-			}
-			if strings.HasPrefix(value, "excellens/internal/") {
-				target := strings.TrimPrefix(value, "excellens/internal/")
-				if !slices.Contains(allowed, target) {
-					return fmt.Errorf("%s crosses package boundary %s -> %s", name, owner, target)
-				}
-			}
 		}
 	}
 	return checkReleaseFiles()

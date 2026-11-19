@@ -4,6 +4,7 @@
 param(
     [string]$GoExe = 'go',
     [string]$UpxExe = 'upx',
+    [string]$DeliveryRoot = '',
     [switch]$StageOnly
 )
 Set-StrictMode -Version Latest
@@ -18,13 +19,30 @@ $moduleSource = Get-Content -LiteralPath (Join-Path $Root 'go.mod') -Raw
 if ($moduleSource -notmatch '(?m)^go ([0-9.]+)\s*$') { throw 'Go toolchain version is missing.' }
 $RequiredGo = 'go' + $Matches[1]
 $ValidationDir = Join-Path $Root ('validation/' + $Version)
-$ReleaseDir = Join-Path $Root 'release'
-$StageDir = Join-Path $Root ('release.stage.' + [guid]::NewGuid().ToString('N'))
-$BackupDir = Join-Path $Root ('release.previous.' + [guid]::NewGuid().ToString('N'))
+$PackageRoot = $Root
+if ($DeliveryRoot) {
+    $destination = Get-Item -LiteralPath $DeliveryRoot -ErrorAction Stop
+    if (!$destination.PSIsContainer -or ($destination.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'DeliveryRoot must be a local ExcelLens checkout directory.'
+    }
+    $PackageRoot = $destination.FullName
+    $destinationModule = Get-Content -Raw -LiteralPath (Join-Path $PackageRoot 'go.mod')
+    $destinationVersion = Get-Content -Raw -LiteralPath (Join-Path $PackageRoot 'internal/buildinfo/version.go')
+    if ($destinationModule -notmatch '(?m)^module excellens\s*$' -or
+        $destinationVersion -notmatch ('const Version = "' + [regex]::Escape($Version) + '"')) {
+        throw 'DeliveryRoot must be an ExcelLens checkout for this release version.'
+    }
+}
+$ReleaseDir = Join-Path $PackageRoot 'release'
+$StageDir = Join-Path $PackageRoot ('release.stage.' + [guid]::NewGuid().ToString('N'))
+$BackupDir = Join-Path $PackageRoot ('release.previous.' + [guid]::NewGuid().ToString('N'))
 # Bound every directory later moved or recursively removed to this workspace.
 foreach ($releasePath in @($ReleaseDir, $StageDir, $BackupDir)) {
-    if ((Split-Path -Parent ([System.IO.Path]::GetFullPath($releasePath))) -ne $Root) {
+    if ((Split-Path -Parent ([System.IO.Path]::GetFullPath($releasePath))) -ne $PackageRoot) {
         throw "Release path escaped the project directory: $releasePath"
+    }
+    if ((Test-Path -LiteralPath $releasePath) -and ((Get-Item -LiteralPath $releasePath).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Release path is a reparse point: $releasePath"
     }
 }
 
@@ -50,6 +68,18 @@ Assert-Succeeded 'upx --version'
 $upxVersion = ($upxVersionText -split '\r?\n')[0]
 $goVersion = (& $GoExe version | Out-String).Trim()
 Assert-Succeeded 'go version'
+if (!$PSBoundParameters.ContainsKey('GoExe') -and $goVersion -notmatch "\b$([regex]::Escape($RequiredGo))\b") {
+    # Go installs independently selected toolchains as verified modules. Use an
+    # existing Windows toolchain when the system launcher is one patch behind.
+    $moduleCache = (& $GoExe env GOMODCACHE | Out-String).Trim()
+    Assert-Succeeded 'go env GOMODCACHE'
+    $cachedGo = Join-Path $moduleCache ("golang.org/toolchain@v0.0.1-$RequiredGo.windows-amd64/bin/go.exe")
+    if (Test-Path -LiteralPath $cachedGo -PathType Leaf) {
+        $GoExe = $cachedGo
+        $goVersion = (& $GoExe version | Out-String).Trim()
+        Assert-Succeeded 'cached go version'
+    }
+}
 if ($goVersion -notmatch "\b$([regex]::Escape($RequiredGo))\b") {
     throw "Only Go $RequiredGo may build this release. Found: $goVersion"
 }
@@ -159,9 +189,9 @@ try {
     # Do not replace an executable that is still running.
     $running = @(Get-Process -Name 'ExcelLens' -ErrorAction SilentlyContinue).Count -gt 0
     if ($StageOnly -or $running) {
-        $artifactRoot = Join-Path $Root 'artifacts'
+        $artifactRoot = Join-Path $PackageRoot 'artifacts'
         $artifactDir = Join-Path $artifactRoot ($Version + '-verified-' + [guid]::NewGuid().ToString('N'))
-        if (![IO.Path]::GetFullPath($artifactDir).StartsWith($Root + [IO.Path]::DirectorySeparatorChar)) { throw 'Artifact path escaped the project.' }
+        if ((Split-Path -Parent ([IO.Path]::GetFullPath($artifactDir))) -ne $artifactRoot) { throw 'Artifact path escaped the project.' }
         New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
         Move-Item -LiteralPath $StageDir -Destination $artifactDir
         $StageDir = ''

@@ -40,7 +40,7 @@ func TestRealWorkbookExportAndExactCellRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("real sheet=%s rows=%d cols=%d indexing=%s", meta.Name, len(idx.Rows), idx.MaxCol, time.Since(start))
+	t.Logf("real sheet=%s rows=%d cols=%d indexing=%s", meta.Name, idx.RowCount(), idx.MaxCol, time.Since(start))
 	rows, err := wb.ReadRows(idx, 0, 6, 1, 18)
 	if err != nil {
 		t.Fatal(err)

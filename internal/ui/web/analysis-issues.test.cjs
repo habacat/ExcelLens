@@ -6,7 +6,7 @@ function setup(){
     addEventListener(name,fn){this.handlers[name]=fn;}showModal(){this.open=true;}close(){this.open=false;}
   }
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
-  const ctx={window:{},document:{getElementById:node,createElement:()=>new Element()}};vm.runInNewContext(fs.readFileSync(__dirname+'/analysis-issues.js','utf8'),ctx);
+  const ctx={window:{},document:{getElementById:node,createElement:()=>new Element()}};vm.runInNewContext(fs.readFileSync(__dirname+'/cell-address.js','utf8'),ctx);vm.runInNewContext(fs.readFileSync(__dirname+'/analysis-issues.js','utf8'),ctx);
   let book='one';const navigations=[],calls=[],messages=[],exports=[],saved=[];
   const panel=new ctx.window.ExcelLensAnalysisIssues({identity:()=>book,api:async(path,opts)=>{calls.push({path,body:JSON.parse(opts.body)});return {id:'new',rows:10000,total:15000,truncated:true};},toast:(...args)=>messages.push(args),navigate:(...args)=>navigations.push(args),askName:async()=> '核对表',onMaterialized:async data=>saved.push(data),startExport:(...args)=>exports.push(args)});
   const snapshot={book,job:'job',query:{source:'wb:数据'},result:{invalidNumbers:15000,issuesTruncated:true,issues:[{row:103,sourceColumn:28,sourceField:'C28',field:'D_x',fieldName:'转换金额',kind:'number',original:'0001',input:'0001',value:'0001',reason:'源值为文本'}]}};

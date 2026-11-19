@@ -145,7 +145,7 @@
       if(item.attributes)this.field(raw,'原始属性',JSON.stringify(item.attributes,null,2),true);
       for(const [at,text] of (item.continuationHex||[]).entries())this.field(raw,`续记录 ${at+1}`,text,true);body.append(raw);
     }
-    areaText(area){const column=n=>{let text='';for(;n>0;n=Math.floor((n-1)/26))text=String.fromCharCode(65+(n-1)%26)+text;return text;};const first=column(area.col)+area.row,last=column(area.endCol)+area.endRow;return first===last?first:first+':'+last;}
+    areaText(area){const column=window.ExcelLensAddress.columnName;const first=column(area.col)+area.row,last=column(area.endCol)+area.endRow;return first===last?first:first+':'+last;}
     key(event){
       const items=this.page?.page.items;if(!items?.length)return;let at=Math.max(0,items.findIndex(item=>item.id===this.selected));
       if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();at=event.key==='Home'?0:event.key==='End'?items.length-1:Math.max(0,Math.min(items.length-1,at+(event.key==='ArrowDown'?1:-1)));this.select(items[at].id,true);}

@@ -212,6 +212,13 @@ func (w *Workbook) resolveCatalogue(ctx context.Context, input Catalogue) (Catal
 	return bounded.value, nil
 }
 
+// ResolveXLSXNameRanges applies the same fixed-range, alias and scope rules as
+// the read-only name catalogue to definitions collected by copy preflight.
+func ResolveXLSXNameRanges(ctx context.Context, sheets []SheetMeta, names []CatalogueItem) (Catalogue, error) {
+	w := Workbook{Format: "xlsx", Sheets: sheets}
+	return w.resolveCatalogue(ctx, Catalogue{Items: names, Complete: true})
+}
+
 func (r *catalogueResolver) item(index int, visited map[int]bool, depth int) ([]CatalogueArea, error) {
 	if err := r.spend(1); err != nil {
 		return nil, err
@@ -312,7 +319,9 @@ func splitCatalogueUnion(value string) ([]string, error) {
 	return parts, nil
 }
 
-func splitCatalogueSheet(value string) (sheet, address string, qualified bool, err error) {
+// SplitSheetReference separates a local sheet qualifier, including escaped
+// quotes, from its address. External and three-dimensional targets are rejected.
+func SplitSheetReference(value string) (sheet, address string, qualified bool, err error) {
 	quote, separator := false, -1
 	for i := 0; i < len(value); i++ {
 		if value[i] == '\'' {
@@ -359,7 +368,7 @@ func (r *catalogueResolver) expression(expression, scope string, visited map[int
 			return nil, err
 		}
 		part = strings.TrimSpace(part)
-		sheet, address, qualified, err := splitCatalogueSheet(part)
+		sheet, address, qualified, err := SplitSheetReference(part)
 		if err != nil {
 			return nil, err
 		}
@@ -532,7 +541,13 @@ func (r *catalogueResolver) absoluteArea(sheet, reference string) (CatalogueArea
 	if !ok {
 		return CatalogueArea{}, errors.New("引用的工作表不存在")
 	}
-	capability, ok := formats.Lookup(r.w.Format)
+	return AbsoluteSourceArea(r.w.Format, meta.Name, reference)
+}
+
+// AbsoluteSourceArea parses an absolute cell, row or column range within the
+// specified source format. The caller supplies the resolved sheet name.
+func AbsoluteSourceArea(format, sheet, reference string) (CatalogueArea, error) {
+	capability, ok := formats.Lookup(format)
 	if !ok || capability.MaxRows < 1 {
 		return CatalogueArea{}, errors.New("源格式没有可定位的单元格容量")
 	}
@@ -580,7 +595,7 @@ func (r *catalogueResolver) absoluteArea(sheet, reference string) (CatalogueArea
 		r1, r2 = 1, capability.MaxRows
 	}
 	if r1 < 1 || r2 < r1 || r2 > capability.MaxRows || c1 < 1 || c2 < c1 || c2 > capability.MaxColumns {
-		return CatalogueArea{}, fmt.Errorf("引用范围超出%s容量或方向无效", r.w.Format)
+		return CatalogueArea{}, fmt.Errorf("引用范围超出%s容量或方向无效", format)
 	}
-	return CatalogueArea{Sheet: meta.Name, Start: ColumnName(c1) + strconv.Itoa(r1), End: ColumnName(c2) + strconv.Itoa(r2), Row: r1, Col: c1, EndRow: r2, EndCol: c2}, nil
+	return CatalogueArea{Sheet: sheet, Start: ColumnName(c1) + strconv.Itoa(r1), End: ColumnName(c2) + strconv.Itoa(r2), Row: r1, Col: c1, EndRow: r2, EndCol: c2}, nil
 }

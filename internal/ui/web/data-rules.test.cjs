@@ -35,7 +35,7 @@ function harness(override){
     return {changed:true};
   };
   const context={window:{},document,Option,URLSearchParams,AbortController,setTimeout,clearTimeout,JSON,Number,Math,Object,Set};
-  vm.runInNewContext(read('analysis-jobs.js'),context);vm.runInNewContext(source,context);
+  vm.runInNewContext(read('cell-address.js'),context);vm.runInNewContext(read('analysis-jobs.js'),context);vm.runInNewContext(source,context);
   const rules=new context.window.ExcelLensDataRules({state,api,toast:(...args)=>toasts.push(args),supported:()=>state.supported!==false,limits:{pageRows:3},sleep:async()=>{},navigate:async(area,guard)=>{if(guard()){arrivals.push(area);return true;}return false;}});
   return {rules,state,nodes,calls,arrivals,html,toasts,summaries,document};
 }

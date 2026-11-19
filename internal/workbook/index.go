@@ -80,14 +80,14 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 				progress(0, cached.Size(), "正在更新有效内容边界索引")
 			}
 			linkStart := int64(-1)
-			layout := SourceLayout{DefaultRow: 20, DefaultCol: 64, digitWidth: w.normalDigitWidth(), catalogue: new(worksheetCatalogueSeed)}
+			layout := SourceLayout{DefaultRow: 20, DefaultCol: defaultColumnPixels(8, w.normalDigitWidth()), digitWidth: w.normalDigitWidth(), catalogue: new(worksheetCatalogueSeed)}
 			rows, anchors, dim, maxRow, maxCol, scanErr := scanWorksheetWithSharedHint(io.TeeReader(f, hash), cached.Size(), cancel, progress, w.Shared, &linkStart, &layout)
 			_ = f.Close()
 			if scanErr == nil && hash.Sum32() == entry.CRC32 {
 				idx := &SheetIndex{
 					SheetPath: meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 					Dimension: dim, MaxRow: maxRow, MaxCol: maxCol,
-					XMLSize: cached.Size(), Rows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
+					XMLSize: cached.Size(), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
 				}
 				if err := saveIndex(idx); err != nil {
 					return nil, err
@@ -134,7 +134,7 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 	// stream, keeping row offsets and ZIP CRC verification deterministic.
 	// Small sheets retain the lower-overhead synchronous path.
 	linkStart := int64(-1)
-	layout := SourceLayout{DefaultRow: 20, DefaultCol: 64, digitWidth: w.normalDigitWidth(), catalogue: new(worksheetCatalogueSeed)}
+	layout := SourceLayout{DefaultRow: 20, DefaultCol: defaultColumnPixels(8, w.normalDigitWidth()), digitWidth: w.normalDigitWidth(), catalogue: new(worksheetCatalogueSeed)}
 	rows, anchors, dimension, maxRow, maxCol, scanErr := scanAndSpoolWorksheetHint(rc, tmp, int64(entry.UncompressedSize64), cancel, progress, w.Shared, &linkStart, &layout)
 	if scanErr != nil {
 		_ = rc.Close()
@@ -164,7 +164,7 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 	idx := &SheetIndex{
 		SheetPath: meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 		Dimension: dimension, MaxRow: maxRow, MaxCol: maxCol,
-		XMLSize: st.Size(), Rows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
+		XMLSize: st.Size(), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
 	}
 	if err := saveIndex(idx); err != nil {
 		return nil, fmt.Errorf("保存行索引失败：%w", err)
@@ -438,7 +438,7 @@ func loadIndex(indexPath, xmlPath, sheetPath string) (*SheetIndex, error) {
 	if _, err := br.ReadByte(); err != io.EOF {
 		return nil, errors.New("本机行索引包含多余数据")
 	}
-	idx := &SheetIndex{SheetPath: sheetPath, XMLPath: xmlPath, IndexPath: indexPath, Dimension: dim, MaxRow: int(maxRow), MaxCol: int(maxCol), XMLSize: int64(xmlSize), Rows: rows, SharedAnchors: anchors, HyperlinkStart: hyperlinkStart}
+	idx := &SheetIndex{SheetPath: sheetPath, XMLPath: xmlPath, IndexPath: indexPath, Dimension: dim, MaxRow: int(maxRow), MaxCol: int(maxCol), XMLSize: int64(xmlSize), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: hyperlinkStart}
 	if count > residentRowOffsets {
 		idx.mappedRows, err = mapIndexRows(indexPath, indexRowsStart(dim), int(count))
 		if err != nil {

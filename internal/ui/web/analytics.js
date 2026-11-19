@@ -1207,8 +1207,7 @@
     if(!previous&&drafts.entries(book).some(entry=>entry.id===id))throw Error('此表还有未保存草稿，请先重试保存后再选择性粘贴');
     const selected=previous||(state.sheetCell?.id===id&&state.sheetCell.page===page?state.sheetCell:{row:data.offset,col:0});
     const row=selected.row,col=selected.col;
-    const letter=n=>{let text='';for(let value=n+1;value>0;value=Math.floor((value-1)/26))text=String.fromCharCode(65+(value-1)%26)+text;return text;};
-    return {id,book,pathBook,page,revision,row,col,columns:data.columns.length,label:`${data.name} · ${letter(col)}${row+1}`,
+    return {id,book,pathBook,page,revision,row,col,columns:data.columns.length,label:`${data.name} · ${window.ExcelLensAddress.columnName(col+1)}${row+1}`,
       current:()=>state.opened&&state.tab==='sheets'&&state.fingerprint===book&&state.book===pathBook&&state.loadedSheet===id&&state.sheetPage===page&&state.gridData?.id===id&&state.sheetRevisions.get(id)===revision};
   }
   async function refreshPasteTarget(previous){

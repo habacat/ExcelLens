@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const clip=window.ExcelLensClipboard;
-  const colName=column=>{let result='';for(let n=column;n>0;n=Math.floor((n-1)/26))result=String.fromCharCode(65+(n-1)%26)+result;return result;};
+  const colName = window.ExcelLensAddress.columnName;
   function cellsOf(row,start,end){
     const cells=new Map();
     for(const cell of row.cells||[]){if(!Number.isSafeInteger(cell.col)||cell.col<start||cell.col>end||cells.has(cell.col))throw Error('复制单元格坐标无效或重复');cells.set(cell.col,cell);}

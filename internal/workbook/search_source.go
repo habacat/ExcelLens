@@ -45,7 +45,11 @@ func (w *Workbook) SourceIndexStamp(ctx context.Context, meta SheetMeta, idx *Sh
 	if err != nil {
 		return "", err
 	}
-	encoded, err := json.Marshal([]any{1, w.Fingerprint, w.Format, meta.Name, meta.Path, w.Date1904, idx.RowCount(), idx.MaxRow, idx.MaxCol, idx.XMLSize, index, rows})
+	semantics := 1
+	if len(idx.SharedAnchors) > 0 {
+		semantics = 2 // Shared formula text now translates whole row/column references.
+	}
+	encoded, err := json.Marshal([]any{semantics, w.Fingerprint, w.Format, meta.Name, meta.Path, w.Date1904, idx.RowCount(), idx.MaxRow, idx.MaxCol, idx.XMLSize, index, rows})
 	if err != nil {
 		return "", err
 	}

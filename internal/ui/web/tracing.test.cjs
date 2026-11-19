@@ -55,7 +55,7 @@ test('a search completing after a partial-result jump does not replace or prolon
   assert.equal(h.trace.pulseUntil,deadline);assert.match(h.trace.pulseLabel,/源表!A1/);h.advance(1749);assert.equal(h.o.layer.hidden,false);h.advance(1);assert.equal(h.o.layer.hidden,true);
 });
 test('the application rejects delayed navigation after a sheet, workbook or trace intent changes',async()=>{
-  const source=read('app.js'),start=source.indexOf('  async function navigateToCell('),end=source.indexOf('  async function getCell(',start);
+  const source=read('app.js'),start=source.indexOf('  function beginGridNavigation('),end=source.indexOf('  async function getCell(',start);
   for(const change of ['guard','sheet','book']){
     let release,allowed=true,selected=0;const S={workbookKey:'old',sheet:'源表',sheetEpoch:1,selected:null,filtered:false,maxRow:100,maxCol:20,cellMap:new Map([['A1',{raw:'12'}]]),frozenCellMap:new Map()},grid={clientWidth:1000,clientHeight:600,scrollLeft:0,scrollTo(){},focus(){}};
     const ctx={S,Map,Math,ROW_HEAD:26,$:()=>grid,parseRef:()=>({ref:'A1',row:1,col:1}),activeMerge:()=>null,frozenPanes:{effective:()=>({rows:0,cols:0})},ensureExtent(){},rowTop:()=>0,colLeft:()=>0,rowHeight:()=>25,colWidth:()=>100,headerHeight:()=>27,getVirtualScrollTop:()=>0,scrollTopToPhysical:v=>v,sourceRowLimit:()=>50000000,updateCanvasSize(){},loadViewport:()=>new Promise(r=>release=r),selectCell:()=>selected++,recordVisit(){}};

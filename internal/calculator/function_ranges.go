@@ -85,6 +85,15 @@ func rangeShape(v FormulaValue) (int, int, error) {
 	}
 	return 0, 0, errors.New("#VALUE! 范围缺少行列信息")
 }
+
+// Address lookup only touches a single position or a bounded slice. The
+// logical width of a full-column table can exceed the materialization limit.
+func indexedShape(v FormulaValue) (int, int, error) {
+	if v.Kind == "range" && v.Range != nil && v.Range.Slice != nil {
+		return v.Range.Rows, v.Range.Cols, nil
+	}
+	return rangeShape(v)
+}
 func visitSparse(e *formulaEval, v FormulaValue, fn func(int, FormulaValue) error) error {
 	if err := e.ctx.Err(); err != nil {
 		return err
@@ -126,7 +135,7 @@ func visitSparse(e *formulaEval, v FormulaValue, fn func(int, FormulaValue) erro
 	return errors.New("#VALUE! 范围不支持逐格读取")
 }
 func valueAt(e *formulaEval, v FormulaValue, index int) (FormulaValue, error) {
-	rows, cols, err := rangeShape(v)
+	rows, cols, err := indexedShape(v)
 	if err != nil {
 		return FormulaValue{}, err
 	}
@@ -240,6 +249,13 @@ func numberResult(n *big.Rat) (FormulaValue, error) {
 }
 func integerResult(n int64) (FormulaValue, error) { return NumberValue(big.NewRat(n, 1)), nil }
 func subsetRange(e *formulaEval, v FormulaValue, row, col, rows, cols int) (FormulaValue, error) {
+	if v.Kind == "range" && v.Range.Slice != nil {
+		if row < 0 || col < 0 || rows < 1 || cols < 1 || row+rows > v.Range.Rows || col+cols > v.Range.Cols {
+			return FormulaValue{}, errors.New("#REF! 子范围越界")
+		}
+		sub := v.Range.Slice(row, col, rows, cols)
+		return FormulaValue{Kind: "range", Range: &sub}, nil
+	}
 	nr, nc, err := rangeShape(v)
 	if err != nil {
 		return FormulaValue{}, err

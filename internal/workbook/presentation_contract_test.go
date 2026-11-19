@@ -89,7 +89,7 @@ func TestCrossFormatPresentationContract(t *testing.T) {
 				t.Fatal("search changed source coordinates", matches, truncated, err)
 			}
 			filtered, err := wb.FilterSheetWithOptions(idx, []FilterRule{{Column: 1, Operator: "contains", Value: "000000123456789"}}, FilterOptions{HeaderRow: 1}, nil, nil)
-			if err != nil || len(filtered) != 2 || idx.Rows[filtered[1]].Number != 2 {
+			if err != nil || len(filtered) != 2 || idx.ResidentRows[filtered[1]].Number != 2 {
 				t.Fatal("filter changed source coordinates", filtered, err)
 			}
 			reopened, err := OpenWorkbook(path)

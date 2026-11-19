@@ -125,7 +125,7 @@ func (w *Workbook) ReadCatalogue(ctx context.Context) (Catalogue, error) {
 					item.Reason = "表对象定义未完整读取：" + err.Error()
 					b.notice("部分表对象定义未完整读取")
 				} else {
-					item, err = catalogueTableXML(data, meta.Name, target, rel.ID)
+					item, err = ParseTableDefinition(data, meta.Name, target, rel.ID)
 					if err != nil {
 						item.Status, item.Reason = "invalid", "表对象定义无效："+err.Error()
 						b.notice("部分表对象定义无效")

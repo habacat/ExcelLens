@@ -91,8 +91,8 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 409, "分析来源已切换，请重新打开数据洞察")
 		return
 	}
-	a.cacheMu.RLock()
-	defer a.cacheMu.RUnlock()
+	releaseCapture := a.lockCacheRead()
+	defer releaseCapture()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
 		writeError(w, 404, "找不到工作表")
@@ -154,12 +154,12 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		return wb.CheckSourceUnchanged()
 	}
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-r.Context().Done():
+	releaseCapture()
+	releaseQuery, err := a.lockQueryRead(r.Context())
+	if err != nil {
 		return
 	}
+	defer releaseQuery()
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
 			writeError(w, 409, err.Error())

@@ -152,9 +152,9 @@ func TestRecordNavigationSharesHiddenSortedAndFrozenViewWithoutChangingMatches(t
 }
 
 func TestRecordNeighborsMatchesIndependentOrderAndHugeSparseDomain(t *testing.T) {
-	idx := &workbook.SheetIndex{MaxRow: 100, Rows: make([]workbook.RowOffset, 100)}
-	for i := range idx.Rows {
-		idx.Rows[i].Number = i + 1
+	idx := &workbook.SheetIndex{MaxRow: 100, ResidentRows: make([]workbook.RowOffset, 100)}
+	for i := range idx.ResidentRows {
+		idx.ResidentRows[i].Number = i + 1
 	}
 	rng := rand.New(rand.NewSource(20261116))
 	for sample := 0; sample < 120; sample++ {
@@ -188,7 +188,7 @@ func TestRecordNeighborsMatchesIndependentOrderAndHugeSparseDomain(t *testing.T)
 			}
 		}
 	}
-	sparse := &workbook.SheetIndex{MaxRow: formats.ExternalRows, Rows: []workbook.RowOffset{{Number: 1}, {Number: formats.ExternalRows}}}
+	sparse := &workbook.SheetIndex{MaxRow: formats.ExternalRows, ResidentRows: []workbook.RowOffset{{Number: 1}, {Number: formats.ExternalRows}}}
 	v, err := newSelectionRowView(sparse, nil, 0)
 	if err != nil {
 		t.Fatal(err)

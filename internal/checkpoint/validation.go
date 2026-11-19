@@ -114,7 +114,7 @@ func compactJSON(data []byte, limit int) (json.RawMessage, error) {
 }
 
 func prepareDefinition(def Definition) (Definition, string, error) {
-	if def.Kind != "query" && def.Kind != "export" || !validName(def.Driver) || def.Semantics == 0 || !utf8.ValidString(def.Title) || utf8.RuneCountInString(def.Title) > formats.CheckpointTitleRunes || len(def.Sources) < 1 || len(def.Sources) > formats.CheckpointSources {
+	if def.Kind != "query" && def.Kind != "export" && def.Kind != "edit" || !validName(def.Driver) || def.Semantics == 0 || !utf8.ValidString(def.Title) || utf8.RuneCountInString(def.Title) > formats.CheckpointTitleRunes || len(def.Sources) < 1 || len(def.Sources) > formats.CheckpointSources {
 		return Definition{}, "", ErrBinding
 	}
 	if !utf8.ValidString(def.FileName) || len(def.FileName) > formats.CheckpointFileNameBytes || strings.ContainsRune(def.FileName, '\x00') {

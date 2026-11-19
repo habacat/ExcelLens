@@ -20,6 +20,7 @@ func readOOXMLSourceLayoutContext(ctx context.Context, idx *SheetIndex, digits .
 	layout := SourceLayout{DefaultRow: 20, DefaultCol: 64}
 	if len(digits) > 0 {
 		layout.digitWidth = digits[0]
+		layout.DefaultCol = defaultColumnPixels(8, digits[0])
 	}
 	f, err := os.Open(idx.XMLPath)
 	if err != nil {

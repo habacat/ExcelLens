@@ -69,23 +69,31 @@ func reference(s string) (formulaReference, bool) {
 			i = j + 1
 		}
 	}
+	if r.sheet != "" && strings.HasPrefix(s[i:], "#REF!") {
+		r.start, r.length = "#REF!", i+len("#REF!")
+		return r, true
+	}
 	address, n := cellAddress(s[i:])
 	if n == 0 {
 		start := i
-		letters := i < len(s) && (letter(s[i]) || s[i] == '$')
-		for i < len(s) && (s[i] == '$' || letters && letter(s[i]) || !letters && digit(s[i])) {
-			i++
+		axis := i
+		if axis < len(s) && s[axis] == '$' {
+			axis++
 		}
-		if i == start || i >= len(s) || s[i] != ':' {
+		letters := axis < len(s) && letter(s[axis])
+		i = axisEnd(s, axis, letters)
+		if i == axis || i >= len(s) || s[i] != ':' {
 			return r, false
 		}
 		r.start = strings.ToUpper(strings.ReplaceAll(s[start:i], "$", ""))
 		i++
 		start = i
-		for i < len(s) && (s[i] == '$' || letters && letter(s[i]) || !letters && digit(s[i])) {
+		if i < len(s) && s[i] == '$' {
 			i++
 		}
-		if i == start {
+		axis = i
+		i = axisEnd(s, axis, letters)
+		if i == axis {
 			return r, false
 		}
 		r.end = strings.ToUpper(strings.ReplaceAll(s[start:i], "$", ""))
@@ -117,4 +125,21 @@ func reference(s string) (formulaReference, bool) {
 		return r, false
 	}
 	return r, true
+}
+
+// DeletedReference identifies the complete error operand Excel stores in a
+// defined name after the last referenced row or column has been deleted.
+func DeletedReference(raw string, hasSheet func(string) bool) bool {
+	if raw == "#REF!" {
+		return true
+	}
+	ref, ok := reference(raw)
+	return ok && ref.start == "#REF!" && ref.length == len(raw) && hasSheet(ref.sheet)
+}
+
+func axisEnd(s string, i int, letters bool) int {
+	for i < len(s) && (letters && letter(s[i]) || !letters && digit(s[i])) {
+		i++
+	}
+	return i
 }

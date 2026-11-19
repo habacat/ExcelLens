@@ -1,0 +1,160 @@
+.edit-copy-dialog {
+  width: min(608px, calc(100vw - 20px));
+  max-height: calc(100dvh - 20px);
+  color: var(--reading-ink, #263849);
+  background: var(--reading-surface, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+body.editing-copy .appbar > .brand-area { flex: 0 1 auto; min-width: 0; max-width: 36%; }
+body.editing-copy .app-actions { display: none; }
+.edit-grid-bar {
+  display: flex; flex: 1; min-width: 0; align-items: center; flex-wrap: wrap; gap: 4px 12px;
+}
+.edit-grid-state {
+  flex: 1 1 11em; min-width: 0; display: flex; align-items: baseline; gap: 8px;
+  padding-inline-start: 13px; border-inline-start: 1px solid var(--line);
+  font-size: var(--toolbar-font-size); line-height: 1.5;
+}
+.edit-grid-state > span { font-weight: 600; color: var(--reading-ink, #344d64); white-space: nowrap; }
+.edit-grid-state output { min-width: 0; color: var(--reading-muted, #5b6b7a); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.edit-grid-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--toolbar-gap); }
+.edit-grid-actions .tool-button { flex: none; white-space: nowrap; text-decoration: none; }
+.edit-grid-state .is-error, .edit-copy-status .is-error { color: #a33f33; }
+:root[data-reading-tone="dark"] :is(.edit-grid-state,.edit-copy-status) .is-error { color: #ffb5a7; }
+body.editing-copy .formula-toolbar > :not(.edit-toolbar-control),
+body.editing-copy :is(#quickStats,#selectionStatus,.auto-filter-button,#cellTooltip) { display: none !important; }
+textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
+.formula-expanded textarea.formula-input { field-sizing: content; }
+#editGridInput {
+  position: absolute; z-index: 22; box-sizing: border-box; resize: none; margin: 0;
+  color: var(--reading-ink, #263849); background: var(--reading-paper, #fff);
+  border: 2px solid var(--reading-accent, #2e75b7); border-radius: 0; padding: 0 3px;
+  overflow: auto; outline: none; line-height: 1.25; white-space: pre-wrap;
+}
+#editGridInput:not(.writing) { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+body.editing-copy .edit-copy-coordinate, body.editing-copy #editCopyCellPanel > .edit-copy-cell-head,
+body.editing-copy #editCopyValue, body.editing-copy #editCopyTextHint, body.editing-copy .edit-copy-commit { display: none; }
+@media (max-width: 800px) {
+  body.editing-copy .appbar { flex-wrap: wrap; gap: 4px; }
+  body.editing-copy .appbar > .brand-area, .edit-grid-bar { flex-basis: 100%; max-width: 100%; }
+  .edit-grid-state { padding-inline-start: 0; border: 0; }
+}
+.edit-copy-dialog[open] { display: flex; flex-direction: column; }
+.edit-copy-dialog {
+  --edit-line: var(--reading-line, #d8e1e8);
+  --edit-muted: var(--reading-muted, #566877);
+  --edit-accent: var(--reading-accent, var(--blue));
+}
+.edit-copy-heading { display: grid; min-width: 0; gap: 3px; }
+#editCopyName { color: var(--edit-muted); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.edit-copy-dialog [hidden] { display: none !important; }
+.edit-copy-scroll { min-height: 0; overflow: auto; container: edit-panel / inline-size; padding: 0 var(--dialog-pad) 16px; }
+.edit-copy-line { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.edit-copy-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding-block: 10px 6px; }
+.edit-copy-list strong { overflow-wrap: anywhere; }
+.edit-copy-muted, .edit-copy-list small { color: var(--edit-muted); }
+.edit-copy-dialog .edit-copy-quiet.mini-button { padding-inline: 8px; color: var(--edit-muted); background: transparent; border-color: transparent; }
+.edit-copy-dialog .edit-copy-quiet:enabled:hover { color: var(--edit-accent); background: var(--reading-active, #eaf1f7); }
+#editCopyListView { padding-top: 14px; }
+.edit-copy-coordinate { margin-bottom: 9px; }
+.edit-copy-coordinate #editCopySheet { max-width: min(45vw, 220px); }
+.edit-copy-coordinate input, .edit-copy-ref, #editCopyFillEnd { width: 8.5ch; font-family: Consolas, monospace; }
+.edit-copy-dialog :is(input:not([type="checkbox"]), select, textarea) {
+  box-sizing: border-box;
+  min-height: var(--dialog-control-height);
+  padding: 4px 8px;
+  font-size: var(--dialog-control-size);
+  color: inherit;
+  background: var(--reading-inset, #f8fafb);
+  border: 1px solid var(--reading-line, #ccd6df);
+  border-radius: var(--dialog-control-radius);
+}
+.edit-copy-dialog :is(select, input:not([type="checkbox"])) { height: var(--dialog-control-height); max-width: 100%; }
+.edit-copy-dialog textarea { display: block; margin-top: 5px; width: 100%; resize: vertical; font: 13px/1.5 Consolas, "Microsoft YaHei UI", monospace; }
+.edit-copy-cell-head output { margin-left: auto; color: var(--reading-muted, #566877); }
+.edit-copy-muted { margin: 5px 0; }
+.edit-copy-dialog details { margin-top: 8px; }
+.edit-copy-dialog summary { cursor: pointer; }
+.edit-copy-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 110px; overflow: auto; }
+.edit-copy-commit { justify-content: flex-end; margin: 7px 0; }
+.edit-copy-navigation { border-bottom: 1px solid var(--edit-line); }
+.edit-copy-tabs { display: flex; flex-wrap: wrap; gap: 2px; }
+.edit-copy-tabs button {
+  appearance: none; min-height: 38px; padding: 0 12px; border: none; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--edit-muted); font: inherit; cursor: pointer;
+}
+.edit-copy-tabs button[aria-selected="true"] { color: var(--edit-accent); border-bottom-color: currentColor; font-weight: 650; }
+.edit-copy-tabs button:enabled:hover { background: var(--reading-inset, #f3f6f8); }
+.edit-copy-tool-select { display: none; }
+.edit-copy-origin { min-width: 0; max-width: 100%; display: inline-flex; align-items: baseline; gap: 7px; color: var(--reading-ink, #334b61); font-weight: 600; }
+.edit-copy-origin span { overflow-wrap: anywhere; }
+.edit-copy-origin b { padding-inline-start: 7px; border-inline-start: 1px solid var(--edit-line); color: var(--edit-muted); font: 500 13px/1.2 Consolas, monospace; }
+.edit-copy-pane { display: grid; gap: 14px; padding-block: 16px 2px; }
+.edit-copy-pane > button { justify-self: start; }
+.edit-copy-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; }
+.edit-copy-field { min-width: 0; display: grid; gap: 5px; color: var(--edit-muted); font-size: 12px; }
+.edit-copy-field:has(> :is(input,textarea)[hidden]) { display: none; }
+.edit-copy-field :is(input,textarea,select) { color: var(--reading-ink, #263849); margin: 0; }
+.edit-copy-check { display: inline-flex; align-items: center; gap: 6px; min-height: var(--dialog-control-height); white-space: nowrap; }
+.edit-copy-check input { margin: 0; accent-color: var(--edit-accent); }
+.edit-copy-pane .edit-copy-ref, #editCopyFillEnd { width: 13ch; }
+@container edit-panel (max-width: 425px) {
+  .edit-copy-tabs { display: none; }
+  .edit-copy-tool-select { display: flex; align-items: center; gap: 12px; padding-block: 6px 12px; color: var(--edit-muted); }
+  .edit-copy-tool-select select { flex: 1; min-width: 0; }
+}
+#editCopyBatchSummary { min-width: 0; overflow-wrap: anywhere; }
+.edit-copy-rule-pick, .edit-copy-preview { margin-top: 8px; }
+.edit-copy-rule-pick select { max-width: 55%; }
+#editCopyRuleNumeric input, #editCopyFillStep { width: min(16ch, 100%); }
+#editCopyRuleReference { width: min(24ch, 100%); font-family: Consolas, monospace; }
+.edit-copy-results > :not([hidden]):not(:empty) { margin-top: 12px; }
+.edit-copy-dialog:has(#editCopyWork[hidden]) :is(#editCopySave,#editCopyRevision,#editCopyName,.edit-copy-history) { display: none; }
+.edit-copy-dialog:has(#editCopyWork[hidden]) .edit-copy-status:has(p:empty):has(#editCopyCancel[hidden]) { display: none; }
+.edit-copy-list { display: grid; gap: 5px; }
+.edit-copy-item { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 7px 0; border-bottom: 1px solid var(--reading-line, #dfe5ea); }
+.edit-copy-item > div { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; }
+.edit-copy-item a { text-decoration: none; }
+.edit-copy-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; flex: none; padding: 10px var(--dialog-pad); border-top: 1px solid var(--edit-line); background: var(--reading-inset, #f7f9fb); }
+.edit-copy-feedback { flex: 1 1 8em; min-width: 0; font-variant-numeric: tabular-nums; color: var(--edit-muted); }
+.edit-copy-feedback output { font-size: 12px; }
+.edit-copy-feedback p { margin: 0; max-height: 5em; overflow: auto; overflow-wrap: anywhere; }
+.edit-copy-feedback:has(p:not(:empty)) output { display: none; }
+.edit-copy-history { display: flex; gap: 2px; }
+.edit-copy-status #editCopySave { margin-inline-start: auto; }
+.edit-copy-dialog :focus-visible { outline: 2px solid var(--reading-accent, #365f7d); outline-offset: 2px; }
+@media (max-width: 480px) {
+  .edit-copy-cell-head output { width: 100%; margin-left: 0; }
+  .edit-copy-feedback { flex-basis: 100%; }
+}
+
+#editCopyStructure .edit-copy-field input[type="number"] { width: 12ch; }
+
+.edit-copy-fields select { max-width: 100%; }
+.edit-pivot-layout { min-width:0; margin:0; padding:0; border:0; display:grid; gap:14px; }
+.edit-copy-dialog:has(#editCopyWork[hidden]) #editCopyPivotApply { display:none; }
+.edit-pivot-axes { display:grid; gap:10px; }
+.edit-pivot-axis { display:grid; grid-template-columns:5em minmax(0,1fr); align-items:start; gap:8px; }
+.edit-pivot-heading { padding-top:7px; color:var(--edit-muted); font-size:12px; }
+.edit-pivot-fields,.edit-pivot-field { min-width:0; display:grid; gap:5px; }
+.edit-pivot-field { grid-template-columns:minmax(0,1fr) auto; }
+.edit-pivot-field select,.edit-pivot-add { min-width:0; width:100%; }
+.edit-pivot-add { color:var(--edit-muted); }
+.edit-pivot-order { display:flex; align-items:center; gap:2px; }
+.edit-pivot-action { width:28px; height:32px; display:grid; place-items:center; padding:0; background:transparent; border:0; border-radius:4px; font:inherit; color:var(--edit-muted); cursor:pointer; }
+.edit-pivot-action:enabled:hover { color:var(--edit-accent); background:var(--reading-inset,#f0f4f8); }
+.edit-pivot-action:disabled { opacity:.35; cursor:default; }
+.edit-pivot-action svg { width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round; }
+.edit-pivot-field .edit-pivot-filter { grid-column:1/-1; min-width:0; margin:0; }
+.edit-pivot-filter summary { color:var(--edit-accent); padding:3px 0; }
+.edit-pivot-options { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; padding-block:6px; }
+.edit-pivot-options input[type="search"] { min-width:0;width:100%; }
+.edit-pivot-items,.edit-pivot-options output { grid-column:1/-1; }
+.edit-pivot-items { max-height:10em; overflow:auto; }
+.edit-pivot-items label { display:flex; align-items:center; gap:6px; min-height:26px; overflow-wrap:anywhere; }
+.edit-pivot-options output:empty { display:none; }
+.edit-pivot-options > button { justify-self:start; }
+@container edit-panel (max-width:425px) { .edit-pivot-axis { grid-template-columns:minmax(0,1fr); gap:4px; } .edit-pivot-heading { padding:0; } }

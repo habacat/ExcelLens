@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-const context={window:{}};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'printing-model.js'),'utf8'),context);const m=context.window.ExcelLensPrintingModel;
+const context={window:{}};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'cell-address.js'),'utf8'),context);vm.runInNewContext(fs.readFileSync(path.join(__dirname,'printing-model.js'),'utf8'),context);const m=context.window.ExcelLensPrintingModel;
 const limits={pages:20,rows:100,columns:20,cells:500,areas:4,parts:50,bytes:65536,requestBytes:8192,notices:32,domPixels:8000000,unitsPerPoint:1000000000,firstPageMin:-32768,firstPageMax:4294967295};
 const source={maxRows:65536,maxColumns:256},binding={workbookKey:'content',book:'path-one',sheet:'明细'},id='print-job';
 const plain=x=>JSON.parse(JSON.stringify(x)),input=()=>({defaults:true,paper:'source',width:'210',height:'297',orientation:'',scaleMode:'source',percent:'100',fitWidth:'1',fitHeight:'0',area:'',repeatRows:'',repeatColumns:'',marginMode:'source',left:'20',right:'20',top:'20',bottom:'20',header:'8',footer:'8',pageOrder:'',firstPage:'',rowHeight:'',columnWidth:''});

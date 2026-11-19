@@ -19,6 +19,7 @@
 	  selectionQuick: config.selectionQuick,
 	  chartExport: config.chartExport,
 	  transpose: config.transpose,
+	  editing: config.editing,
 	  relationExports: config.relationExports,
 	  catalogue: config.catalogue,
 	  dataRules: config.dataRules,

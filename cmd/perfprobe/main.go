@@ -144,12 +144,13 @@ func main() {
 	}
 
 	if *search {
-		piece := workbook.SheetIndex{SheetPath: idx.SheetPath, XMLPath: idx.XMLPath, IndexPath: idx.IndexPath, Dimension: idx.Dimension, MaxRow: idx.MaxRow, MaxCol: idx.MaxCol, XMLSize: idx.XMLSize, Rows: idx.Rows, SharedAnchors: idx.SharedAnchors, HyperlinkStart: idx.HyperlinkStart}
-		if idx.RowCount() > 4000 {
-			piece.Rows = make([]workbook.RowOffset, 4000)
-			for i := range piece.Rows {
-				piece.Rows[i] = idx.RowAt(i)
-			}
+		piece := workbook.SheetIndex{SourceFormat: idx.SourceFormat, SheetPath: idx.SheetPath,
+			XMLPath: idx.XMLPath, IndexPath: idx.IndexPath, Dimension: idx.Dimension,
+			MaxRow: idx.MaxRow, MaxCol: idx.MaxCol, XMLSize: idx.XMLSize,
+			SharedAnchors: idx.SharedAnchors, HyperlinkStart: idx.HyperlinkStart,
+			ResidentRows: make([]workbook.RowOffset, min(idx.RowCount(), 4000))}
+		for i := range piece.ResidentRows {
+			piece.ResidentRows[i] = idx.RowAt(i)
 		}
 		start = time.Now()
 		r, _, err := wb.SearchSheet(&piece, meta.Name, "__bench__never__matches__", "value", 20, nil, nil)

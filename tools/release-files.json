@@ -67,5 +67,8 @@
   "docs/user/transpose.md",
   "docs/user/comparison-snapshots.md",
   "docs/user/functions.md",
+  "docs/user/editing.md",
+  "docs/development/xlsx-grid-editing.md",
+  "validation/1.9.0/engineering.json",
   "docs/releases/{version}.md"
 ]

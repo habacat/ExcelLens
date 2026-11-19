@@ -1,6 +1,6 @@
 # 维护与验证
 
-开发环境：`go.mod` 指定的 Go 工具链、Node.js 22+、Git。Node 只用于开发检查；Windows 发布另需 UPX。源文件及用户工作区不属于项目整理或发布清理范围。
+开发环境使用 `go.mod` 指定的 Go 工具链、Node.js 22+ 和 Git。CI 使用 Node.js 26 LTS 验证前端。Windows 发布另需 UPX。
 
 ## 持续改进接续
 
@@ -15,7 +15,7 @@
 ```powershell
 go run ./tools/project fmt
 go run ./tools/project check
-go run ./tools/project check -report validation/1.8.19/check.json
+go run ./tools/project check -report validation/1.8.3/check.json
 ```
 
 `check` 依次校验工具链与版本、Go 格式、包依赖边界、文档链接、发布清单、离线 vendor 依赖、完整 Go 测试、`go vet`、JavaScript 语法与自动回归、生成的函数目录。失败返回非零退出码，发布构建复用同一入口。它不会访问网络、更新依赖或改写代码。
@@ -48,5 +48,17 @@ Windows竞态检查出现初始化分配失败、错误87，或需要指定MinGW
 2. 执行 `build.ps1` 或 `upgrade-build.ps1`。构建脚本从唯一版本源、`go.mod` 和发布清单读取配置；先通过全部检查，再构建、检查 PE、UPX 压缩与校验、逐文件核对 ZIP。
 3. 候选核验使用 `build.ps1 -StageOnly`：执行相同完整检查、PE/UPX和ZIP核验后，将完整包保留在 `artifacts/<版本>-verified-*`，不替换 `release/`。普通构建全部成功后才原子替换 `release/`；正在运行旧版时同样保留完整已验证包和收据，不强制终止用户进程，用户退出托盘后再运行发布步骤。
 4. 不自动提交、推送或公开发布。源码交付需与指定 Git 提交一致；工作树未提交时不能宣称源码包等于 HEAD。
+
+本地交付源码时，先为发行提交建标签，再从标签生成归档。以下命令从唯一版本源取当前版本，独立核对两个包。源码包内的每个文件都要匹配发行标签的 Git 对象，之后的收据提交可以继续追加到分支。
+
+```powershell
+$releaseVersion = [regex]::Match((Get-Content -Raw internal/buildinfo/version.go), 'const Version = "([0-9.]+)"').Groups[1].Value
+$releaseTag = "v$releaseVersion"
+git archive --format=zip -9 -o "release/ExcelLens_${releaseVersion}_Source_Full.zip" $releaseTag
+python tools/qa/verify_release.py $releaseVersion
+python tools/qa/verify_release.py $releaseVersion --source --ref $releaseTag
+```
+
+同一份 Windows 和源码包用于本地及 GitHub 交付时，可在公开源码工作树运行 `build.ps1 -DeliveryRoot <本地同版本项目目录>`。完整检查通过后，脚本将该工作树的 Windows 包交付到目标目录的 `release/`。建立版本标签后，运行 `python tools/qa/verify_release.py <版本> --finalize --ref <标签> --dir <发行目录>`。它会核对包内资源、从标签生成源码 ZIP，并为两个 ZIP 写出 SHA-256 清单。
 
 用户指南、当前变更及验证分开放置；完整目录说明见 [文档索引](docs/README.md)。

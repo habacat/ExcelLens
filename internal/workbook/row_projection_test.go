@@ -20,7 +20,7 @@ func projectionFixture(t *testing.T, n int) (*SheetIndex, *AxisVisibility, []int
 	var states []SourceAxisRange
 	for i := 0; i < n; i++ {
 		number := i*3 + 1
-		idx.Rows = append(idx.Rows, RowOffset{Number: number})
+		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: number})
 		if i%4 == 1 {
 			states = append(states, SourceAxisRange{Min: number, Max: number, HiddenSet: true, Hidden: true})
 		}
@@ -169,7 +169,7 @@ func TestRowProjectionIdentityEmptyAndActiveCancellationDoNotLeakFiles(t *testin
 		}
 	}
 	wrong := *idx
-	wrong.Rows = wrong.Rows[:len(wrong.Rows)-1]
+	wrong.ResidentRows = wrong.ResidentRows[:len(wrong.ResidentRows)-1]
 	if _, err := NewRowProjection(context.Background(), t.TempDir(), &wrong, base, visibility, 0, nil); err == nil {
 		t.Fatal("different source index accepted")
 	}

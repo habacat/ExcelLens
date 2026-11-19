@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const copy=value=>JSON.parse(JSON.stringify(value));
-  const label=column=>{let out='';while(column>0){column--;out=String.fromCharCode(65+column%26)+out;column=Math.floor(column/26);}return out;};
+  const label = window.ExcelLensAddress.columnName;
   function suggest(expected,actual){
     const matches=new Map();for(const field of actual){const hash=field.headerHash;if(!hash)continue;matches.set(hash,matches.has(hash)?null:field);}
     return expected.map(field=>{

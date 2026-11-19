@@ -8,8 +8,7 @@
     if(typeof value!=='string'||! /^(?:0|-?[1-9]\d*)$/.test(value)||value.length>20)fail();
     const n=BigInt(value);if(n>max64||n< -max64||!negative&&n<0n)fail();return n;
   }
-  function columnName(n){let out='';for(;n>0;n=Math.floor((n-1)/26))out=String.fromCharCode(65+(n-1)%26)+out;return out;}
-  function columnNumber(text){let n=0;for(const ch of text.toUpperCase())n=n*26+ch.charCodeAt(0)-64;return n;}
+  const {columnName, columnNumber} = window.ExcelLensAddress;
   function ref(text,source){
     const match=/^\$?([A-Za-z]+)\$?([1-9]\d*)$/.exec(text.trim());
     if(!match)throw Error('区域地址无效：'+text);

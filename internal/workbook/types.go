@@ -93,15 +93,17 @@ type StyleInfo struct {
 }
 
 type SheetIndex struct {
-	SourceFormat   string // supplied by its owning adapter, not encoded in the index
-	SheetPath      string
-	XMLPath        string
-	IndexPath      string
-	Dimension      string
-	MaxRow         int
-	MaxCol         int
-	XMLSize        int64
-	Rows           []RowOffset
+	SourceFormat string // supplied by its owning adapter, not encoded in the index
+	SheetPath    string
+	XMLPath      string
+	IndexPath    string
+	Dimension    string
+	MaxRow       int
+	MaxCol       int
+	XMLSize      int64
+	// ResidentRows is the backing storage for small indexes. Readers must use
+	// RowCount, RowAt or RowOffsets so mapped and resident sources behave alike.
+	ResidentRows   []RowOffset
 	mappedRows     *mappedRowIndex // large immutable indexes stay on disk
 	rowSpool       *os.File        // unpublished external-index build only
 	spooledRows    int

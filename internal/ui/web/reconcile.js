@@ -12,7 +12,7 @@
   function resolveColumn(raw,fields){
     raw=String(raw).trim();let column=0;
     if(/^\d+$/.test(raw))column=Number(raw);
-    else if(/^[A-Za-z]{1,5}$/.test(raw)){for(const c of raw.toUpperCase())column=column*26+c.charCodeAt(0)-64;}
+    else if(/^[A-Za-z]{1,5}$/.test(raw)){column=window.ExcelLensAddress.columnNumber(raw);}
     const exists=fields.some(field=>field.column===column);
     const named=fields.filter(field=>field.headerLoaded&&!field.truncated&&(field.rawName===raw||field.name===raw));
     if(exists&&named.some(field=>field.column!==column)&&!/^\d+$/.test(raw))throw Error('字段名与列标识有歧义，请输入列序号');

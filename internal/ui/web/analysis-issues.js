@@ -2,7 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id);
   const kinds={conversion:'转换失败',number:'未计入数值聚合',missing_cache:'公式缺缓存'};
-  const colName=index=>{let text='';while(index>0){index--;text=String.fromCharCode(65+index%26)+text;index=Math.floor(index/26);}return text;};
+  const colName = window.ExcelLensAddress.columnName;
   class Issues {
     constructor({api,identity,toast,navigate,askName,onMaterialized,startExport}){
       Object.assign(this,{api,identity,toast,navigate,askName,onMaterialized,startExport});this.snapshot=null;this.dialog=$('analysisIssuesDialog');this.busy=false;

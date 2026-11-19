@@ -116,14 +116,11 @@ func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 	}
 	// Queue before acquiring the cache lock; cancellation while waiting needs
 	// no source IO or source-sized allocation.
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-r.Context().Done():
+	release, err := a.lockQueryRead(r.Context())
+	if err != nil {
 		return
 	}
-	a.cacheMu.RLock()
-	defer a.cacheMu.RUnlock()
+	defer release()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
 		writeError(w, 404, "快速分析工作表不存在")

@@ -33,17 +33,23 @@ func registerDateFunctions(add functionRegistrar) {
 	add("NETWORKDAYS.INTL,WORKDAY.INTL", "起始日期, 结束日期或天数, [周末], [节假日]", 2, 4, dateFunction)
 }
 func (e *formulaEval) dateSerial(t time.Time) *big.Rat {
+	return big.NewRat(ExcelDateSerial(t, e.date1904), 1)
+}
+
+// ExcelDateSerial maps a calendar date to an Excel day in the workbook's
+// compatibility date system. Serial 60 in the 1900 system has no time.Time.
+func ExcelDateSerial(t time.Time, date1904 bool) int64 {
 	y, m, d := t.Date()
 	t = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	base := time.Date(1899, 12, 31, 0, 0, 0, 0, time.UTC)
-	if e.date1904 {
+	if date1904 {
 		base = time.Date(1904, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 	days := (t.Unix() - base.Unix()) / 86400
-	if !e.date1904 && !t.Before(time.Date(1900, 3, 1, 0, 0, 0, 0, time.UTC)) {
+	if !date1904 && !t.Before(time.Date(1900, 3, 1, 0, 0, 0, 0, time.UTC)) {
 		days++
 	}
-	return big.NewRat(days, 1)
+	return days
 }
 func (e *formulaEval) serialTime(v FormulaValue) (time.Time, int64, error) {
 	if v.Kind == "text" {

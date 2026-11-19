@@ -19,6 +19,18 @@ func sourceColumnPixels(characters float64, digits ...float64) float64 {
 	return math.Floor(characters*digit + 5)
 }
 
+// Excel rounds an implicit width from the Normal font up to a whole
+// eight-pixel boundary. An explicit col width already includes its margin.
+func defaultColumnPixels(base, digit float64) float64 {
+	if base <= 0 || base > 255 {
+		base = 8
+	}
+	if digit <= 0 {
+		digit = 7
+	}
+	return 8 * math.Ceil((base*digit+5)/8)
+}
+
 func storedColumnPixels(width, digit float64) float64 {
 	if !(width > 0 && width <= 255) {
 		return 0
@@ -46,6 +58,9 @@ func (s *SourceLayout) captureXML(tag, name []byte, row int) {
 	case "sheetFormatPr":
 		if v := number("defaultRowHeight") * 4 / 3; validSourceSize(v) {
 			s.DefaultRow = v
+		}
+		if xmlAttribute(tag, "defaultColWidth") == nil {
+			s.DefaultCol = defaultColumnPixels(number("baseColWidth"), s.digitWidth)
 		}
 		if v := sourceColumnPixels(number("defaultColWidth"), s.digitWidth); validSourceSize(v) {
 			s.DefaultCol = v

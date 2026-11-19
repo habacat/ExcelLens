@@ -84,8 +84,8 @@ func TestSelectionStatsFilteredUsesVisualOrder(t *testing.T) {
 	wb := a.currentWorkbook()
 	meta, _ := wb.FindSheet("First")
 	idx := wb.GetCachedIndex(meta.Path)
-	if len(idx.Rows) != 4 {
-		t.Fatalf("rows=%d", len(idx.Rows))
+	if len(idx.ResidentRows) != 4 {
+		t.Fatalf("rows=%d", len(idx.ResidentRows))
 	}
 	a.mu.Lock()
 	a.filterResults["sorted"] = &FilterResult{ID: "sorted", Sheet: "First", SheetPath: meta.Path, Sorted: true, Rows: rowOrderFixture(t, idx.RowCount(), 2, 0)}

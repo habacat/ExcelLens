@@ -311,7 +311,7 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 		SourceFormat: w.Format,
 		SheetPath:    meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
-		XMLSize: writer.count, Rows: writer.offsets.rows, HyperlinkStart: -1,
+		XMLSize: writer.count, ResidentRows: writer.offsets.rows, HyperlinkStart: -1,
 		rowSpool: writer.offsets.file, spooledRows: writer.offsets.count,
 		SharedAnchors: make(map[string]SharedFormulaAnchor),
 	}

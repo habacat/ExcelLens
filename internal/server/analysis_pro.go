@@ -190,7 +190,7 @@ func (a *App) handleAnalysisProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := r.URL.Query().Get("source")
-	release, err := a.acquireCompositionAnalysisSlot(r.Context(), source)
+	release, err := a.acquireAnalysisQuerySlot(r.Context(), source, false)
 	if err != nil {
 		writeError(w, 408, "字段画像已取消")
 		return

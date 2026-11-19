@@ -1,0 +1,213 @@
+{
+  "version": "1.9.0",
+  "result": "PASS",
+  "nativePivots": {
+    "excel": "16.0 Build 20326",
+    "cases": 38,
+    "states": 123,
+    "savedCells": 37083,
+    "excelRefreshSaveReopenCells": 37083,
+    "typedCacheValues": 138478,
+    "ribbonUndoRedoCases": 2,
+    "numericValuesAtFirstOpen": {
+      "exact": 2367,
+      "withinTolerance": 70,
+      "maxUlps": 3,
+      "maxAbsDifference": 1.1641532182693481e-10
+    },
+    "rules": "Compare formula texts and types, numeric constants with max(1e-12, 2e-15 * abs(expected)); original inputs retain their hashes."
+  },
+  "crossSheetFormulas": {
+    "states": [
+      "base",
+      "edit",
+      "undo",
+      "redo"
+    ],
+    "formulaComparisons": 66408,
+    "restartedBeforeRedo": true,
+    "exact": 62748,
+    "within8Ulp": 3584,
+    "withinAbsoluteTolerance": 76,
+    "absoluteTolerance": 1e-12,
+    "outsideTolerance": 0
+  },
+  "browser": {
+    "cases": 3,
+    "widths": [
+      320,
+      360,
+      850
+    ],
+    "checks": [
+      "source selection",
+      "apply to grid",
+      "undo",
+      "redo",
+      "save and reopen"
+    ],
+    "commandPaletteHideRestoreCycles": 3
+  },
+  "previousVersion": {
+    "version": "1.8.30",
+    "resumedRevision": "7",
+    "atomicRejections": 3
+  },
+  "archiveChecks": [
+    {
+      "format": "7z",
+      "extractedBytes": 1073465131,
+      "checks": [
+        "full SHA-256",
+        "repeat member reuse"
+      ]
+    },
+    {
+      "format": "7z/HTML XLS",
+      "rows": 75475,
+      "columns": 14,
+      "merges": 3627,
+      "literalFormulas": 837,
+      "checks": [
+        "full decoded field digest",
+        "warm reopen"
+      ]
+    },
+    {
+      "format": "truncated TAR",
+      "rows": 345030,
+      "columns": 39,
+      "checks": [
+        "mapped row offsets",
+        "full decoded field digest",
+        "partial tail reported"
+      ]
+    }
+  ],
+  "pagingBenchmark": {
+    "distinctSourceItems": 16384,
+    "requestedPages": 32,
+    "itemsPerPage": 128,
+    "samples": 3,
+    "iterationsPerSample": 3,
+    "scope": "Synthetic, single-process benchmark. Includes setting up the per-revision list.",
+    "before": {
+      "medianNsPerRun": 34727467,
+      "medianBytesPerRun": 11869226,
+      "medianAllocationsPerRun": 68750
+    },
+    "after": {
+      "medianNsPerRun": 4134733,
+      "medianBytesPerRun": 1659928,
+      "medianAllocationsPerRun": 115
+    }
+  },
+  "modules": [
+    {
+      "module": "github.com/bodgit/sevenzip",
+      "before": "v1.6.5",
+      "after": "v1.6.5",
+      "upstream": "https://proxy.golang.org/github.com/bodgit/sevenzip/@latest"
+    },
+    {
+      "module": "github.com/ulikunitz/xz",
+      "before": "v0.5.15",
+      "after": "v0.5.17",
+      "upstream": "https://proxy.golang.org/github.com/ulikunitz/xz/@latest"
+    },
+    {
+      "module": "golang.org/x/text",
+      "before": "v0.40.0",
+      "after": "v0.44.0",
+      "upstream": "https://proxy.golang.org/golang.org/x/text/@latest"
+    },
+    {
+      "module": "github.com/andybalholm/brotli",
+      "before": "v1.2.2",
+      "after": "v1.3.0",
+      "upstream": "https://proxy.golang.org/github.com/andybalholm/brotli/@latest"
+    },
+    {
+      "module": "github.com/bodgit/plumbing",
+      "before": "v1.3.0",
+      "after": "v1.3.0",
+      "upstream": "https://proxy.golang.org/github.com/bodgit/plumbing/@latest"
+    },
+    {
+      "module": "github.com/bodgit/windows",
+      "before": "v1.0.1",
+      "after": "v1.0.1",
+      "upstream": "https://proxy.golang.org/github.com/bodgit/windows/@latest"
+    },
+    {
+      "module": "github.com/hashicorp/golang-lru/v2",
+      "before": "v2.0.7",
+      "after": "v2.0.7",
+      "upstream": "https://proxy.golang.org/github.com/hashicorp/golang-lru/v2/@latest"
+    },
+    {
+      "module": "github.com/klauspost/compress",
+      "before": "v1.19.0",
+      "after": "v1.20.4",
+      "upstream": "https://proxy.golang.org/github.com/klauspost/compress/@latest"
+    },
+    {
+      "module": "github.com/pierrec/lz4/v4",
+      "before": "v4.1.27",
+      "after": "v4.1.33",
+      "upstream": "https://proxy.golang.org/github.com/pierrec/lz4/v4/@latest"
+    },
+    {
+      "module": "github.com/spf13/afero",
+      "before": "v1.15.0",
+      "after": "v1.15.0",
+      "upstream": "https://proxy.golang.org/github.com/spf13/afero/@latest"
+    },
+    {
+      "module": "github.com/stangelandcl/ppmd",
+      "before": "v0.1.1",
+      "after": "v0.1.1",
+      "upstream": "https://proxy.golang.org/github.com/stangelandcl/ppmd/@latest"
+    },
+    {
+      "module": "go4.org",
+      "before": "v0.0.0-20260112195520-a5071408f32f",
+      "after": "v0.0.0-20261028031214-ed6929a230fe",
+      "upstream": "https://proxy.golang.org/go4.org/@latest"
+    }
+  ],
+  "toolchain": {
+    "modules": 12,
+    "upgraded": 6,
+    "files": 459,
+    "treeSHA256": "b34c6a12dd95a29cc72557bcb5afedc18f4b9d9db57f5943fcb1e8672547e2c3",
+    "toolchain": "go1.27.4",
+    "goWindowsAMD64SHA256": "178ab98950ac69ab25069307dc6ade79f3816e414cce95b4da166a115cde1e7e",
+    "ciNode": "v26.13.1",
+    "upx": "5.3.0",
+    "ciActions": [
+      {
+        "action": "actions/checkout",
+        "commit": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "version": "v7.0.1"
+      },
+      {
+        "action": "actions/setup-go",
+        "commit": "d8cbb8045d7f43706b9177cceb36c1f91a6644d5",
+        "version": "v7.1.0"
+      },
+      {
+        "action": "actions/setup-node",
+        "commit": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+        "version": "v7.1.0"
+      }
+    ]
+  },
+  "checks": {
+    "windowsRaceSteps": 7,
+    "frontendTestsInWindowsRaceRun": 530,
+    "additionalRegression": "sparse columns cannot satisfy an unfetched contiguous request",
+    "desktopManual": "not performed",
+    "wps": "not performed"
+  }
+}

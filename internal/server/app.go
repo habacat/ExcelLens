@@ -18,11 +18,19 @@ import (
 	"time"
 
 	"excellens/internal/archives"
+	"excellens/internal/editfile"
 	"excellens/internal/recovery"
 	"excellens/internal/workbook"
 )
 
 type App struct {
+	// A legacy document reuses its digest-verified layout within the browser session.
+	// mu protects the binding and its immutable layout together.
+	legacyEditBinding string
+	legacyEditLayout  editfile.XLSXLayout
+	calculationMu     sync.Mutex
+	calculation       *editCalculationCache
+
 	recoveryOnce     sync.Once
 	recoveryStore    *recovery.Store
 	recoveryErr      error
@@ -407,6 +415,11 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/recent", a.handleRecent)
 	mux.HandleFunc("/api/navigate", a.handleNavigate)
 	mux.HandleFunc("/api/open", a.handleOpen)
+	mux.HandleFunc("/api/edits", a.handleEditList)
+	for _, path := range []string{"start", "state", "base", "grid", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
+		mux.HandleFunc("/api/edits/"+path, a.handleEditCommand)
+	}
+	mux.HandleFunc("/api/edits/download", a.handleEditDownload)
 	mux.HandleFunc("/api/archive/list", a.handleArchiveList)
 	mux.HandleFunc("/api/archive/open", a.handleArchiveOpen)
 	mux.HandleFunc("/api/archive/job", a.handleArchiveJob)
@@ -688,7 +701,7 @@ func (a *App) securityHeaders(next http.Handler) http.Handler {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/export/download" && r.URL.Path != "/api/image/content" && r.Header.Get("X-ExcelLens-Token") != a.token {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/export/download" && r.URL.Path != "/api/image/content" && r.URL.Path != "/api/edits/download" && r.Header.Get("X-ExcelLens-Token") != a.token {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

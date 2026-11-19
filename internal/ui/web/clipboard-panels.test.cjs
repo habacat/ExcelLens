@@ -3,7 +3,7 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);re
 function setup(){
   const nodes=new Map(),node=id=>{if(!nodes.has(id)){const events={};nodes.set(id,{value:'',checked:false,disabled:false,open:false,textContent:'',style:{},classList:{toggle(){}},setAttribute(){},replaceChildren(){},append(){},focus(){},addEventListener(name,fn){events[name]=fn;},emit(name){events[name]?.();},showModal(){this.open=true;},close(){this.open=false;events.close?.();}});}return nodes.get(id);};
   const context={window:{},document:{getElementById:node,createElement:()=>({append(){}})},setTimeout,clearTimeout,AbortController,navigator:{clipboard:{readText:async()=>''}}};
-  for(const name of ['clipboard','clipboard-special','clipboard-panels'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+name+'.js','utf8'),context);
+  for(const name of ['cell-address','clipboard','clipboard-special','clipboard-panels'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+name+'.js','utf8'),context);
   context.window.ExcelLensClipboard.configure({rows:10,columns:5,cells:50,textBytes:10000,htmlBytes:20000});
   node('copySpecialFormat').value='tsv';node('copySpecialMode').value='raw';node('pasteSpecialFormat').value='tsv';node('pasteSpecialMode').value='raw';
   return {context,node};

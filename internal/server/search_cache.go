@@ -16,10 +16,9 @@ import (
 
 // Search caches contain only *completed* searches. They are tied to the
 // workbook's content fingerprint (CacheDir) and invalidated when it changes.
-// v3 invalidates snippets and hits produced by the old float-based fixed
-// decimal renderer. v1/v2 results are ignored and recomputed on demand;
-// worksheet, source-value and row caches are unchanged.
-const searchCacheSchema = 3
+// v4 uses the actual shifted whole-row/column references in shared formulas.
+// Earlier completed searches are recomputed on demand from the original index.
+const searchCacheSchema = 4
 const maxCachedSearches = 32
 const maxSearchCacheBytes = 3 << 20
 

@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 function setup(){
   const nodes=new Map();class Node{constructor(){this.children=[];this.attrs={};this.dataset={};this.open=false;this.listeners={};this.value='';this.classList={toggle(){}};}append(...children){this.children.push(...children);}replaceChildren(...children){this.children=children;}setAttribute(k,v){this.attrs[k]=v;}addEventListener(k,f){(this.listeners[k]??=[]).push(f);}focus(){}showModal(){this.open=true;}close(){this.open=false;queueMicrotask(()=>{for(const f of this.listeners.close||[])f();});}}
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},context={window:{},document:{getElementById:get,createElement:()=>new Node(),body:new Node()}};
-  for(const file of ['composition-model.js','field-picker.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+  for(const file of ['cell-address.js','composition-model.js','field-picker.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
   const picker=new context.window.ExcelLensFieldPicker({id:'testPicker',pageRows:3}),fields=Array.from({length:8},(_,i)=>({column:i+1,name:'字段'+(i+1)}));return {picker,fields,get};
 }
 test('paged multiselect retains off-page choices, enforces capacity and applies only on confirmation',()=>{

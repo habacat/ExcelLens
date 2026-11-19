@@ -59,12 +59,12 @@ func (idx *SheetIndex) RowCount() int {
 	if idx.rowSpool != nil {
 		return idx.spooledRows
 	}
-	return len(idx.Rows)
+	return len(idx.ResidentRows)
 }
 
 func (idx *SheetIndex) RowAt(i int) RowOffset {
 	if idx.mappedRows == nil {
-		return idx.Rows[i]
+		return idx.ResidentRows[i]
 	}
 	m := idx.mappedRows
 	if i < 0 || i >= m.count {

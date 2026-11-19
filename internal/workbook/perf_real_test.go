@@ -37,13 +37,13 @@ func TestRealSearchPerformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("index %s rows=%d", time.Since(t0), len(idx.Rows))
-	n := len(idx.Rows)
+	t.Logf("index %s rows=%d", time.Since(t0), len(idx.ResidentRows))
+	n := len(idx.ResidentRows)
 	if n > 20000 {
 		n = 20000
 	}
 	piece := *idx
-	piece.Rows = idx.Rows[:n]
+	piece.ResidentRows = idx.ResidentRows[:n]
 	for _, mode := range []string{"formula", "value"} {
 		t0 = time.Now()
 		result, truncated, err := wb.SearchSheet(&piece, sh.Name, "__non_existing_query_xyz_999", mode, 500, nil, nil)
@@ -78,8 +78,8 @@ func TestRealSearchParity(t *testing.T) {
 		t.Fatal(err)
 	}
 	piece := *idx
-	if len(piece.Rows) > 60 {
-		piece.Rows = piece.Rows[:60]
+	if len(piece.ResidentRows) > 60 {
+		piece.ResidentRows = piece.ResidentRows[:60]
 	}
 	for _, tt := range []struct{ query, mode string }{{"INDEX(", "formula"}, {"__no_matching_xyz__", "formula"}, {"2000", "value"}, {"__no_matching_xyz__", "value"}, {"A1", "reference"}} {
 		t.Run(tt.mode+"-"+tt.query, func(t *testing.T) {

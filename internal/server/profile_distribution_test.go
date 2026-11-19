@@ -225,7 +225,7 @@ func TestProfileDistributionRejectsMalformedExpiredAndSameContentDifferentPath(t
 }
 
 func TestProfileDistributionCapacityAndTruncatedFrequencyNeverBecomePartialExactStatistics(t *testing.T) {
-	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.ProfileSourceRowBytes + 1, Rows: []workbook.RowOffset{{Number: 2, End: formats.ProfileSourceRowBytes + 1}}}
+	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.ProfileSourceRowBytes + 1, ResidentRows: []workbook.RowOffset{{Number: 2, End: formats.ProfileSourceRowBytes + 1}}}
 	rows := iter.Seq[workbook.SourceRowReference](func(yield func(workbook.SourceRowReference) bool) {
 		yield(workbook.SourceRowReference{Number: 2, Position: 0})
 	})

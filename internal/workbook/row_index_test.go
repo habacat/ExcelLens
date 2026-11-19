@@ -76,7 +76,7 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	if owner.HasMappedIndexes() {
 		t.Fatal("discarded snapshot remained owned")
 	}
-	if loaded.mappedRows == nil || loaded.Rows != nil || loaded.RowCount() != residentRowOffsets+2 {
+	if loaded.mappedRows == nil || loaded.ResidentRows != nil || loaded.RowCount() != residentRowOffsets+2 {
 		t.Fatal("large index was materialized", loaded.RowCount())
 	}
 	last := loaded.RowCount() - 1

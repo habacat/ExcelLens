@@ -40,7 +40,7 @@ function harness(){
     return {changed:true};
   };
   const context={window:{},document,URLSearchParams,AbortController,setTimeout,clearTimeout,Map,Set};
-  for(const file of ['analysis-jobs.js','analysis-clusters.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+  for(const file of ['cell-address.js','analysis-jobs.js','analysis-clusters.js'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
   const panel=new context.window.ExcelLensAnalysisClusters({api,context:()=>state,limits:{pageGroups:2,pageVariants:2},sleep:async()=>{},toast(){},
     onTransform:(step,guard)=>{if(guard())transforms.push(step);},navigate:(data,guard)=>{if(guard())arrivals.push(data);},startExport:(...args)=>arrivals.push(args)});
   panel.open({id:'C1',name:'机构'});

@@ -20,7 +20,7 @@ func TestFormulaExportPreservesCachedTypes(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
-	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(data)), MaxRow: 1, MaxCol: 6, Rows: []workbook.RowOffset{{Number: 1, End: int64(len(data))}}}
+	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(data)), MaxRow: 1, MaxCol: 6, ResidentRows: []workbook.RowOffset{{Number: 1, End: int64(len(data))}}}
 	s := Selection{Sheet: workbook.SheetMeta{Name: "Data"}, Index: idx, FirstRow: 1, LastRow: 1, FirstCol: 1, LastCol: 6}
 	wb := &workbook.Workbook{Format: "xls"}
 	var out bytes.Buffer
@@ -77,7 +77,7 @@ func TestFormulaExportRejectsUnresolvedOriginal(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
-	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(data)), MaxRow: 1, MaxCol: 1, Rows: []workbook.RowOffset{{Number: 1, End: int64(len(data))}}}
+	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(data)), MaxRow: 1, MaxCol: 1, ResidentRows: []workbook.RowOffset{{Number: 1, End: int64(len(data))}}}
 	s := Selection{Sheet: workbook.SheetMeta{Name: "Data"}, Index: idx, FirstRow: 1, LastRow: 1, FirstCol: 1, LastCol: 1}
 	wb := &workbook.Workbook{Format: "xls"}
 	var out bytes.Buffer

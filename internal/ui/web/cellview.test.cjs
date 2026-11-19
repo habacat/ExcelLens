@@ -12,7 +12,7 @@ function setup(){
     setAttribute(k,v){this.attrs[k]=v;}getContext(){return {measureText:s=>{measured.push(s.length);return {width:s.length*10};}};}
   }
   const document={createElement:tag=>new Element(tag),createTextNode:s=>new Element('#text',s)};
-  const sandbox={window:{},document};vm.runInNewContext(read('conditional.js'),sandbox);vm.runInNewContext(read('richtext.js'),sandbox);vm.runInNewContext(read('cellview.js'),sandbox);vm.runInNewContext(read('wire.js'),sandbox);
+  const sandbox={window:{},document};vm.runInNewContext(read('conditional.js'),sandbox);vm.runInNewContext(read('richtext.js'),sandbox);vm.runInNewContext(read('cellview.js'),sandbox);vm.runInNewContext(read('cell-address.js'),sandbox);vm.runInNewContext(read('wire.js'),sandbox);
   const state={showFormulas:false,showStyles:true,styles:[{}],zoom:100,indexReady:true,source:{format:'xlsx'},frozenCellMap:new Map()};
   const options={state,applyStyle:(node,c)=>{node.appliedStyle=c.style||0;},colName:c=>String.fromCharCode(c+64),scale:()=>1,fontStack:s=>s,merge:()=>null,richLimits:{cellRuns:4096,viewRuns:8192}};
   const presenter=new sandbox.window.ExcelLensCellView.Presenter(options);
@@ -143,6 +143,7 @@ test('the actual main and frozen cell factories share text, styles, filters and 
   const frozen=read('freeze.js'),start=frozen.indexOf('      const make = (data,'),end=frozen.indexOf('      const head =',start);
   Object.assign(sandbox,{s:h.state,cellByColumn:data=>data?Object.fromEntries(data.cells.map(c=>[c.col,c])):null,colWidth:()=>100,rowHeight:()=>25,topLayouts:h.layouts,pinnedLayouts:h.layouts,topPositions:new Map([[1,0]]),pinnedPositions:new Map([[1,0]]),renderer:{o:{paintCell:h.presenter.paint.bind(h.presenter),extendTextIntoBlanks:h.presenter.overflow.bind(h.presenter),colName:c=>String.fromCharCode(64+c),updateSharedBorders(){},isPrecedent:()=>false,isSearchMatch:()=>false}},fixture:row});
   sandbox.sourceHeight=()=>25;
+  Object.assign(sandbox,{borderRows:new Map([[2,row]]),borderColumns:h.layouts.map(c=>c.col),nr:2,sourceTop:r=>(r-1)*25});
   const pinned=vm.runInNewContext('(function(){'+frozen.slice(start,end)+'return make(fixture,1,2,2,0,0);}).call(renderer)',sandbox);
   assert.equal(main._xlOverflowSpan.textContent,pinned._xlOverflowSpan.textContent);assert.equal(main.style.getPropertyValue('--overflow-width'),pinned.style.getPropertyValue('--overflow-width'));assert.equal(main.appliedStyle,pinned.appliedStyle);
 });

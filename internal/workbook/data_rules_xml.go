@@ -13,6 +13,15 @@ import (
 	"excellens/internal/formats"
 )
 
+// WorksheetValidationRules uses the source-rule reader on a worksheet or a
+// coordinate window with its original namespace declarations and metadata.
+func WorksheetValidationRules(ctx context.Context, data []byte) ([]SourceDataRule, bool, error) {
+	source, _ := formats.Lookup("xlsx")
+	b := newDataRuleBuilder(source)
+	err := scanDataRuleXML(ctx, bytes.NewReader(data), int64(len(data)), b, nil)
+	return b.index.rules, b.index.summary.Complete && b.index.summary.UnknownScopes == 0, err
+}
+
 // Scan tags without decoding cell values or retaining sheetData. One explicit
 // read verifies all source XML bytes once, while buffering only a bounded rule
 // block and the root namespace declaration. No used-row guess finds the tail.
