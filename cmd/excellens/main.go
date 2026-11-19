@@ -70,7 +70,7 @@ func main() {
 		filePath := strings.Trim(os.Args[1], `"`)
 		if absolute, absErr := filepath.Abs(filePath); absErr == nil {
 			var openErr error
-			launchID, openErr = app.OpenPathForLaunch(absolute)
+			launchID, openErr = app.PreparePathForLaunch(absolute)
 			if openErr != nil {
 				log.Printf("打开启动参数中的工作簿失败：%v", openErr)
 			}
@@ -125,7 +125,7 @@ func main() {
 		Address: url,
 		OnOpen:  openViewer,
 		OnChooseFile: func(path string) error {
-			id, err := app.OpenPathForLaunch(path)
+			id, err := app.PreparePathForLaunch(path)
 			if err != nil {
 				return err
 			}

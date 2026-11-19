@@ -19,6 +19,8 @@
   }
   const escape = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  // Excel interprets a plain HTML break as the start of another worksheet row.
+  const cellHTML = value => escape(value).replace(/\r\n?|\n/g,'<br style="mso-data-placement:same-cell">');
   const tsvCell = value => {
     const text=String(value ?? '');
     return /[\t\r\n"]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;
@@ -55,17 +57,42 @@
     }
     return parts.join(';');
   }
-  function build(payload, styles=[], showStyles=true, fontOverride='',richLimits,copyLimits) {
+  // Rows in a filtered view, or a separately requested header, can be
+  // reordered. Only merge down when the visible source members are together
+  // in their original order. Horizontal spans are independent of row order.
+  function mergeHeight(rows, index, merge) {
+    const height=merge.visibleRows;
+    if (index+height>rows.length) return 1;
+    for (let offset=1;offset<height;offset++) {
+      const row=rows[index+offset].row;
+      if (row<=rows[index+offset-1].row || row>merge.endRow) return 1;
+    }
+    return height;
+  }
+  function build(payload, styles=[], showStyles=true, fontOverride='',richLimits,copyLimits,mergeAt) {
     const {start,end,limits}=checkCopy(payload,copyLimits);copyLimits=limits;
     const plain=[],notices=new Set(),html=[];let sourceBytes=0,htmlBytes=0;
     const append=(...parts)=>{for(const part of parts){htmlBytes+=utf8Length(part);if(copyLimits&&htmlBytes>copyLimits.htmlBytes)throw Error('复制HTML超过本次容量，请缩小选区或使用导出');html.push(part);}};
     append('<html><body><!--StartFragment--><table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse">');
-    for(const row of payload.rows){
+    const coveredUntil=new Uint32Array(end-start+1);
+    for(const [index,row] of payload.rows.entries()){
       if(showStyles&&row.presentationNotice)notices.add(row.presentationNotice);
       const cells=new Map((row.cells||[]).map(x=>[x.col,x]));
       const values=[];
       append('<tr>');
       for(let col=start;col<=end;col++){
+        if (coveredUntil[col-start]>index) {
+          values.push('');
+          continue;
+        }
+        let span='';
+        const merge=mergeAt?.(row.row,col);
+        if (merge) {
+          const width=Math.min(end,merge.endCol)-col+1, height=mergeHeight(payload.rows,index,merge);
+          if (width>1) span+=' colspan="'+width+'"';
+          if (height>1) span+=' rowspan="'+height+'"';
+          coveredUntil.fill(index+height,col-start,col-start+width);
+        }
         const cell=cells.get(col)||{display:'',raw:'',style:0};
         sourceBytes+=utf8Length(cell.raw||'')+utf8Length(cell.display||'')+utf8Length(cell.formula||'');
         if(showStyles&&cell.conditional?.display!=null)sourceBytes+=utf8Length(cell.conditional.display);
@@ -73,10 +100,10 @@
         const value=window.ExcelLensConditional?.value(cell,false,showStyles)??String(cell.display??cell.raw??'');
         values.push(tsvCell(value));
         const base=window.ExcelLensConditional?.visual(cell,styles)||styles[Number(cell.style)||0]||{};
-        const rich=showStyles?window.ExcelLensRichText?.html(cell,base,{limits:richLimits,fontOverride}):null;
+        const rich=showStyles?window.ExcelLensRichText?.html(cell,base,{limits:richLimits,fontOverride},cellHTML):null;
         if(rich?.notice)notices.add(rich.notice);
         const notice=[rich?.notice,showStyles&&cell.conditional?.notice].filter(Boolean).join('；');if(notice)notices.add(notice);
-        append('<td style="',escape(styleOf(cell,styles,showStyles,fontOverride,rich?.rich)),'"',notice?' title="'+escape(notice)+'"':'','>',rich?.html??escape(value).replace(/\r\n?|\n/g,'<br>'),'</td>');
+        append('<td',span,' style="',escape(styleOf(cell,styles,showStyles,fontOverride,rich?.rich)),'"',notice?' title="'+escape(notice)+'"':'','>',rich?.html??cellHTML(value),'</td>');
       }
       plain.push(values.join('\t'));
       append('</tr>');

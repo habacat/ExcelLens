@@ -3,6 +3,16 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const context={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/merges.js','utf8'),context);
 const create=()=>new context.window.ExcelLensMergedCells();
+test('copying one covered cell or dragging backwards includes every intersected Excel merge',()=>{
+  const m=create();
+  m.load([{row:2,col:2,endRow:3,endCol:4},{row:4,col:1,endRow:5,endCol:2},{row:1,col:6,endRow:7,endCol:6}]);
+  const bounds=(r1,c1,r2,c2,visibility)=>JSON.parse(JSON.stringify(m.expand({row1:r1,col1:c1,row2:r2,col2:c2},visibility)));
+  assert.deepEqual(bounds(3,3,3,3),{row1:2,col1:2,row2:3,col2:4});
+  assert.deepEqual(bounds(5,5,3,3),{row1:5,col1:5,row2:2,col2:1});
+  const hidden={visible:r=>r!==3&&r!==4,previous:r=>r===3||r===4?2:r};
+  assert.deepEqual(bounds(2,2,2,2,hidden),{row1:2,col1:2,row2:2,col2:4});
+  assert.deepEqual(bounds(5,2,5,2,hidden),{row1:5,col1:2,row2:5,col2:2});
+});
 test('HTML title/header merged anchors and covered positions keep their source coordinates',()=>{
   const m=create();m.load([{row:2,col:1,endRow:2,endCol:13},{row:8,col:2,endRow:9,endCol:2}]);
   assert.equal(m.at(2,13).col,1);assert.equal(m.at(9,2).row,8);assert.equal(m.at(7,2),null);assert.equal(m.at(2,14),null);

@@ -112,7 +112,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .primary-button:disabled { opacity: .5; cursor: not-allowed; }
 .primary-button.compact { min-height: 31px; padding: 0 13px; }
 .drop-hint { margin-top: 11px; color: #9aa4ae; font-size: 10px; }
-.upload-progress { width: min(420px, 90%); margin: 21px auto 0; }
 .progress-track { height: 5px; overflow: hidden; border-radius: 5px; background: #e9eef3; }
 .progress-fill { width: 0; height: 100%; border-radius: inherit; background: #347bb8; transition: width .12s linear; }
 .progress-label, .index-detail { margin-top: 7px; color: #7e8a98; font-size: 10px; }
@@ -149,13 +148,12 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .grid-region { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #fff; isolation:isolate; }
 .grid-region.sheet-switching #grid {opacity:.55;pointer-events:none;}
-.sheet-switch-status {position:absolute;top:9px;left:50%;transform:translateX(-50%);z-index:31;padding:7px 12px;border:1px solid #d6e1e8;border-radius:5px;background:#f8fafc;color:#496174;font-size:11px;pointer-events:none;}
 .reading-veil {position:absolute;inset:0 var(--grid-v-scrollbar,0px) var(--grid-h-scrollbar,0px) 0;z-index:22;mix-blend-mode:multiply;pointer-events:none;}
 .reading-mode-button {width:27px;height:22px;display:grid;place-items:center;flex:none;padding:0;border:0;border-radius:4px;background:transparent;color:#748491;cursor:pointer;}
 .reading-mode-button:hover,.reading-mode-button:focus-visible {background:#e8eef3;color:#345c7b;}
 .reading-mode-button.is-active {color:#28745d;background:#e2f0e8;}
 .reading-mode-panel {position:fixed;right:16px;bottom:44px;z-index:85;width:min(268px,calc(100vw - 32px));padding:10px;border:1px solid #d1dde3;border-radius:8px;background:#fff;box-shadow:0 8px 25px #263c5024;color:#344d60;font-size:12px;}
-.reading-mode-panel[hidden],.reading-veil[hidden],.sheet-switch-status[hidden] {display:none;}
+.reading-mode-panel[hidden],.reading-veil[hidden] {display:none;}
 .reading-mode-heading {display:flex;align-items:center;justify-content:space-between;margin:0 1px 9px;}
 .reading-mode-heading strong {font-size:12px;font-weight:600;}
 .reading-mode-heading button {width:22px;height:22px;border:0;border-radius:3px;background:transparent;color:#7b8c98;font-size:19px;cursor:pointer;}
@@ -242,8 +240,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .grid-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa5b1; font-size: 11px; pointer-events: none; }
 .index-overlay { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(247, 249, 251, .72); backdrop-filter: blur(1px); }
 .index-card { width: min(390px, 90%); padding: 16px; border: 1px solid #dfe6ed; border-radius: 8px; background: #fff; box-shadow: 0 8px 30px rgba(20, 45, 70, .1); }
-.index-overlay.previewing { inset:auto 12px 12px auto; background:transparent; backdrop-filter:none; display:block; pointer-events:none; }
-.index-overlay.previewing .index-card { width:340px; max-width:65vw; pointer-events:auto; }
 .index-title { margin-bottom: 11px; color: #344b62; font-size: 12px; font-weight: 700; }
 .index-detail { overflow-wrap: anywhere; }
 .index-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
@@ -440,8 +436,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .tool-button.format-active { border-color:#a9c8e0; background:#ecf5fc; color:#255e8f; }
 
 /* Transient fast-scroll indication: visible only while the current tile is missing. */
-.viewport-loading {position:absolute;right:18px;bottom:13px;z-index:24;pointer-events:none;padding:6px 10px;border-radius:5px;background:rgba(255,255,255,.94);border:1px solid #d6e3ee;color:#50718c;box-shadow:0 2px 10px rgba(30,60,90,.10);font-size:11px;}
-.viewport-loading[hidden] {display:none;}
 
 /* Viewport-only lightweight placeholder during a cold, far-away scroll. */
 .viewport-fallback { position:absolute;inset:0;z-index:9;pointer-events:none;contain:strict; }
@@ -536,12 +530,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .resize-guide{position:absolute;z-index:17;pointer-events:none;background:#2775b7;box-shadow:0 0 0 1px rgba(39,117,183,.16);}
 .resize-guide.vertical{width:2px;height:100%;}
 .resize-guide.horizontal{height:2px;width:100%;}
-.tool-button,.mini-button,.sheet-tab,.command-entry{transition:background-color var(--motion-fast,120ms) var(--motion-ease,ease),border-color var(--motion-fast,120ms) var(--motion-ease,ease),color var(--motion-fast,120ms) var(--motion-ease,ease),box-shadow var(--motion-fast,120ms) var(--motion-ease,ease);}
-.tool-button:active:not(:disabled),.mini-button:active:not(:disabled){transform:translateY(1px);}
-.float-dialog[open]{animation:excelLensAppear var(--motion-normal,160ms) var(--motion-ease,cubic-bezier(.2,.7,.2,1));}
-@keyframes excelLensAppear{from{opacity:0;transform:translateY(-5px) scale(.995);}to{opacity:1;transform:translateY(0) scale(1);}}
-.grid-cell.selected{transition:box-shadow .09s ease-out,outline-color .09s ease-out;}
-@media(prefers-reduced-motion:reduce){.tool-button,.mini-button,.sheet-tab,.command-entry,.grid-cell.selected{transition:none!important}.float-dialog[open]{animation:none!important}}
 
 /* Formula inspector: Excel-like token colors and read-only precedent outlines.
  * Only the small virtualized viewport receives highlights. */
@@ -622,7 +610,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .landing-open-button:disabled {opacity:.5;cursor:wait}
 .landing-open-zone .drop-hint {color:#89adad;font-size:11px;margin:24px 0 0;display:flex;align-items:center;gap:11px}
 .drop-hint-line{width:22px;height:1px;background:#6aa89e;flex:none}
-.landing-open-zone .upload-progress { width:min(390px,100%); margin:25px 0 0; }
 .landing-open-zone .progress-track {background:#34555d;}
 .landing-open-zone .progress-fill {background:#8ee5c7;}
 .landing-open-zone .progress-label {color:#c5dad6;font-size:11px;}
@@ -936,14 +923,6 @@ body:not(.home-view) .file-badge {display:block;flex:1 1 auto;max-width:none;min
 .source-sheet-view .grid-cell {line-height:1.2;padding:0 2px;}
 .source-sheet-view .grid-cell.auto-filter-header {padding-right:25px;}
 .grid-cell:focus-visible {outline:2px solid #227568;outline-offset:-2px;}
-
-/* Shared timing for controls and overlays; scrolling and cell layout stay immediate. */
-:root{--motion-fast:120ms;--motion-normal:160ms;--motion-ease:cubic-bezier(.2,.8,.2,1)}
-:where(.tool-button,.mini-button,.primary-button,.landing-open-button,.calculator-icon,.calculator-notes-toggle,.calculator-dock,.recent-action,.sheet-tab,.analysis-nav button){transition:background-color var(--motion-fast) var(--motion-ease),border-color var(--motion-fast) var(--motion-ease),color var(--motion-fast) var(--motion-ease),box-shadow var(--motion-fast) var(--motion-ease)}
-:where(.tool-button,.mini-button,.primary-button,.landing-open-button,.calculator-icon,.calculator-notes-toggle,.calculator-dock):active:not(:disabled){filter:brightness(.95)}
-:where(dialog[open],.auto-filter-popover:not([hidden]),.columns-menu:not([hidden]),.cell-context-menu:not([hidden])){animation:ui-reveal var(--motion-normal) var(--motion-ease)}
-@keyframes ui-reveal{from{opacity:0}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 /* Recent-file typography: explicit last-opened marker and a quiet relative
    clock. A native title provides the precise local timestamp on hover. */

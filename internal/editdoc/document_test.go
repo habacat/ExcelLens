@@ -159,7 +159,7 @@ func TestCalculatedColumnRestoresTemplateEvenWhenEveryMemberIsAnException(t *tes
 	d := open()
 	defer func() { _ = d.Close() }()
 	if _, err = d.CommitPlanned(t.Context(), op, func([]Change) (PreparedChanges, error) {
-		return PreparedChanges{changes, base, []ColumnFormula{{anchor, "=A2", "=A2*2"}}}, nil
+		return PreparedChanges{Changes: changes, Base: base, Templates: []ColumnFormula{{anchor, "=A2", "=A2*2"}}}, nil
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestCalculatedColumnRestoresTemplateEvenWhenEveryMemberIsAnException(t *tes
 	// undoing this entry must distinguish removal from inheriting the source.
 	clearTemplate := Operation{Request: fmt.Sprintf("%032x", 5), Revision: d.Revision, Action: "change", Changes: values}
 	if _, err = d.CommitPlanned(t.Context(), clearTemplate, func([]Change) (PreparedChanges, error) {
-		return PreparedChanges{values, base, []ColumnFormula{{anchor, "=A2", ""}}}, nil
+		return PreparedChanges{Changes: values, Base: base, Templates: []ColumnFormula{{anchor, "=A2", ""}}}, nil
 	}, nil); err != nil {
 		t.Fatal(err)
 	}

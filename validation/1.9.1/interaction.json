@@ -1,0 +1,50 @@
+{
+  "result": "PASS",
+  "clipboard": {
+    "nativeExcel": [
+      "16.0",
+      20326.0
+    ],
+    "pasteCases": 15,
+    "comparedCells": 343,
+    "mismatches": 0,
+    "sourceDigestsPreserved": true
+  },
+  "progress": {
+    "thresholdMs": 500,
+    "controlledFirstRevealMs": 501.1,
+    "independentTabs": true,
+    "reducedMotion": true,
+    "nativeLaunch": true,
+    "lastLayoutFrame": true,
+    "nativeReopen": [
+      {
+        "format": ".xlsm",
+        "bytes": 140117437,
+        "durationMs": 838.5,
+        "firstVisibleFrameMs": 796.1
+      },
+      {
+        "format": ".txt",
+        "bytes": 120000023,
+        "durationMs": 275.3,
+        "firstVisibleFrameMs": null
+      }
+    ],
+    "withSynchronousLayout": [
+      {
+        "format": ".xlsm",
+        "bytes": 140117437,
+        "durationMs": 655.7,
+        "firstVisibleFrameMs": 621.7
+      },
+      {
+        "format": ".txt",
+        "bytes": 120000023,
+        "durationMs": 721.5,
+        "firstVisibleFrameMs": 615.4
+      }
+    ],
+    "delayedOpenEntryPoints": 4
+  }
+}

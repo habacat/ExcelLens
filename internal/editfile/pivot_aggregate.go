@@ -1,15 +1,17 @@
 package editfile
 
 import (
-	"excellens/internal/editdoc"
 	"math"
 	"strconv"
 	"strings"
+
+	"excellens/internal/editdoc"
 )
 
 type pivotAggregate struct {
 	sum, min, max, product, mean, m2 float64
 	numbers, count                   int
+	countAdjustment                  float64
 	err                              string
 }
 
@@ -37,6 +39,14 @@ func (a *pivotAggregate) add(v pivotValue) {
 	a.mean += delta / float64(a.numbers)
 	a.m2 += delta * (n - a.mean)
 }
+func (a *pivotAggregate) addMeasure(value pivotValue, calculated bool) {
+	a.add(value)
+	if calculated && value.kind == "n" {
+		n, _ := strconv.ParseFloat(value.raw, 64)
+		a.countAdjustment += n - 1
+	}
+}
+
 func (a pivotAggregate) value(method string) editdoc.Value {
 	if a.err != "" && method != "count" && method != "countA" && method != "countNums" {
 		return editdoc.Value{Kind: "error", Raw: a.err}
@@ -47,7 +57,7 @@ func (a pivotAggregate) value(method string) editdoc.Value {
 	}
 	switch method {
 	case "count", "countA":
-		n = float64(a.count)
+		n = float64(a.count) + a.countAdjustment
 	case "average", "avg":
 		if a.numbers == 0 {
 			return editdoc.Value{Kind: "error", Raw: "#DIV/0!"}

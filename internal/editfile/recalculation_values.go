@@ -67,6 +67,11 @@ func (s *calcRevision) value(a editdoc.Address) (calculator.FormulaValue, error)
 			return calculator.FormulaValue{}, calculator.ErrWorksheetPending
 		}
 	}
+	if s.arrays != nil {
+		if v, handled, err := s.arrayMember(a); handled {
+			return v, err
+		}
+	}
 	if v, ok := s.typed[a]; ok {
 		return v, nil
 	}
@@ -124,11 +129,13 @@ func (s *calcRevision) value(a editdoc.Address) (calculator.FormulaValue, error)
 	tag := s.book.cells[a].tag
 	var operand calculator.FormulaValue
 	err := calculator.ErrWorksheetPending
-	if tag.kind != "array" || tag.area.single() {
+	if s.arrays != nil && s.arrays.specs[a].kind == "array" {
+		operand, err = s.evalArray(a, form, resolve)
+	} else if tag.kind != "array" || tag.area.single() {
 		operand, err = form.Evaluate(s.ctx, resolve)
-		if barrier != nil {
-			err = barrier
-		}
+	}
+	if barrier != nil {
+		err = barrier
 	}
 	if _, deferred := err.(*deferredInput); deferred {
 		return calculator.FormulaValue{}, err
@@ -329,6 +336,23 @@ func (s *calcRevision) rangeValue(r calculator.WorksheetReference, failure func(
 		return total, err
 	}
 	if rows == 1 && cols == 1 {
+		anchor := editdoc.Address{Sheet: r.Sheet, Row: r.Top, Col: r.Left}
+		rv.Spill = func() (calculator.RangeValue, error) {
+			area := s.book.cells[anchor].tag.area
+			dynamic := s.book.cells[anchor].tag.dynamic
+			if s.arrays != nil {
+				if out, ok := s.result.Arrays[anchor]; ok {
+					area, dynamic = out.area, out.dynamic
+				} else if _, ok := s.arrays.specs[anchor]; ok {
+					return calculator.RangeValue{}, calculator.ErrWorksheetPending
+				}
+			}
+			if !dynamic {
+				return calculator.RangeValue{}, errors.New("#REF!")
+			}
+			ref := calculator.WorksheetReference{Sheet: r.Sheet, Top: area.firstRow, Left: area.firstCol, Bottom: area.lastRow, Right: area.lastCol}
+			return s.rangeValue(ref, failure), nil
+		}
 		v, err := rv.At(0)
 		rv.Scalar = &v
 		rv.Fault = err

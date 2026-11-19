@@ -1,0 +1,43 @@
+{
+  "version": "1.9.1",
+  "os": "windows",
+  "go": "go1.27.4",
+  "result": "PASS",
+  "steps": [
+    {
+      "name": "project metadata, documentation and package boundaries",
+      "result": "PASS",
+      "durationMs": 1712
+    },
+    {
+      "name": "offline vendored dependency resolution",
+      "result": "PASS",
+      "durationMs": 2723
+    },
+    {
+      "name": "Go tests",
+      "result": "PASS",
+      "durationMs": 140146
+    },
+    {
+      "name": "Go vet",
+      "result": "PASS",
+      "durationMs": 11818
+    },
+    {
+      "name": "JavaScript syntax and regression tests",
+      "result": "PASS",
+      "durationMs": 67850
+    },
+    {
+      "name": "generated function catalog",
+      "result": "PASS",
+      "durationMs": 657
+    },
+    {
+      "name": "Go race detector",
+      "result": "PASS",
+      "durationMs": 302667
+    }
+  ]
+}

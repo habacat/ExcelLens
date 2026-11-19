@@ -1,6 +1,16 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function setup(){const context={window:{}};for(const name of ['cell-address','clipboard','clipboard-special'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+name+'.js','utf8'),context);context.window.ExcelLensClipboard.configure({rows:6,columns:4,cells:24,textBytes:100000,htmlBytes:100000});return {...context.window.ExcelLensClipboardSpecial,clip:context.window.ExcelLensClipboard};}
 const plain=value=>JSON.parse(JSON.stringify(value));
+test('the optional header and reordered source rows retain their coordinates for Excel HTML spans',()=>{
+  const h=setup();
+  const header={row:4,cells:[{col:2,raw:'报告',display:'报告'}]};
+  const payload={startCol:2,endCol:3,header,rows:[{row:12,cells:[]},header,{row:11,cells:[]}]};
+  const mergeAt=(row,col)=>row===4&&col===2 ? {endCol:3,endRow:4,visibleRows:1} : null;
+  const result=h.selection(payload,{format:'tsv',includeHeader:true,mergeAt});
+  assert.match(result.html,/<td colspan="2"[^>]*>报告<\/td>/);
+  assert.equal((result.html.match(/<td\b/g)||[]).length,5);
+  assert.equal(result.text,'报告\t\n\t\n\t');
+});
 const cell=(col,raw,extra={})=>({col,raw,display:raw,type:'inlineStr',hasFormula:false,...extra});
 function fixture(){return {startCol:2,endCol:4,header:{row:1,cells:[cell(2,'金额'),cell(3,'金额'),cell(4,'')]},rows:[{row:9,cells:[cell(2,'9007199254740993.31',{display:'9,007,199,254,740,993.31',type:'n'}),cell(3,'001'),cell(4,'<img>|q\tline\n尾')]},{row:4,cells:[cell(2,'2',{type:'n',hasFormula:true,formula:'=B3+1',display:'2.00'}),cell(3,'  ')]}]};}
 

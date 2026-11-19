@@ -84,7 +84,7 @@ func (p *xlsxPackage) readCells(ctx context.Context, cells []editdoc.Address) (m
 				if c.original.cache != nil && len(c.original.cache.Raw) > formats.EditCellBytes {
 					return nil, fmt.Errorf("公式原保存结果超过编辑容量")
 				}
-				values[c.address] = SourceCell{Value: c.original.value, Cache: c.original.cache, ReadOnly: c.original.readOnly, protected: c.original.protected, formula: c.original.formula, names: p.names}
+				values[c.address] = SourceCell{Array: c.original.array, Value: c.original.value, Cache: c.original.cache, ReadOnly: c.original.readOnly, protected: c.original.protected, formula: c.original.formula, names: p.names}
 			}
 		}
 	}
@@ -630,7 +630,7 @@ func clearFormulaResult(data []byte, cell sheetCell) ([]xmlPatch, error) {
 	var patches []xmlPatch
 	if cell.kind != "" {
 		var err error
-		patches, err = removeXMLAttributes(data, cell.from, cell.tagEnd, "t")
+		patches, err = removeXMLAttributes(data, cell.from, cell.tagEnd, "t", "vm")
 		if err != nil {
 			return nil, err
 		}

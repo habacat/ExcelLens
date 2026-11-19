@@ -35,8 +35,15 @@
   <link rel="stylesheet" href="/assets/snapshots.css">
   <link rel="stylesheet" href="/assets/edit-copy.css">
   <link rel="stylesheet" href="/assets/dialog-controls.css">
+  <link rel="stylesheet" href="/assets/motion.css">
 </head>
 <body class="home-view">
+  <div id="tabActivity" class="tab-activity" popover="manual" hidden>
+    <span class="activity-ring" aria-hidden="true"></span>
+    <span class="activity-label" role="status" aria-live="polite" aria-atomic="true"></span>
+    <span class="activity-value" role="progressbar" aria-label="任务进度" aria-valuemin="0" aria-valuemax="100"></span>
+    <button id="cancelIndexBtn" type="button" class="activity-cancel" hidden>取消</button>
+  </div>
   <header class="appbar">
     <div class="brand-area">
       <img class="brand-mark" src="/assets/icon.svg" alt="ExcelLens" width="27" height="27">
@@ -84,6 +91,7 @@
       <div class="edit-grid-actions">
         <button id="editGridUndo" class="tool-button" type="button" title="撤销（Ctrl+Z）">撤销</button>
         <button id="editGridRedo" class="tool-button" type="button" title="重做（Ctrl+Y）">重做</button>
+        <button id="editGridRange" class="tool-button" type="button" aria-haspopup="dialog">区域编辑</button>
         <button id="editGridMore" class="tool-button" type="button" aria-haspopup="dialog">更多编辑</button>
         <button id="editGridRefresh" class="tool-button" type="button" hidden>刷新修订</button>
         <button id="editGridRetry" class="tool-button" type="button" hidden>核对提交</button>
@@ -114,10 +122,7 @@
             <h1>浏览数据</h1>
             <p class="landing-subline">浏览Excel、CSV、TXT与SQlite</p>
             <button id="chooseFileBtn" type="button" class="landing-open-button"><span class="landing-btn-icon">＋</span>选择数据文件 <span class="landing-btn-arrow" aria-hidden="true">↗</span></button>
-            <div id="uploadProgress" class="upload-progress" hidden>
-              <div class="progress-track"><div id="uploadBar" class="progress-fill"></div></div>
-              <div id="uploadText" class="progress-label">正在打开文件…</div>
-            </div>
+            <div id="homeActivitySlot" class="home-activity-slot"></div>
             <div id="welcomeError" class="inline-error" hidden role="alert"></div>
           </div>
         </div>
@@ -187,7 +192,6 @@
       </div>
       <div id="gridBackdrop" class="grid-backdrop" aria-hidden="true" hidden></div>
       <div id="readingVeil" class="reading-veil" aria-hidden="true" hidden></div>
-      <div id="sheetSwitchStatus" class="sheet-switch-status" role="status" hidden></div>
       <div id="traceArrival" class="trace-arrival-layer" hidden></div>
       <div id="pictureOverlay" class="picture-overlay" hidden aria-label="工作表图片">
         <div id="picturePane-normal" class="picture-pane"></div>
@@ -197,14 +201,11 @@
       </div>
       <div id="resizeGuide" class="resize-guide" hidden></div>
       <canvas id="viewportFallback" class="viewport-fallback" hidden aria-hidden="true"></canvas>
-      <div id="viewportLoading" class="viewport-loading" role="status" aria-live="polite" hidden>正在加载可见区域…</div>
       <div id="indexOverlay" class="index-overlay" hidden>
         <div class="index-card">
           <div id="indexTitle" class="index-title">正在准备工作表</div>
-          <div class="progress-track"><div id="indexBar" class="progress-fill"></div></div>
           <div id="indexDetail" class="index-detail">首次打开需要建立本机索引。</div>
           <div class="index-actions">
-            <button id="cancelIndexBtn" class="mini-button">取消</button>
             <button id="retryIndexBtn" class="mini-button primary-mini" hidden>重试</button>
             <button id="showRowsRecoveryBtn" class="mini-button" hidden>暂时显示全部行</button>
           </div>
@@ -339,7 +340,7 @@
       <div class="archive-columns" aria-hidden="true"><span>文件 / 所在目录</span><span>大小</span></div>
       <div id="archiveList" class="archive-list" role="listbox" aria-label="可打开的成员文件" tabindex="0"></div>
       <div class="archive-footer"><span id="archiveSummary" class="dialog-summary" aria-live="polite"></span><button type="button" id="archivePrev" class="mini-button">上一页</button><button type="button" id="archiveNext" class="mini-button">下一页</button></div>
-      <div id="archiveProgress" class="archive-progress" hidden><div id="archiveStage" role="status"></div><progress id="archiveBar" max="100"></progress><button type="button" id="archiveCancel" class="mini-button">取消读取</button></div>
+      <div id="archiveProgress" class="archive-progress" hidden><div class="activity-line"><span id="archiveActivity" class="activity-slot"></span><span id="archiveStage" role="status"></span></div><progress id="archiveBar" max="100"></progress><button type="button" id="archiveCancel" class="mini-button">取消读取</button></div>
       <p id="archiveError" class="archive-error" role="alert" hidden></p>
       <label id="archivePartialChoice" class="archive-partial-choice" hidden><input id="archiveAllowPartial" type="checkbox">我知道数据不完整，仅查看现存 TXT 片段（末条未结束记录不纳入表格）</label>
       <div class="dialog-actions"><span class="dialog-summary">双击或按 Enter 打开；仅缓存选中的文件。</span><span class="status-spacer"></span><button type="button" id="archiveOpen" class="primary-button compact" disabled>打开文件</button></div>
@@ -390,6 +391,7 @@
         <div id="searchHistoryList" class="history-list"></div>
       </div>
       <div class="search-navigation">
+        <span id="searchActivity" class="activity-slot" data-native-percent></span>
         <span id="searchSummary" class="dialog-summary" aria-live="polite" hidden></span>
         <button id="cancelSearchBtn" class="mini-button" hidden type="button">取消</button>
       </div>
@@ -536,7 +538,7 @@
       <button id="addFilterRuleBtn" class="add-rule-button">＋ 添加条件</button>
       <div id="filterProgress" class="filter-progress" hidden>
         <div class="progress-track"><div id="filterBar" class="progress-fill"></div></div>
-        <div id="filterProgressText" class="progress-label">正在筛选…</div>
+        <div class="activity-line progress-label"><span id="filterActivity" class="activity-slot"></span><span id="filterProgressText">正在筛选…</span></div>
       </div>
     </div>
     <footer class="filter-footer">
@@ -599,7 +601,7 @@
       </div>
       <div id="exportAdvisory" class="export-advisory" aria-live="polite"></div>
       <div id="exportProgress" class="export-progress" hidden>
-        <div class="export-task-line"><strong id="exportStage">准备导出</strong><span id="exportPercent">0%</span></div>
+        <div class="export-task-line"><span class="activity-line"><span id="exportActivity" class="activity-slot" data-native-percent></span><strong id="exportStage">准备导出</strong></span><span id="exportPercent">0%</span></div>
         <div class="progress-track"><div id="exportBar" class="progress-fill"></div></div>
         <div id="exportDetails" class="dialog-summary">正在准备数据...</div>
       </div>
@@ -714,7 +716,7 @@
               <button id="editCopyTabPaste" type="button" role="tab" aria-selected="false" aria-controls="editCopyPanePaste" tabindex="-1">粘贴</button>
               <button id="editCopyTabFill" type="button" role="tab" aria-selected="false" aria-controls="editCopyPaneFill" tabindex="-1">填充</button>
               <button id="editCopyTabRules" type="button" role="tab" aria-selected="false" aria-controls="editCopyRules" tabindex="-1" hidden>数据规则</button>
-              <button id="editCopyTabStructure" type="button" role="tab" aria-selected="false" aria-controls="editCopyStructure" tabindex="-1" hidden>工作表与行列</button>
+              <button id="editCopyTabStructure" type="button" role="tab" aria-selected="false" aria-controls="editCopyStructure" tabindex="-1" hidden>区域与工作表</button>
               <button id="editCopyTabObjects" type="button" role="tab" aria-selected="false" aria-controls="editCopyObjects" tabindex="-1" hidden>透视表与图表</button>
             </div>
             <label class="edit-copy-tool-select">编辑工具<select id="editCopyToolSelect"></select></label>
@@ -755,15 +757,20 @@
           <div id="editCopyStructure" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabStructure" hidden>
             <div class="edit-copy-fields">
               <label class="edit-copy-field">操作<select id="editCopyStructureKind">
+                <option value="mergeCells">合并单元格</option><option value="unmergeCells">取消合并</option>
+                <option value="fixedArray">设置固定数组</option><option value="spillFormula">设置动态数组</option><option value="clearArray">清除数组</option>
                 <option value="renameSheet">重命名工作表</option><option value="insertRows">插入整行</option><option value="deleteRows">删除整行</option><option value="moveRows">移动整行</option>
                 <option value="insertColumns">插入整列</option><option value="deleteColumns">删除整列</option><option value="moveColumns">移动整列</option>
               </select></label>
+              <label class="edit-copy-field" id="editCopyRangeField" hidden>单元格范围<input id="editCopyRange" placeholder="A1:C3" spellcheck="false"></label>
               <label class="edit-copy-field" id="editCopyNewNameField">新表名<input id="editCopyNewName" maxlength="31"></label>
               <label class="edit-copy-field" id="editCopyAtField" hidden><span id="editCopyAtLabel">起始行号</span><input id="editCopyAt" type="number" min="1" step="1"></label>
               <label class="edit-copy-field" id="editCopyCountField" hidden>数量<input id="editCopyCount" type="number" min="1" step="1" value="1"></label>
               <label class="edit-copy-field" id="editCopyBeforeField" hidden>移至此序号之前<input id="editCopyBefore" type="number" min="1" step="1"></label>
             </div>
-            <button id="editCopyApplyStructure" type="button" class="mini-button">重命名工作表</button>
+            <label id="editCopyArrayFormulaField" class="edit-copy-field" hidden>数组公式<input id="editCopyArrayFormula" type="text" spellcheck="false" autocomplete="off"></label>
+            <label id="editCopyMergeConsent" class="edit-copy-check" hidden><input id="editCopyReplaceContents" type="checkbox"> <span id="editCopyConsentLabel">若有多个值，仅保留首个有内容的格</span></label>
+            <button id="editCopyApplyStructure" type="button" class="mini-button">应用</button>
           </div>
           <div id="editCopyObjects" class="edit-copy-pane" role="tabpanel" aria-labelledby="editCopyTabObjects" hidden>
             <div id="editCopyPivotTools" class="edit-copy-fields" hidden>
@@ -779,6 +786,27 @@
               <label class="edit-copy-field">行项目<select id="editCopyPivotFilter"><option value="keep">沿用当前筛选</option><option value="all">显示全部</option><option value="item">只显示指定项</option></select></label>
               <label class="edit-copy-field">指定项目<input id="editCopyPivotItem" maxlength="255" hidden></label>
               </div>
+              <details id="editCopyPivotValues" class="edit-pivot-detail">
+                <summary>值筛选</summary>
+                <div class="edit-copy-fields">
+                  <label class="edit-copy-field">筛选字段<select id="editCopyValueField"></select></label>
+                  <label class="edit-copy-field">条件<select id="editCopyValueKind"></select></label>
+                  <label class="edit-copy-field"><span id="editCopyPivotThresholdLabel">数量</span><input id="editCopyValueStart" type="number" step="any"></label>
+                  <label class="edit-copy-field">上限<input id="editCopyValueEnd" type="number" step="any" hidden></label>
+                  <button id="editCopyValueApply" class="mini-button" type="button">应用筛选</button>
+                </div>
+              </details>
+              <details id="editCopyItemTools" class="edit-pivot-detail">
+                <summary>计算项目</summary>
+                <div class="edit-copy-fields">
+                  <label class="edit-copy-field">所属字段<select id="editCopyItemField"></select></label>
+                  <label class="edit-copy-field">项目名称<input id="editCopyItemName" type="text" list="editCopyItemList" maxlength="255" autocomplete="off"></label>
+                  <datalist id="editCopyItemList"></datalist>
+                  <label class="edit-copy-field edit-pivot-expression">项目公式<input id="editCopyItemFormula" type="text" placeholder="=项目一+项目二" spellcheck="false"></label>
+                  <button id="editCopyItemApply" class="mini-button" type="button">添加项目</button>
+                  <button id="editCopyItemRemove" class="mini-button" type="button" hidden>移除项目</button>
+                </div>
+              </details>
             </fieldset>
             <button id="editCopyCharts" type="button" class="mini-button" hidden>刷新图表数据</button>
           </div>
@@ -813,6 +841,7 @@
   <script src="/assets/task-recovery-model.js"></script>
   <script src="/assets/task-recovery.js"></script>
   <script src="/assets/session.js"></script>
+  <script src="/assets/activity.js"></script>
   <script src="/assets/grid-borders.js"></script>
   <script src="/assets/recent.js"></script>
   <script src="/assets/multisort.js"></script>
@@ -949,7 +978,7 @@
       <main class="analysis-main">
         <section class="analysis-panel" data-analysis-panel="pivot">
           <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" disabled title="将筛选及计算列加工后的原始明细提取到独立编辑表（最多1万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" disabled>导出结果</button></div></div></div>
-          <div id="analysisProgress" class="analysis-progress" hidden><div class="analysis-progress-top"><span id="analysisProgressText">正在分析…</span><strong id="analysisProgressPercent"></strong></div><div class="analysis-progress-track"><span id="analysisProgressBar"></span></div></div>
+          <div id="analysisProgress" class="analysis-progress" hidden><div class="analysis-progress-top"><span class="activity-line"><span id="analysisActivity" class="activity-slot" data-native-percent></span><span id="analysisProgressText">正在分析…</span></span><strong id="analysisProgressPercent"></strong></div><div class="analysis-progress-track"><span id="analysisProgressBar"></span></div></div>
           <div id="analysisMetrics" class="analysis-metrics" hidden></div>
           <div class="analysis-chart-card"><div class="analysis-card-header"><div><h3>数据可视化</h3><span id="analysisChartSummary">选择分类和指标后生成图表</span></div><div class="analysis-chart-tools"><button id="analysisSnapshotSave" type="button" class="analysis-outline-button" disabled>保存快照</button><button id="analysisChartImage" type="button" class="analysis-outline-button" disabled>导出图片</button><label for="analysisChartMetric" id="analysisChartMetricLabel" hidden>指标</label><select id="analysisChartMetric" class="analysis-chart-select" hidden aria-label="选择图表指标"></select><label for="analysisChartSelect">类型</label><select id="analysisChartSelect" class="analysis-chart-select"><option value="bar">纵向柱状</option><option value="horizontal">横向条形</option><option value="line">折线</option><option value="area">面积</option><option value="donut">环形</option><option value="pie">饼图</option><option value="scatter">散点</option><option value="stacked">堆叠柱状</option><option value="heatmap">热力矩阵</option></select></div></div>
           <div class="analysis-plot-wrap"><canvas id="analysisChart" aria-label="交互式汇总图表" role="img"></canvas><div id="analysisChartHint" class="analysis-chart-hint">选择左侧字段，或从模板库选择分析方案。</div><div id="analysisChartTooltip" class="analysis-chart-tooltip" hidden></div></div></div>
@@ -979,6 +1008,8 @@
   <script src="/assets/edit-copy-model.js"></script>
   <script src="/assets/edit-grid.js"></script>
   <script src="/assets/edit-pivot.js"></script>
+  <script src="/assets/edit-pivot-values.js"></script>
+  <script src="/assets/edit-pivot-items.js"></script>
   <script src="/assets/edit-tools.js"></script>
   <script src="/assets/edit-copy.js"></script>
   <script src="/assets/wire.js"></script>

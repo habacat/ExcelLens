@@ -15,6 +15,8 @@ import pythoncom
 from win32com.client import DispatchEx
 from edit_recalculation_excel import service
 from pivot_reference import compare_saved_pivot
+from array_reference import compare_array_caches
+from pivot_chart_reference import compare_pivot_charts
 
 
 def native_axes(pivot, axes):
@@ -64,6 +66,63 @@ def native_axes(pivot, axes):
 def native_operation(book, change):
     sheet = book.Worksheets(change['sheet'])
     kind = change['kind']
+    if kind == 'cellEdit':
+        for c in change['changes']:
+            dest = book.Worksheets(c['sheet']).Cells(c['row'], c['col'])
+            value = c['value']
+            if value['kind'] == 'blank':
+                dest.ClearContents()
+            elif value['kind'] == 'formula':
+                dest.Formula2 = value['raw']
+            else:
+                dest.Value2 = float(value['raw']) if value['kind'] == 'number' else value['raw']
+        return
+    if kind in ('fixedArray', 'spillFormula', 'clearArray'):
+        region = sheet.Range(change['range'])
+        anchor = region.Cells(1, 1)
+        if anchor.HasArray:
+            anchor.CurrentArray.ClearContents()
+        elif kind == 'clearArray':
+            anchor.ClearContents()
+        if kind == 'fixedArray':
+            region.FormulaArray = change['formula']
+        elif kind == 'spillFormula':
+            anchor.Formula2 = change['formula']
+        return
+    if kind in ('mergeCells','unmergeCells'):
+        region=sheet.Range(change['range'])
+        (region.Merge if kind=='mergeCells' else region.UnMerge)()
+        return
+    if kind == 'pivotCalculatedItem':
+        pivot = sheet.PivotTables(change['pivot'])
+        pivot.PivotCache().Refresh()
+        entry = change['calculatedItem']
+        field = pivot.PivotFields(entry['field'])
+        item = next((i for i in field.CalculatedItems() if str(i.Name) == entry['name']), None)
+        if item is None:
+            field.CalculatedItems().Add(entry['name'], entry['formula'])
+        elif entry['formula']:
+            item.Formula = entry['formula']
+        else:
+            item.Delete()
+        assert pivot.RefreshTable()
+        return
+    if kind == 'pivotValueFilter':
+        p = sheet.PivotTables(change['pivot'])
+        p.PivotCache().Refresh()
+        spec = change['valueFilter']
+        field = p.PivotFields(spec['field'])
+        field.ClearValueFilters()
+        if spec['kind'] != 'clear':
+            modes = ['topCount','bottomCount','topPercent','bottomPercent','topSum','bottomSum',
+                     'valueEqual','valueNotEqual','valueGreaterThan','valueGreaterThanOrEqual',
+                     'valueLessThan','valueLessThanOrEqual','valueBetween','valueNotBetween']
+            args = dict(Type=modes.index(spec['kind'])+1, DataField=p.DataFields(1), Value1=spec['value'])
+            if spec['kind'] in ('valueBetween','valueNotBetween'):
+                args['Value2'] = spec['second']
+            field.PivotFilters.Add2(**args)
+        assert p.RefreshTable()
+        return
     if kind == 'refreshCharts':
         for chart in sheet.ChartObjects(): chart.Chart.Refresh()
         return
@@ -136,7 +195,7 @@ def ordered_double(x):
     return -(1 << 63) - bits if bits < 0 else bits
 
 
-def compare_books(excel, expected, artifact, rectangles, check_names=False, format_cells=None, numeric=None):
+def compare_books(excel, expected, artifact, rectangles, check_names=False, format_cells=None, numeric=None, ownership=False):
     actual = excel.Workbooks.Open(str(artifact), UpdateLinks=0, ReadOnly=True, CorruptLoad=0)
     try:
         excel.CalculateFull()
@@ -160,6 +219,12 @@ def compare_books(excel, expected, artifact, rectangles, check_names=False, form
                 assert len(l) == len(r) == columns
                 for col,(v,w) in enumerate(zip(l,r)):
                     coords = (index,address,row+1,col+1)
+                    if ownership:
+                        ca,cb=a.Cells(row+1,col+1),b.Cells(row+1,col+1)
+                        assert ca.MergeArea.Address==cb.MergeArea.Address,(coords,'MergeArea',ca.MergeArea.Address,cb.MergeArea.Address)
+                        assert ca.HasArray==cb.HasArray,(coords,'array')
+                        if ca.HasArray:
+                            assert ca.CurrentArray.Address==cb.CurrentArray.Address,(coords,'array range',ca.CurrentArray.Address,cb.CurrentArray.Address)
                     assert type(v) is type(w), (coords,'Value2 type',type(v),type(w))
                     if type(w) is float:
                         delta = abs(v-w)
@@ -277,7 +342,10 @@ def run(probe, source, case, output):
                     def step(action, change=None):
                         nonlocal rev, book
                         op = dict(request=uuid4().hex, revision=rev,action=action)
-                        if change: op['structure']=change
+                        if change and change['kind'] == 'cellEdit':
+                            op.update(action='change', changes=change['changes'])
+                        elif change:
+                            op['structure'] = change
                         response = call('/api/edits/commit',dict(document=doc,operation=op))
                         rev = response['committed']
                         assert call('/api/edits/commit',dict(document=doc,operation=op))==response
@@ -285,6 +353,10 @@ def run(probe, source, case, output):
                             book = call('/api/edits/base',dict(book=book,document=doc,revision=rev))['book']
                         assert book==response['book']
                         call('/api/edits/grid',dict(document=doc,revision=rev,book=book,mode='projection'))
+                    def apply_native(change):
+                        native_operation(ref, change)
+                        for downstream in case.get('downstream', []):
+                            native_operation(ref, dict(kind='refreshPivot', **downstream))
                     def verify(stage, index):
                         x = call('/api/edits/save',dict(document=doc,revision=rev))
                         artifact=root/('generated-'+rev+'.xlsx')
@@ -293,14 +365,24 @@ def run(probe, source, case, output):
                         if saved_caches:
                             check_chart_cache(artifact, saved_caches)
                         record = dict(stage=stage, revision=rev)
-                        if case.get('comparePivotDisk'):
+                        if case.get('compareArrayDisk'):
+                            native = root/('array-reference-'+rev+'.xlsx')
+                            excel.CalculateFull()
+                            ref.SaveCopyAs(str(native))
+                            record['savedCells'] = compare_array_caches(artifact, native, case['rectangles'])
+                        if case.get('comparePivotDisk') or case.get('compareChartDisk'):
                             native = root/('native-saved-'+rev+'.xlsx')
                             ref.SaveCopyAs(str(native))
                             pivot = case['changes'][0]
-                            record['savedPivot'] = compare_saved_pivot(artifact,native,pivot['sheet'],case['rectangles'][pivot['sheet']],pivot['pivot'],records=index>0)
+                            if case.get('comparePivotDisk'):
+                                record['savedPivot'] = compare_saved_pivot(artifact,native,pivot['sheet'],case['rectangles'][pivot['sheet']],pivot['pivot'],records=index>0)
+                            for part in case.get('downstream', []):
+                                record.setdefault('downstream', []).append(compare_saved_pivot(artifact,native,part['sheet'],case['rectangles'][part['sheet']],part['pivot'],records=index>0))
+                            if case.get('compareChartDisk'):
+                                record['pivotChartPoints'] = compare_pivot_charts(artifact,native)
                         formats = case.get('formatCells') if index > 0 else None
                         record['numbers'] = comparison_stats()
-                        n = compare_books(excel,ref,artifact,case['rectangles'],case.get('names',False),formats,record['numbers'])
+                        n = compare_books(excel,ref,artifact,case['rectangles'],case.get('names',False),formats,record['numbers'],case.get('ownership',False))
                         record['cells']=n
                         if saved_caches: record['chartCacheParts'] = len(saved_caches)
                         if case.get('refreshAndResave'):
@@ -326,14 +408,14 @@ def run(probe, source, case, output):
                         if ribbon:
                             select_reference(ribbon['edit'])
                         else:
-                            native_operation(ref,change)
+                            apply_native(change)
                         verify(change['kind'], i+1)
                     if len(case['changes'])==1 or case.get('fullHistory'):
                         # Reconstruct each Excel reference from the immutable source.
                         for index in range(len(case['changes'])-1, -1, -1):
                             select_reference(ribbon['undo'] if ribbon else original)
                             if cell: ref.Worksheets(cell['sheet']).Cells(cell['row'],cell['col']).Value2 = float(cell['value']['raw'])
-                            for change in case['changes'][:index]: native_operation(ref,change)
+                            for change in case['changes'][:index]: apply_native(change)
                             step('undo')
                             verify('undo', index)
                         for index,change in enumerate(case['changes'],1):
@@ -341,7 +423,7 @@ def run(probe, source, case, output):
                             if ribbon:
                                 select_reference(ribbon['redo'])
                             else:
-                                native_operation(ref,change)
+                                apply_native(change)
                             verify('redo', index)
             finally:
                 ref.Close(False)

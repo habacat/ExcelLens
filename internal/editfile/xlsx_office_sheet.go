@@ -113,7 +113,7 @@ func (p *xlsxPackage) readOfficeCells(ctx context.Context, cells []editdoc.Addre
 				if len(v.value.Raw) > formats.EditCellBytes || v.cache != nil && len(v.cache.Raw) > formats.EditCellBytes {
 					return nil, ErrXLSX
 				}
-				result[c.address] = SourceCell{Value: v.value, Cache: v.cache, ReadOnly: v.readOnly, formula: v.formula, names: p.names, rules: v.rules, protected: v.protected}
+				result[c.address] = SourceCell{Array: v.array, Value: v.value, Cache: v.cache, ReadOnly: v.readOnly, formula: v.formula, names: p.names, rules: v.rules, protected: v.protected}
 			}
 		}
 	}

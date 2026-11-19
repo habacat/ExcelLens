@@ -38,6 +38,7 @@ var sheetElements = map[string][]string{
 }
 
 type sheetCell struct {
+	array                                    *ArrayOwner
 	protected                                bool
 	rules                                    []validatedRule
 	value                                    editdoc.Value
@@ -191,7 +192,7 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 	columnStyles := map[int]string{}
 	var cell sheetCell
 	var stored, inline, text, formula bool
-	var cm string
+	var cm, vm string
 	var formulaTag sourceFormulaTag
 	var raw, expression strings.Builder
 	summary := XLSXSheet{Name: shape.Name, Part: shape.Part, ReadOnly: shape.ReadOnly}
@@ -298,9 +299,13 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 				}
 			case "c":
 				cm = attribute(token, "", "cm")
+				vm = attribute(token, "", "vm")
 				for _, a := range token.Attr {
-					if !nsDeclaration(a) && (a.Name.Space != "" || !slices.Contains([]string{"r", "s", "t", "cm"}, a.Name.Local)) {
+					if !nsDeclaration(a) && (a.Name.Space != "" || !slices.Contains([]string{"r", "s", "t", "cm", "vm"}, a.Name.Local)) {
 						return ErrXLSX
+					}
+					if a.Name == (xml.Name{Local: "vm"}) && (p.rich == nil || p.rich.code(vm) == "" || attribute(token, "", "t") != "e") {
+						return fmt.Errorf("%w：单元格值元数据 %s", ErrXLSX, vm)
 					}
 					if a.Name == (xml.Name{Local: "cm"}) && (cm != "1" || !p.dynamic || !p.layout.Structured) {
 						return fmt.Errorf("%w：单元格元数据", ErrXLSX)
@@ -396,6 +401,9 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 					if err != nil {
 						return err
 					}
+					if vm != "" && cache != nil {
+						cache.Raw = p.rich.code(vm)
+					}
 					cell.cache = cache
 					summary.Formulas++
 					if cache != nil {
@@ -425,6 +433,9 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 					}
 					if err != nil {
 						return err
+					}
+					if vm != "" {
+						v.Raw = p.rich.code(vm)
 					}
 					cell.value = v
 					if structure.visitArrayResult != nil && structure.arrayThrough[col] >= row && v.Kind != "blank" {
@@ -489,6 +500,12 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 				}
 				if p.layout.Structured {
 					c.original.protected = structure.protected
+					for _, rect := range structure.arrayRanges {
+						if rect.contains(c.address.Row, c.address.Col) {
+							c.original.array = &ArrayOwner{Range: pivotRectRef(rect), Dynamic: structure.arrayDynamic[rect]}
+							break
+						}
+					}
 					c.original.readOnly = structure.readOnly(shape, *c, p.unlockedStyles[c.original.value.Style])
 					if reason := p.layout.tableLock(c.address); reason != "" {
 						c.original.readOnly = reason
@@ -618,7 +635,7 @@ func (l XLSXLayout) validateStoredValue(ctx context.Context, a editdoc.Address, 
 	if !value.Valid() {
 		return editdoc.ErrInvalid
 	}
-	if source.formula.kind == "array" && !source.formula.area.single() && value.Kind != "formula" {
+	if source.formula.kind == "array" && !source.formula.dynamic && !source.formula.area.single() && value.Kind != "formula" && value.Kind != "" {
 		return errors.New("多格数组的锚点须保留公式")
 	}
 	switch value.Kind {
@@ -628,13 +645,17 @@ func (l XLSXLayout) validateStoredValue(ctx context.Context, a editdoc.Address, 
 				return errors.New("公式含保留的 XML 转义形式")
 			}
 			p := xlsxPackage{layout: l, names: source.names}
-			parsed, err := p.parseFormula(ctx, value.Raw[1:], a, nil)
-			if err == nil && source.formula.dynamic && !parsed.Scalar {
-				return errors.New("该动态数组公式的结果可能溢出原区域")
-			}
+			_, err := p.parseFormula(ctx, value.Raw[1:], a, nil)
 			return err
 		}
-		return l.validateFormula(ctx, value.Raw)
+		if err := l.validateFormula(ctx, value.Raw); err != nil {
+			p := xlsxPackage{layout: l, names: source.names}
+			parsed, wider := p.parseFormula(ctx, strings.TrimPrefix(value.Raw, "="), a, nil)
+			if wider != nil || parsed.Scalar || xlsxTextEscapes.MatchString(value.Raw) {
+				return err
+			}
+		}
+		return nil
 	case "text":
 		return validateXLSXText(value.Raw)
 	case "number":

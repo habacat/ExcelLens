@@ -60,9 +60,13 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 ### 服务入口和前端组件
 
+原生文件打开入口先分配独立会话，该会话的首次 API 调用再读取文件。网页等待任务由当前文档的 `activity.js` 持有。一次任务可以连续跨过传输、解析、索引和显示阶段，轮询、取消和迟到响应均使用原任务句柄。已有进度区可接入同一指示器，空闲文档不订阅其他页的任务。`motion.css` 负责控件与弹层的时序，网格坐标和大小直接更新。
+
 工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
 
 界面的 A1 坐标转换由 `cell-address.js` 提供，调用方传入来源容量。命令检索、键盘选择及可用性判断由 `command-palette.js` 管理，操作回调由应用装配。视口的覆盖范围、字节估计和缓存淘汰由 `viewport-cache.js` 管理。网格请求直接持有写入或复用的条目，缓存总量由同一组件维护。
+
+复制沿用当前工作表的源合并索引，无需读取虚拟网格的 DOM。普通视图将矩形扩到完整的合并范围后计算容量。编辑副本网格按本次修订投影选区内的值和公式结果。HTML 表格在左上角写入 `rowspan` 和 `colspan`，TSV 在覆盖坐标写入空字段。行序发生变化时，只对按源顺序相邻的对应行写入跨行合并。Windows 由浏览器将 HTML 片段写成系统剪贴板格式。原生回归从该剪贴板执行普通粘贴，逐格读取 `Value2` 和 `MergeArea`，并检查矩形外围。[HTML 表格模型](https://html.spec.whatwg.org/multipage/tables.html#table-model) · [Windows HTML Clipboard Format](https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format) · [Excel Range.MergeArea](https://learn.microsoft.com/en-us/office/vba/api/excel.range.mergearea)
 
 ### 从一次格内编辑到一个可下载的副本
 

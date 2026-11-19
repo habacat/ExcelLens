@@ -3,21 +3,41 @@ package editdoc
 // At and Before use one-based coordinates of the current revision. Before
 // identifies the original row or column before which a moved block is placed.
 type Structure struct {
-	Kind       string     `json:"kind"`
-	Sheet      string     `json:"sheet"`
-	Name       string     `json:"name,omitempty"`
-	At         int        `json:"at,omitempty"`
-	Count      int        `json:"count,omitempty"`
-	Before     int        `json:"before,omitempty"`
-	Pivot      string     `json:"pivot,omitempty"`
-	Rows       string     `json:"rows,omitempty"`
-	Columns    string     `json:"columns,omitempty"`
-	Data       string     `json:"data,omitempty"`
-	Aggregate  string     `json:"aggregate,omitempty"`
-	Filter     string     `json:"filter,omitempty"`
-	FilterMode string     `json:"filterMode,omitempty"`
-	Item       string     `json:"item,omitempty"`
-	Axes       *PivotAxes `json:"axes,omitempty"`
+	Kind            string               `json:"kind"`
+	Sheet           string               `json:"sheet"`
+	Name            string               `json:"name,omitempty"`
+	At              int                  `json:"at,omitempty"`
+	Count           int                  `json:"count,omitempty"`
+	Before          int                  `json:"before,omitempty"`
+	Pivot           string               `json:"pivot,omitempty"`
+	Rows            string               `json:"rows,omitempty"`
+	Columns         string               `json:"columns,omitempty"`
+	Data            string               `json:"data,omitempty"`
+	Aggregate       string               `json:"aggregate,omitempty"`
+	Filter          string               `json:"filter,omitempty"`
+	FilterMode      string               `json:"filterMode,omitempty"`
+	Item            string               `json:"item,omitempty"`
+	CalculatedItem  *PivotCalculatedItem `json:"calculatedItem,omitempty"`
+	ValueFilter     *PivotValueFilter    `json:"valueFilter,omitempty"`
+	Axes            *PivotAxes           `json:"axes,omitempty"`
+	Range           string               `json:"range,omitempty"`
+	Formula         string               `json:"formula,omitempty"`
+	ReplaceContents bool                 `json:"replaceContents,omitempty"`
+}
+
+type PivotCalculatedItem struct {
+	Field   string `json:"field"`
+	Name    string `json:"name"`
+	Formula string `json:"formula"`
+}
+
+// PivotValueFilter applies the selected data measure to the members of one
+// axis field. A second bound is used by between and not-between comparisons.
+type PivotValueFilter struct {
+	Field  string  `json:"field"`
+	Kind   string  `json:"kind"`
+	Value  float64 `json:"value"`
+	Second float64 `json:"second,omitempty"`
 }
 
 // Axis order is significant. A page with no selected items displays all items.

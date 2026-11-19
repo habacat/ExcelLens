@@ -14,7 +14,7 @@ class Client{
   async shot(file){await this.call('Page.bringToFront');await this.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');const r=await this.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(file,Buffer.from(r.data,'base64'));}
   close(){for(const item of this.pending.values()){clearTimeout(item.timer);item.reject(Error('QA browser closed'));}this.pending.clear();this.socket.close();}
 }
-async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe')}){
+async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe'),launchFile,systemClipboard=false}){
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'excellens-ui-qa-'));
   const profile = path.join(storage, 'chrome');
   const clients = [];
@@ -59,13 +59,18 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
   }
   const harness={storage,close,async tabs(){return(await fetch('http://127.0.0.1:'+port+'/json/list')).json();},async connect(tab){const socket=new WebSocket(tab.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});const c=new Client(socket,errors);clients.push(c);await c.call('Runtime.enable');await c.call('Page.enable');return c;}};
   const startServer=async()=>{
-    server=spawn(exe,['-duration',duration,'-storage',storage],{cwd:path.resolve(__dirname,'../..'),windowsHide:true,stdio:['ignore','pipe','pipe']});
+    const args=['-duration',duration,'-storage',storage];
+    if(launchFile)args.push('-launch-file',path.resolve(launchFile));
+    server=spawn(exe,args,{cwd:path.resolve(__dirname,'../..'),windowsHide:true,stdio:['ignore','pipe','pipe']});
     harness.address=await new Promise((resolve,reject)=>{let text='',errors='';server.stderr.on('data',x=>errors+=x);server.stdout.on('data',x=>{text+=x;if(text.includes('\n')){try{resolve(JSON.parse(text.split('\n')[0]).url);}catch(e){reject(e);}}});server.once('error',reject);server.once('exit',code=>reject(Error('uiprobe exited '+code+' '+errors)));});
   };
   harness.restart=async()=>{await stop(server);await startServer();return harness.address;};
   try{
     await startServer();
-    browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+    // Headless Chrome has a private clipboard. A Windows interop check needs
+    // the browser's platform clipboard, shared with the separate Excel instance.
+    const display=systemClipboard ? ['--incognito','--disable-background-mode','--window-position=-32000,-32000'] : ['--headless=new'];
+    browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',[...display,'--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
     await new Promise((resolve, reject) => {
       browser.once('spawn', resolve);
       browser.once('error', reject);

@@ -263,6 +263,11 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 			}
 		}
 	}
+	if p.chart != nil {
+		if err := p.chart.bind(p, c, rows, cols, grid, body, top, left, cap); err != nil {
+			return nil, nil, err
+		}
+	}
 	raw, err := p.layoutXML(ctx, c, rows, cols, body, dataRow, dataCol, pg, caption)
 	return raw, grid.cells, err
 }

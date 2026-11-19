@@ -14,6 +14,7 @@ import (
 )
 
 type pivotPlan struct {
+	chart               *pivotChartData
 	part, sheet         string
 	table               pivotTableXML
 	xml                 []byte
@@ -21,6 +22,7 @@ type pivotPlan struct {
 	rows, cols, pages   []int
 	selections          map[int][]editdoc.PivotItem
 	aggregation, filter string
+	valueFilters        []pivotFilter
 	keepFilter          bool
 	old                 cellRect
 	oldPages            []cellRect
@@ -127,6 +129,13 @@ func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cache
 		}
 		plan.selections[plan.pages[len(plan.pages)-1]] = page.Items
 	}
+	plan.valueFilters, err = t.valueFilters(len(fields))
+	if err != nil {
+		return plan, err
+	}
+	if err = plan.configureValueFilter(fields, change); err != nil {
+		return plan, err
+	}
 	return plan, nil
 }
 
@@ -135,21 +144,34 @@ func (p *xlsxPackage) rewritePivot(ctx context.Context, dst io.Writer, src *work
 	if err != nil {
 		return opc.Receipt{}, err
 	}
-	cache := p.pivotOutputs[target]
-	fields, definition, err := p.cacheFields(ctx, cache)
+	values, err := newObjectValues(ctx, src, p.layout)
 	if err != nil {
 		return opc.Receipt{}, err
+	}
+	return p.refreshPivotCaches(ctx, dst, target, &op, values)
+}
+
+type pivotCacheChanges struct {
+	cells  map[editdoc.Address]editdoc.Value
+	plans  []pivotPlan
+	charts []*pivotChartData
+}
+
+func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string, op *editdoc.Structure, values objectValues, updates map[string][]byte, chartKeys map[string]bool) (*pivotCacheChanges, error) {
+	fields, definition, err := p.cacheFields(ctx, cache)
+	if err != nil {
+		return nil, err
 	}
 	if err := walkXML(ctx, definition, func(e xmlEvent) error {
 		if tag, ok := e.token.(xml.StartElement); ok && tag.Name.Space == mainNS {
 			switch tag.Name.Local {
-			case "calculatedItems", "calculatedMembers", "fieldGroup", "cacheHierarchies", "dimensions", "measureGroups":
+			case "calculatedMembers", "fieldGroup", "cacheHierarchies", "dimensions", "measureGroups":
 				return errors.New("此缓存含计算项目、分组或数据模型，请在 Excel 中刷新")
 			}
 		}
 		return nil
 	}); err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
 	var recordPart string
 	for _, part := range p.links[cache] {
@@ -158,26 +180,22 @@ func (p *xlsxPackage) rewritePivot(ctx context.Context, dst io.Writer, src *work
 		}
 	}
 	if recordPart == "" {
-		return opc.Receipt{}, errors.New("透视缓存没有已保存的记录部件")
-	}
-	values, err := newObjectValues(ctx, src, p.layout)
-	if err != nil {
-		return opc.Receipt{}, err
+		return nil, errors.New("透视缓存没有已保存的记录部件")
 	}
 	names := make([]string, len(fields))
 	for i, f := range fields {
 		if f.Formula != "" {
-			return opc.Receipt{}, errors.New("此缓存含计算字段")
+			return nil, errors.New("此缓存含计算字段")
 		}
 		names[i] = f.Name
 	}
 	schema, err := readPivotSchema(values, p.pivotSources[cache], names)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
 	fields, definition, err = schema.cache(ctx, definition, fields)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
 	var plans []pivotPlan
 	dimensions := map[int]bool{}
@@ -187,11 +205,20 @@ func (p *xlsxPackage) rewritePivot(ctx context.Context, dst io.Writer, src *work
 		}
 		var change *editdoc.Structure
 		if f.Name == target {
-			change = &op
+			change = op
 		}
 		plan, err := p.planPivot(ctx, f.Name, fields, schema, change)
 		if err != nil {
-			return opc.Receipt{}, fmt.Errorf("%s：%w", f.Name, err)
+			return nil, fmt.Errorf("%s：%w", f.Name, err)
+		}
+		if change != nil && change.Kind == "pivotCalculatedItem" {
+			if change.CalculatedItem == nil {
+				return nil, ErrTarget
+			}
+			index := findField(fields, change.CalculatedItem.Field)
+			if !slices.Contains(plan.rows, index) && !slices.Contains(plan.cols, index) {
+				return nil, errors.New("请选择行或列字段创建计算项目")
+			}
 		}
 		for _, axis := range [][]int{plan.rows, plan.cols, plan.pages} {
 			for _, i := range axis {
@@ -202,77 +229,44 @@ func (p *xlsxPackage) rewritePivot(ctx context.Context, dst io.Writer, src *work
 	}
 	records, err := loadPivotRecords(ctx, values, p.pivotSources[cache], fields, dimensions)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
+	}
+	definition, err = records.configureCalculatedItems(ctx, definition, fields, schema, op)
+	if err != nil {
+		return nil, err
 	}
 	newDef, err := records.definition(ctx, definition)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
 	oldRecords, err := p.readPart(ctx, recordPart)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
 	newRecords, err := records.xmlRecords(ctx, oldRecords)
 	if err != nil {
-		return opc.Receipt{}, err
+		return nil, err
 	}
-	updates := map[string][]byte{cache: newDef, recordPart: newRecords}
-	edits := map[string]map[editdoc.Address]editdoc.Value{}
+	updates[cache], updates[recordPart] = newDef, newRecords
+	final := &pivotCacheChanges{cells: map[editdoc.Address]editdoc.Value{}, plans: plans}
 	for _, plan := range plans {
+		if chartKeys[chartKey(plan.sheet, plan.table.Name)] {
+			plan.chart = new(pivotChartData)
+		}
 		xmlTable, changes, err := plan.render(ctx, records, values)
 		if err != nil {
-			return opc.Receipt{}, err
+			return nil, err
 		}
 		updates[plan.part] = xmlTable
-		if edits[plan.sheet] == nil {
-			edits[plan.sheet] = map[editdoc.Address]editdoc.Value{}
+		if plan.chart != nil {
+			final.charts = append(final.charts, plan.chart)
 		}
 		for a, v := range changes {
-			if _, found := edits[plan.sheet][a]; found {
-				return opc.Receipt{}, errors.New("更新后的透视结果区域重叠")
+			if _, found := final.cells[a]; found {
+				return nil, errors.New("更新后的透视结果区域重叠")
 			}
-			edits[plan.sheet][a] = v
+			final.cells[a] = v
 		}
 	}
-	for _, sheet := range p.layout.Sheets {
-		if len(edits[sheet.Name]) == 0 {
-			continue
-		}
-		data, err := p.pivotSheet(ctx, sheet, edits[sheet.Name], plans)
-		if err != nil {
-			return opc.Receipt{}, err
-		}
-		updates[sheet.Part] = data
-	}
-	if p.files["xl/sharedStrings.xml"] != nil {
-		data, err := p.readPart(ctx, "xl/sharedStrings.xml")
-		if err != nil {
-			return opc.Receipt{}, err
-		}
-		ps, err := sharedCountPatches(ctx, data)
-		if err != nil {
-			return opc.Receipt{}, err
-		}
-		if len(ps) > 0 {
-			updates["xl/sharedStrings.xml"], err = applyXML(ctx, data, ps)
-			if err != nil {
-				return opc.Receipt{}, err
-			}
-		}
-	}
-	changes := map[editdoc.Address]editdoc.Value{}
-	for _, cells := range edits {
-		for a, v := range cells {
-			changes[a] = v
-		}
-	}
-	recalculated, err := values.book.Calculate(ctx, changes, nil)
-	if err != nil {
-		return opc.Receipt{}, err
-	}
-	current := objectValues{book: values.book, calculation: recalculated, overlay: changes}
-	if err := p.refreshDependents(ctx, current, updates); err != nil {
-		return opc.Receipt{}, err
-	}
-	return replaceParts(ctx, dst, p.zip, updates)
+	return final, nil
 }

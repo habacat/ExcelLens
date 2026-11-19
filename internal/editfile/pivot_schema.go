@@ -178,9 +178,9 @@ func (s pivotSchema) table(ctx context.Context, raw []byte) ([]byte, error) {
 		switch {
 		case e.local() == "field" && (e.parent() == "rowFields" || e.parent() == "colFields"):
 			key = "x"
-		case e.local() == "pageField" && e.parent() == "pageFields", e.local() == "dataField" && e.parent() == "dataFields":
+		case e.local() == "pageField" && e.parent() == "pageFields", e.local() == "dataField" && e.parent() == "dataFields", e.local() == "filter" && e.parent() == "filters":
 			key = "fld"
-		case e.local() == "formats" || e.local() == "conditionalFormats" || e.local() == "chartFormats" || e.local() == "filters" || e.local() == "autoSortScope":
+		case e.local() == "formats" || e.local() == "conditionalFormats" || e.local() == "chartFormats" || e.local() == "autoSortScope":
 			return errors.New("透视源字段变化涉及专用格式或筛选，需在 Excel 中重绑")
 		default:
 			return nil
@@ -194,6 +194,9 @@ func (s pivotSchema) table(ctx context.Context, raw []byte) ([]byte, error) {
 			return err
 		}
 		if n < 0 {
+			if e.local() == "filter" {
+				return errors.New("透视源已移除值筛选字段，请先清除该筛选")
+			}
 			if e.local() == "dataField" {
 				return errors.New("透视源已移除当前值字段")
 			}

@@ -2,11 +2,49 @@ package server
 
 import (
 	"encoding/json"
+	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestRecentRequestBodyCannotBlockAnotherTabsList(t *testing.T) {
+	isolateTestStorage(t)
+	app, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	body, writer := io.Pipe()
+	postDone := make(chan struct{})
+	go func() {
+		defer close(postDone)
+		defer body.Close()
+		app.handleRecent(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/recent", body))
+	}()
+	defer func() { _ = writer.Close(); <-postDone }()
+	// Write waits until the handler is reading. Leave the JSON body unfinished.
+	if _, err := io.WriteString(writer, "{"); err != nil {
+		t.Fatal(err)
+	}
+	list := make(chan int, 1)
+	go func() {
+		response := httptest.NewRecorder()
+		app.handleRecent(response, httptest.NewRequest("GET", "/api/recent", nil))
+		list <- response.Code
+	}()
+	select {
+	case code := <-list:
+		if code != 200 {
+			t.Fatal(code)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("an unfinished request held the shared recent history lock")
+	}
+}
 
 func TestRecentFilesReopenPinRemoveAndMissing(t *testing.T) {
 	isolateTestStorage(t)

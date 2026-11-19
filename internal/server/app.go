@@ -221,6 +221,10 @@ func New() (*App, error) {
 }
 
 func (a *App) OpenPath(filePath string) error {
+	return a.openPathAs(filePath, "")
+}
+
+func (a *App) openPathAs(filePath, displayName string) error {
 	if archives.IsPath(filePath) {
 		return a.openArchive(context.Background(), filePath, filepath.Base(filePath), 0)
 	}
@@ -233,6 +237,9 @@ func (a *App) OpenPath(filePath string) error {
 		return err
 	}
 	defer release()
+	if displayName != "" {
+		wb.SetDisplayName(displayName)
+	}
 	a.replaceWorkbook(wb, "")
 	a.recordRecent(wb)
 	return nil

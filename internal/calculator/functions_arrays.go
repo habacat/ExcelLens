@@ -261,8 +261,11 @@ func arrayFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 			return FormulaValue{}, err
 		}
 		cols, err := integer(1, 1)
-		if err != nil || rows < 1 || cols < 1 || rows > maxArrayCells || cols > maxArrayCells || rows*cols > maxArrayCells {
+		if err != nil || rows < 1 || cols < 1 {
 			return FormulaValue{}, errors.New("#NUM! SEQUENCE 尺寸无效")
+		}
+		if rows > maxArrayCells || cols > maxArrayCells || rows*cols > maxArrayCells {
+			return FormulaValue{}, errors.New("#NUM! 数组超过20万格")
 		}
 		start, step := big.NewRat(1, 1), big.NewRat(1, 1)
 		for i, target := range []*big.Rat{start, step} {

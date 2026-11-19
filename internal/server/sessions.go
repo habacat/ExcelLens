@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,6 +35,10 @@ func validSessionID(id string) bool {
 }
 
 func (a *App) sessionFor(id string) (*browserSession, error) {
+	return a.sessionWithLaunch(id, "")
+}
+
+func (a *App) sessionWithLaunch(id, launchPath string) (*browserSession, error) {
 	if !validSessionID(id) {
 		return nil, errors.New("无效的页面会话标识")
 	}
@@ -73,13 +78,38 @@ func (a *App) sessionFor(id string) (*browserSession, error) {
 	child.exportSem = a.exportSem
 	child.analysisSem = a.analysisSem
 	child.inspectSem = a.inspectSem
-	session := &browserSession{app: child, routes: child.routes(), lastSeen: now}
+	routes := child.routes()
+	if launchPath != "" {
+		next := routes
+		open := sync.OnceFunc(func() {
+			if err := child.OpenPath(launchPath); err != nil {
+				child.mu.Lock()
+				child.startupError = err.Error()
+				child.mu.Unlock()
+			}
+		})
+		routes = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			open()
+			next.ServeHTTP(w, r)
+		})
+	}
+	session := &browserSession{app: child, routes: routes, lastSeen: now}
 	a.sessions[id] = session
 	a.sessionsMu.Unlock()
 	for _, old := range expired {
 		old.Close()
 	}
 	return session, nil
+}
+
+// PreparePathForLaunch lets the browser paint before the first API request
+// reads the native file. Only the new tab waits, outside the sessions lock.
+func (a *App) PreparePathForLaunch(path string) (string, error) {
+	id := randomID()
+	if _, err := a.sessionWithLaunch(id, path); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // A native shell context-menu launch explicitly supplies a workbook. It opens

@@ -487,6 +487,12 @@ func (d *Document) commit(ctx context.Context, op Operation, prepare func([]Chan
 		if err != nil {
 			return 0, err
 		}
+		if planned.NextBase != nil {
+			// Keep the original request digest, including the submitted cells.
+			// The existing snapshot transaction replays across old and new bases.
+			tx.Action, tx.NextBase = "structure", planned.NextBase
+			break
+		}
 		if len(planned.Changes) > formats.EditBatchCells {
 			return 0, ErrHistory
 		}

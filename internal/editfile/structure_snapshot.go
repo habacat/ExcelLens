@@ -5,18 +5,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/formats"
+	"excellens/internal/opc"
 	"excellens/internal/workbook"
 )
 
 // MaterializeStructure runs while the document lease is held. A confirmed
 // revision never shares a filename with a later branch of its undo history.
 func MaterializeStructure(ctx context.Context, dir string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, op editdoc.Structure) (string, error) {
+	return materializeRevision(ctx, dir, doc, layout, src, doc.Snapshot(), doc.ColumnFormulas(), func(write io.Writer, source *workbook.EditSourceFile) (opc.Receipt, error) {
+		return RewriteStructure(ctx, write, source, op)
+	})
+}
+
+func materializeRevision(ctx context.Context, dir string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, values map[editdoc.Address]editdoc.Value, templates map[editdoc.Address]string, rewrite func(io.Writer, *workbook.EditSourceFile) (opc.Receipt, error)) (string, error) {
 	if layout.XLSX == nil {
 		return "", ErrTarget
 	}
@@ -28,8 +37,8 @@ func MaterializeStructure(ctx context.Context, dir string, doc *editdoc.Document
 	current := filepath.Join(dir, ".overlay")
 	defer os.Remove(current)
 	defer os.Remove(pending)
-	if doc.Changed != 0 || doc.Rules != 0 || len(doc.ColumnFormulas()) != 0 {
-		if err := materializeOverlay(ctx, current, doc, layout, src); err != nil {
+	if len(values) != 0 || doc.Rules != 0 || len(templates) != 0 {
+		if err := materializeOverlay(ctx, current, doc, layout, src, values, templates); err != nil {
 			return "", err
 		}
 		f, err := workbook.OpenEditSource(current)
@@ -44,7 +53,7 @@ func MaterializeStructure(ctx context.Context, dir string, doc *editdoc.Document
 		return "", err
 	}
 	write := &boundedCopy{ctx: ctx, file: out}
-	receipt, err := RewriteStructure(ctx, write, src, op)
+	receipt, err := rewrite(write, src)
 	if err == nil && len(receipt.Changed) == 0 {
 		err = editdoc.ErrNoChange
 	}
@@ -88,12 +97,12 @@ func MaterializeStructure(ctx context.Context, dir string, doc *editdoc.Document
 	return next, nil
 }
 
-func materializeOverlay(ctx context.Context, path string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile) error {
+func materializeOverlay(ctx context.Context, path string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, values map[editdoc.Address]editdoc.Value, templates map[editdoc.Address]string) error {
 	out, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	verify, err := layout.Write(ctx, &boundedCopy{ctx: ctx, file: out}, src, doc.Base.Source.Stamp, doc.Snapshot(), doc.RuleChanges(), doc.ColumnFormulas(), TextOptions{}, &Artifact{})
+	verify, err := layout.Write(ctx, &boundedCopy{ctx: ctx, file: out}, src, doc.Base.Source.Stamp, values, doc.RuleChanges(), templates, TextOptions{}, &Artifact{})
 	if err == nil {
 		err = verify(out)
 	}

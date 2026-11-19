@@ -51,6 +51,12 @@ var (
 
 func classifyPart(name string) partType {
 	switch name {
+	case richValuePart:
+		return richPartType("rdRichValue")
+	case richStructurePart:
+		return richPartType("rdRichValueStructure")
+	case richTypesPart:
+		return richPartType("rdRichValueTypes")
 	case "[Content_Types].xml":
 		return partType{role: "types"}
 	case "_rels/.rels", "xl/_rels/workbook.xml.rels":
@@ -138,7 +144,7 @@ func allowsRelationship(owner, role string) bool {
 	}
 	switch classifyPart(owner).role {
 	case "book":
-		return slices.Contains([]string{"sheet", "styles", "shared", "theme", "chain", "pivotCache", "sheetMetadata", "vba", "externalBook", "customXml"}, role)
+		return slices.Contains([]string{"sheet", "styles", "shared", "theme", "chain", "pivotCache", "sheetMetadata", "richValue", "vba", "externalBook", "customXml"}, role)
 	case "sheet":
 		return role == "table" || role == "pivotTable" || role == "drawing" || role == "notesDrawing" || role == "comments" || role == "printer" || role == "control"
 	case "customXml":

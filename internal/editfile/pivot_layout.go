@@ -19,6 +19,9 @@ func (d *pivotDimension) itemsXML() string {
 	fmt.Fprintf(&out, `<items xmlns="%s" count="%d">`, mainNS, len(d.items)+len(subs))
 	for _, it := range d.items {
 		fmt.Fprintf(&out, `<item x="%d"`, it.X)
+		if isTrue(it.Calculated) {
+			out.WriteString(` f="1"`)
+		}
 		if isTrue(it.Hidden) {
 			out.WriteString(` h="1"`)
 		}
@@ -158,6 +161,13 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 				if err := set(e, "axis", axis); err != nil {
 					return err
 				}
+				measure := ""
+				if slices.ContainsFunc(p.valueFilters, func(f pivotFilter) bool { return f.field == field }) {
+					measure = "1"
+				}
+				if err := set(e, "measureFilter", measure); err != nil {
+					return err
+				}
 				data := ""
 				if field == p.data {
 					data = "1"
@@ -223,7 +233,11 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 	if err != nil {
 		return nil, err
 	}
-	return applyXML(ctx, raw, patches)
+	data, err := applyXML(ctx, raw, patches)
+	if err != nil {
+		return nil, err
+	}
+	return p.writeValueFilters(ctx, data)
 }
 
 func (p *xlsxPackage) pivotSheet(ctx context.Context, sheet XLSXSheet, edits map[editdoc.Address]editdoc.Value, plans []pivotPlan) ([]byte, error) {
@@ -285,17 +299,12 @@ func (p *xlsxPackage) pivotSheet(ctx context.Context, sheet XLSXSheet, edits map
 			if c.original.protected {
 				return nil, errors.New("透视结果所在工作表受保护")
 			}
-			if inside && c.original.readOnly == lockPivotResult {
+			if inside && (c.original.readOnly == lockPivotResult || c.original.readOnly == lockPivotHeader || c.original.readOnly == lockPivotInput) {
 				c.original.readOnly = ""
 			}
 			if !inside {
 				if table, _ := p.layout.tableAt(a); table != nil {
 					return nil, fmt.Errorf("透视结果将覆盖 Excel 表格 %s", table.Name)
-				}
-				for _, source := range p.pivotSources {
-					if source.sheet == a.Sheet && source.area.contains(a.Row, a.Col) {
-						return nil, fmt.Errorf("透视结果将覆盖透视数据源 %s!%s%d", a.Sheet, workbook.ColumnName(a.Col), a.Row)
-					}
 				}
 			}
 			if !inside && (c.original.value.Kind != "blank" && c.original.value.Kind != "missing" || c.original.readOnly != "") {

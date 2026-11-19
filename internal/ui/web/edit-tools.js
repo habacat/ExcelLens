@@ -2,9 +2,14 @@
   'use strict';
   const el = suffix => document.getElementById('editCopy' + suffix);
 
+  const rangeKinds = new Set(['mergeCells', 'unmergeCells', 'fixedArray', 'spillFormula', 'clearArray']);
+  const arrayFormulaKinds = new Set(['fixedArray', 'spillFormula']);
+
   class EditTools {
     constructor(editor) {
       this.editor = editor;
+      this.calculatedItems = new window.ExcelLensPivotCalculatedItems(item => this.commit({kind:'pivotCalculatedItem', pivot:el('Pivot').value, calculatedItem:item}));
+      this.valueFilters = new window.ExcelLensPivotValues(filter => this.commit({kind:'pivotValueFilter', pivot:el('Pivot').value, valueFilter:filter}));
       this.pivotLayout = new window.ExcelLensPivotLayout(editor);
       this.selected = 'Copy';
       this.tabs = [...el('Tools').querySelectorAll('[role="tab"]')];
@@ -21,7 +26,10 @@
         this.structureFields(editor.cell);
         editor.controls();
       });
-      for (const id of ['NewName', 'At', 'Count', 'Before']) el(id).addEventListener('input', () => editor.controls());
+      for (const id of ['NewName', 'At', 'Count', 'Before', 'Range', 'ArrayFormula', 'ReplaceContents']) el(id).addEventListener('input', () => {
+        if (id === 'Range') el('ReplaceContents').checked = false;
+        editor.controls();
+      });
       el('ApplyStructure').addEventListener('click', () => this.commit(this.structureInput()));
       el('Pivot').addEventListener('change', () => {
         this.pivotFields();
@@ -40,7 +48,7 @@
 
     async commit(change) {
       if (!change) return;
-      const returnToGrid = this.contextualPivot && (change.kind === 'configurePivot' || change.kind === 'refreshPivot');
+      const returnToGrid = !!change.range || this.contextualPivot && ['configurePivot', 'refreshPivot', 'pivotValueFilter', 'pivotCalculatedItem'].includes(change.kind);
       const saved = await this.editor.commitStructure({...change, sheet:el('Sheet').value});
       if (saved && returnToGrid) this.editor.close();
     }
@@ -94,7 +102,7 @@
       el('ToolSelect').value = active || '';
       el('ToolSelect').disabled = blocked;
       if (active === 'Objects' && !blocked) this.resolvePivotLayout();
-      for (const id of ['StructureKind','NewName','At','Count','Before','Pivot','PivotFields','PivotData','PivotAggregate','PivotFilter','PivotItem','PivotRefresh','PivotApply','Charts']) {
+      for (const id of ['StructureKind','NewName','At','Count','Before','Range','ArrayFormula','ReplaceContents','Pivot','PivotFields','PivotData','PivotAggregate','PivotFilter','PivotItem','PivotRefresh','PivotApply','Charts']) {
         el(id).disabled = blocked || editor.invalidated;
       }
       el('PivotFilter').parentElement.hidden = !this.pivotLayout.axes?.rows.length;
@@ -114,6 +122,10 @@
     bindCell(cell) {
       if (this.meta?.error) this.meta=null;
       const sheet = el('Sheet').value;
+      if (cell && this.chooseRangeKind) {
+        this.chooseRangeKind = false;
+        if (cell.array) el('StructureKind').value = cell.array.dynamic ? 'spillFormula' : 'fixedArray';
+      }
       this.structureFields(cell);
       this.pivots = (this.editor.data?.pivots || []).filter(pivot => pivot.sheet === sheet);
       this.charts = this.editor.data?.chartSheets?.includes(sheet);
@@ -133,6 +145,8 @@
       el('PivotReason').hidden = !el('PivotReason').textContent;
       el('PivotFields').hidden = !info?.data || !!info.refreshReason;
       this.pivotLayout.bind(el('PivotFields').hidden ? null : info);
+      this.valueFilters.bind(el('PivotFields').hidden ? null : info);
+      this.calculatedItems.bind(el('PivotFields').hidden ? null : info);
       if (el('PivotFields').hidden) return;
       el('PivotData').replaceChildren(...info.fields.map(field => new Option(field, field)));
       el('PivotData').value = info.data;
@@ -167,8 +181,19 @@
     structureFields(cell) {
       const kind = el('StructureKind').value;
       const rename = kind === 'renameSheet', rows = kind.endsWith('Rows');
+      const range = rangeKinds.has(kind);
+      el('RangeField').hidden = !range;
+      el('ArrayFormulaField').hidden = !arrayFormulaKinds.has(kind);
+      el('ArrayFormula').value = cell?.array?.formula || (cell?.value?.kind === 'formula' ? cell.value.raw : '');
+      el('MergeConsent').hidden = kind !== 'mergeCells' && kind !== 'fixedArray';
+      el('ConsentLabel').textContent = kind === 'fixedArray' ? '替换选区内已有内容' : '若有多个值，仅保留首个有内容的格';
+      el('ReplaceContents').checked = false;
+      const selected = this.editor.grid.active && this.editor.context().sheet === el('Sheet').value ? this.editor.grid.view.range() : cell?.ref || '';
+      const fullArray = cell?.array?.range;
+      el('Range').value = fullArray && (!selected.includes(':') || selected === fullArray) && (arrayFormulaKinds.has(kind) || kind === 'clearArray')
+        ? (kind === 'spillFormula' ? fullArray.split(':')[0] : fullArray) : selected;
       el('NewNameField').hidden = !rename;
-      el('AtField').hidden = el('CountField').hidden = rename;
+      el('AtField').hidden = el('CountField').hidden = rename||range;
       el('BeforeField').hidden = !kind.startsWith('move');
       el('AtLabel').textContent = rows ? '起始行号' : '起始列号';
       el('At').value = cell ? (rows ? cell.address.row : cell.address.col) : '';
@@ -179,6 +204,21 @@
     structureInput() {
       const sheet = el('Sheet').value, kind = el('StructureKind').value;
       if (!sheet) return null;
+      if (rangeKinds.has(kind)) {
+        const range = el('Range').value.trim().toUpperCase(), parts = range.split(':');
+        if (parts.length > 2) return null;
+        try {
+          const [a, b = a] = parts.map(ref => window.ExcelLensEditModel.target(ref, this.editor.shape));
+          if (a.row > b.row || a.col > b.col || kind === 'mergeCells' && a.row === b.row && a.col === b.col) return null;
+        } catch { return null; }
+        const result = {kind, range};
+        if (arrayFormulaKinds.has(kind)) {
+          result.formula = el('ArrayFormula').value.trim();
+          if (!result.formula.startsWith('=') || result.formula.length < 2) return null;
+        }
+        if (!el('MergeConsent').hidden && el('ReplaceContents').checked) result.replaceContents = true;
+        return result;
+      }
       if (kind === 'renameSheet') {
         const name = el('NewName').value;
         return name.trim() && name !== sheet ? {kind, name} : null;

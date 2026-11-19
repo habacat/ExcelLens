@@ -19,12 +19,14 @@
     effective() {
       const {state: s, grid, rowHeight, colWidth, headerHeight, rowHead} = this.o;
       let rows=0,cols=0,rowUsed=0,colUsed=0;
+      const heightLimit=s.freeze.rows ? grid.clientHeight-headerHeight()-105 : 0;
+      const widthLimit=s.freeze.cols ? grid.clientWidth-rowHead-230 : 0;
       for(let i=1;i<=s.freeze.rows;i++){
-        const size=(this.o.sourceRowHeight||rowHeight)(i);if(rowUsed+size>grid.clientHeight-headerHeight()-105)break;
+        const size=(this.o.sourceRowHeight||rowHeight)(i);if(rowUsed+size>heightLimit)break;
         rowUsed+=size;rows++;
       }
       for(let i=1;i<=Math.min(s.freeze.cols,80);i++){
-        const size=colWidth(i);if(colUsed+size>grid.clientWidth-rowHead-230)break;
+        const size=colWidth(i);if(colUsed+size>widthLimit)break;
         colUsed+=size;cols++;
       }
       return {rows,cols};

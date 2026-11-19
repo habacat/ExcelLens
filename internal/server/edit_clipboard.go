@@ -102,6 +102,9 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 	for _, addr := range addresses {
 		source := sources[addr]
 		value := doc.ValueAt(addr, source.Value)
+		if derived, ok := calc.ArrayMembers[addr]; ok {
+			value = derived
+		}
 		item := editClipboardCell{Style: value.Style}
 		value.Style = ""
 		if value.Kind == "formula" {

@@ -13,6 +13,7 @@ type ColumnFormula struct {
 	Original, Formula string
 }
 type PreparedChanges struct {
+	NextBase  *Base // A verified array spill owns coordinates outside the submitted cells.
 	Changes   []Change
 	Base      map[Address]Value
 	Templates []ColumnFormula

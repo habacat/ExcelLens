@@ -37,6 +37,7 @@
     async build({sheet=this.s.sheet,filterId=this.s.filterId||'',baseId='',settings,change,persist=false,revision,signal,guard=()=>true}={}){
       this.cancel(true);const ticket=this.serial,book=this.s.workbookKey,origin=this.s.sheet,epoch=this.s.sheetEpoch,abort=new AbortController();this.abort=abort;
       let owned='',accepted=false;
+      const activity=globalThis.ExcelLensActivity?.begin('正在更新可见行',{signal:abort.signal});
       const current=()=>this.current(ticket,book,origin,epoch)&&!abort.signal.aborted&&!signal?.aborted&&guard();
       const stop=()=>{abort.abort();if(owned)this.post('/api/row-view/cancel',{id:owned}).catch(()=>{});};signal?.addEventListener('abort',stop,{once:true});
       try{
@@ -51,6 +52,7 @@
         for(;;){
           const state=await this.api('/api/row-view/status?id='+encodeURIComponent(owned),{signal:abort.signal});
           if(!current())throw new DOMException('已取消','AbortError');
+          activity?.job(state);
           if(state.status==='done')break;
           if(state.status==='error'||state.status==='cancelled')throw Error(state.error||'可见行任务已取消');
           if(state.status!=='queued'&&state.status!=='running')throw Error('可见行任务状态无效，请重试');
@@ -62,6 +64,7 @@
       }catch(error){
         if(!current())throw interrupted();throw error;
       }finally{
+        activity?.end();
         signal?.removeEventListener('abort',stop);if(!accepted&&owned){this.post('/api/row-view/cancel',{id:owned}).catch(()=>{});this.cleanup(owned);}
         if(ticket===this.serial){this.job='';if(this.abort===abort)this.abort=null;}
       }

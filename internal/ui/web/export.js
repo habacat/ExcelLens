@@ -20,6 +20,7 @@
       $('exportResult').hidden=true;$('exportDownload').removeAttribute('href');$('exportDownload').removeAttribute('download');$('exportFileDetails').textContent='';$('exportSnapshot').textContent='';
     }
     resetBook(){
+      this.activity?.end();this.activity=null;
       if(this.job&&this.running)this.cancelOwned(this.job);
       ++this.serial;clearTimeout(this.timer);this.pending?.abort();this.pending=null;
       this.job='';this.running=false;this.busy=false;this.snapshot='';this.resultSource='';this.failures=0;
@@ -109,6 +110,7 @@
     async begin(path,payload,label,request){
       const {ticket,book,ctrl}=request||{ticket:++this.serial,book:this.s.workbookKey,ctrl:new AbortController()};this.pending=ctrl;
       const current=()=>ticket===this.serial&&book===this.s.workbookKey&&!ctrl.signal.aborted;
+      const activity=this.activity=globalThis.ExcelLensActivity?.begin('正在生成导出文件',{slot:'exportActivity'});
       this.snapshot=label;this.failures=0;this.busy=true;this.clearResult();this.refresh();
       this.resultSource=[this.s.fileName,payload.sheet,label].filter(Boolean).join(' · ');
       try {
@@ -118,7 +120,7 @@
         $('exportProgress').hidden=false;$('exportCancelBtn').hidden=false;
         await this.poll();
       }catch(e){if(current()){this.toast(`导出失败：${e.message}`,'error');$('exportStage').textContent=`导出失败：${e.message}`;}}
-      finally{if(ticket===this.serial){this.busy=false;this.refresh();if(this.pending===ctrl)this.pending=null;}}
+      finally{if(!this.running||ticket!==this.serial)activity?.end();if(ticket===this.serial){this.busy=false;this.refresh();if(this.pending===ctrl)this.pending=null;}}
     }
     async cancelOwned(id){
       if(!id)return;
@@ -128,6 +130,7 @@
       if(this.running||this.busy||item.book!==this.s.book||item.workbookKey!==this.s.workbookKey)return false;
       ++this.serial;this.pending?.abort();clearTimeout(this.timer);this.generated=null;this.failures=0;
       this.job=start.jobId;this.running=true;this.snapshot=item.file+(item.sheet?' · '+item.sheet:'');this.resultSource=this.snapshot;
+      this.activity=globalThis.ExcelLensActivity?.begin('正在生成导出文件',{slot:'exportActivity'});
       $('exportFormat').value=item.mode;$('exportScope').value=item.scope;$('exportRecoverable').checked=true;
       this.clearResult();$('exportProgress').hidden=false;$('exportCancelBtn').hidden=false;this.refresh();this.openDialog('exportDialog');
       this.poll();return true;
@@ -142,6 +145,8 @@
         const data=await this.api(`/api/export/status?id=${encodeURIComponent(job)}`,{signal:ctrl.signal});
         if(!current())return;
         this.failures=0;$('exportRetryBtn').hidden=true;
+        this.activity ||= globalThis.ExcelLensActivity?.begin('正在生成导出文件',{slot:'exportActivity'});
+        this.activity?.job(data);
         const done=Number(data.doneRows||0),total=Number(data.totalRows||0);
         const pct=Math.max(0,Math.min(100,Number(data.progress||0)));
         $('exportBar').style.width=`${pct}%`;
@@ -170,7 +175,10 @@
         // Keep cancellation and the task identity, with bounded automatic retries.
         if(++this.failures<=3)this.timer=setTimeout(()=>this.poll(),Math.min(8000,1000*2**(this.failures-1)));
         this.refresh();
-      }finally{if(this.pending===ctrl)this.pending=null;}
+      }finally{
+        if(ticket===this.serial&&(!this.running||this.failures>3)){this.activity?.end();this.activity=null;}
+        if(this.pending===ctrl)this.pending=null;
+      }
     }
     formatBytes(value) {return window.ExcelLensDisplayFormat.bytes(value);}
     async cancel() {

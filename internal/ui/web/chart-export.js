@@ -54,6 +54,7 @@
       if(!this.revalidate()||!this.dialog.open||this.busy)return;
       let spec;try{spec=this.specification();}catch(error){this.status(error.message,true);return;}
       this.stop();const serial=this.serial,ctrl=new AbortController(),bound=this.bound;this.abort=ctrl;this.busy=true;this.controls();this.status('正在生成…');
+      const activity=globalThis.ExcelLensActivity?.begin('正在生成图表文件',{signal:ctrl.signal});
       const current=()=>serial===this.serial&&!ctrl.signal.aborted&&this.bound===bound&&this.dialog.open&&bound.current();
       const checkpoint=async()=>{if(!current())throw abortError();await new Promise(resolve=>setTimeout(resolve,0));if(!current())throw abortError();};
       let candidate;
@@ -73,7 +74,7 @@
         $('chartExportDownload').href=this.accepted.packageURL;$('chartExportPreview').src=this.accepted.imageURL;$('chartExportPreview').alt=payload.chart.title+'（导出预览）';$('chartExportResult').hidden=false;
         this.revoke(previous);this.status('');
       }catch(error){if(current()&&error.name!=='AbortError')this.status(error.message+(this.accepted?'（保留上次结果）':''),true);}
-      finally{this.revoke(candidate);if(serial===this.serial){this.abort=null;this.busy=false;this.controls();if(!bound.current())this.close();}}
+      finally{activity?.end();this.revoke(candidate);if(serial===this.serial){this.abort=null;this.busy=false;this.controls();if(!bound.current())this.close();}}
     }
   }
   let singleton;

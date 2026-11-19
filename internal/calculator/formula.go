@@ -45,6 +45,8 @@ type RangeValue struct {
 	VisitSubtotal func(skipHidden bool, visit func(int, FormulaValue) error) error
 	// Ordered promises increasing source positions from Visit.
 	Ordered bool
+	// Spill resolves the current dynamic array owned by a single reference.
+	Spill func() (RangeValue, error)
 }
 type FormulaResolver func(sheet, start, end string) (RangeValue, error)
 type formulaNode struct {
@@ -206,7 +208,12 @@ func (p *formulaParser) newNode(n *formulaNode) (*formulaNode, error) {
 func (p *formulaParser) referenceNode(ref formulaReference) (*formulaNode, error) {
 	start := p.pos
 	p.pos += ref.length
-	return p.newNode(&formulaNode{kind: "ref", ref: ref, refOffset: start})
+	node, err := p.newNode(&formulaNode{kind: "ref", ref: ref, refOffset: start})
+	if err == nil && p.strictNames && ref.end == "" && p.pos < len(p.text) && p.text[p.pos] == '#' {
+		p.pos++
+		return p.newNode(&formulaNode{kind: "function", op: "ANCHORARRAY", args: []*formulaNode{node}, refOffset: start})
+	}
+	return node, err
 }
 func (p *formulaParser) expression(min int) (*formulaNode, error) {
 	p.depth++
@@ -410,6 +417,8 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 		name := strings.ToUpper(p.text[start:p.pos])
 		if !p.strictNames {
 			name = strings.TrimPrefix(strings.TrimPrefix(name, "_XLFN."), "_XLWS.")
+		} else if prefix, bare, ok := worksheetArrayName(name); ok && name == prefix+bare {
+			name = bare
 		}
 		p.space()
 		if p.pos >= len(p.text) || p.text[p.pos] != '(' {
@@ -418,7 +427,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 			}
 			return p.newNode(&formulaNode{kind: "name", op: name})
 		}
-		if _, ok := formulaFunctions[name]; !ok && !(p.preserveSingle && (name == "_XLFN.SINGLE" || name == "SUBTOTAL")) {
+		if _, ok := formulaFunctions[name]; !ok && !(p.preserveSingle && (name == "ANCHORARRAY" || name == "_XLFN.SINGLE" || name == "SUBTOTAL")) {
 			return nil, fmt.Errorf("#NAME? %s", name)
 		}
 		p.pos++
@@ -426,7 +435,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 		p.space()
 		if p.pos < len(p.text) && p.text[p.pos] == ')' {
 			p.pos++
-			return p.newNode(&formulaNode{kind: "function", op: name, args: args})
+			return p.newNode(&formulaNode{kind: "function", op: name, args: args, refOffset: start})
 		}
 		for {
 			p.space()
@@ -457,7 +466,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 				return nil, p.fail("参数需要逗号")
 			}
 		}
-		return p.newNode(&formulaNode{kind: "function", op: name, args: args})
+		return p.newNode(&formulaNode{kind: "function", op: name, args: args, refOffset: start})
 	}
 	return nil, p.fail("无法识别")
 }
@@ -556,6 +565,17 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 		}
 		return NumberValue(rv.Sum), nil
 	case "function":
+		if e.worksheet && n.op == "ANCHORARRAY" {
+			r, err := e.get(n.args[0].ref)
+			if err != nil {
+				return FormulaValue{}, err
+			}
+			if r.Spill == nil {
+				return FormulaValue{}, errors.New("#REF!")
+			}
+			spill, err := r.Spill()
+			return FormulaValue{Kind: "range", Range: &spill}, err
+		}
 		v, err := e.function(n)
 		if e.worksheet && err == nil && v.Kind == "error" {
 			return v, valueFault(v)

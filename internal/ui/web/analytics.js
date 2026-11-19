@@ -21,7 +21,7 @@
   window.ExcelLensSnapshots=snapshots;
   const pasteSpecial=new window.ExcelLensPasteSpecial({capture:capturePasteTarget,toast,refresh:refreshPasteTarget,
     commit:(context,changes)=>commitBatch(context.id,changes,{refresh:true,guard:context.current})});
-  const analysisJobs=new window.ExcelLensAnalysisJobs({api,identity:()=>JSON.stringify([state.fingerprint,state.book,state.opened]),requestIdentity:()=>state.fingerprint,sleep,
+  const analysisJobs=new window.ExcelLensAnalysisJobs({api,slot:'analysisActivity',identity:()=>JSON.stringify([state.fingerprint,state.book,state.opened]),requestIdentity:()=>state.fingerprint,sleep,
     onBusy:setAnalysisBusy,onProgress:showAnalysisProgress});
   const treeRenderer=new window.ExcelLensAnalysisTreeRenderer();
   const tree=new window.ExcelLensAnalysisTree({api,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened}),limits:JSON.parse($('fileFormats').textContent).analysisTree,
@@ -54,13 +54,16 @@
     $('analysisDraftRecovery').addEventListener('click',()=>window.ExcelLensRecovery.show(recovery,{title:'恢复分析草稿',explanation:'草稿按原文件和编辑表匹配。载入后核对当前已保存值，再点击“重试保存”；本页同格草稿优先保留。'}));
   }
   async function api(path,opts={}){
-    await window.ExcelLensSession?.ready;
-    const headers=new Headers(opts.headers||{});headers.set('X-ExcelLens-Token',TOKEN);window.ExcelLensSession?.apply(headers);
-    if(opts.body&&!(opts.body instanceof FormData))headers.set('Content-Type','application/json');
-    const response=await fetch(path,{...opts,headers,cache:'no-store'});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok){const error=new Error(data.error||`请求失败 HTTP ${response.status}`);error.status=response.status;throw error}
-    return data;
+    const activity = window.ExcelLensActivity?.request(path, opts);
+    try {
+      await window.ExcelLensSession?.ready;
+      const headers=new Headers(opts.headers||{});headers.set('X-ExcelLens-Token',TOKEN);window.ExcelLensSession?.apply(headers);
+      if(opts.body&&!(opts.body instanceof FormData))headers.set('Content-Type','application/json');
+      const response=await fetch(path,{...opts,headers,cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){const error=new Error(data.error||`请求失败 HTTP ${response.status}`);error.status=response.status;throw error}
+      return data;
+    } finally { activity?.end(); }
   }
   function toast(message,tone='info'){
     const el=$('analysisToast');
@@ -147,6 +150,8 @@
   }
   async function open(){
     const ticket=state.openSerial=(state.openSerial||0)+1;
+    state.openActivity?.end();
+    const activity=state.openActivity=globalThis.ExcelLensActivity?.begin('正在打开分析工作区');
     state.fieldsReady=false;setAnalysisBusy(!!analysisJobs.main);
     try{
       const status=await api('/api/status');if(!status.opened){toast('请先打开原始 Excel 工作簿','warning');return}
@@ -177,10 +182,10 @@
       setText('analysisSourceCaption',state.workspace.workbook||status.fileName||'');
       setTab(state.tab);await loadFields();if(state.activeResult&&state.opened){bindTreeResult();renderPivot();}
       if(state.tab==='sheets')renderSheets();
-    }catch(err){if(ticket===state.openSerial)toast(err.message,'error')}
+    }catch(err){if(ticket===state.openSerial)toast(err.message,'error')}finally{activity?.end();}
   }
   function invalidateSourceRequests(){++state.abortIndex;state.fieldsController?.abort();state.profileController?.abort();state.drillAbort?.abort();clusters?.reset();sourceRows.cancel();state.fieldsLoading=false;}
-  function close(){state.openSerial=(state.openSerial||0)+1;++state.reportOpenSerial;invalidateSourceRequests();window.ExcelLensCompositionUI?.reset();sourceRows.reset();tree.reset();plans?.close();issuePanel?.close();if(pasteSpecial.dialog.open)pasteSpecial.dialog.close();analysisJobs.reset();state.sheetLoadSeq++;state.sheetAbortController?.abort();state.sheetAbortController=null;root.hidden=true;document.body.classList.remove('analysis-mode');$('analysisDrill').hidden=true;state.opened=false;window.ExcelLensChartExport?.revalidate();}
+  function close(){state.openActivity?.end();state.openSerial=(state.openSerial||0)+1;++state.reportOpenSerial;invalidateSourceRequests();window.ExcelLensCompositionUI?.reset();sourceRows.reset();tree.reset();plans?.close();issuePanel?.close();if(pasteSpecial.dialog.open)pasteSpecial.dialog.close();analysisJobs.reset();state.sheetLoadSeq++;state.sheetAbortController?.abort();state.sheetAbortController=null;root.hidden=true;document.body.classList.remove('analysis-mode');$('analysisDrill').hidden=true;state.opened=false;window.ExcelLensChartExport?.revalidate();}
   function clearResultDisplay(){
     snapshots?.changed();if($('analysisSnapshotSave'))$('analysisSnapshotSave').disabled=true;
     state.chartCapture=null;window.ExcelLensChartExport?.revalidate();$('analysisChartImage').disabled=true;
@@ -214,17 +219,21 @@
     return true;
   }
   async function ensureIndex(sheet,current=()=>state.opened){
-    const data=await post('/api/index/start',{sheet});if(data.ready)return;
-    let deadline=Date.now()+120000;
-    while(Date.now()<deadline&&current()){
-      await sleep(350);
-      const s=await api('/api/index/status?id='+encodeURIComponent(data.jobId));
-      if(!current())throw Object.assign(Error('读取字段已取消'),{name:'AbortError'});
-      setText('analysisSourceInfo',s.stage||'正在建立行索引…');
-      if(s.status==='done')return;
-      if(s.status==='error'||s.status==='cancelled')throw new Error(s.error||'建立索引未完成');
-    }
-    throw new Error('建立索引超时或已取消');
+    const activity=globalThis.ExcelLensActivity?.begin('正在建立行索引');
+    try {
+      const data=await post('/api/index/start',{sheet});if(data.ready)return;
+      let deadline=Date.now()+120000;
+      while(Date.now()<deadline&&current()){
+        await sleep(350);
+        const s=await api('/api/index/status?id='+encodeURIComponent(data.jobId));
+        if(!current())throw Object.assign(Error('读取字段已取消'),{name:'AbortError'});
+        activity?.job(s);
+        setText('analysisSourceInfo',s.stage||'正在建立行索引…');
+        if(s.status==='done')return;
+        if(s.status==='error'||s.status==='cancelled')throw new Error(s.error||'建立索引未完成');
+      }
+      throw new Error('建立索引超时或已取消');
+    } finally { activity?.end(); }
   }
   function renderSourceScope(){
     const combined=!!state.query?.composition;$('analysisSourceScope').disabled=combined;$('analysisHeaderLabel').hidden=combined;$('analysisPlansOpen').disabled=combined;
@@ -323,12 +332,13 @@
   async function backupExport(){
     await saveChain.catch(()=>{});
     if(hasUnsaved()){toast('仍有未保存的分析内容，请先重试保存','warning');return;}
+    const activity=globalThis.ExcelLensActivity?.begin('正在导出分析备份');
     try{
       await window.ExcelLensSession?.ready;
       const res=await fetch('/api/analysis/backup',{headers:window.ExcelLensSession?.apply(new Headers({'X-ExcelLens-Token':TOKEN}))||{'X-ExcelLens-Token':TOKEN}});
       if(!res.ok)throw new Error('获取备份失败');
       downloadBlob(await res.blob(),'ExcelLens-Analysis-Backup-'+new Date().toISOString().slice(0,10)+'.json');toast('已导出分析工作区备份','success');
-    }catch(err){toast(err.message,'error')}
+    }catch(err){toast(err.message,'error')}finally{activity?.end();}
   }
   async function backupImport(file){
     if(!file)return;
@@ -336,12 +346,13 @@
     if(file.size>41*1024*1024){toast('备份文件超过大小限制','warning');return}
     const answer=await askText('恢复分析工作区','','请输入“恢复”确认覆盖当前编辑表和已保存报表');
     if(answer!=='恢复')return;
+    const activity=globalThis.ExcelLensActivity?.begin('正在恢复分析备份');
     try{
       const raw=await file.text();const document=JSON.parse(raw);
       await post('/api/analysis/backup',document);
       state.reportCache.clear();state.sheetRevisions.clear();state.undoHistory.clear();state.gridData=null;state.activeResult=null;state.activeResultQuery=null;state.activeReportID='';state.loadedSheet=null;
       await refreshWorkspace();await loadFields();setTab('dashboard');toast('分析工作区已从备份恢复','success');
-    }catch(err){toast('恢复失败：'+err.message,'error')}
+    }catch(err){toast('恢复失败：'+err.message,'error')}finally{activity?.end();}
   }
   function addField(id,zone){
     if(!allFields().some(f=>f.id===id))return;
@@ -706,6 +717,7 @@
     if(!state.jobID)return;
     const job=state.jobID,book=state.fingerprint;
     const format=$('analysisExportFormat').value==='csv'?'csv':'xlsx';
+    const activity=globalThis.ExcelLensActivity?.begin('正在导出分析结果');
     try{
       await window.ExcelLensSession?.ready;
       if(book!==state.fingerprint)return;
@@ -714,7 +726,7 @@
       if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(data.error||'导出失败')}
       const blob=await res.blob();if(book!==state.fingerprint)return;
       downloadBlob(blob,'ExcelLens-Analysis.'+format);toast('分析结果已导出','success');
-    }catch(e){toast(e.message,'error')}
+    }catch(e){toast(e.message,'error')}finally{activity?.end();}
   }
   function restoreReportQuery(query){
     const q=JSON.parse(JSON.stringify(query));

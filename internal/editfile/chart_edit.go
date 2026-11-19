@@ -36,6 +36,9 @@ func newObjectValues(ctx context.Context, src *workbook.EditSourceFile, layout X
 }
 
 func (v objectValues) cell(address editdoc.Address) (editdoc.Value, error) {
+	if derived, ok := v.calculation.ArrayMembers[address]; ok {
+		return derived, nil
+	}
 	c, ok := v.book.cells[address]
 	if !ok {
 		c.value = editdoc.Value{Kind: "blank"}
@@ -90,9 +93,34 @@ func (p *xlsxPackage) refreshCharts(ctx context.Context, dst io.Writer, src *wor
 	if len(parts) == 0 {
 		return opc.Receipt{}, errors.New("此工作表没有关联图表")
 	}
+	var pivotTargets []string
+	for _, part := range parts {
+		raw, err := p.readPart(ctx, part)
+		if err != nil {
+			return opc.Receipt{}, err
+		}
+		key, pivot, err := chartPivotSource(ctx, raw)
+		if err != nil {
+			return opc.Receipt{}, err
+		}
+		if !pivot {
+			continue
+		}
+		index := slices.IndexFunc(p.layout.Pivots, func(info PivotInfo) bool { return chartKey(info.Sheet, info.Name) == key })
+		if index < 0 {
+			return opc.Receipt{}, fmt.Errorf("无法在本簿定位透视图表来源")
+		}
+		target := p.layout.Pivots[index].Part
+		if !slices.Contains(pivotTargets, target) {
+			pivotTargets = append(pivotTargets, target)
+		}
+	}
 	values, err := newObjectValues(ctx, src, p.layout)
 	if err != nil {
 		return opc.Receipt{}, err
+	}
+	if len(pivotTargets) > 0 {
+		return p.refreshCacheRoots(ctx, dst, pivotTargets, nil, values, parts)
 	}
 	updates := map[string][]byte{}
 	for _, part := range parts {

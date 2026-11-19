@@ -52,6 +52,13 @@
 4. 工作表启用内容保护时，已分配的格按其实际样式判断锁定，未分配格依次查行、列和默认样式。值编辑和公式展开都复查受影响的坐标。保护记录、密码校验信息和原样式按源部件保留。 [Excel 的 Locked 属性](https://learn.microsoft.com/en-us/office/vba/api/excel.range.locked)
 5. 保存时在工作表和表格部件写出同一修订。重读并核对列模板、汇总函数、标签和单元格内容，再开放下载。原生验证比较工作表矩形的实际值、类型和公式，也比对生成件与 Excel 对照中的每套表格定义。
 
+### 第 8 包的区域、数组与修订
+
+1. 合并前按源坐标读取完整矩形，检查现有数组、合并及对象归属。首个内容需要移至左上角时重绑直接引用与名称，保留被移单元格的样式及公式。结构快照保存清除前的整块内容。
+2. 固定数组按输出矩形广播单行或单列，超过可用结果的坐标填 `#N/A`。动态数组由公式结果决定尺寸。每轮在同一份范围归属上计算，形状变化后重绑稀疏范围、跨表引用和 `A1#`，并清除新范围外的旧结果。越界、合并区以及已占用格的原生溢出错误分别记录。
+3. 普通输入、显式区域命令和生成文件共用计算与写出代码。生成件使用数组锚点的 `f@ref` 和 XLDAPR 元数据。溢出及其传播错误使用值元数据绑定到富值记录。超出计算容量或无法确定整组结果的操作在提交前返回原因。 [动态数组与溢出行为](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531) · [单元格元数据与数组公式](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.cellformula)
+4. 普通输入引起数组结果变化时，输入和输出作为同一笔修订持久化。重复请求按原始操作摘要返回收据，撤销和重做切换到对应的已核验工作簿快照。
+
 ### 第 9 包的结构事务
 
 1. 按当前修订的一基坐标描述剪切块及插入点，插入沿用前一行或列的格式。坐标变换区分物理位置、连续区域和 Excel 错误引用。遇到 `Data!#REF!` 保留限定表名和错误类型。 [Excel 插入位置与格式来源](https://learn.microsoft.com/en-us/office/vba/api/excel.range.insert) · [Excel 剪切](https://learn.microsoft.com/en-us/office/vba/api/excel.range.cut)
@@ -62,7 +69,7 @@
 
 1. 从工作表、透视表和缓存的 OPC 关系绑定源矩形、行字段和输出。按当前修订的公式结果读取源记录，保留旧共享项目编号并登记新增项目。数据和值字段的汇总、总计、项目顺序和手动筛选共同决定输出矩形。 [透视缓存定义](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.pivotcachedefinition) · [RowItems](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.rowitems)
 2. 同一缓存服务的受支持布局在一个事务里生成。扩张前检查相邻格和其他对象的所有权，缩小时清理释放的格。透视结果产生后的计算和图表缓存都读取同一修订。本簿普通图表的固定序列保留点号、空位和已有点格式，未涉及的系列保留原 XML。 [Excel 刷新透视表](https://learn.microsoft.com/en-us/office/vba/api/excel.pivottable.refreshtable) · [DrawingML 数值缓存](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.charts.numberingcache)
-3. 1.8.29 第一组操作覆盖单行字段、单值字段、五种普通汇总和行项目筛选。1.8.30 扩展到多层行列和分页字段。值筛选、计算项目、跨缓存级联和专用透视图表依后续设计推进。第 8 包的合并与数组区域调整保持原计划。
+3. 1.8.29 第一组操作覆盖单行字段、单值字段、五种普通汇总和行项目筛选。1.8.30 扩展到多层行列和分页字段。1.9.1 继续交付值筛选、计算项目、跨缓存级联与专用透视图表，区域编辑见上文第 8 包。
 
 #### 多层布局与分页的计算和写出
 
@@ -72,12 +79,16 @@
 4. 工作表、缓存和分页筛选分别保留类型。布尔值和错误值在缓存中使用 `b` 和 `e`，Excel 对这两类项目沿用文本组的共享项标志，行列及分页标签显示为文本。日期从已有的数值样式和工作簿日期系统取值，缓存按秒分组，回写标签使用日期序列和同簿样式。重新统计共享项目和内联记录的类型及数值边界。已有日期格式的文本编号保持文本。 [共享项及字段标志](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.shareditems) · [Excel 日期系统](https://support.microsoft.com/en-us/office/date-systems-in-excel-e7fe7167-48a9-4b96-bb53-5612a800b487)
 5. 行列同时启用自定义小计时，同一统计方法计算两组的交集，不同方法的交叉格留空。受筛选的组没有非空记录时保留空值。平均值从交集内的原始记录计算，生成件保留二进制浮点数回读所需的有效位。核对时对 Excel 工作表公式逐字比较，对数值单元格同时记录类型和 `Value2`。Excel 的 `Range.Formula` 也会为数字常数返回经舍入的显示文字，核对器遇到这一情形会检查两端的 `HasFormula`。 [Excel Range.Formula](https://learn.microsoft.com/en-us/office/vba/api/excel.range.formula) · [Range.Value2](https://learn.microsoft.com/en-us/office/vba/api/excel.range.value2)
 
-其余透视功能继续沿用同一结构事务。
+1.9.1 在同一结构事务中接入下列操作。
 
 | 用户操作 | 实施路径 | 原生核对 |
 | --- | --- | --- |
 | 添加值筛选和计算项目 | 解析筛选的字段序号、汇总字段及执行顺序，将项目公式绑定到所属字段与缓存项目。将数据源变动、汇总、筛选和总计作为同一修订提交。 | 比对并列前五项、空项、项目公式与手动筛选组合后的输出和字段定义。 [透视筛选](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.pivotfilter) · [计算项目](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.calculateditem) |
 | 刷新由上游透视供数的缓存及专用透视图表 | 由输出区域与下游源区域建立缓存间依赖。按依赖次序刷新，检测循环，解析图表的透视来源名称和格式标识，再重建类别层级及系列缓存。 | 在同一文件中核对两级缓存、图表类别与值，检查失败回退、撤销、重做、Excel 刷新另存和重开。 [图表的透视来源](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.charts.pivotsource) |
+
+值筛选使用当前值字段的汇总结果，在同轴父项内评估。值筛选保留另一轴的项目，即使该交叉格在筛选后为空。计数排名包含并列，累计百分比及累计值按项目顺序达到阈值后截止。 [Excel 值筛选类型](https://learn.microsoft.com/en-us/office/vba/api/excel.xlpivotfiltertype)
+
+计算项目先绑定到缓存字段和共享项目编号，再按项目引用排序计算。乘积等非线性表达式在其余可见轴的每个组合上执行，然后参加小计和总计。源缓存记录保持业务行数。刷新时使用本簿公式的反向引用和输入矩形建立缓存依赖，写出前检测循环。专用图表通过透视表名称及格式标识关联，只将可见数据项写入系列缓存，工作表引用仍覆盖原生 Excel 的总计坐标。
 
 ## 依据
 

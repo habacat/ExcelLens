@@ -70,5 +70,8 @@
   "docs/user/editing.md",
   "docs/development/xlsx-grid-editing.md",
   "validation/1.9.0/engineering.json",
+  "validation/1.9.1/range-editing.json",
+  "validation/1.9.1/pivot-editing.json",
+  "validation/1.9.1/interaction.json",
   "docs/releases/{version}.md"
 ]

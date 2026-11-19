@@ -42,6 +42,7 @@ type worksheetStructure struct {
 	groups           map[int]sharedGroup
 	merges           []cellRect
 	arrayRanges      []cellRect
+	arrayDynamic     map[cellRect]bool
 	arrayThrough     map[int]int
 	visitArrayResult func(int, int, sheetCell) error
 	tableIDs         map[string]bool
@@ -78,10 +79,8 @@ func (s *worksheetStructure) readOnly(shape XLSXSheet, c cellTarget, unlocked bo
 	if c.original.readOnly != "" {
 		return c.original.readOnly
 	}
-	for _, a := range s.arrayRanges {
-		if a.contains(c.address.Row, c.address.Col) && (a.firstRow != c.address.Row || a.firstCol != c.address.Col) {
-			return lockArrayMember
-		}
+	if c.original.array != nil && c.original.formula.kind != "array" {
+		return lockArrayMember
 	}
 	for _, area := range s.merges {
 		if area.contains(c.address.Row, c.address.Col) && (c.address.Row != area.firstRow || c.address.Col != area.firstCol) {
@@ -356,9 +355,7 @@ func (p *xlsxPackage) checkSourceFormula(ctx context.Context, s *worksheetStruct
 		if err != nil {
 			return err
 		}
-		if tag.dynamic && (!parsed.Scalar || !tag.area.single()) {
-			return fmt.Errorf("%w：无法限定动态数组溢出范围", ErrXLSX)
-		}
+
 	}
 	switch tag.kind {
 	case "shared":
@@ -381,6 +378,12 @@ func (p *xlsxPackage) checkSourceFormula(ctx context.Context, s *worksheetStruct
 			return fmt.Errorf("%w：数组公式范围数量超限", ErrXLSX)
 		}
 		s.arrayRanges = append(s.arrayRanges, tag.area)
+		if tag.dynamic {
+			if s.arrayDynamic == nil {
+				s.arrayDynamic = map[cellRect]bool{}
+			}
+			s.arrayDynamic[tag.area] = true
+		}
 		if !tag.area.single() {
 			if s.arrayThrough == nil {
 				s.arrayThrough = map[int]int{}

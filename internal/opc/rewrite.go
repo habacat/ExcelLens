@@ -9,6 +9,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
+	"slices"
+	"strings"
 )
 
 // Change leaves the compressed data intact by default. Remove omits the part.
@@ -36,12 +40,22 @@ func (r cancelReader) Read(p []byte) (int, error) {
 }
 
 func Rewrite(ctx context.Context, dst io.Writer, source *zip.Reader, plan func(*zip.File) (Change, error)) (Receipt, error) {
+	return RewriteWithAdditions(ctx, dst, source, nil, plan)
+}
+
+// Newly required OPC parts have explicit names and contents and receive the
+// same content-digest verification as repaired parts. Existing names may only
+// be changed through plan, which also owns removals.
+func RewriteWithAdditions(ctx context.Context, dst io.Writer, source *zip.Reader, added map[string][]byte, plan func(*zip.File) (Change, error)) (Receipt, error) {
 	result := Receipt{Parts: make(map[string][32]byte), Changed: make(map[string]bool)}
 	archive := zip.NewWriter(dst)
 	if err := archive.SetComment(source.Comment); err != nil {
 		return Receipt{}, err
 	}
 	for _, part := range source.File {
+		if _, exists := added[part.Name]; exists {
+			return Receipt{}, fmt.Errorf("部件已存在：%s", part.Name)
+		}
 		if err := ctx.Err(); err != nil {
 			return Receipt{}, err
 		}
@@ -91,6 +105,23 @@ func Rewrite(ctx context.Context, dst io.Writer, source *zip.Reader, plan func(*
 		var digest [32]byte
 		hash.Sum(digest[:0])
 		result.Parts[part.Name] = digest
+	}
+	for _, name := range slices.Sorted(maps.Keys(added)) {
+		if err := ctx.Err(); err != nil {
+			return Receipt{}, err
+		}
+		if !fs.ValidPath(name) || name == "." || strings.ContainsAny(name, "\\:#?%") {
+			return Receipt{}, fmt.Errorf("部件路径无效：%s", name)
+		}
+		out, err := archive.Create(name)
+		if err != nil {
+			return Receipt{}, err
+		}
+		if _, err = out.Write(added[name]); err != nil {
+			return Receipt{}, err
+		}
+		result.Parts[name] = sha256.Sum256(added[name])
+		result.Changed[name] = true
 	}
 	if err := archive.Close(); err != nil {
 		return Receipt{}, err

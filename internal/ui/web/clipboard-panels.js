@@ -11,7 +11,7 @@
       for(const id of ['copySpecialHeader','copySpecialHeaderRow'])$(id).onchange=()=>this.load();
       this.dialog.addEventListener('close',()=>{if(this.dialog.open)return;++this.serial;this.abort?.abort();this.payload=null;this.result=null;this.snapshot=null;});
     }
-    options(){return {format:$('copySpecialFormat').value,mode:$('copySpecialMode').value,includeHeader:$('copySpecialHeader').checked,styled:this.snapshot?.styled,sheet:this.snapshot?.sheet};}
+    options(){return {format:$('copySpecialFormat').value,mode:$('copySpecialMode').value,includeHeader:$('copySpecialHeader').checked,styled:this.snapshot?.styled,sheet:this.snapshot?.sheet,mergeAt:this.snapshot?.mergeAt};}
     open(){
       try{this.snapshot=this.capture();}catch(error){this.toast(error.message,'warning');return;}
       $('copySpecialSource').textContent=this.snapshot.label;$('copySpecialHeaderRow').value=String(this.snapshot.headerRow);$('copySpecialHeaderRow').max=String(this.snapshot.maxRow);

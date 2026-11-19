@@ -42,10 +42,11 @@
       el('Save').onclick = () => this.act(() => owner.save());
       el('Exit').onclick = () => this.act(() => owner.exitGrid());
       el('More').onclick = () => this.act(() => owner.advanced());
+      el('Range').onclick = () => this.act(() => owner.advanced('Range'));
       el('Refresh').onclick = () => this.reload();
       el('Retry').onclick = () => this.act(null);
       this.region.addEventListener('pointerdown', e => {
-        if (!this.active || !e.target.closest('.grid-cell')) return;
+        if (!this.active || !this.blocked || !e.target.closest('.grid-cell')) return;
         // Resolve the clicked source coordinate on click, after the previous
         // draft has been confirmed. The reader's drag must not change it first.
         e.stopImmediatePropagation(); e.preventDefault();
@@ -54,8 +55,9 @@
         const node = e.target.closest('.grid-cell');
         if (!this.active || !node) return;
         e.preventDefault(); e.stopImmediatePropagation();
+        if (this.view.dragged()) { this.focus(); return; }
         if (this.view.ready()) this.act(() => {
-          this.view.select(node.dataset.ref, Number(node.dataset.visualIndex));
+          this.view.selectPoint(node,e);
           if (e.detail > 1) this.begin(false, this.input);
           this.focus();
         });
@@ -74,8 +76,9 @@
       document.addEventListener('keydown', e => this.key(e), true);
       this.input.addEventListener('paste', e => this.paste(e));
       this.input.addEventListener('copy', e => {
-        if (this.active && !this.draft && e.clipboardData) {
-          e.preventDefault(); e.clipboardData.setData('text/plain', this.selected?.display ?? '');
+        if (this.active && !this.draft) {
+          e.preventDefault();
+          if (!this.moving) this.view.copy();
         }
       });
       this.input.addEventListener('cut', e => {
@@ -161,6 +164,17 @@
       return base;
     }
 
+    projectRow(sheet, row, firstCol, lastCol) {
+      const source = new Map((row.cells || []).map(cell => [cell.col,cell]));
+      const cells = [];
+      for (let col=firstCol; col<=lastCol; col++) {
+        const ref = this.owner.colName(col) + row.row;
+        const cell = this.project(sheet, ref, source.get(col));
+        if (cell) cells.push(cell);
+      }
+      return cells;
+    }
+
     status(message, error = false) {
       this.statusNode.textContent = message || this.summary();
       this.statusNode.classList.toggle('is-error', error);
@@ -176,6 +190,8 @@
       el('Redo').disabled = busy || !doc.redo || !!this.owner.pending || this.stale;
       el('Save').disabled = busy || !!this.owner.pending || this.stale;
       el('More').disabled = el('Save').disabled || !this.view.ready();
+      el('Range').hidden = !!this.owner.data.encoding;
+      el('Range').disabled = el('More').disabled || this.view.filtered();
       el('Exit').disabled = busy || !!this.owner.pending;
       el('Refresh').hidden = !this.stale;
       el('Retry').hidden = !this.owner.pending;
@@ -367,7 +383,7 @@
     }
     step(key, shift) {
       const delta = {Tab:[0,shift?-1:1], Enter:[shift?-1:1,0], ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1]}[key];
-      return this.act(async () => { await this.view.move(...delta); this.focus(); });
+      return this.act(async () => { await this.view.move(...delta,shift && key.startsWith('Arrow')); this.focus(); });
     }
     key(e) {
       if (!this.active || document.querySelector('dialog:modal')) return;
@@ -385,6 +401,7 @@
         return;
       }
       if (key === 'Escape') { take(); if (!this.owner.pending) this.cancelDraft(); this.focus(); return; }
+      if (ctrl && !e.altKey && !e.shiftKey && !this.draft && lower === 'c') { take(); this.view.copy(); return; }
       if (ctrl && !e.altKey && !this.draft && ['z','y'].includes(lower)) { take(); this.history(lower === 'y' || e.shiftKey ? 'redo' : 'undo'); return; }
       if (key === 'Enter' && e.altKey && this.draft) {
         take(); field.setRangeText('\n', field.selectionStart, field.selectionEnd, 'end'); field.dispatchEvent(new Event('input')); return;

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"strconv"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/workbook"
@@ -12,6 +13,10 @@ import (
 // Pivot outputs can be upstream of ordinary formulas and chart series.
 // Refresh their saved results against the same revision as the cache records.
 func (p *xlsxPackage) refreshDependents(ctx context.Context, values objectValues, updates map[string][]byte) error {
+	return p.refreshWithMetadata(ctx, values, updates, newArrayMetadata(p))
+}
+
+func (p *xlsxPackage) refreshWithMetadata(ctx context.Context, values objectValues, updates map[string][]byte, meta *arrayMetadata) error {
 	sheets := map[string]bool{}
 	for a := range values.calculation.Cells {
 		sheets[a.Sheet] = true
@@ -28,7 +33,7 @@ func (p *xlsxPackage) refreshDependents(ctx context.Context, values objectValues
 				return err
 			}
 		}
-		next, err := resultCaches(ctx, data, s.Name, values.calculation)
+		next, err := resultCaches(ctx, data, s.Name, values.calculation, meta)
 		if err != nil {
 			return err
 		}
@@ -51,6 +56,11 @@ func (p *xlsxPackage) refreshDependents(ctx context.Context, values objectValues
 		if err != nil {
 			return err
 		}
+		if _, pivot, err := chartPivotSource(ctx, data); err != nil {
+			return err
+		} else if pivot {
+			continue
+		}
 		next, err := p.updateChartCaches(ctx, data, values, affected)
 		if err != nil {
 			return err
@@ -59,10 +69,10 @@ func (p *xlsxPackage) refreshDependents(ctx context.Context, values objectValues
 			updates[f.Name] = next
 		}
 	}
-	return nil
+	return meta.write(ctx, updates)
 }
 
-func resultCaches(ctx context.Context, data []byte, sheet string, calc *Calculation) ([]byte, error) {
+func resultCaches(ctx context.Context, data []byte, sheet string, calc *Calculation, meta *arrayMetadata) ([]byte, error) {
 	var ps []xmlPatch
 	var active bool
 	var value string
@@ -88,6 +98,7 @@ func resultCaches(ctx context.Context, data []byte, sheet string, calc *Calculat
 					return nil
 				}
 				kind := ""
+				vm := 0
 				if item.State == "calculated" {
 					raw := item.Value.Raw
 					switch item.Value.Kind {
@@ -95,6 +106,10 @@ func resultCaches(ctx context.Context, data []byte, sheet string, calc *Calculat
 						kind = "str"
 					case "error":
 						kind = "e"
+						vm = meta.bind(arrayResult{}, arrayCell{value: item.Value}, true)
+						if vm != 0 {
+							raw = "#VALUE!"
+						}
 					case "boolean":
 						kind = "b"
 						raw = "0"
@@ -113,6 +128,15 @@ func resultCaches(ctx context.Context, data []byte, sheet string, calc *Calculat
 					patches, err = setXMLAttribute(data, e.from, e.to, "t", kind)
 				} else {
 					patches, err = removeXMLAttributes(data, e.from, e.to, "t")
+				}
+				ps = append(ps, patches...)
+				if err != nil {
+					return err
+				}
+				if vm != 0 {
+					patches, err = setXMLAttribute(data, e.from, e.to, "vm", strconv.Itoa(vm))
+				} else {
+					patches, err = removeXMLAttributes(data, e.from, e.to, "vm")
 				}
 				ps = append(ps, patches...)
 				return err

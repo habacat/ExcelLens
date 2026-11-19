@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"excellens/internal/formats"
@@ -58,35 +57,27 @@ func (p pivotPlan) cube(ctx context.Context, r pivotRecords) (pivotCube, error) 
 	if work > formats.EditCalcVisits {
 		return c, errors.New("透视层级组合超过单次计算上限")
 	}
-	for _, record := range r.rows {
+	descend := func(n *pivotNode, axis []int, record []pivotValue) *pivotNode {
+		for _, f := range axis {
+			n = n.child(dims[f].positions[r.dicts[f].index[record[f]]])
+		}
+		return n
+	}
+	rows, err := p.filteredRows(ctx, r, dims, func(record []pivotValue) {
+		descend(c.rowRoot, p.rows, record)
+		descend(c.colRoot, p.cols, record)
+	})
+	if err != nil {
+		return c, err
+	}
+	for _, record := range rows {
 		if err := ctx.Err(); err != nil {
 			return c, err
 		}
-		visible := true
-		for f, d := range dims {
-			pos := d.positions[r.dicts[f].index[record[f]]]
-			if isTrue(d.items[pos].Hidden) || d.page && len(d.pagePositions) == 1 && pos != d.pagePositions[0] {
-				visible = false
-				break
-			}
-		}
-		if !visible {
-			continue
-		}
-		descend := func(n *pivotNode, axis []int) *pivotNode {
-			for _, f := range axis {
-				n = n.child(dims[f].positions[r.dicts[f].index[record[f]]])
-			}
-			return n
-		}
-		row, col := descend(c.rowRoot, p.rows), descend(c.colRoot, p.cols)
-		value := record[p.data]
-		if value.kind == "d" {
-			n, err := pivotDateSerial(value.raw, r.book.date1904)
-			if err != nil {
-				return c, err
-			}
-			value = pivotValue{"n", strconv.FormatFloat(n, 'g', -1, 64)}
+		row, col := descend(c.rowRoot, p.rows, record), descend(c.colRoot, p.cols, record)
+		value, err := pivotMeasure(record[p.data], r)
+		if err != nil {
+			return c, err
 		}
 		for i := row; i != nil; i = i.parent {
 			for j := col; j != nil; j = j.parent {
@@ -99,7 +90,7 @@ func (p pivotPlan) cube(ctx context.Context, r pivotRecords) (pivotCube, error) 
 					a = &pivotAggregate{}
 					c.groups[key] = a
 				}
-				a.add(value)
+				a.addMeasure(value, len(record) > len(r.fields))
 			}
 		}
 	}
@@ -132,7 +123,14 @@ func (c pivotCube) lines(ctx context.Context, root *pivotNode, axis []int, rows,
 			}
 			slices.Sort(order)
 		}
+		var allowed map[int]bool
+		if d.allowed != nil {
+			allowed = d.allowed[filterPath(parent.path())]
+		}
 		for _, pos := range order {
+			if d.allowed != nil && !allowed[pos] {
+				continue
+			}
 			visited++
 			if visited%512 == 0 {
 				if err := ctx.Err(); err != nil {

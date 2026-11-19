@@ -90,6 +90,18 @@ def saved_pivot(path, sheet, area, name, records=False):
             pages.append((cache[k].get('name'),selected))
         loc=table.find(S+'location')
         attrs={k:loc.get(k,'0') for k in ('ref','firstDataRow','firstDataCol','rowPageCount','colPageCount')}
+        filters = []
+        for f in table.findall(S+'filters/'+S+'filter'):
+            column = f.find('.//'+S+'filterColumn')
+            filters.append((cache[int(f.get('fld'))].get('name'), f.get('type'), f.get('iMeasureFld'), [
+                (x.tag.split('}')[-1], tuple(sorted(x.attrib.items()))) for x in column.iter() if x is not column]))
+        calculations = []
+        for c in definition.findall(S+'calculatedItems/'+S+'calculatedItem'):
+            ref = c.find('.//'+S+'reference')
+            field = cache[int(ref.get('field'))]
+            member = field.find(S+'sharedItems')[int(ref.find(S+'x').get('v','0'))]
+            calculations.append((field.get('name'), member.get('v'), member.get('f'), c.get('formula')))
+        attrs = (attrs, filters, calculations)
         if not records:return values,axes,pages,attrs
         cachelinks=posixpath.join(posixpath.dirname(cachepart),'_rels',posixpath.basename(cachepart)+'.rels')
         rec=next(r for r in ET.fromstring(archive.read(cachelinks)) if r.get('Type').endswith('/pivotCacheRecords'))

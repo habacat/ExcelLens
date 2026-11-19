@@ -27,6 +27,6 @@
 @keyframes trace-arrive {from{opacity:.35;box-shadow:0 0 0 4px var(--trace-halo),0 0 18px #e2ad4a90}to{opacity:1;box-shadow:0 0 0 1px var(--trace-halo),0 0 12px #e2ad4a80}}
 /* Consistent lightweight reveals for frequently used controls. Sheet tiles
  * and worksheet geometry keep their immediate rendering path. */
-.reading-mode-panel:not([hidden]),.calculator-completion:not([hidden]),#analysisRoot:not([hidden]),.toast:not([hidden]),.analysis-toast:not([hidden]) {animation:ui-reveal var(--motion-normal) var(--motion-ease);}
-.calculator-dock:not([hidden]),.trace-dock:not([hidden]) {animation:ui-reveal var(--motion-fast) var(--motion-ease);}
+#analysisRoot:not([hidden]),.analysis-toast:not([hidden]) {animation:ui-reveal var(--motion-normal) var(--motion-ease);}
+.trace-dock:not([hidden]) {animation:ui-reveal var(--motion-fast) var(--motion-ease);}
 @media(prefers-reduced-motion:reduce){.trace-arrival-box,.trace-dialog[open],.reading-mode-panel:not([hidden]),.calculator-completion:not([hidden]),#analysisRoot:not([hidden]),.calculator-dock:not([hidden]),.trace-dock:not([hidden]),.toast:not([hidden]),.analysis-toast:not([hidden]){animation:none!important}.trace-go{transition:none!important}}

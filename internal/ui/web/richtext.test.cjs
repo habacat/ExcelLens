@@ -7,7 +7,8 @@ test('HTML copy and source text share exact UTF16 spans, inherit styles and neve
   const base={bold:true,underline:true,strike:true,fontName:'宋体',fontSize:11};
   const value=context.window.ExcelLensClipboard.build({startCol:1,endCol:1,rows:[{cells:[{...cell,col:1}]}]},[base],true,'',limits);
   assert.equal(value.text,context.window.ExcelLensClipboard.tsvCell(cell.raw));assert(!value.html.includes('<img'));assert(!value.html.includes('<&'));
-  assert.match(value.html,/font-weight:400/);assert.match(value.html,/text-decoration-line:none/);assert.match(value.html,/vertical-align:sub/);assert.match(value.html,/<br>/);
+  assert.match(value.html,/font-weight:400/);assert.match(value.html,/text-decoration-line:none/);assert.match(value.html,/vertical-align:sub/);
+  assert.match(value.html,/<br style="mso-data-placement:same-cell">/);
   const td=value.html.slice(value.html.indexOf('<td'),value.html.indexOf('><span'));assert(!td.includes('text-decoration:underline'));
   const override=rich.html(cell,base,{limits,fontOverride:'Arial'});assert(override.html.includes('Arial'));assert(!override.html.includes('onerror'));
 });

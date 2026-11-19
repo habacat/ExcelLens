@@ -4,9 +4,8 @@
 (() => {
   'use strict';
   class RecentWorkbooks {
-    constructor({api, open, toast,canOpen=()=>true}) {
+    constructor({api, open, toast}) {
       this.api=api; this.open=open; this.toast=toast;
-      this.canOpen=canOpen;
       this.items=[]; this.ticket=0; this.busy=false;
       this.list=document.getElementById('recentList');
       this.search=document.getElementById('recentSearch');
@@ -109,14 +108,11 @@
       const entry=this.items.find(x=>x.id===id);
       if(!entry)return;
       const action=e.target.closest('[data-action]')?.dataset.action||'open';
-      if(action==='open'&&!this.canOpen())return;
       if(action==='open' && !entry.available){this.toast('文件已移动或删除，可移除该记录后重新选择文件','warning');return;}
       this.busy=true;itemNode.classList.add('recent-working');
       try {
         if(action==='open') {
-          itemNode.querySelector('.recent-name').textContent='正在打开 '+entry.name;
-          const data=await this.api('/api/recent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id})});
-          await this.open(data);
+          await this.open(entry);
         } else {
           await this.api('/api/recent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id})});
           await this.load();

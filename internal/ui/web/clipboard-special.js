@@ -18,7 +18,7 @@
     return mode==='display'?String(styled&&cell.conditional?.display!=null?cell.conditional.display:cell.display??cell.raw??''):String(cell.raw??cell.display??'');
   }
   const markdown=value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\/g,'\\\\').replace(/\|/g,'\\|').replace(/\r\n?|\n/g,'<br>').replace(/\t/g,'&#9;').replace(/^ +| +$/g,s=>'&#32;'.repeat(s.length));
-  function selection(payload,{format='tsv',mode='display',includeHeader=false,styled=false,sheet=''}={},limits){
+  function selection(payload,{format='tsv',mode='display',includeHeader=false,styled=false,sheet='',mergeAt}={},limits){
     if(!['tsv','markdown','json'].includes(format)||!['display','raw','formula'].includes(mode))throw Error('复制方式无效');
     const rows=includeHeader?payload.rows.filter(row=>row.row!==payload.header?.row):payload.rows;
     if(includeHeader&&!payload.header)throw Error('请先读取所选表头行');
@@ -35,8 +35,8 @@
     }else{
       const values=all.map(row=>inspect(row).map(cell=>{if(styled&&cell.conditional?.notice)notices.add(cell.conditional.notice);return valueOf(cell,mode,styled);}));
       if(format==='tsv'){
-        const literal={startCol:start,endCol:end,rows:values.map((row,i)=>({row:i+1,cells:row.map((value,j)=>({col:start+j,raw:value,display:value,type:'inlineStr',hasFormula:false}))}))};
-        const result=clip.build(literal,[],false,'',null,budget);text=result.text;html=result.html;
+        const literal={startCol:start,endCol:end,rows:values.map((row,i)=>({row:all[i].row,cells:row.map((value,j)=>({col:start+j,raw:value,display:value,type:'inlineStr',hasFormula:false}))}))};
+        const result=clip.build(literal,[],false,'',null,budget,mergeAt);text=result.text;html=result.html;
       }
       else{
         const header=includeHeader?values.shift():Array.from({length:end-start+1},(_,i)=>colName(start+i));

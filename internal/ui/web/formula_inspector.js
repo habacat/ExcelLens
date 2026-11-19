@@ -422,19 +422,21 @@
       if(sheet===this.o.state.sheet && this.o.state.indexReady)return;
       if(this.readySheets.has(sheet))return;
       if(this.indexTasks.has(sheet))return this.indexTasks.get(sheet);
+      const activity=globalThis.ExcelLensActivity?.begin("正在读取引用工作表");
       const task=(async()=>{
         const started=await this.o.api('/api/index/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet})});
         if(started.ready) {this.readySheets.add(sheet);return;}
         while(true){
           await new Promise(r=>setTimeout(r,270));
           const result=await this.o.api('/api/index/status?id='+encodeURIComponent(started.jobId));
+          activity?.job(result);
           progress(`首次读取「${sheet}」：建立索引 ${Math.round(result.progress||0)}%`);
           if(result.status==='done'){this.readySheets.add(sheet);return;}
           if(result.status==='error'||result.status==='cancelled')throw new Error(result.error||'建立索引失败');
         }
       })();
       this.indexTasks.set(sheet,task);
-      try {await task;} finally {this.indexTasks.delete(sheet);}
+      try {await task;} finally {activity?.end();this.indexTasks.delete(sheet);}
     }
     async readCell(sheet,ref,progress) {
       const key=sheet+'!'+ref;

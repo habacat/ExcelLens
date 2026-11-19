@@ -82,6 +82,7 @@
       if (this.abort) return false;
       const controller = new AbortController();
       this.abort = controller;
+      const activity = globalThis.ExcelLensActivity?.begin(message, {signal:controller.signal});
       this.status(message); this.controls(); el('Cancel').hidden = !cancellable;
       try { await action(controller.signal); return true; }
       catch (error) {
@@ -90,6 +91,7 @@
         if (error.status === 409 && this.grid.active) this.grid.stale = true;
         return false;
       } finally {
+        activity?.end();
         el('Cancel').hidden = true; this.abort = null; this.controls();
       }
     }
@@ -121,17 +123,23 @@
       }
     }
 
-    advanced() {
+    advanced(tool) {
       if (!this.grid.view.ready()) return false;
-      const pivot = this.tools.pivotAt(this.grid.selected);
+      const range = tool === 'Range';
+      const pivot = !range && this.tools.pivotAt(this.grid.selected);
       this.tools.contextualPivot = !!pivot;
-      el('Title').textContent = pivot ? '透视布局' : '更多编辑';
+      el('Title').textContent = range ? '区域编辑' : pivot ? '透视布局' : '更多编辑';
       this.openDialog('editCopyDialog');
       el('Work').hidden = false; el('ListView').hidden = true;
       const {sheet, ref} = this.context();
       el('Sheet').value = sheet; el('Address').value = ref || '';
       this.cell = null; this.clearPreview(); this.setCell(null);
       if (pivot) this.tools.openPivot(pivot);
+      if (range) {
+        this.tools.selected = 'Structure';
+        this.tools.chooseRangeKind = true;
+        el('StructureKind').value = this.grid.view.merged() ? 'unmergeCells' : 'mergeCells';
+      }
       return this.run('正在读取选区…', signal => this.fetchCell(signal));
     }
 

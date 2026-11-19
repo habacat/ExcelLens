@@ -1,6 +1,29 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ctx={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/clipboard.js','utf8'),ctx);
 const clip=ctx.window.ExcelLensClipboard,plain=value=>JSON.parse(JSON.stringify(value));
+test('HTML keeps the merged grid while TSV keeps a placeholder for every covered position',()=>{
+  const limits={rows:12,columns:8,cells:40,textBytes:20000,htmlBytes:20000};
+  vm.runInNewContext(fs.readFileSync(__dirname+'/merges.js','utf8'),ctx);
+  const merges=new ctx.window.ExcelLensMergedCells();
+  merges.load([{row:7,col:2,endRow:9,endCol:3},{row:7,col:4,endRow:7,endCol:5}]);
+  const row=n=>({row:n,cells:[2,3,4,5,6].map(col=>({col,display:n+'-'+col}))});
+  const build=(numbers,visibility)=>clip.build({startCol:2,endCol:6,rows:numbers.map(row)},[],false,'',null,limits,
+    (r,c)=>merges.copyAnchor(r,c,visibility));
+  const result=build([7,8,9]);
+  assert.match(result.html,/<td colspan="2" rowspan="3"[^>]*>7-2<\/td>/);
+  assert.match(result.html,/<td colspan="2"[^>]*>7-4<\/td>/);
+  assert.equal((result.html.match(/<td\b/g)||[]).length,9);
+  assert.equal(result.text,'7-2\t\t7-4\t\t7-6\n\t\t8-4\t8-5\t8-6\n\t\t9-4\t9-5\t9-6');
+  assert.doesNotMatch(result.html,/8-2/);
+  const hidden=build([7,9],{count:()=>1});
+  assert.match(hidden.html,/colspan="2" rowspan="2"/);
+  for (const rows of [[7,10,9],[7,9,8],[9,7],[7,9]]) {
+    const reordered=build(rows);
+    assert.doesNotMatch(reordered.html,/rowspan/);
+    assert.match(reordered.html,/colspan="2"/);
+    assert.ok(reordered.html.includes(rows.at(-1)+'-6'));
+  }
+});
 test('Excel/WPS quoted TSV round trips literal tabs, CRLF, quotes, empty cells and text identifiers',()=>{
   const rows=[['000123','1,234.50','line1\r\nline2','"quoted"','\t'],['','tail','','','']];
   const text=rows.map(row=>row.map(clip.tsvCell).join('\t')).join('\r\n')+'\r\n';

@@ -35,6 +35,7 @@
     }
     use(summary) {
       if(this.archive?.id!==summary?.id){
+        this.activity?.end();
         ++this.ticket;++this.operation;this.controller?.abort();
         const previousJob=this.job;
         this.job='';this.busy=false;
@@ -147,6 +148,7 @@
       const partial=!!this.items.find(item=>item.id===this.selected)?.incomplete;
       if(partial&&!$('archiveAllowPartial').checked){this.error('该 TXT 不完整，请先勾选「仅查看现存 TXT 片段」。');return;}
       const operation=++this.operation;
+      const activity=this.activity=globalThis.ExcelLensActivity?.begin('正在读取压缩包',{slot:'archiveActivity'});
       this.busy=true;this.error('');this.controls();
       $('archiveProgress').hidden=false;
       $('archiveStage').textContent='正在准备读取…';$('archiveBar').removeAttribute('value');
@@ -156,6 +158,7 @@
         this.job=started.jobId;
         for(;;){
           const state=await this.api('/api/archive/job?id='+encodeURIComponent(started.jobId));
+          if(operation===this.operation)activity?.job(state);
           if(operation!==this.operation)return;
           $('archiveStage').textContent=state.stage;
           if(state.totalBytes>0){$('archiveBar').value=Math.min(100,state.doneBytes/state.totalBytes*100);}else $('archiveBar').removeAttribute('value');
@@ -168,7 +171,7 @@
           await delay(240);
         }
       }catch(error){if(operation===this.operation)this.error(error.message);}
-      finally{if(operation===this.operation){this.busy=false;this.job='';$('archiveProgress').hidden=true;this.controls();}}
+      finally{activity?.end();if(operation===this.operation){this.activity=null;this.busy=false;this.job='';$('archiveProgress').hidden=true;this.controls();}}
     }
   }
   window.ExcelLensArchives=Archives;

@@ -32,7 +32,14 @@ func RewriteStructure(ctx context.Context, dst io.Writer, src *workbook.EditSour
 	if err = p.inspectGrid(ctx); err != nil {
 		return opc.Receipt{}, err
 	}
-	if op.Kind == "refreshPivot" || op.Kind == "configurePivot" {
+	switch op.Kind {
+	case "fixedArray", "spillFormula", "clearArray":
+		return p.rewriteArray(ctx, dst, src, op)
+	}
+	if op.Kind == "mergeCells" || op.Kind == "unmergeCells" {
+		return p.rewriteMerge(ctx, dst, src, op)
+	}
+	if op.Kind == "refreshPivot" || op.Kind == "configurePivot" || op.Kind == "pivotValueFilter" || op.Kind == "pivotCalculatedItem" {
 		return p.rewritePivot(ctx, dst, src, op)
 	}
 	if op.Kind == "refreshCharts" {
@@ -394,7 +401,7 @@ func (a axisEdit) editPart(ctx context.Context, data []byte, role, sheet string,
 				expression = ""
 			}
 			if local == "c" && role == "sheet" && clearValue {
-				p, err := removeXMLAttributes(data, cellTag.from, cellTag.to, "t")
+				p, err := removeXMLAttributes(data, cellTag.from, cellTag.to, "t", "vm")
 				if err != nil {
 					return err
 				}

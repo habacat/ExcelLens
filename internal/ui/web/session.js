@@ -47,6 +47,8 @@
     });
   }
   window.ExcelLensSession=Object.freeze({
+    nativeLaunch:valid(launch),
+    get restoring(){return valid(stored) && id===stored;},
     get id(){return id},
     ready,
     apply(headers){headers.set('X-ExcelLens-Session',id);return headers;}

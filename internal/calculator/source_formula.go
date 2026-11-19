@@ -83,6 +83,12 @@ func localFormulaScalar(node *formulaNode) bool {
 	case "value":
 		return true
 	case "function":
+		if _, _, ok := worksheetArrayName(node.op); ok {
+			return false
+		}
+		if node.op == "TRANSPOSE" {
+			return len(args) == 1 && localFormulaScalar(args[0])
+		}
 		switch node.op {
 		case "SUBTOTAL", "_XLFN.SINGLE", "SUM", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA", "AND", "OR", "PRODUCT", "SUMPRODUCT", "ROWS", "COLUMNS":
 			return true
@@ -212,6 +218,15 @@ func checkLocalFormula(node *formulaNode, body string, sheet func(string) bool, 
 		}
 	case "function":
 		switch node.op {
+		case "ANCHORARRAY":
+			if len(node.args) != 1 || node.args[0].kind != "ref" || node.args[0].ref.end != "" {
+				return errLocalFormula
+			}
+		case "SEQUENCE", "TRANSPOSE", "FILTER", "SORT", "UNIQUE", "TAKE", "DROP", "CHOOSECOLS", "CHOOSEROWS", "HSTACK", "VSTACK", "TOCOL", "TOROW", "TEXTSPLIT":
+			spec := formulaFunctions[node.op]
+			if len(node.args) < spec.min || len(node.args) > spec.max {
+				return errLocalFormula
+			}
 		case "ROW", "COLUMN":
 			// In a workbook the formula cell supplies the omitted reference.
 			if len(node.args) > 1 {

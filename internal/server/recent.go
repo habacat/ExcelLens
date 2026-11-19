@@ -135,9 +135,6 @@ func (a *App) recordRecent(wb *workbook.Workbook) {
 	if wb == nil {
 		return
 	}
-	recentStoreMu.Lock()
-	defer recentStoreMu.Unlock()
-	r := readRecents()
 	p, _ := filepath.Abs(wb.Path)
 	if p == "" {
 		p = wb.Path
@@ -149,6 +146,9 @@ func (a *App) recordRecent(wb *workbook.Workbook) {
 	}
 	item := recentEntry{ID: id, Name: workbookDisplayName(wb), Path: p, Fingerprint: wb.Fingerprint, FileSize: st.Size(), SheetCount: len(wb.Sheets), OpenedAt: time.Now(), Available: true}
 	a.archiveRecent(wb, &item)
+	recentStoreMu.Lock()
+	defer recentStoreMu.Unlock()
+	r := readRecents()
 	for _, existing := range r.Items {
 		if existing.ID == id {
 			item.Pinned = existing.Pinned
@@ -170,15 +170,21 @@ func (a *App) recordRecent(wb *workbook.Workbook) {
 	_ = writeRecents(r)
 }
 
+// Checking a source path can block on external storage. Hold the shared
+// history lock only while reading the JSON snapshot or committing a change.
+func snapshotRecents() recentFile {
+	recentStoreMu.Lock()
+	defer recentStoreMu.Unlock()
+	return readRecents()
+}
+
 func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet && req.Method != http.MethodPost {
 		methodNotAllowed(w)
 		return
 	}
-	recentStoreMu.Lock()
-	defer recentStoreMu.Unlock()
-	r := readRecents()
 	if req.Method == http.MethodGet {
+		r := snapshotRecents()
 		for i := range r.Items {
 			if r.Items[i].ArchivePath != "" {
 				st, err := os.Stat(r.Items[i].ArchivePath)
@@ -199,6 +205,14 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 	if json.NewDecoder(http.MaxBytesReader(w, req.Body, 4<<10)).Decode(&input) != nil {
 		writeError(w, 400, "历史记录操作参数无效")
 		return
+	}
+	var r recentFile
+	if input.Action == "open" {
+		r = snapshotRecents()
+	} else {
+		recentStoreMu.Lock()
+		defer recentStoreMu.Unlock()
+		r = readRecents()
 	}
 	target := -1
 	for i := range r.Items {
@@ -222,13 +236,14 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, map[string]any{"removed": true})
 		return
 	case "pin":
-		r.Items[target].Pinned = !r.Items[target].Pinned
+		pinned := !item.Pinned
+		r.Items[target].Pinned = pinned
 		sortedRecents(r.Items)
 		if err := writeRecents(r); err != nil {
 			writeError(w, 500, "无法保存置顶状态")
 			return
 		}
-		writeJSON(w, map[string]any{"pinned": r.Items[target].Pinned})
+		writeJSON(w, map[string]any{"pinned": pinned})
 		return
 	case "open":
 		if !workbook.SupportedExtensions(filepath.Ext(item.Path)) {
@@ -244,20 +259,14 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			writeError(w, 404, "文件已移动或不存在。可以从列表移除该记录，或重新选择文件。")
 			return
 		}
-		// Release recentMu before a potentially long workbook operation. The
-		// handler is intentionally separate from path-based client input.
-		recentStoreMu.Unlock()
 		if item.ArchivePath != "" {
 			err = a.reopenArchiveRecent(req.Context(), item)
+			if err == nil {
+				a.recordRecent(a.currentWorkbook())
+			}
 		} else {
-			err = a.OpenPath(item.Path)
+			err = a.openPathAs(item.Path, item.Name)
 		}
-		if err == nil {
-			wb := a.currentWorkbook()
-			wb.SetDisplayName(item.Name) // Uploaded copies retain original name.
-			a.recordRecent(wb)
-		}
-		recentStoreMu.Lock()
 		if err != nil {
 			writeError(w, 400, fmt.Sprintf("无法打开最近文件：%v", err))
 			return

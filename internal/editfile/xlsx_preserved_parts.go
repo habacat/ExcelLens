@@ -119,11 +119,12 @@ func checkPassiveXML(e xmlEvent, space string, elements map[string][]string) (bo
 
 var cacheDefinitionElements = map[string][]string{
 	"":                     {"pivotCacheDefinition"},
-	"pivotCacheDefinition": {"cacheSource", "cacheFields"},
-	"cacheSource":          {"worksheetSource"},
-	"cacheFields":          {"cacheField"},
-	"cacheField":           {"sharedItems"},
-	"sharedItems":          {"s", "n", "b", "d", "e", "m"},
+	"pivotCacheDefinition": {"cacheSource", "cacheFields", "calculatedItems"},
+	"calculatedItems":      {"calculatedItem"}, "calculatedItem": {"pivotArea"}, "pivotArea": {"references"}, "references": {"reference"}, "reference": {"x"},
+	"cacheSource": {"worksheetSource"},
+	"cacheFields": {"cacheField"},
+	"cacheField":  {"sharedItems"},
+	"sharedItems": {"s", "n", "b", "d", "e", "m"},
 }
 
 func pivotIdentity(a xml.Attr) bool {
@@ -224,17 +225,19 @@ func (p *xlsxPackage) checkPivotDefinition(ctx context.Context, part string, dat
 
 var pivotTableElements = map[string][]string{
 	"":                     {"pivotTableDefinition"},
-	"pivotTableDefinition": {"location", "pivotFields", "rowFields", "rowItems", "colFields", "colItems", "pageFields", "dataFields", "pivotTableStyleInfo"},
-	"pivotFields":          {"pivotField"},
-	"pivotField":           {"items"},
-	"items":                {"item"},
-	"rowFields":            {"field"},
-	"colFields":            {"field"},
-	"rowItems":             {"i"},
-	"colItems":             {"i"},
-	"i":                    {"x"},
-	"dataFields":           {"dataField"},
-	"pageFields":           {"pageField"},
+	"pivotTableDefinition": {"location", "pivotFields", "rowFields", "rowItems", "colFields", "colItems", "pageFields", "dataFields", "pivotTableStyleInfo", "filters", "chartFormats"},
+	"filters":              {"filter"}, "filter": {"autoFilter"}, "autoFilter": {"filterColumn"}, "filterColumn": {"top10", "customFilters"}, "customFilters": {"customFilter"},
+	"chartFormats": {"chartFormat"}, "chartFormat": {"pivotArea"}, "pivotArea": {"references"}, "references": {"reference"}, "reference": {"x"},
+	"pivotFields": {"pivotField"},
+	"pivotField":  {"items"},
+	"items":       {"item"},
+	"rowFields":   {"field"},
+	"colFields":   {"field"},
+	"rowItems":    {"i"},
+	"colItems":    {"i"},
+	"i":           {"x"},
+	"dataFields":  {"dataField"},
+	"pageFields":  {"pageField"},
 }
 
 func (p *xlsxPackage) checkPivotTable(ctx context.Context, part string, data []byte) error {

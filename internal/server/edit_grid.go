@@ -107,6 +107,20 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 		}
 		dest[addr.Sheet][ref] = editGridFormula(wb, addr, ref, derived.Formula, derived.State, &derived.Value)
 	}
+	for addr, v := range calc.ArrayMembers {
+		ref := workbook.ColumnName(addr.Col) + strconv.Itoa(addr.Row)
+		dest := calculated
+		if req.Mode != "projection" {
+			if _, asked := result[addr.Sheet][ref]; req.Cells != nil && !asked {
+				continue
+			}
+			dest = result
+		}
+		if dest[addr.Sheet] == nil {
+			dest[addr.Sheet] = map[string]*workbook.CellData{}
+		}
+		dest[addr.Sheet][ref] = editGridValue(wb, addr, ref, v)
+	}
 	if req.Mode != "projection" {
 		return result, nil
 	}

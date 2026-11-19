@@ -29,6 +29,13 @@ func (l Layout) PrepareChanges(ctx context.Context, f *workbook.EditSourceFile, 
 	var order []editdoc.Address
 	for i := range changes {
 		c := &changes[i]
+		if l.XLSX != nil && c.Value.Kind == "formula" {
+			// Normalize Excel's formula-bar spelling before journaling. The
+			// following validation still binds every name to its real scope.
+			if f, err := calculator.ParseLocalFormula(ctx, strings.TrimPrefix(c.Value.Raw, "="), l.XLSX.HasSheet, func(string) (bool, bool) { return false, true }); err == nil {
+				c.Value.Raw = f.ArrayStorageFormula()
+			}
+		}
 		if l.XLSX == nil || len(l.XLSX.Tables) == 0 {
 			continue
 		}

@@ -1,0 +1,247 @@
+{
+  "version": "1.9.1",
+  "result": "PASS",
+  "excel": [
+    "16.0",
+    20326.0
+  ],
+  "totals": {
+    "states": 60,
+    "reopenedCells": 6279,
+    "afterExcelRefresh": 6279,
+    "cacheValues": 24288,
+    "chartPoints": 267
+  },
+  "cases": [
+    {
+      "scenario": "filter-tie",
+      "states": 3,
+      "reopenedCells": 108,
+      "afterExcelRefresh": 108,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "50a1af478808fc61cc4ce8a9f702ec1049363276a71361ac72fe7bf8847fa926",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-bottom",
+      "states": 3,
+      "reopenedCells": 108,
+      "afterExcelRefresh": 108,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "50a1af478808fc61cc4ce8a9f702ec1049363276a71361ac72fe7bf8847fa926",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-between",
+      "states": 3,
+      "reopenedCells": 108,
+      "afterExcelRefresh": 108,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "50a1af478808fc61cc4ce8a9f702ec1049363276a71361ac72fe7bf8847fa926",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-sum",
+      "states": 3,
+      "reopenedCells": 108,
+      "afterExcelRefresh": 108,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "50a1af478808fc61cc4ce8a9f702ec1049363276a71361ac72fe7bf8847fa926",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-clear",
+      "states": 3,
+      "reopenedCells": 108,
+      "afterExcelRefresh": 108,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "40580149bd3cac87dafc15c04caccfc32fb5ba046830bbb819495f3ebdc619fb",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-real-sc",
+      "states": 3,
+      "reopenedCells": 900,
+      "afterExcelRefresh": 900,
+      "cacheValues": 7648,
+      "chartPoints": 0,
+      "sourceSHA256": "cef50cb21e9aadb6063c4963160ca9c3d9e9bb673b2f0af73d53e51c536b429f",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "filter-real-oct",
+      "states": 3,
+      "reopenedCells": 24,
+      "afterExcelRefresh": 24,
+      "cacheValues": 224,
+      "chartPoints": 0,
+      "sourceSHA256": "7f3f24d2722f3cc01326ecd14c28eff4b7f8cf88773997cb2c9696059d8bf0a5",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-add",
+      "states": 3,
+      "reopenedCells": 195,
+      "afterExcelRefresh": 195,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "50a1af478808fc61cc4ce8a9f702ec1049363276a71361ac72fe7bf8847fa926",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-change",
+      "states": 3,
+      "reopenedCells": 195,
+      "afterExcelRefresh": 195,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "9d6b06773a1749356f7c2d61a40200f493be2dfcb7f6cb01f762fa0a426875ac",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-remove",
+      "states": 3,
+      "reopenedCells": 195,
+      "afterExcelRefresh": 195,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "9d6b06773a1749356f7c2d61a40200f493be2dfcb7f6cb01f762fa0a426875ac",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-multiple",
+      "states": 3,
+      "reopenedCells": 195,
+      "afterExcelRefresh": 195,
+      "cacheValues": 56,
+      "chartPoints": 0,
+      "sourceSHA256": "7c91fbffe906fb38fac0dbb1ebe5371370eb5c91d885e62bf321608d3aba44c2",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-real-sc",
+      "states": 3,
+      "reopenedCells": 900,
+      "afterExcelRefresh": 900,
+      "cacheValues": 7648,
+      "chartPoints": 0,
+      "sourceSHA256": "cef50cb21e9aadb6063c4963160ca9c3d9e9bb673b2f0af73d53e51c536b429f",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "item-real-oct",
+      "states": 3,
+      "reopenedCells": 192,
+      "afterExcelRefresh": 192,
+      "cacheValues": 224,
+      "chartPoints": 0,
+      "sourceSHA256": "7f3f24d2722f3cc01326ecd14c28eff4b7f8cf88773997cb2c9696059d8bf0a5",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "cache-formula",
+      "states": 3,
+      "reopenedCells": 330,
+      "afterExcelRefresh": 330,
+      "cacheValues": 76,
+      "chartPoints": 0,
+      "sourceSHA256": "adbd1d1b871c8c1c17c449c59eb9bf8dfe5384aee0a7f2a8030d8f58e86f8fef",
+      "probeSHA256": "02e56701ce37e81d5a8563af7a847cad07fae22f3d0356310b4ce7f90b430ea9"
+    },
+    {
+      "scenario": "chart-reduce",
+      "states": 3,
+      "reopenedCells": 342,
+      "afterExcelRefresh": 342,
+      "cacheValues": 56,
+      "chartPoints": 61,
+      "sourceSHA256": "4daf22ef02dbc1591e1afc76c886a53ae0262b5e0161caeeccb6a45c03204f4d",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "cache-chain",
+      "states": 3,
+      "reopenedCells": 288,
+      "afterExcelRefresh": 288,
+      "cacheValues": 76,
+      "chartPoints": 0,
+      "sourceSHA256": "691acc5dddce58d43f7ee3b54fd7510f540c6bd32e0c62a5511d4e7b70cddd8b",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "chart-level-filter",
+      "states": 3,
+      "reopenedCells": 342,
+      "afterExcelRefresh": 342,
+      "cacheValues": 56,
+      "chartPoints": 67,
+      "sourceSHA256": "4daf22ef02dbc1591e1afc76c886a53ae0262b5e0161caeeccb6a45c03204f4d",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "chart-expand",
+      "states": 3,
+      "reopenedCells": 378,
+      "afterExcelRefresh": 378,
+      "cacheValues": 56,
+      "chartPoints": 93,
+      "sourceSHA256": "8f1baa0e65f0dd89469921524abbcf08a0b845d71d5b0d359f6b9722badee56f",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "chart-calculated",
+      "states": 3,
+      "reopenedCells": 195,
+      "afterExcelRefresh": 195,
+      "cacheValues": 56,
+      "chartPoints": 33,
+      "sourceSHA256": "8f1baa0e65f0dd89469921524abbcf08a0b845d71d5b0d359f6b9722badee56f",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    },
+    {
+      "scenario": "real-cascade-chart",
+      "states": 3,
+      "reopenedCells": 1068,
+      "afterExcelRefresh": 1068,
+      "cacheValues": 7664,
+      "chartPoints": 13,
+      "sourceSHA256": "50acefebb4a455c1078614bcfecb87d378533d763286866173100dea5304ef72",
+      "probeSHA256": "de9cbc04dac3761ab1995b5cbfc0dcff5e6e3d770b2cffbfdf5403ecce17f3ac"
+    }
+  ],
+  "cycle": {
+    "result": "PASS",
+    "http": 422,
+    "preservedRevision": 1,
+    "preservedCell": "Report!A5"
+  },
+  "browser": [
+    {
+      "result": "PASS",
+      "stages": [
+        "base",
+        "edit",
+        "undo",
+        "redo",
+        "saveReopen"
+      ],
+      "errors": []
+    },
+    {
+      "result": "PASS",
+      "stages": [
+        "base",
+        "edit",
+        "undo",
+        "redo",
+        "saveReopen"
+      ],
+      "errors": []
+    }
+  ]
+}

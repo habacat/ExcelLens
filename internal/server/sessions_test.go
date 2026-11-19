@@ -28,6 +28,50 @@ func sessionCall(t *testing.T, a *App, session, method, path, body string) *http
 	return result
 }
 
+func TestNativeLaunchWaitsForItsOwnTabAndOpensOnce(t *testing.T) {
+	isolateTestStorage(t)
+	root, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	file := filepath.Join(t.TempDir(), "deferred.xlsx")
+	id, err := root.PreparePathForLaunch(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := root.sessionFor(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := sessionCall(t, root, randomID(), "GET", "/api/status", "")
+	if other.Code != 200 || !strings.Contains(other.Body.String(), `"opened":false`) || session.app.currentWorkbook() != nil {
+		t.Fatal("an idle tab consumed the native launch")
+	}
+	writeMultiSheetWorkbook(t, file)
+	first := sessionCall(t, root, id, "GET", "/api/status", "")
+	if first.Code != 200 || !strings.Contains(first.Body.String(), "deferred.xlsx") {
+		t.Fatal(first.Body.String())
+	}
+	book := session.app.currentWorkbook()
+	sessionCall(t, root, id, "GET", "/api/status", "")
+	if book == nil || session.app.currentWorkbook() != book {
+		t.Fatal("reload reopened the native source")
+	}
+	missing, err := root.PreparePathForLaunch(filepath.Join(t.TempDir(), "missing.xlsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := sessionCall(t, root, missing, "GET", "/api/status", "")
+	var status struct {
+		Opened bool
+		Error  string
+	}
+	if err := json.Unmarshal(failed.Body.Bytes(), &status); err != nil || status.Opened || status.Error == "" {
+		t.Fatal("missing launch error", failed.Body.String(), err)
+	}
+}
+
 func TestBrowserTabsKeepIndependentWorkbooksAndCaches(t *testing.T) {
 	isolateTestStorage(t)
 	fileA := filepath.Join(t.TempDir(), "audit_a.xlsx")

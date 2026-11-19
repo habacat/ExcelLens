@@ -41,6 +41,7 @@ type WorksheetName struct {
 
 type WorksheetFormula struct {
 	Subtotal   bool
+	MaySpill   bool
 	root       *formulaNode
 	References []WorksheetReference
 }
@@ -102,7 +103,7 @@ func (e *formulaEval) operandText(v FormulaValue) (string, error) {
 // collecting dependencies. The evaluator and the dependency index consequently
 // refer to the same cells, including positional criteria such as B:B in SUMIFS.
 func (f EditableFormula) BindWorksheet(row, col int, array bool, name func(string) WorksheetName) WorksheetFormula {
-	var result WorksheetFormula
+	result := WorksheetFormula{MaySpill: !f.Scalar}
 	var bind func(*formulaNode, bool) *formulaNode
 	bind = func(n *formulaNode, scalar bool) *formulaNode {
 		if n == nil {
@@ -218,6 +219,10 @@ func worksheetRangeArgument(op string, i int) bool {
 }
 
 func (f WorksheetFormula) Evaluate(ctx context.Context, resolve FormulaResolver) (FormulaValue, error) {
+	return f.evaluate(ctx, resolve, false)
+}
+
+func (f WorksheetFormula) evaluate(ctx context.Context, resolve FormulaResolver, array bool) (FormulaValue, error) {
 	if f.root == nil {
 		return FormulaValue{}, ErrWorksheetPending
 	}
@@ -232,17 +237,17 @@ func (f WorksheetFormula) Evaluate(ctx context.Context, resolve FormulaResolver)
 		}
 		// Resource limits and unavailable inputs must not become a fabricated
 		// Excel error. Excel error codes travel as ordinary typed cell results.
-		if errors.Is(err, ErrWorksheetPending) || strings.Contains(err.Error(), "超过") || strings.Contains(err.Error(), "过于复杂") || strings.Contains(err.Error(), "过多") {
+		if errors.Is(err, ErrWorksheetPending) || strings.Contains(err.Error(), "超过") || strings.Contains(err.Error(), "过于复杂") || strings.Contains(err.Error(), "过多") || strings.Contains(err.Error(), "过大") {
 			return FormulaValue{}, ErrWorksheetPending
 		}
-		for _, code := range []string{"#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#N/A", "#NULL!"} {
+		for _, code := range []string{"#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#N/A", "#NULL!", "#CALC!", "#SPILL!"} {
 			if strings.HasPrefix(err.Error(), code) {
 				return FormulaValue{Kind: "error", Text: code}, nil
 			}
 		}
 		return FormulaValue{}, ErrWorksheetPending
 	}
-	if v.Kind == "range" {
+	if v.Kind == "range" && !array {
 		return FormulaValue{}, ErrWorksheetPending
 	}
 	if v.Kind == "blank" {

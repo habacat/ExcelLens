@@ -95,6 +95,7 @@ func (p *xlsxPackage) officeWindow(ctx context.Context, sheet XLSXSheet, cells [
 		used += hi - lo
 		return nil
 	}
+	var dynamic bool
 	var ownerGroup int
 	var ownerArea cellRect
 	var body strings.Builder
@@ -123,6 +124,9 @@ func (p *xlsxPackage) officeWindow(ctx context.Context, sheet XLSXSheet, cells [
 				}
 				selected = needed
 			}
+			if e.local() == "c" && e.parent() == "row" {
+				dynamic = attribute(t, "", "cm") != ""
+			}
 			if len(e.stack) != 5 || e.stack[1] != (xml.Name{Space: mainNS, Local: "sheetData"}) || e.stack[3] != (xml.Name{Space: mainNS, Local: "c"}) || t.Name != (xml.Name{Space: mainNS, Local: "f"}) {
 				return nil
 			}
@@ -131,9 +135,6 @@ func (p *xlsxPackage) officeWindow(ctx context.Context, sheet XLSXSheet, cells [
 				return nil
 			}
 			kind := attribute(t, "", "t")
-			if !strings.Contains(ref, ":") && kind == "array" {
-				return nil
-			}
 			area, ok := parseRect(ref)
 			if !ok {
 				return fmt.Errorf("%w：公式所属范围", ErrXLSX)
@@ -146,7 +147,15 @@ func (p *xlsxPackage) officeWindow(ctx context.Context, sheet XLSXSheet, cells [
 				if len(w.structure.arrayRanges) >= formats.EditXLSXRangeLimit {
 					return ErrXLSX
 				}
-				w.structure.arrayRanges = append(w.structure.arrayRanges, area)
+				if kind == "array" {
+					w.structure.arrayRanges = append(w.structure.arrayRanges, area)
+					if dynamic {
+						if w.structure.arrayDynamic == nil {
+							w.structure.arrayDynamic = map[cellRect]bool{}
+						}
+						w.structure.arrayDynamic[area] = true
+					}
+				}
 				if kind == "dataTable" {
 					w.structure.blocks = append(w.structure.blocks, ownedRange{area: area, reason: "模拟运算表的结果区域"})
 				}

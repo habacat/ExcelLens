@@ -162,6 +162,7 @@ type xlsxPackage struct {
 	pivotSources       map[string]pivotSource
 	pivotOutputs       map[string]string
 	pivotRanges        map[string][]ownedRange
+	rich               *richErrorStore
 	dynamic            bool
 }
 
@@ -638,6 +639,9 @@ func (p *xlsxPackage) loadWorkbook(ctx context.Context) error {
 	}
 	if err := p.metadata(ctx); err != nil {
 		return err
+	}
+	if p.files[richValuePart] != nil {
+		return p.loadRichMetadata(ctx)
 	}
 	if p.files[sheetMetadataPart] != nil {
 		return p.checkDynamicMetadata(ctx)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"excellens/internal/workbook"
 
@@ -20,8 +21,10 @@ type pivotDimension struct {
 	values        []pivotValue
 	items         []pivotItemXML
 	positions     map[int]int
+	allowed       map[string]map[int]bool
 	pagePositions []int
 	page          bool
+	customSort    bool
 	date1904      bool
 	dateStyle     string
 	dateFormat    workbook.CalendarNumberFormat
@@ -37,7 +40,16 @@ func (p pivotPlan) dimensions(r pivotRecords) (map[int]*pivotDimension, error) {
 	for _, axis := range [][]int{p.rows, p.cols, p.pages} {
 		for _, f := range axis {
 			field := p.table.Fields[f]
-			d := &pivotDimension{field: field, name: r.fields[f].Name, values: r.dicts[f].values, positions: map[int]int{}, page: slices.Contains(p.pages, f)}
+			if x, ok := r.removedItems[f]; ok {
+				field.Items = slices.DeleteFunc(slices.Clone(field.Items), func(it pivotItemXML) bool { return (it.Type == "" || it.Type == "data") && it.X == x })
+				for i := range field.Items {
+					it := &field.Items[i]
+					if (it.Type == "" || it.Type == "data") && it.X > x {
+						it.X--
+					}
+				}
+			}
+			d := &pivotDimension{customSort: pivotOn(p.table.CustomListSort), field: field, name: r.fields[f].Name, values: r.dicts[f].values, positions: map[int]int{}, page: slices.Contains(p.pages, f)}
 			if r.book != nil {
 				d.date1904 = r.book.date1904
 				d.dateStyle = r.dateStyles[f]
@@ -48,6 +60,11 @@ func (p pivotPlan) dimensions(r pivotRecords) (map[int]*pivotDimension, error) {
 			}
 			if err := d.orderItems(collator); err != nil {
 				return nil, err
+			}
+			for i := range d.items {
+				if r.dicts[f].calculated[d.items[i].X] {
+					d.items[i].Calculated = "1"
+				}
 			}
 			if err := d.applySelection(p, r.dicts[f], f); err != nil {
 				return nil, err
@@ -79,9 +96,16 @@ func (d *pivotDimension) orderItems(c *collate.Collator) error {
 		}
 	}
 	if sortAll {
+		var custom map[string]int
+		if d.customSort {
+			custom = matchingPivotOrder(d.values)
+		}
 		slices.SortStableFunc(d.items, func(a, b pivotItemXML) int {
 			v, w := d.values[a.X], d.values[b.X]
 			order := comparePivotItems(c, v, w, d.date1904)
+			if custom != nil && v.kind == "s" && w.kind == "s" {
+				order = cmp.Compare(custom[strings.ToLower(v.raw)], custom[strings.ToLower(w.raw)])
+			}
 			if d.field.Sort == "descending" && v.kind != "m" && w.kind != "m" {
 				return -order
 			}
@@ -93,6 +117,40 @@ func (d *pivotDimension) orderItems(c *collate.Collator) error {
 	}
 	return nil
 }
+
+// Excel's built-in month and weekday lists are used when a field first
+// enters an axis. Already saved manual order takes precedence.
+var pivotCustomOrders = func() []map[string]int {
+	lists := []string{
+		"jan feb mar apr may jun jul aug sep oct nov dec",
+		"january february march april may june july august september october november december",
+		"sun mon tue wed thu fri sat", "sunday monday tuesday wednesday thursday friday saturday",
+		"一月 二月 三月 四月 五月 六月 七月 八月 九月 十月 十一月 十二月",
+		"1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月",
+		"星期日 星期一 星期二 星期三 星期四 星期五 星期六",
+		"周日 周一 周二 周三 周四 周五 周六",
+	}
+	var result []map[string]int
+	for _, words := range lists {
+		order := map[string]int{}
+		for i, v := range strings.Fields(words) {
+			order[v] = i
+		}
+		result = append(result, order)
+	}
+	return result
+}()
+
+func matchingPivotOrder(values []pivotValue) map[string]int {
+	for _, order := range pivotCustomOrders {
+		if slices.ContainsFunc(values, func(v pivotValue) bool { _, ok := order[strings.ToLower(v.raw)]; return v.kind == "s" && !ok }) {
+			continue
+		}
+		return order
+	}
+	return nil
+}
+
 func (v pivotValue) sortGroup() int {
 	switch v.kind {
 	case "n", "d":

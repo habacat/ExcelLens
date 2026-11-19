@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
@@ -30,12 +32,31 @@ func (a *App) editRead(ctx context.Context, doc *editdoc.Document, layout editfi
 		return nil, err
 	}
 	source := values[address]
+	if owner := source.Array; owner != nil {
+		start, _, _ := strings.Cut(owner.Range, ":")
+		anchor, err := editAddress(req.Sheet, start)
+		if err != nil {
+			return nil, err
+		}
+		value := source.Value
+		if anchor != address {
+			base, err := layout.Read(ctx, f, []editdoc.Address{anchor})
+			if err != nil {
+				return nil, err
+			}
+			value = base[anchor].Value
+		}
+		owner.Formula = doc.ValueAt(anchor, value).Raw
+	}
 	current := doc.ValueAt(address, source.Value)
 	var formulaState string
 	var savedResult, calculatedResult *editdoc.Value
 	calc, err := a.calculationFor(ctx, doc, layout, f)
 	if err != nil {
 		return nil, err
+	}
+	if derived, ok := calc.ArrayMembers[address]; ok {
+		current = derived
 	}
 	if current.Kind == "formula" {
 		formulaState, savedResult = calc.FormulaResult(address, source)
@@ -53,20 +74,21 @@ func (a *App) editRead(ctx context.Context, doc *editdoc.Document, layout editfi
 		choices = editfile.RuleChoices(*rule)
 	}
 	return struct {
-		Address          editdoc.Address `json:"address"`
-		Ref              string          `json:"ref"`
-		Base             editdoc.Value   `json:"base"`
-		Value            editdoc.Value   `json:"value"`
-		FormulaState     string          `json:"formulaState,omitempty"`
-		SavedResult      *editdoc.Value  `json:"savedResult,omitempty"`
-		CalculatedResult *editdoc.Value  `json:"calculatedResult,omitempty"`
-		Rule             *editdoc.Rule   `json:"rule,omitempty"`
-		Choices          []string        `json:"choices,omitempty"`
-		ReadOnly         string          `json:"readOnly,omitempty"`
-		GeneratedStatus  string          `json:"generatedStatus,omitempty"`
+		Address          editdoc.Address      `json:"address"`
+		Ref              string               `json:"ref"`
+		Base             editdoc.Value        `json:"base"`
+		Value            editdoc.Value        `json:"value"`
+		FormulaState     string               `json:"formulaState,omitempty"`
+		SavedResult      *editdoc.Value       `json:"savedResult,omitempty"`
+		CalculatedResult *editdoc.Value       `json:"calculatedResult,omitempty"`
+		Rule             *editdoc.Rule        `json:"rule,omitempty"`
+		Choices          []string             `json:"choices,omitempty"`
+		ReadOnly         string               `json:"readOnly,omitempty"`
+		Array            *editfile.ArrayOwner `json:"array,omitempty"`
+		GeneratedStatus  string               `json:"generatedStatus,omitempty"`
 	}{
 		Address: address, Ref: fmt.Sprintf("%s%d", workbook.ColumnName(col), row), Base: source.Value, Value: current,
-		FormulaState: formulaState, SavedResult: savedResult, CalculatedResult: calculatedResult, Rule: rule, Choices: choices, ReadOnly: source.ReadOnly, GeneratedStatus: status,
+		FormulaState: formulaState, SavedResult: savedResult, CalculatedResult: calculatedResult, Rule: rule, Choices: choices, ReadOnly: source.ReadOnly, GeneratedStatus: status, Array: source.Array,
 	}, nil
 }
 
@@ -156,7 +178,31 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil {
 			return editdoc.PreparedChanges{}, err
 		}
-		return layout.PrepareChanges(ctx, f, changes, doc)
+		plan, err := layout.PrepareChanges(ctx, f, changes, doc)
+		if err != nil || layout.XLSX == nil || len(plan.Changes) == 0 {
+			return plan, err
+		}
+		entry, err := a.calculationRevision(ctx, doc, layout, f, slices.ContainsFunc(plan.Changes, func(c editdoc.Change) bool { return c.Value.Kind == "formula" }))
+		if err != nil {
+			return plan, err
+		}
+		if entry.book == nil {
+			if entry.indexErr != nil && layout.XLSX.NeedsArrayCalculation(ctx, plan.Changes) {
+				return plan, entry.indexErr
+			}
+			return plan, nil
+		}
+		array, err := entry.book.ArrayChange(ctx, doc, plan)
+		if err != nil || array == nil {
+			return plan, err
+		}
+		base, err := verifiedRevision(ctx, doc, f, func(dir string) (string, error) {
+			return array.Materialize(ctx, dir, doc, layout, f)
+		})
+		if err == nil {
+			plan.NextBase = &base
+		}
+		return plan, err
 	}, func(rule editdoc.Rule) (*editdoc.Rule, error) {
 		if !a.validEditProof(doc, req.Proof, rule) {
 			return nil, errors.New("请重新预览当前修订的数据规则")
@@ -180,7 +226,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 	if err != nil {
 		return nil, err
 	}
-	return editCommitResult{doc.Info, commit, layout.XLSX != nil && len(layout.XLSX.Tables) > 0, doc.Base.Source.Book}, nil
+	return editCommitResult{doc.Info, commit, layout.XLSX != nil && (len(layout.XLSX.Tables) > 0 || doc.Structures > 0), doc.Base.Source.Book}, nil
 }
 
 type editCommitResult struct {

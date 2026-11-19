@@ -71,11 +71,11 @@
 :root[data-reading-preset] body {background:var(--reading-inset);color:var(--reading-ink);}
 :root[data-reading-preset] body.home-view #globalStatus {color:var(--reading-muted);}
 :root[data-reading-preset] :is(.appbar,.formula-toolbar,.bottom-bar,.status-strip,.sheet-controls,
-  .float-dialog,.dialog-head,.dialog-footer,.reading-mode-panel,.index-card,.sheet-switch-status,
+  .float-dialog,.dialog-head,.dialog-footer,.reading-mode-panel,.index-card,
   .cell-context-menu,.columns-menu,.auto-filter-popover,.sheet-edge-button,.calculator-dock,.cell-tooltip,
   .formula-ref-tooltip,.formula-expanded,.calculator-window,.calculator-completion,.archive-list,
   .landing-shell,.landing-topline,.landing-recent,.landing-footer,.inspect-panel,.inspect-titlebar,
-  .inspect-list-header,.inspect-more,.history-panel,.viewport-loading,.picture-viewer-bar) {
+  .inspect-list-header,.inspect-more,.history-panel,.picture-viewer-bar) {
   background:var(--reading-surface);color:var(--reading-ink);border-color:var(--reading-line);
 }
 :root[data-reading-preset] :is(.welcome-screen,.workspace,.dialog-body,.search-results,
@@ -288,7 +288,6 @@
 :root[data-reading-preset] *::-webkit-scrollbar-thumb {background:var(--reading-scroll-thumb);border-color:var(--reading-inset);}
 :root[data-reading-preset] *::-webkit-scrollbar-thumb:hover {background:var(--reading-muted);}
 :root[data-reading-tone="dark"] .index-overlay {background:color-mix(in srgb,var(--reading-paper) 78%,transparent);}
-:root[data-reading-tone="dark"] .index-overlay.previewing {background:transparent;}
 
 /* Preserve the meaning of success, warning and error colors in dark themes. */
 :root[data-reading-tone="dark"] {

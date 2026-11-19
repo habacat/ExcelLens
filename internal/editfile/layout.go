@@ -18,7 +18,14 @@ type Layout struct {
 	XLSX *XLSXLayout `json:"xlsx,omitempty"`
 }
 
+type ArrayOwner struct {
+	Formula string `json:"formula,omitempty"`
+	Range   string `json:"range"`
+	Dynamic bool   `json:"dynamic"`
+}
+
 type SourceCell struct {
+	Array     *ArrayOwner
 	protected bool
 	rules     []validatedRule
 	Value     editdoc.Value

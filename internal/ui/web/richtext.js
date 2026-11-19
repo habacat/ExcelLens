@@ -85,11 +85,11 @@
     node.style.textDecoration='none';node._xlRichNode=root;
     return true;
   }
-  function html(cell,base,options){
+  function html(cell,base,options,encoded=text=>escape(text).replace(/\r\n?|\n/g,'<br>')){
     options={...options,fontOverlay:cell?.conditional?.style?.font};
     const info=presentationInfo(cell,options,base);
     if(!info)return null;
-    const encoded=text=>escape(text).replace(/\r\n?|\n/g,'<br>'),parts=[];
+    const parts=[];
     if(!info.runs.length)return {html:encoded(info.text),notice:info.notice,rich:false};
     eachPart(info,(text,font)=>{const css=Object.entries(properties(font,base,options)).map(([k,v])=>k+':'+v).join(';');parts.push('<span style="'+escape(css)+'">'+encoded(text)+'</span>');});
     return {html:parts.join(''),notice:info.notice,rich:true};

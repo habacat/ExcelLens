@@ -19,6 +19,7 @@ import (
 func main() {
 	duration := flag.Duration("duration", 5*time.Minute, "maximum server lifetime")
 	storage := flag.String("storage", "", "reuse an excellens-ui-qa-* directory directly under the OS temp directory")
+	launchFile := flag.String("launch-file", "", "open a fixture in its own native launch session")
 	flag.Parse()
 	var root string
 	var err error
@@ -54,6 +55,13 @@ func main() {
 	listener, address, err := app.Listen()
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *launchFile != "" {
+		id, err := app.PreparePathForLaunch(*launchFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		address += "?session=" + id
 	}
 	if err := json.NewEncoder(os.Stdout).Encode(map[string]string{"url": address}); err != nil {
 		log.Fatal(err)

@@ -160,7 +160,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  await sleep(105);await shot('excellens-58-scroll-pending-170ms');
  for(let i=0;i<7;i++){await evaluate(`document.querySelector('#grid').scrollTo({top:${1800+i*1350},left:${i*120}})`);await sleep(55);}
  await waitFor('window.ExcelLensPerformance().hasVisibleCoverage && !window.ExcelLensPerformance().hasPendingRequest',18000);
- const scroll=await evaluate('({perf:window.ExcelLensPerformance(),loadingHidden:document.querySelector("#viewportLoading").hidden,canvasHidden:document.querySelector("#viewportFallback").hidden})');
+ const scroll=await evaluate('({perf:window.ExcelLensPerformance(),loadingHidden:document.querySelector("#tabActivity").hidden,canvasHidden:document.querySelector("#viewportFallback").hidden})');
  console.log('fast scroll stable',scroll);
  if(!scroll.perf.hasVisibleCoverage||!scroll.loadingHidden||!scroll.canvasHidden)throw Error('scroll did not settle');
  if(errors.length)throw Error('uncaught browser exceptions: '+errors.join('\n'));

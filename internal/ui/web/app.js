@@ -59,7 +59,7 @@
     viewportTimer: 0,
     viewportFrame: 0,
     fallbackFrame: 0,
-    fallbackTimer: 0,
+    viewportActivity: null,
     viewportForce: false,
     viewportPending: null,
     viewportRetryTimer: 0,
@@ -93,7 +93,6 @@
     sheetViews: new Map(),
     sheetViewsBytes: 0,
     sheetLoadAbort: null,
-    sheetOverlayTimer: 0,
     sheetLoadingEpoch: 0,
     sheetLayout: null,
     reusableSheetRows: null,
@@ -155,15 +154,18 @@
   ];
 
   async function api(url, options = {}) {
-    await window.ExcelLensSession?.ready;
-    const headers = new Headers(options.headers || {});
-    headers.set("X-ExcelLens-Token", TOKEN);
-    window.ExcelLensSession?.apply(headers);
-    const response = await fetch(url, { ...options, headers, cache: "no-store" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {const error=new Error(data.error || `请求失败（HTTP ${response.status}）`);error.status=response.status;throw error;}
-    if(data.compact===1 && Array.isArray(data.rows))data.rows=window.ExcelLensWire.unpack(data.rows);
-    return data;
+    const activity = window.ExcelLensActivity?.request(url, options);
+    try {
+      await window.ExcelLensSession?.ready;
+      const headers = new Headers(options.headers || {});
+      headers.set("X-ExcelLens-Token", TOKEN);
+      window.ExcelLensSession?.apply(headers);
+      const response = await fetch(url, { ...options, headers, cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {const error=new Error(data.error || `请求失败（HTTP ${response.status}）`);error.status=response.status;throw error;}
+      if(data.compact===1 && Array.isArray(data.rows))data.rows=window.ExcelLensWire.unpack(data.rows);
+      return data;
+    } finally { activity?.end(); }
   }
 
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -239,11 +241,13 @@
     const multiple=parsed.start.ref!==parsed.end.ref;
     if(S.filtered&&sheet===S.sheet&&multiple){toast('筛选视图请按可见行拖选；名称框矩形范围使用源行号','warning');return;}
     if(!await navigateToCell(sheet,parsed.start.ref))return;
-    if(sheet!==S.sheet || !S.selected || S.selected.ref!==parsed.start.ref)return;
+    const first=activeMerge(parsed.start.row,parsed.start.col);
+    if(sheet!==S.sheet || S.selected?.ref!==(first ? colName(first.col)+first.row : parsed.start.ref))return;
     if(multiple){
       if(S.filtered){toast('筛选视图不支持直接按源行号选中矩形；请清除筛选后重试','warning');return;}
       extendRange({row:parsed.start.row,col:parsed.start.col,visual:parsed.start.row},parsed.end.row,parsed.end.col);
-      $('nameBox').value=`${parsed.start.ref}:${parsed.end.ref}`;
+      const points=window.ExcelLensMultiSelection.points(S.range,colName);
+      $('nameBox').value=`${points.start}:${points.end}`;
     }
   }
 
@@ -532,7 +536,8 @@
   }
   function pageSheetTabs(direction) {
     const tabs=$("sheetTabs");
-    tabs.scrollBy({left:direction*Math.max(110,Math.round(tabs.clientWidth*.72)),behavior:'smooth'});
+    const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    tabs.scrollBy({left:direction*Math.max(110,Math.round(tabs.clientWidth*.72)),behavior:reduced?'auto':'smooth'});
   }
 
   function renderSheetPicker(query = "") {
@@ -577,6 +582,13 @@
     document.title=S.fileName||'ExcelLens';
   }
   async function loadStatus() {
+    const launch=window.ExcelLensSession?.nativeLaunch || window.ExcelLensSession?.restoring;
+    const activity=launch ? globalThis.ExcelLensActivity?.begin('正在打开文件',{priority:2}) : null;
+    if(launch){
+      S.opening=true;
+      $('openBtn').disabled=$('chooseFileBtn').disabled=true;
+      activity?.stage('正在打开文件',0,60);
+    }
     try {
       const data = await api("/api/status");
       archiveCenter?.use(data.archive);
@@ -595,6 +607,7 @@
         return;
       }
       S.opened = true;
+      activity?.stage('正在准备工作表',60,65);
       S.sheets = data.sheets || [];
       S.activeTab = Number.isInteger(data.activeTab) ? data.activeTab : 0;
       S.fileName = data.fileName || "";
@@ -609,12 +622,11 @@
       updateFileTitle();
       showWorkspace();
       await loadStylePalette();
-      renderSheetTabs();
       const launchParams=new URLSearchParams(window.location?.search||'');
       const requested=launchParams.get('sourceSheet');
       const active = S.sheets.find(sheet=>sheet.name===requested)||S.sheets[S.activeTab]||S.sheets[0];
-      if (active) await selectSheet(active.name,requested===active.name?(launchParams.get('sourceRef')||''):'');
-      else setStatus("工作簿中没有工作表");
+      if (active) await selectSheet(active.name,requested===active.name?(launchParams.get('sourceRef')||''):'', false, null, activity);
+      else { renderSheetTabs(); setStatus("工作簿中没有工作表"); }
       bookmarkCenter.load(true).catch(() => {});
       refreshSearchHistory().catch(() => {});
     } catch (error) {
@@ -622,6 +634,9 @@
       recentManager?.load();
       setStatus("本机服务连接失败");
       toast(error.message,'error');
+    } finally {
+      activity?.end();
+      if(launch){S.opening=false;$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
     }
   }
 
@@ -630,6 +645,7 @@
   }
 
   function canOpenWorkbook(action='切换文件'){
+    if (S.opening) return false;
     if (editCopy?.grid.active && editCopy.grid.blocked) {
       toast('请先确认当前单元格的输入'); return false;
     }
@@ -639,70 +655,65 @@
     return true;
   }
 
-  function setUploadProgress(percent, text) {
-    $("uploadProgress").hidden = false;
-    $("uploadBar").style.width = `${Math.max(0, Math.min(100, percent))}%`;
-    $("uploadText").textContent = text;
-  }
-
-  function finishOpening() {
-    S.opening = false;
-    $("openBtn").disabled = $("chooseFileBtn").disabled = false;
-  }
-
-  async function uploadFile(file) {
-    await window.ExcelLensSession?.ready;
-    if (!file || S.opening) return;
-    if(!canOpenWorkbook())return;
-    if (!fileFormats.supports(file.name)) { toast("支持表格、台账及 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包",'warning'); return; }
+  async function openWorkbook(load, name = '', size = 0, current = () => true) {
+    if (S.opening || !canOpenWorkbook()) return false;
     S.opening = true;
-    $("openBtn").disabled = $("chooseFileBtn").disabled = true;
+    $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = true;
     $("welcomeError").hidden = true;
-    setUploadProgress(0, `正在读取 ${file.name}…`);
-    setStatus("正在读取工作簿");
-    const form = new FormData();
-    form.append("file", file, file.name);
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/open");
-    xhr.setRequestHeader("X-ExcelLens-Token", TOKEN);
-    if(window.ExcelLensSession?.id)xhr.setRequestHeader("X-ExcelLens-Session",window.ExcelLensSession.id);
-    xhr.upload.onprogress = event => {
-      if (!event.lengthComputable) return;
-      const percent = event.loaded / event.total * 100;
-      setUploadProgress(percent, `本机读取 ${percent.toFixed(1)}% · ${fmtBytes(event.loaded)} / ${fmtBytes(event.total)}`);
-    };
-    xhr.onload = async () => {
-      let data = {};
-      try { data = JSON.parse(xhr.responseText); } catch { /* ignore invalid response */ }
-      if (xhr.status < 200 || xhr.status >= 300) {
-        const message = data.error || `打开失败（HTTP ${xhr.status}）`;
-        $("welcomeError").textContent = message;
-        $("welcomeError").hidden = false;
-        $("uploadProgress").hidden = true;
-        setStatus("打开失败");
-        toast(message,'error');
-        finishOpening();
-        return;
-      }
-      await acceptOpenedWorkbook(data, file.name, file.size);
-    };
-    xhr.onerror = () => {
-      const message = "本机文件读取失败，请重新选择文件";
-      $("welcomeError").textContent = message;
+    setStatus("正在打开文件");
+    const activity = window.ExcelLensActivity?.begin('正在打开文件', {priority:2});
+    activity?.stage('正在打开文件', 0, 60);
+    try {
+      await window.ExcelLensSession?.ready;
+      const data = await load(activity);
+      if (!current()) return false;
+      activity?.stage('正在准备工作表', 60, 65);
+      await acceptOpenedWorkbook(data, data.fileName || name, data.fileSize || size, activity);
+      await activity?.paintIfDue?.();
+      return true;
+    } catch (error) {
+      $("welcomeError").textContent = error.message;
       $("welcomeError").hidden = false;
-      $("uploadProgress").hidden = true;
-      setStatus("读取失败");
-      toast(message,'error');
-      finishOpening();
-    };
-    xhr.onabort = () => { setStatus("读取已取消"); finishOpening(); };
-    xhr.send(form);
+      setStatus("打开失败");
+      throw error;
+    } finally {
+      activity?.end();
+      S.opening = false;
+      $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = false;
+    }
   }
 
-  async function acceptOpenedWorkbook(data, fallbackName = data.fileName || "", fallbackSize = data.fileSize || 0) {
+  function uploadFile(file) {
+    if (!file || S.opening) return;
+    if (!fileFormats.supports(file.name)) { toast("支持表格、台账及 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包",'warning'); return; }
+    return openWorkbook(activity => new Promise((resolve, reject) => {
+      activity?.stage('正在读取文件', 0, 28);
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/open");
+      xhr.setRequestHeader("X-ExcelLens-Token", TOKEN);
+      if (window.ExcelLensSession?.id) xhr.setRequestHeader("X-ExcelLens-Session", window.ExcelLensSession.id);
+      xhr.upload.onprogress = event => {
+        if (event.lengthComputable) activity?.report(event.loaded, event.total, '', fmtBytes(event.loaded) + ' / ' + fmtBytes(event.total));
+      };
+      xhr.upload.onload = () => activity?.stage('正在解析文件', 28, 60);
+      xhr.onload = () => {
+        let data;
+        try { data = JSON.parse(xhr.responseText); } catch { /* Surface malformed output as an open failure. */ }
+        if (xhr.status >= 200 && xhr.status < 300 && data) resolve(data);
+        else reject(new Error(data?.error || '无法打开文件（HTTP ' + xhr.status + '）'));
+      };
+      xhr.onerror = () => reject(new Error("本机文件读取失败，请重新选择文件"));
+      xhr.onabort = () => reject(new Error("读取已取消"));
+      xhr.send(form);
+    }), file.name, file.size).catch(error => toast(error.message,'error'));
+  }
+
+  async function acceptOpenedWorkbook(data, fallbackName = data.fileName || "", fallbackSize = data.fileSize || 0, activity) {
       if (editCopy?.grid.active) editCopy.grid.leave();
       archiveCenter?.use(data.archive);
-      if(data.archiveOnly){finishOpening();$("uploadProgress").hidden=true;archiveCenter.present(data.archive);setStatus("请选择压缩包内的文件");return;}
+      if(data.archiveOnly){archiveCenter.present(data.archive);setStatus("请选择压缩包内的文件");return;}
       S.opened = true;
       S.sheets = data.sheets || [];
       S.activeTab = Number.isInteger(data.activeTab) ? data.activeTab : 0;
@@ -712,6 +723,10 @@
       S.sheet = null;
       S.indexReady = false;
       S.index = null;
+      // Only a confirmed workbook handoff discards the old cells. In
+      // particular, don't lay out the previous grid again on leaving Home.
+      invalidateViewport();
+      frozenPanes?.reset();
       S.searchCache.clear();
       traceUI?.reset();
       formulaInspector?.resetWorkbook();
@@ -726,6 +741,7 @@
       rowViews?.resetBook();
       if(S.filterJob)cancelFilter(S.filterJob);
       S.searchSession = null;
+      S.searchActivity?.end();
       ++S.searchRequestID;
       S.searchSelectedIndex = -1;
       S.searchJob = null;
@@ -762,24 +778,15 @@
       updateFileTitle();
       showWorkspace();
       await loadStylePalette();
-      renderSheetTabs();
-      finishOpening();
       const active = S.sheets[S.activeTab] || S.sheets[0];
-      if (active) await selectSheet(active.name);
-      else setStatus("工作簿中没有工作表");
+      if (active) await selectSheet(active.name, '', false, null, activity);
+      else { renderSheetTabs(); setStatus("工作簿中没有工作表"); }
       bookmarkCenter.load(true).catch(() => {});
       refreshSearchHistory().catch(() => {});
   }
 
   async function openTaskSource(payload,current){
-    if(S.opening||!canOpenWorkbook())return false;
-    S.opening=true;$('openBtn').disabled=$('chooseFileBtn').disabled=$('homeBtn').disabled=true;
-    try{
-      const data=await api('/api/tasks/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(!current())return false;
-      await acceptOpenedWorkbook(data);
-      return true;
-    }finally{finishOpening();$('homeBtn').disabled=false;}
+    return openWorkbook(() => api('/api/tasks/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}), '', 0, current);
   }
 
   async function cancelIndex(jobID) {
@@ -819,8 +826,8 @@
 
   function finishSheetSwitch(epoch,ready=true){
     if(epoch!==S.sheetEpoch)return;
-    clearTimeout(S.sheetOverlayTimer);S.sheetOverlayTimer=0;S.sheetLoadingEpoch=0;
-    $('grid').inert=!ready;$('sheetSwitchStatus').hidden=true;
+    S.sheetLoadingEpoch=0;
+    $('grid').inert=!ready;
     $('grid').parentElement.classList.remove('sheet-switching');
     editCopy?.grid.controls();
     if (ready && editCopy?.grid.active) { editCopy.grid.selection(); editCopy.grid.focus(); }
@@ -828,7 +835,7 @@
 	if(typeof dataRulesCenter!=='undefined')dataRulesCenter?.controls();if(typeof printingCenter!=='undefined')printingCenter?.controls();recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
   }
 
-  async function selectSheet(name, targetRef = "", preserveTrace = false, navigationGuard = null) {
+  async function selectSheet(name, targetRef = "", preserveTrace = false, navigationGuard = null, openingActivity = null) {
     if (editCopy?.grid.active && editCopy.grid.draft && !await editCopy.grid.act()) return false;
     if(navigationGuard&&!navigationGuard())return;
     if (!name || !S.opened) return;
@@ -859,9 +866,6 @@
     S.sheetLoadingEpoch=epoch;
     editCopy?.grid.controls();
     $('grid').inert=true;$('grid').parentElement.classList.add('sheet-switching');
-    $('sheetSwitchStatus').textContent=`正在打开：${name}`;$('sheetSwitchStatus').hidden=false;
-    clearTimeout(S.sheetOverlayTimer);
-    S.sheetOverlayTimer=setTimeout(()=>{if(epoch===S.sheetEpoch&&S.sheetLoadingEpoch===epoch)$('indexOverlay').hidden=false;},160);
     pictures?.reset();
     S.sheet = name;
     S.sourceRowSizes=[];S.sourceColumnWidths={};S.sourceDefaultRow=0;S.sourceDefaultCol=0;S.sourceGridLines=S.source?.format!=='xls-html';updateSourceAppearance();
@@ -902,16 +906,14 @@
     updateAutoFilterButton();
     $("gridEmpty").hidden = true;
     $("indexOverlay").hidden = true;
-	$("indexOverlay").classList.remove('previewing');
 	S.previewOnly=false;
-    $("indexTitle").textContent = `正在准备：${name}`;
-    $("indexDetail").textContent = "检查本机索引；首次打开需要建立索引。";
-    $("indexBar").style.width = "0%";
     $("retryIndexBtn").hidden = true;
     $('showRowsRecoveryBtn').hidden=true;
-    $("cancelIndexBtn").hidden = false;
     renderSheetTabs();
     setStatus(`正在打开 · ${name}`);
+    const activity = openingActivity || window.ExcelLensActivity?.begin('正在准备工作表', {priority:2, signal:opening.signal});
+    if (openingActivity) opening.signal.addEventListener('abort', activity.end, {once:true});
+    activity?.stage('正在读取工作表', openingActivity ? 65 : 0, 85);
     try {
       const start = warm ? {...warm.index,ready:true} : await api("/api/index/start", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sheet: name }),signal:opening.signal
@@ -920,14 +922,15 @@
       if (start.ready) S.index = start;
       else {
         S.indexJob = start.jobId;
+        activity?.onCancel(() => cancelIndex(start.jobId));
 		paintInitialPreview(name,epoch);
-        S.index = await pollIndex(start.jobId, name, epoch);
+        S.index = await pollIndex(start.jobId, name, epoch, activity);
       }
       if (epoch !== S.sheetEpoch) return;
       S.indexJob = null;
       if(S.previewOnly)for(const row of S.renderedRows.values())row._xlSheetEpoch=-1;
 	  S.previewAbort?.abort();S.previewAbort=null;S.previewOnly=false;S.previewData=null;cancelAnimationFrame(S.previewFrame);S.previewFrame=0;
-	  $("indexOverlay").classList.remove('previewing');
+      activity?.stage('正在读取工作表布局', 85, 95);
       S.usedMaxRow = Math.max(1, Number(S.index.maxRow || 1));
       S.usedMaxCol = Math.max(1, Number(S.index.maxCol || 1));
       S.dimension = S.index.usedDimension || `A1:${colName(S.usedMaxCol)}${S.usedMaxRow}`;
@@ -1002,6 +1005,7 @@
         tiles.store(viewportKey(warm.entry.request),warm.entry.data,warm.entry.request);
       }
       try {
+        activity?.stage('正在显示单元格', 95, 99);
         await loadViewport(true, epoch, true);
       } catch (error) {
         if (S.filtered && /筛选结果已失效/.test(error.message)) {
@@ -1017,7 +1021,6 @@
         } else throw error;
       }
       if (epoch !== S.sheetEpoch) return;
-      clearTimeout(S.sheetOverlayTimer);S.sheetOverlayTimer=0;
       $("indexOverlay").hidden = true;
       setStatus(`已打开 · ${name}`);
       let arrived=true;
@@ -1048,17 +1051,18 @@
       return arrived;
     } catch (error) {
       if (epoch !== S.sheetEpoch) return;
-	  S.previewAbort?.abort();S.previewOnly=false;$("indexOverlay").classList.remove('previewing');
+	  S.previewAbort?.abort();S.previewOnly=false;
       $("indexOverlay").hidden = false;
       S.indexReady=false;finishSheetSwitch(epoch,false);
       $("indexTitle").textContent = `${name} · 读取失败`;
       $("indexDetail").textContent = error.message;
-      $("indexBar").style.width = "0%";
       $("retryIndexBtn").hidden = false;
       $('showRowsRecoveryBtn').hidden=!S.rowViewFailure;
-      $("cancelIndexBtn").hidden = true;
       setStatus("读取失败");
       toast(error.message,'error');
+    } finally {
+      if (openingActivity) opening.signal.removeEventListener('abort', activity.end);
+      else { await activity?.paintIfDue?.(); activity?.end(); }
     }
   }
 
@@ -1074,8 +1078,7 @@
 	  S.maxRow=Math.max(1,Math.min(120,data.maxRow||80));S.maxCol=Math.max(12,Math.min(40,(data.maxCol||1)+3));
 	  S.virtualScrollScale=1;updateCanvasSize();
 	  renderInitialPreview();
-	  $('indexOverlay').classList.add('previewing');
-	  $('indexOverlay').hidden=false;finishSheetSwitch(epoch);
+	  finishSheetSwitch(epoch);
 	  $('gridStatus').textContent=`${name} · 首屏预览（完整索引建立中）`;
 	} catch(error) { /* Full indexing remains the authoritative validation path. */ }
   }
@@ -1095,17 +1098,13 @@
     S.previewFrame=requestAnimationFrame(()=>{S.previewFrame=0;renderInitialPreview();});
   }
 
-  async function pollIndex(jobID, sheetName, epoch) {
+  async function pollIndex(jobID, sheetName, epoch, activity) {
     while (epoch === S.sheetEpoch) {
       await delay(320);
       const progress = await api(`/api/index/status?id=${encodeURIComponent(jobID)}`);
       if (epoch !== S.sheetEpoch) return null;
-      const percent = Number(progress.progress || 0);
-      $("indexTitle").textContent = `${sheetName} · ${progress.stage || "正在建立索引"}`;
-      $("indexBar").style.width = `${Math.max(0, Math.min(100, percent))}%`;
-      if (progress.totalBytes > 0) {
-        $("indexDetail").textContent = `${percent.toFixed(1)}% · ${fmtBytes(progress.doneBytes)} / ${fmtBytes(progress.totalBytes)}`;
-      } else $("indexDetail").textContent = progress.stage || "正在建立索引";
+      activity?.report(progress.doneBytes, progress.totalBytes, progress.stage || '正在建立索引',
+        progress.totalBytes > 0 ? fmtBytes(progress.doneBytes) + ' / ' + fmtBytes(progress.totalBytes) : '');
       if (progress.status === "error") throw new Error(progress.error || "索引建立失败");
       if (progress.status === "cancelled") throw new Error("索引任务已取消");
       if (progress.status === "done") return progress;
@@ -1515,18 +1514,14 @@
     if(!canvas)return;
     if(!request){
       cancelAnimationFrame(S.fallbackFrame);S.fallbackFrame=0;
-      clearTimeout(S.fallbackTimer);S.fallbackTimer=0;
-      $('viewportLoading').hidden=true;canvas.hidden=true;return;
+      S.viewportActivity?.end();S.viewportActivity=null;
+      canvas.hidden=true;return;
     }
     // Fill genuinely missing tiles with a restrained grid in the very next
     // animation frame. Waiting for the HTTP response caused a full white
     // rectangle on fast scroll / thumb dragging. Suppress only the *spinner*
     // for short requests; placeholders must never contain guessed cell values.
-    if(!S.fallbackTimer)S.fallbackTimer=setTimeout(()=>{
-      S.fallbackTimer=0;
-      if(S.indexReady&&S.sheet&&!viewportCoversVisible(S.window,getViewportRequest()))
-        $('viewportLoading').hidden=false;
-    },145);
+    S.viewportActivity ||= window.ExcelLensActivity?.begin('正在读取可见区域');
     if(S.fallbackFrame)return;
     S.fallbackFrame=requestAnimationFrame(()=>{
       S.fallbackFrame=0;
@@ -1591,7 +1586,6 @@
   function updateViewportLoading() {
     const request = S.indexReady && S.sheet ? getViewportRequest() : null;
     const missing = request && !viewportCoversVisible(S.window,request);
-    const indicator = $("viewportLoading");
     paintViewportFallback(missing ? request : null);
     // Keep the existing data DOM visible until new data is ready. It may still
     // overlap the moving viewport, which prevents white flashes on rapid scroll.
@@ -1616,8 +1610,6 @@
     tiles.clear();
     S.window = null;
     if(!preserveDOM)resetGridDOM();
-    const indicator = $("viewportLoading");
-    if (indicator) indicator.hidden = true;
   }
 
   function applyViewport(entry) {
@@ -1707,7 +1699,7 @@
     pending.promise = (async () => {
       let failed = false;
       try {
-        const data = await api('/api/sheet?'+params.toString(),{signal:controller.signal});
+        const data = await api('/api/sheet?'+params.toString(),{signal:controller.signal,activity:false});
         if (controller.signal.aborted || ticket !== S.viewportRequest || expectedEpoch !== S.sheetEpoch) return;
         const entry = tiles.store(key,data,request);
         const latest = getViewportRequest();
@@ -1914,6 +1906,7 @@
     // Measure scrollport BEFORE modifying canvas dimensions. Writing style
     // and immediately reading clientWidth forced a synchronous layout on
     // every tile commit, even when the entire workbook size was unchanged.
+    const pinnedHeight=S.filtered?sourceRowTop(frozenPanes.effective().rows+1):0;
     const canvasWidth=`${Math.max(width,grid.clientWidth)}px`;
     const canvasHeight=`${physicalCanvasHeight(height,grid)}px`;
     if(canvas.style.width!==canvasWidth)canvas.style.width=canvasWidth;
@@ -2002,7 +1995,7 @@
       }
       // Repeated assignments to unchanged geometry can invalidate CSS layout
       // even when every recycled row already occupies the correct pixel band.
-      const logicalTop = rowTop(visual)+(S.filtered?sourceRowTop(frozenPanes.effective().rows+1):0);
+      const logicalTop = rowTop(visual)+pinnedHeight;
       const topPx = `${virtualScroll.rowPosition(logicalTop,physicalScroll)}px`;
       const heightPx = `${rowHeight(visual)}px`;
       if(row.style.top!==topPx)row.style.top=topPx;
@@ -2553,43 +2546,59 @@
       if(!v1||!v2){toast('当前筛选行位置尚未加载，请先滚动到目标行','warning');return;}
     }
     S.rangeAnchor={...anchor,visual:v1||anchor.visual||anchor.row};
-    S.range={row1:anchor.row,col1:anchor.col,row2:row,col2:col,visual1:v1,visual2:v2};
+    const area={row1:anchor.row,col1:anchor.col,row2:row,col2:col,visual1:v1,visual2:v2};
+    S.range=S.filtered ? area : mergedCells.expand(area,S.rowVisibility);
     const rows=S.rowVisibility?S.rowVisibility.selectionCount(S.range,S.filtered,frozenPanes.effective().rows):window.ExcelLensMultiSelection.rowCount(S.range,S.filtered,frozenPanes.effective().rows);
-    const cols=Math.abs(anchor.col-col)+1;
+    const cols=Math.abs(S.range.col1-S.range.col2)+1;
     $('selectionStatus').textContent=S.multiRanges.length?`${S.multiRanges.length+1} 处选区`:`${rows}行 × ${cols}列 · ${(rows*cols).toLocaleString()}格`;
     applySelectionClasses();
     selectionStats?.schedule();
   }
 
   async function writeClipboardPayload(content) {
-    try {
-      if(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
+    if(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
+      try {
         await navigator.clipboard.write([new ClipboardItem({
           'text/plain':new Blob([content.text],{type:'text/plain'}),
           'text/html':new Blob([content.html],{type:'text/html'})
         })]);
         toast('已复制','success');
         return true;
-      }else{
-        return await copyText(content.text);
-      }
-    }catch(err){
-      // Firefox and some managed Windows browsers expose only writeText.
-      try{return await copyText(content.text);}catch{toast('复制失败：'+err.message,'error');return false;}
+      } catch { /* Some browsers only allow HTML during a native copy event. */ }
     }
+    let rich=false;
+    const onCopy=event=>{
+      if (!event.clipboardData) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.clipboardData.setData('text/plain',content.text);
+      event.clipboardData.setData('text/html',content.html);
+      rich=true;
+    };
+    document.addEventListener('copy',onCopy,true);
+    try {
+      if (document.execCommand('copy') && rich) { toast('已复制','success'); return true; }
+    } catch { /* A text-only clipboard can still accept the TSV. */ }
+    finally { document.removeEventListener('copy',onCopy,true); }
+    const copied=await copyText(content.text);
+    if(copied)toast('已复制为纯文本，当前浏览器未写入表格格式','warning');
+    return copied;
   }
 
-  function clipboardIdentity(){return JSON.stringify([S.book,S.workbookKey,S.sheet,S.sheetEpoch,S.indexReady,S.filtered,S.filterId,S.rowView?.id,S.selected?.ref,S.selected?.row,S.selected?.col,S.selectedVisualIndex,S.range,S.multiRanges,S.showStyles,S.fontOverride,S.freeze]);}
+  function clipboardIdentity(){return JSON.stringify([S.book,S.workbookKey,S.sheet,S.sheetEpoch,S.indexReady,S.filtered,S.filterId,S.rowView?.id,S.selected?.ref,S.selected?.row,S.selected?.col,S.selectedVisualIndex,S.range,S.multiRanges,S.showStyles,S.fontOverride,S.freeze,editCopy?.grid.active && editCopy.data.document.revision]);}
   function selectionSourceIdentity(){return JSON.stringify([S.book,S.workbookKey,S.sheet,S.sheetEpoch,S.indexReady,S.filtered,S.filterId,S.rowView?.id,S.freeze]);}
-  function captureClipboardSelection({purpose='复制',limits=fileFormats.clipboard}={}){
+  function captureClipboardSelection({purpose='复制',limits=fileFormats.clipboard,withMerges=false}={}){
     if(!S.indexReady||!S.selected||S.sheetLoadingEpoch)throw Error('请先选择一个已加载的单元格或区域');
+    if(editCopy?.grid.active && (editCopy.grid.stale || editCopy.pending || editCopy.abort))throw Error('请先确认当前编辑修订');
     if(S.multiRanges.length)throw Error(`请选择一个连续区域进行${purpose}`);
-    const range=S.range;
-    const model=window.ExcelLensMultiSelection,area=model.areas(S,true).at(-1),points=model.points(area,colName);
-    const col1=range?Math.min(range.col1,range.col2):S.selected.col;
-    const col2=range?Math.max(range.col1,range.col2):S.selected.col;
-    const visual1=S.filtered?(range?.visual1||S.selectedVisualIndex):0;
-    const visual2=S.filtered?(range?.visual2||S.selectedVisualIndex):0;
+    const model=window.ExcelLensMultiSelection,visibility=S.rowVisibility;
+    let area=model.areas(S,true).at(-1);
+    if (withMerges && !S.filtered) area=mergedCells.expand(area,visibility);
+    if (withMerges && S.filtered && !S.range) {
+      const m=mergedCells.at(S.selected.row,S.selected.col);
+      if (m && m.row===S.selected.row) area={...area,col1:m.col,col2:m.endCol};
+    }
+    const points=model.points(area,colName), col1=Math.min(area.col1,area.col2), col2=Math.max(area.col1,area.col2);
     const rowCount=S.rowVisibility?S.rowVisibility.selectionCount(area,S.filtered,frozenPanes.effective().rows):model.rowCount(area,S.filtered,frozenPanes.effective().rows);
     const colCount=col2-col1+1;
     if(rowCount<1)throw Error('选区没有可见行');
@@ -2597,39 +2606,43 @@
     const sheet=S.sheet,identity=clipboardIdentity(),selected={...S.selected},viewId=S.rowView?.id||'',filterId=S.filtered?S.filterId:'',excluded=frozenPanes.effective().rows,book=S.book,workbookKey=S.workbookKey,styled=S.showStyles,styles=S.styles,fontOverride=S.fontOverride;
     const current=()=>identity===clipboardIdentity();
     const sourceIdentity=selectionSourceIdentity(),sourceCurrent=()=>sourceIdentity===selectionSourceIdentity();
-    return {book,workbookKey,sheet,styled,styles,fontOverride,current,sourceCurrent,rows:rowCount,firstColumn:col1,lastColumn:col2,...points,maxRow:sourceRowLimit(),headerRow:S.autoFilter?.row||S.sortHeaderBySheet.get(sheet)||S.source?.tableHeader?.row||1,
+    const mergeAt=withMerges && mergedCells.root ? (row,col)=>mergedCells.copyAnchor(row,col,visibility) : undefined;
+    return {book,workbookKey,sheet,styled,styles,fontOverride,current,sourceCurrent,mergeAt,rows:rowCount,firstColumn:col1,lastColumn:col2,...points,maxRow:sourceRowLimit(),headerRow:S.autoFilter?.row||S.sortHeaderBySheet.get(sheet)||S.source?.tableHeader?.row||1,
       label:`${sheet} · ${points.start}:${points.end} · ${rowCount}行 × ${colCount}列`,
       read:async({headerRow=0,richText=true,conditional=styled,force=false}={},signal)=>{
         if(!current())throw Error('来源或选区已变化，请重新选择');
-      // Single-cell copy takes no network round-trip.
-      let payload;
-      if(rowCount===1&&colCount===1&&!headerRow&&!force){
-        const cell={...selected};if(!richText)delete cell.richText;if(!conditional)delete cell.conditional;
-        payload={book,workbookKey,sheet,startCol:col1,endCol:col2,rows:[{row:selected.row,cells:[cell]}]};
-      }else{
+        // A lone cell already holds the current edit projection.
+        if(rowCount===1&&colCount===1&&!headerRow&&!force){
+          const cell={...selected};if(!richText)delete cell.richText;if(!conditional)delete cell.conditional;
+          return {book,workbookKey,sheet,startCol:col1,endCol:col2,rows:[{row:selected.row,cells:[cell]}]};
+        }
         const params=new URLSearchParams({sheet,start:points.start,end:points.end,format:'json',book,workbookKey,richText:richText?'1':'0',conditional:conditional?'1':'0'});
         if(headerRow)params.set('headerRow',String(headerRow));
         if(viewId)params.set('viewId',viewId);
         if(filterId){
           params.set('filterId',filterId);
-          params.set('visualStart',String(visual1));
-          params.set('visualEnd',String(visual2));
+          params.set('visualStart',String(points.visualStart));
+          params.set('visualEnd',String(points.visualEnd));
           params.set('excludeThroughRow',String(excluded));
         }
-        payload=await api(`/api/range?${params}`,{signal});
-      }
+        const payload=await api(`/api/range?${params}`,{signal});
         if(!current())throw Object.assign(Error('复制已取消，来源或选区已变化'),{name:'AbortError'});
+        if (editCopy?.grid.active) {
+          for (const row of payload.rows) row.cells=editCopy.grid.projectRow(sheet,row,col1,col2);
+          if (payload.header) payload.header.cells=editCopy.grid.projectRow(sheet,payload.header,col1,col2);
+        }
         return payload;
       }};
   }
   async function copySelection(plain=false) {
+    const activity=globalThis.ExcelLensActivity?.begin('正在复制选区');
     try{
-      const snapshot=captureClipboardSelection(),payload=await snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled});if(!snapshot.current())return;
-      const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard);
+      const snapshot=captureClipboardSelection({withMerges:!plain}),payload=await snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled});if(!snapshot.current())return;
+      const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard,snapshot.mergeAt);
       if(plain)await copyText(content.text);
       else await writeClipboardPayload(content);
       if(!plain&&content.notices.length)toast(content.notices.join('；'),'warning');
-    }catch(err){if(err.name!=='AbortError')toast(err.message,'error');}
+    }catch(err){if(err.name!=='AbortError')toast(err.message,'error');}finally{activity?.end();}
   }
 
   function openDialog(id) {
@@ -2879,6 +2892,7 @@
     const key = searchKey(mode,scope,query,currentSheet);
     const recoverable=$('searchRecoverable').checked,book=S.book,workbookKey=S.workbookKey;
     const requestID = ++S.searchRequestID;
+    S.searchActivity?.end();
     const current=()=>requestID===S.searchRequestID&&book===S.book&&workbookKey===S.workbookKey;
     if (S.searchJob) await cancelSearch(S.searchJob, false);
     if(!current())return;
@@ -2902,6 +2916,7 @@
       $("cancelSearchBtn").hidden = true;
       return;
     }
+    const activity=S.searchActivity=globalThis.ExcelLensActivity?.begin('正在搜索',{slot:'searchActivity'});
     try {
       const start = await api("/api/search/start", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -2909,14 +2924,14 @@
       });
       if (!current()){cancelSearch(start.jobId,false);return;}
       S.searchJob = start.jobId;
-      await pollSearch(start.jobId, requestID, Boolean(start.cached));
+      await pollSearch(start.jobId, requestID, Boolean(start.cached), activity);
     } catch (error) {
       if (!current()) return;
       S.searchSession.status = "error";
       displaySearchSummary(error.message);
       $("searchBtn").disabled = false;
       $("cancelSearchBtn").hidden = true;
-    }
+    } finally { activity?.end(); }
   }
 
   function beginSearchSession(spec){
@@ -2973,50 +2988,54 @@
     refreshAutoFilterHeaders();updateAutoFilterButton();
   }
 
-  async function pollSearch(jobID, requestID, alreadyCached) {
-    while (S.searchJob === jobID && requestID === S.searchRequestID) {
-      if (!alreadyCached) await delay(350);
-      let data;
-      try { data = await api(`/api/search/status?id=${encodeURIComponent(jobID)}`); }
-      catch (error) {
-        if (requestID !== S.searchRequestID) return;
-        displaySearchSummary(error.message);
+  async function pollSearch(jobID, requestID, alreadyCached, activity=globalThis.ExcelLensActivity?.begin('正在搜索',{slot:'searchActivity'})) {
+    S.searchActivity=activity;
+    try {
+      while (S.searchJob === jobID && requestID === S.searchRequestID) {
+        if (!alreadyCached) await delay(350);
+        let data;
+        try { data = await api(`/api/search/status?id=${encodeURIComponent(jobID)}`); }
+        catch (error) {
+          if (requestID !== S.searchRequestID) return;
+          displaySearchSummary(error.message);
+          S.searchJob = null;
+          S.searchSession.status = "error";
+          $("searchBtn").disabled = false;
+          $("cancelSearchBtn").hidden = true;
+          return;
+        }
+        if (requestID !== S.searchRequestID || S.searchJob !== jobID) return;
+        activity?.report(data.progress, 100, data.stage || '正在搜索');
+        const matches = data.matches || [];
+        const changed = S.searchSession.matches.length !== matches.length ||
+          (S.searchSession.matches.length && matches.length && S.searchSession.matches.at(-1)?.ref !== matches.at(-1)?.ref);
+        S.searchSession.matches = matches;
+        S.searchSession.status = data.status;
+        S.searchSession.truncated = Boolean(data.truncated);
+        if (changed || data.status !== "running") {
+          buildSearchHits(matches);
+          renderSearchResults(data);
+          applySearchHighlightClasses();
+        }
+        if (data.status === "running") {
+          if (data.scope === "all") displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.stage || "搜索中"} · ${matches.length} 条`);
+          else displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.scanned || 0}/${data.total || 0} 行 · ${matches.length} 条`);
+          continue;
+        }
+        if (data.status === "done") {
+          S.searchCache.set(S.searchSession.key, {matches, truncated:Boolean(data.truncated),status:"done"});
+          if (S.searchCache.size > 32) S.searchCache.delete(S.searchCache.keys().next().value);
+          const elapsed = alreadyCached ? " · 本机缓存" : ` · ${(Number(data.durationMs || 0) / 1000).toFixed(2)}秒`;
+          displaySearchSummary(`${matches.length} 条匹配${data.truncated ? "（最多显示500条）" : ""}${elapsed}`);
+          if (!alreadyCached) refreshSearchHistory().catch(() => {});
+        } else if (data.status === "cancelled") displaySearchSummary("已取消搜索 · 已找到的结果仍可访问");
+        else displaySearchSummary(data.error || "搜索失败");
         S.searchJob = null;
-        S.searchSession.status = "error";
         $("searchBtn").disabled = false;
         $("cancelSearchBtn").hidden = true;
         return;
       }
-      if (requestID !== S.searchRequestID || S.searchJob !== jobID) return;
-      const matches = data.matches || [];
-      const changed = S.searchSession.matches.length !== matches.length ||
-        (S.searchSession.matches.length && matches.length && S.searchSession.matches.at(-1)?.ref !== matches.at(-1)?.ref);
-      S.searchSession.matches = matches;
-      S.searchSession.status = data.status;
-      S.searchSession.truncated = Boolean(data.truncated);
-      if (changed || data.status !== "running") {
-        buildSearchHits(matches);
-        renderSearchResults(data);
-        applySearchHighlightClasses();
-      }
-      if (data.status === "running") {
-        if (data.scope === "all") displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.stage || "搜索中"} · ${matches.length} 条`);
-        else displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.scanned || 0}/${data.total || 0} 行 · ${matches.length} 条`);
-        continue;
-      }
-      if (data.status === "done") {
-        S.searchCache.set(S.searchSession.key, {matches, truncated:Boolean(data.truncated),status:"done"});
-        if (S.searchCache.size > 32) S.searchCache.delete(S.searchCache.keys().next().value);
-        const elapsed = alreadyCached ? " · 本机缓存" : ` · ${(Number(data.durationMs || 0) / 1000).toFixed(2)}秒`;
-        displaySearchSummary(`${matches.length} 条匹配${data.truncated ? "（最多显示500条）" : ""}${elapsed}`);
-        if (!alreadyCached) refreshSearchHistory().catch(() => {});
-      } else if (data.status === "cancelled") displaySearchSummary("已取消搜索 · 已找到的结果仍可访问");
-      else displaySearchSummary(data.error || "搜索失败");
-      S.searchJob = null;
-      $("searchBtn").disabled = false;
-      $("cancelSearchBtn").hidden = true;
-      return;
-    }
+    } finally { activity?.end(); }
   }
 
   function applySearchHighlightClasses() {
@@ -3107,7 +3126,7 @@
   async function cancelSearch(jobID, updateUI = true) {
     if (!jobID) return;
     const owned=S.searchJob===jobID;
-    if(owned)S.searchJob=null;
+    if(owned){S.searchJob=null;S.searchActivity?.end();}
     if(owned&&updateUI){
       ++S.searchRequestID;
       if(S.searchSession)S.searchSession.status='cancelled';
@@ -3465,6 +3484,8 @@
     $("filterBar").style.width = "0%";
     $("filterProgressText").textContent = "正在扫描当前工作表…";
     setStatus(`正在筛选 · ${S.sheet}`);
+    S.filterActivity?.end();
+    const activity=S.filterActivity=globalThis.ExcelLensActivity?.begin('正在筛选数据',{slot:'filterActivity'});
     try {
       const start = await api("/api/filter/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -3474,7 +3495,7 @@
       S.filterJob = start.jobId;
       S.pendingFilterSpec={sheet,rules,options};
       $("cancelFilterJobBtn").hidden = false;
-      return await pollFilter(start.jobId,sheet,epoch);
+      return await pollFilter(start.jobId,sheet,epoch,activity);
     } catch (error) {
       if(!current())return false;
       S.filterJob=null;
@@ -3484,7 +3505,7 @@
       setStatus(`已打开 · ${sheet}`);
       toast(error.message,'error');
       return false;
-    }
+    } finally { activity?.end(); }
   }
 
   async function commitRowView(data,guard=()=>true){
@@ -3576,50 +3597,56 @@
     }finally{if(preparedRows&&S.rowView?.id!==preparedRows.id)rowViews.cleanup(preparedRows.id);}
   }
 
-  async function pollFilter(jobID,sheet=S.sheet,epoch=S.sheetEpoch) {
-    while (S.filterJob === jobID) {
-      await delay(350);
-      const data = await api(`/api/filter/status?id=${encodeURIComponent(jobID)}`);
-      if(S.filterJob!==jobID)return;
-      if(S.sheet!==sheet||S.sheetEpoch!==epoch){S.filterJob=null;return;}
-      const percent = Number(data.progress || 0);
-      $("filterBar").style.width = `${percent}%`;
-      $("filterProgressText").textContent = `${data.stage || "正在筛选"} · ${data.scanned || 0}/${data.total || 0} 行`;
-      if (data.status === "done") {
-        const abort=new AbortController();S.filterCommitAbort=abort;
-        let accepted=false;
-        try{accepted=await adoptFilterResult(data,sheet,null,{guard:()=>S.filterJob===jobID,signal:abort.signal,onCommit:()=>{if(S.pendingFilterSpec?.restore)installRestoredFilter(sheet,S.pendingFilterSpec.restore);}});}
-        finally{if(S.filterCommitAbort===abort)S.filterCommitAbort=null;}
-        if(S.filterJob!==jobID||S.sheet!==sheet||S.sheetEpoch!==epoch)return false;
-        if(!accepted){S.filterJob=null;S.pendingFilterSpec=null;$('applyFilterBtn').disabled=false;$('cancelFilterJobBtn').hidden=true;$('filterProgressText').textContent='视图已变化；筛选任务已结束';setStatus(`已打开 · ${sheet}`);return false;}
-        if(S.pendingFilterSpec?.sheet===sheet){
-          S.lastRulesBySheet.set(sheet,S.pendingFilterSpec.rules);
-          S.pendingFilterSpec=null;
+  async function pollFilter(jobID,sheet=S.sheet,epoch=S.sheetEpoch,activity=globalThis.ExcelLensActivity?.begin('正在筛选数据',{slot:'filterActivity'})) {
+    S.filterActivity=activity;
+    try {
+      while (S.filterJob === jobID) {
+        await delay(350);
+        const data = await api(`/api/filter/status?id=${encodeURIComponent(jobID)}`);
+        if(S.filterJob!==jobID)return;
+        if(S.sheet!==sheet||S.sheetEpoch!==epoch){S.filterJob=null;return;}
+        const percent = Number(data.progress || 0);
+        activity?.job(data);
+        $("filterBar").style.width = `${percent}%`;
+        $("filterProgressText").textContent = `${data.stage || "正在筛选"} · ${data.scanned || 0}/${data.total || 0} 行`;
+        if (data.status === "done") {
+          activity?.stage('正在显示筛选结果',95,99);
+          const abort=new AbortController();S.filterCommitAbort=abort;
+          let accepted=false;
+          try{accepted=await adoptFilterResult(data,sheet,null,{guard:()=>S.filterJob===jobID,signal:abort.signal,onCommit:()=>{if(S.pendingFilterSpec?.restore)installRestoredFilter(sheet,S.pendingFilterSpec.restore);}});}
+          finally{if(S.filterCommitAbort===abort)S.filterCommitAbort=null;}
+          if(S.filterJob!==jobID||S.sheet!==sheet||S.sheetEpoch!==epoch)return false;
+          if(!accepted){S.filterJob=null;S.pendingFilterSpec=null;$('applyFilterBtn').disabled=false;$('cancelFilterJobBtn').hidden=true;$('filterProgressText').textContent='视图已变化；筛选任务已结束';setStatus(`已打开 · ${sheet}`);return false;}
+          if(S.pendingFilterSpec?.sheet===sheet){
+            S.lastRulesBySheet.set(sheet,S.pendingFilterSpec.rules);
+            S.pendingFilterSpec=null;
+          }
+          $("filterProgressText").textContent = `筛选完成 · ${S.filterTotal.toLocaleString()} 行符合条件`;
+          $("filterStatus").hidden = false;
+          $("clearFilterBtn").disabled = false;
+          $("applyFilterBtn").disabled = false;
+          $("cancelFilterJobBtn").hidden = true;
+          S.filterJob = null;
+          setStatus(`已打开 · ${sheet}`);
+          toast(`筛选完成 · ${Math.max(0,S.filterTotal-(S.autoFilter?.row||0)).toLocaleString()} 行`,'success');
+          return true;
         }
-        $("filterProgressText").textContent = `筛选完成 · ${S.filterTotal.toLocaleString()} 行符合条件`;
-        $("filterStatus").hidden = false;
-        $("clearFilterBtn").disabled = false;
-        $("applyFilterBtn").disabled = false;
-        $("cancelFilterJobBtn").hidden = true;
-        S.filterJob = null;
-        setStatus(`已打开 · ${sheet}`);
-        toast(`筛选完成 · ${Math.max(0,S.filterTotal-(S.autoFilter?.row||0)).toLocaleString()} 行`,'success');
-        return true;
+        if (data.status === "error" || data.status === "cancelled") {
+          $("filterProgressText").textContent = data.error || "筛选已取消";
+          $("applyFilterBtn").disabled = false;
+          $("cancelFilterJobBtn").hidden = true;
+          S.filterJob = null;
+          setStatus(`已打开 · ${sheet}`);
+          if(data.status==='error')toast(data.error||'筛选失败','error');
+          return false;
+        }
       }
-      if (data.status === "error" || data.status === "cancelled") {
-        $("filterProgressText").textContent = data.error || "筛选已取消";
-        $("applyFilterBtn").disabled = false;
-        $("cancelFilterJobBtn").hidden = true;
-        S.filterJob = null;
-        setStatus(`已打开 · ${sheet}`);
-        if(data.status==='error')toast(data.error||'筛选失败','error');
-        return false;
-      }
-    }
+    } finally { activity?.end(); }
   }
 
   async function cancelFilter(jobID) {
     if (!jobID) return;
+    if(S.filterJob===jobID)S.filterActivity?.end();
     if (S.filterJob === jobID) {
       S.filterRequest=(S.filterRequest||0)+1;
       S.filterCommitAbort?.abort();S.filterCommitAbort=null;
@@ -4209,7 +4236,11 @@
     $("openBtn").addEventListener("click", chooseFile);
     $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});
     $("chooseFileBtn").addEventListener("click", chooseFile);
-    $("fileInput").addEventListener("change", event => uploadFile(event.target.files?.[0]));
+    $("fileInput").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      uploadFile(file);
+    });
     $("nameBox").addEventListener("keydown", event => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -4311,7 +4342,6 @@
     document.addEventListener("fullscreenchange", updateFullscreenButton);
     $("zoomOutBtn").addEventListener("click", () => setZoom(S.zoom - 5));
     $("zoomInBtn").addEventListener("click", () => setZoom(S.zoom + 5));
-    $("cancelIndexBtn").addEventListener("click", () => cancelIndex(S.indexJob));
     $("retryIndexBtn").addEventListener("click", () => selectSheet(S.sheet));
     for (const id of ["exitBtn", "homeExitBtn"]) $(id).addEventListener("click", async () => {
       if(!canOpenWorkbook('退出程序'))return;
@@ -4473,13 +4503,26 @@
 
   readingMode=new window.ExcelLensReadingMode({button:$('readingModeBtn'),panel:$('readingModePanel'),veil:$('readingVeil'),textureToggle:$('gridTextureToggle'),onTextureChange:syncGridBackdrop});
   highlightMode=new window.ExcelLensHighlightMode({toggle:$('crosshairToggle'),button:$('crosshairColorBtn'),panel:$('crosshairPanel'),onChange:applySelectionClasses});
-  recentManager=new window.ExcelLensRecentWorkbooks({api,open:acceptOpenedWorkbook,toast,canOpen:canOpenWorkbook});
+  recentManager=new window.ExcelLensRecentWorkbooks({api,toast,open:item=>openWorkbook(() =>
+    api('/api/recent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'open',id:item.id})}),item.name,item.size)});
   if (window.ExcelLensEditCopy && fileFormats.editing && $('editCopyDialog')) {
     editCopy = new window.ExcelLensEditCopy({api, openDialog, adopt: acceptOpenedWorkbook, canOpen: canOpenWorkbook,
       context: () => ({book: S.book, fileName: S.fileName, source: S.source, sheet: S.sheet, ref: S.selected?.ref}),
       grid: {
         selected:()=>S.selected, ready:()=>S.indexReady && !S.sheetLoadingEpoch, filtered:()=>S.filtered,
-        move:moveSelection, select:selectCellByAddress,
+        dragged:()=>suppressGridClick,
+        selectPoint:(node,event)=>{
+          const p=parseRef(node.dataset.ref);
+          if (p) selectWithModifiers(cellAt(p.row,p.col),{...p,visual:Number(node.dataset.visualIndex)||p.row},event);
+        },
+        range:()=>{
+          if (!S.selected || S.multiRanges.length || S.filtered) return '';
+          const model=window.ExcelLensMultiSelection, area=mergedCells.expand(model.areas(S,true).at(-1));
+          const {start,end}=model.points(area,colName);
+          return start===end?start:start+':'+end;
+        },
+        merged:()=>S.selected&&mergedCells.at(S.selected.row,S.selected.col),
+        move:moveSelection, select:selectCellByAddress, copy:copySelection,
         bounds:ref=>{
           for(const node of document.querySelectorAll(`.grid-region .grid-cell[data-ref="${ref}"]`)){
             const rect=traceVisibleRect(node); if(rect)return {rect,node};
@@ -4576,7 +4619,7 @@
   $('taskRecoveryHome').addEventListener('click',()=>taskRecovery.open());
   $('recentRefreshBtn').addEventListener('click',()=>taskRecovery.refreshHome());
   window.addEventListener('focus',()=>taskRecovery.refreshHome());
-  copySpecial = new window.ExcelLensCopySpecial({capture:captureClipboardSelection,copy:content=>content.html?writeClipboardPayload(content):copyText(content.text),toast,limits:fileFormats.clipboard});
+  copySpecial = new window.ExcelLensCopySpecial({capture:()=>captureClipboardSelection({withMerges:true}),copy:content=>content.html?writeClipboardPayload(content):copyText(content.text),toast,limits:fileFormats.clipboard});
   transposeCenter=new window.ExcelLensTranspose({capture:captureClipboardSelection,copy:copyText,toast,navigate:navigateToCell,colName,fontStack,limits:fileFormats.transpose,richLimits:fileFormats.richText});
   window.ExcelLensExportIssues=(jobId,protectCSV)=>exportCenter.startGenerated('/api/analysis/issues/export',{jobId,protectCSV},'异常核对清单（完整）');
   window.ExcelLensExportClusters=(jobId,protectCSV)=>exportCenter.startGenerated('/api/analysis/clusters/export',{jobId,protectCSV},'疑似重复候选（完整计数、有限位置样例）');

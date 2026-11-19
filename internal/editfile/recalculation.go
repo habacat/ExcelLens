@@ -84,6 +84,9 @@ type CalculationBook struct {
 	unbound          []editdoc.Address
 	deps             calcDependencies
 	owners           []calcOwner
+	arrays           map[editdoc.Address]sourceFormulaTag
+	merges           map[string][]cellRect
+	barriers         map[string][]cellRect
 	hidden           map[string]map[int]bool
 	filtered         map[string][]cellRect
 	date1904         bool
@@ -128,7 +131,8 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 		source: xlsxPackage{layout: layout, names: p.names},
 		cells:  make(map[editdoc.Address]calcCell), columns: make(map[calcColumn][]int),
 		formulas: make(map[editdoc.Address]calculator.WorksheetFormula),
-		deps:     newCalcDependencies(), date1904: p.date1904, hidden: map[string]map[int]bool{}, filtered: map[string][]cellRect{},
+		arrays:   map[editdoc.Address]sourceFormulaTag{}, merges: map[string][]cellRect{}, barriers: map[string][]cellRect{},
+		deps: newCalcDependencies(), date1904: p.date1904, hidden: map[string]map[int]bool{}, filtered: map[string][]cellRect{},
 	}
 	if len(layout.Pivots) > 0 && p.files["xl/styles.xml"] != nil {
 		raw, err := p.readPart(ctx, "xl/styles.xml")
@@ -178,7 +182,9 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 				if c.cache == nil || p.staleFormulaCaches || b.constantCacheDiffers(ctx, program, c) {
 					b.missing = append(b.missing, a)
 				}
-				if c.formula.kind == "array" && !c.formula.area.single() {
+				if c.formula.kind == "array" && (!c.formula.area.single() || c.formula.dynamic && program.MaySpill) && program.Bound() {
+					b.arrays[a] = c.formula
+				} else if c.formula.kind == "array" && !c.formula.area.single() {
 					b.addOwner(a.Sheet, cellRect{row, col, row, col}, a.Sheet, c.formula.area, false)
 				}
 			}
@@ -193,6 +199,18 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 		}
 		if !layout.Native && checked != sheet {
 			return nil, ErrBinding
+		}
+		b.merges[sheet.Name] = structure.merges
+		for _, block := range structure.blocks {
+			b.barriers[sheet.Name] = append(b.barriers[sheet.Name], block.area)
+		}
+		for _, owner := range p.pivotRanges[sheet.Name] {
+			b.barriers[sheet.Name] = append(b.barriers[sheet.Name], owner.area)
+		}
+		for _, table := range layout.Tables {
+			if table.Sheet == sheet.Name {
+				b.barriers[sheet.Name] = append(b.barriers[sheet.Name], table.bounds())
+			}
 		}
 		if structure.filtered {
 			rows := structure.filter
@@ -304,10 +322,12 @@ type CalculatedCell struct {
 type Calculation struct {
 	Cells map[editdoc.Address]CalculatedCell
 	// Affected is the conservative fallback when the source index exceeds capacity.
-	Affected  map[string]bool
-	Generated []GeneratedArea
-	Visits    int
-	patches   map[editdoc.Address]editdoc.Value
+	Affected     map[string]bool
+	Generated    []GeneratedArea
+	Arrays       map[editdoc.Address]arrayResult
+	ArrayMembers map[editdoc.Address]editdoc.Value
+	Visits       int
+	patches      map[editdoc.Address]editdoc.Value
 }
 
 func (c *Calculation) GeneratedStatus(a editdoc.Address) string {
@@ -353,6 +373,7 @@ type calcRevision struct {
 	positions     map[calculator.WorksheetReference][]editdoc.Address
 	positionCount int
 	resultBytes   int
+	arrays        *arrayPass
 	result        Calculation
 }
 
@@ -371,9 +392,9 @@ func compareCalcAddress(a, b editdoc.Address) int {
 
 // Calculate takes ownership of an immutable document snapshot. Previous must
 // belong to the same base and document; a cold restart can always pass nil.
-func (b *CalculationBook) Calculate(ctx context.Context, patches map[editdoc.Address]editdoc.Value, previous *Calculation) (*Calculation, error) {
+func (b *CalculationBook) calculatePass(ctx context.Context, patches map[editdoc.Address]editdoc.Value, previous *Calculation, arrays *arrayPass) (*Calculation, error) {
 	s := &calcRevision{
-		ctx: calculator.WithDateSystem(ctx, b.date1904), book: b, patches: patches,
+		ctx: calculator.WithDateSystem(ctx, b.date1904), book: b, patches: patches, arrays: arrays,
 		added: map[calcColumn][]int{}, programs: map[editdoc.Address]calculator.WorksheetFormula{},
 		busy: map[editdoc.Address]bool{}, waiting: map[editdoc.Address]bool{}, typed: map[editdoc.Address]calculator.FormulaValue{},
 		positions: map[calculator.WorksheetReference][]editdoc.Address{},
@@ -397,7 +418,13 @@ func (b *CalculationBook) Calculate(ctx context.Context, patches map[editdoc.Add
 			if formulaBytes > formats.EditCalcFormulaBytes {
 				return nil, ErrCalcCapacity
 			}
-			form := b.compile(ctx, a, v.Raw, src.tag)
+			tag := src.tag
+			if arrays != nil {
+				if request, ok := arrays.specs[a]; ok {
+					tag = request
+				}
+			}
+			form := b.compile(ctx, a, v.Raw, tag)
 			edges += len(form.References)
 			if edges > formats.EditCalcReferences {
 				return nil, ErrCalcCapacity
@@ -408,8 +435,12 @@ func (b *CalculationBook) Calculate(ctx context.Context, patches map[editdoc.Add
 			}
 		}
 	}
-	for _, rows := range s.added {
+	if arrays != nil {
+		roots = arrays.seed(s, roots)
+	}
+	for key, rows := range s.added {
 		slices.Sort(rows)
+		s.added[key] = slices.Compact(rows)
 	}
 	var queue []editdoc.Address
 	var err error

@@ -64,8 +64,9 @@ func (v pivotValue) write(out *strings.Builder) {
 }
 
 type pivotDictionary struct {
-	values []pivotValue
-	index  map[pivotValue]int
+	values     []pivotValue
+	index      map[pivotValue]int
+	calculated map[int]bool
 }
 
 func (d *pivotDictionary) add(v pivotValue) int {
@@ -79,11 +80,13 @@ func (d *pivotDictionary) add(v pivotValue) int {
 }
 
 type pivotRecords struct {
-	fields     []cacheFieldXML
-	rows       [][]pivotValue
-	dicts      []pivotDictionary
-	dateStyles []string
-	book       *CalculationBook
+	fields       []cacheFieldXML
+	rows         [][]pivotValue
+	dicts        []pivotDictionary
+	removedItems map[int]int
+	items        []pivotCalculated
+	dateStyles   []string
+	book         *CalculationBook
 }
 
 func loadPivotRecords(ctx context.Context, values objectValues, source pivotSource, fields []cacheFieldXML, dimensions map[int]bool) (pivotRecords, error) {
@@ -117,7 +120,13 @@ func loadPivotRecords(ctx context.Context, values objectValues, source pivotSour
 					if _, ok := d.index[v]; ok {
 						return records, errors.New("透视缓存包含重复的共享项目")
 					}
-					d.add(v)
+					x := d.add(v)
+					if isTrue(old.Calculated) {
+						if d.calculated == nil {
+							d.calculated = map[int]bool{}
+						}
+						d.calculated[x] = true
+					}
 				}
 			}
 		}
@@ -142,7 +151,9 @@ func loadPivotRecords(ctx context.Context, values objectValues, source pivotSour
 				}
 			}
 			if d := &records.dicts[i]; d.index != nil {
-				d.add(line[i])
+				if d.calculated[d.add(line[i])] {
+					return records, fmt.Errorf("源字段 %s 的值与计算项目同名", fields[i].Name)
+				}
 			}
 		}
 		records.rows = append(records.rows, line)
@@ -287,8 +298,12 @@ func (r *pivotRecords) sharedItems(field int) string {
 		out.WriteString(` containsMixedTypes="1"`)
 	}
 	out.WriteByte('>')
-	for _, v := range d.values {
-		v.write(&out)
+	for x, v := range d.values {
+		if d.calculated[x] {
+			fmt.Fprintf(&out, `<%s v="%s" f="1"/>`, v.kind, escapedXML(v.raw))
+		} else {
+			v.write(&out)
+		}
 	}
 	out.WriteString("</sharedItems>")
 	return out.String()

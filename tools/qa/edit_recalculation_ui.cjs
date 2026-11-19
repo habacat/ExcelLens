@@ -79,9 +79,9 @@ async function main() {
       const op = sample.structure;
       await sheet(op.sheet); await select(op.ref);
       if (op.axes) assert.equal(await p.evaluate('editGridMore.textContent'),'透视布局');
-      await p.click('#editGridMore');
+      await p.click(op.range ? '#editGridRange' : '#editGridMore');
       await p.wait('editCopyDialog.open && !editCopyClose.disabled');
-      const pivot = op.kind === 'configurePivot';
+      const pivot = ['configurePivot', 'pivotCalculatedItem', 'pivotValueFilter'].includes(op.kind);
       if(op.axes) {
         assert.ok(await p.evaluate('editCopyTabObjects.getAttribute("aria-selected")==="true" && editCopyTitle.textContent==="透视布局"'));
         assert.equal(await p.evaluate('editCopyPivot.value'),op.pivot);
@@ -103,8 +103,19 @@ async function main() {
           set('PivotData',op.data);
           set('PivotAggregate',op.aggregate); set('PivotFilter',op.item ? 'item' : 'keep');
           if (op.item) set('PivotItem',op.item);
+        } else if (op.kind === 'pivotValueFilter') {
+          editCopyPivotValues.open = true;
+          set('ValueField',op.valueFilter.field); set('ValueKind',op.valueFilter.kind);
+          set('ValueStart',op.valueFilter.value);
+          if (op.valueFilter.second !== undefined) set('ValueEnd',op.valueFilter.second);
+        } else if (op.kind === 'pivotCalculatedItem') {
+          editCopyItemTools.open = true;
+          set('ItemField',op.calculatedItem.field); set('ItemName',op.calculatedItem.name);
+          set('ItemFormula',op.calculatedItem.formula);
         } else {
           set('StructureKind',op.kind);
+          if (op.range) set('Range',op.range);
+          if (op.formula) set('ArrayFormula',op.formula);
           if (op.name) set('NewName',op.name);
           if (op.at) set('At',op.at);
           if (op.count) set('Count',op.count);
@@ -122,7 +133,8 @@ async function main() {
         }
         await p.call('Emulation.setDeviceMetricsOverride',{width:1200,height:850,deviceScaleFactor:1,mobile:false});
       }
-      await p.click(pivot ? '#editCopyPivotApply' : '#editCopyApplyStructure');
+      const action = {pivotValueFilter:'ValueApply', pivotCalculatedItem:'ItemApply', configurePivot:'PivotApply'}[op.kind] || 'ApplyStructure';
+      await p.click('#editCopy' + action);
       await revision(2);
         if (op.axes) {
           await p.wait('!editCopyDialog.open');

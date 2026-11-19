@@ -1,0 +1,177 @@
+{
+  "version": "1.9.1",
+  "engine": "Microsoft Excel",
+  "cases": [
+    {
+      "scenario": "merge-sichuan",
+      "states": 6,
+      "reopenedCells": 300,
+      "serializedCells": 0,
+      "sourceSHA256": "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea",
+      "probeSHA256": "70a18f5cc430b2ab3df7c704c1d76e325578739a7b6837daa4b920678a0cbcb0"
+    },
+    {
+      "scenario": "merge-move",
+      "states": 3,
+      "reopenedCells": 90,
+      "serializedCells": 0,
+      "sourceSHA256": "12e8209c09bc41e7924c952a9e05bf45378bb5025df18db2663f3c73bb52e304",
+      "probeSHA256": "9174a73aae26ce9916690e9745bbbab6ecc759cadafef27d3255ca0b34c851a2"
+    },
+    {
+      "scenario": "fixed-verified",
+      "states": 6,
+      "reopenedCells": 180,
+      "serializedCells": 180,
+      "sourceSHA256": "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "clear-verified",
+      "states": 6,
+      "reopenedCells": 180,
+      "serializedCells": 180,
+      "sourceSHA256": "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "spill-verified",
+      "states": 6,
+      "reopenedCells": 180,
+      "serializedCells": 180,
+      "sourceSHA256": "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "array-grow-disk",
+      "states": 6,
+      "reopenedCells": 324,
+      "serializedCells": 324,
+      "sourceSHA256": "527cd202e8e6eabe63a4312f45f8425f0e8ed48ad14b12479b04a908f55d0916",
+      "probeSHA256": "962480d01d6039240cf95002e3038a305be14632332e4610cfdfaafa30eabc43"
+    },
+    {
+      "scenario": "array-unblock-verified",
+      "states": 6,
+      "reopenedCells": 324,
+      "serializedCells": 324,
+      "sourceSHA256": "527cd202e8e6eabe63a4312f45f8425f0e8ed48ad14b12479b04a908f55d0916",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "array-replace-verified",
+      "states": 6,
+      "reopenedCells": 324,
+      "serializedCells": 324,
+      "sourceSHA256": "527cd202e8e6eabe63a4312f45f8425f0e8ed48ad14b12479b04a908f55d0916",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "array-inline-verified",
+      "states": 3,
+      "reopenedCells": 162,
+      "serializedCells": 162,
+      "sourceSHA256": "527cd202e8e6eabe63a4312f45f8425f0e8ed48ad14b12479b04a908f55d0916",
+      "probeSHA256": "31ff8a5bc35c3eabb06bc7d6cbf7eeae37cc89b95add1fddbffe0ffdfe4eb981"
+    },
+    {
+      "scenario": "blocked-ref",
+      "states": 6,
+      "reopenedCells": 180,
+      "serializedCells": 180,
+      "sourceSHA256": "12e8209c09bc41e7924c952a9e05bf45378bb5025df18db2663f3c73bb52e304",
+      "probeSHA256": "dfcc2791346e7666b29e2aac82424014c041bcfe28e6d5b855f21d821bbbe438"
+    },
+    {
+      "scenario": "edge-reference",
+      "states": 6,
+      "reopenedCells": 180,
+      "serializedCells": 180,
+      "sourceSHA256": "12e8209c09bc41e7924c952a9e05bf45378bb5025df18db2663f3c73bb52e304",
+      "probeSHA256": "dfcc2791346e7666b29e2aac82424014c041bcfe28e6d5b855f21d821bbbe438"
+    },
+    {
+      "scenario": "array-anchor-grow-bound",
+      "states": 6,
+      "reopenedCells": 588,
+      "serializedCells": 588,
+      "sourceSHA256": "d1a156fca31a7748d4f36d985fb296448fb7ec72cc38d252e16b1d1a971f47bd",
+      "probeSHA256": "2aeeab18cc3d85ed2c8fe9c7b7fd8e87906896672ffa15d3cd20d3806950683b"
+    },
+    {
+      "scenario": "array-anchor-ref-bound",
+      "states": 6,
+      "reopenedCells": 588,
+      "serializedCells": 588,
+      "sourceSHA256": "d1a156fca31a7748d4f36d985fb296448fb7ec72cc38d252e16b1d1a971f47bd",
+      "probeSHA256": "2aeeab18cc3d85ed2c8fe9c7b7fd8e87906896672ffa15d3cd20d3806950683b"
+    },
+    {
+      "scenario": "array-anchor-enter-bound",
+      "states": 3,
+      "reopenedCells": 294,
+      "serializedCells": 294,
+      "sourceSHA256": "d1a156fca31a7748d4f36d985fb296448fb7ec72cc38d252e16b1d1a971f47bd",
+      "probeSHA256": "2aeeab18cc3d85ed2c8fe9c7b7fd8e87906896672ffa15d3cd20d3806950683b"
+    }
+  ],
+  "excel": [
+    "16.0",
+    20326.0
+  ],
+  "totals": {
+    "reopenedCells": 3894,
+    "serializedCells": 3504
+  },
+  "browsers": [
+    {
+      "result": "PASS",
+      "stages": [
+        "base",
+        "edit",
+        "undo",
+        "redo",
+        "saveReopen"
+      ],
+      "errors": []
+    },
+    {
+      "result": "PASS",
+      "stages": [
+        "base",
+        "edit",
+        "undo",
+        "redo",
+        "saveReopen"
+      ],
+      "errors": []
+    }
+  ],
+  "recovery": {
+    "result": "PASS",
+    "competing": [
+      409,
+      "2"
+    ],
+    "undo": 3,
+    "restarted": true,
+    "redo": 4,
+    "resultValue": "#SPILL!",
+    "requestReplay": true
+  },
+  "coverage": "Native Excel independently applies the operations. Each editor revision is saved and reopened. The array cases also compare serialized cell types, formulas, caches, ownership and rich error fields before Excel opens the artifact.",
+  "ordinaryFormulaRegression": {
+    "states": [
+      "base",
+      "edit",
+      "undo",
+      "redo"
+    ],
+    "addressesPerState": 16602,
+    "comparisons": 66408,
+    "absoluteTolerance": 1e-12,
+    "ulpTolerance": 8,
+    "mismatches": 0,
+    "restartedBeforeRedo": true
+  }
+}

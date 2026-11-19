@@ -19,6 +19,7 @@
       window.addEventListener('resize',()=>this.refreshPulse());
     }
     stopRun(){
+      this.activity?.end();
       ++this.request;if(this.waiting){clearTimeout(this.waiting.timer);this.waiting.resolve();this.waiting=null;}
       const job=this.job;this.job=null;
       if(job?.owned)this.o.api('/api/search/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:job.id})}).catch(()=>{});
@@ -53,12 +54,14 @@
         this.updateDock();this.pulse(this.refs,`${names[kind]} · ${this.refs.length} 处`);return;
       }
       const scope=this.o.scope.value,query=scope==='all'?`'${this.source.sheet.replaceAll("'","''")}'!${this.source.ref}`:this.source.ref;
+      const activity=this.activity=globalThis.ExcelLensActivity?.begin('正在追踪从属公式');
       try{
         const start=await this.o.api('/api/search/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:this.source.sheet,query,mode:'reference',scope})});
         if(ticket!==this.request){if(!start.reused)this.o.api('/api/search/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:start.jobId})}).catch(()=>{});return;}
         this.job={id:start.jobId,owned:!start.reused};
         while(ticket===this.request){
           const data=await this.o.api('/api/search/status?id='+encodeURIComponent(start.jobId));if(ticket!==this.request)return;
+          activity?.report(data.progress,100,data.stage);
           const refs=(data.matches||[]).map(match=>{const p=this.o.parseRef(match.ref);return p?{sheet:match.sheet||this.source.sheet,label:`${match.sheet||this.source.sheet}!${match.ref}`,start:p,end:p,formula:match.formula}:null;}).filter(Boolean);
           const changed=refs.length!==this.refs.length||refs.at(-1)?.label!==this.refs.at(-1)?.label||data.status!=='running';this.refs=refs;
           if(changed){if(!this.muted)this.o.setRefs(this.refs);this.render(ticket);this.updateDock();}
@@ -72,6 +75,7 @@
           await new Promise(resolve=>{this.waiting={resolve,timer:setTimeout(()=>{this.waiting=null;resolve();},250)};});
         }
       }catch(error){if(ticket===this.request){this.stopRun();this.o.summary.textContent='追踪失败：'+error.message;this.o.cancel.hidden=true;}}
+      finally{activity?.end();}
     }
     render(ticket){
       const fragment=document.createDocumentFragment();

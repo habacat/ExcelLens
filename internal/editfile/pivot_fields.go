@@ -11,23 +11,26 @@ import (
 )
 
 type PivotInfo struct {
-	Part          string             `json:"part"`
-	Name          string             `json:"name"`
-	Sheet         string             `json:"sheet"`
-	Fields        []string           `json:"fields,omitempty"`
-	Row           string             `json:"row,omitempty"`
-	Data          string             `json:"data,omitempty"`
-	Aggregate     string             `json:"aggregate,omitempty"`
-	Axes          *editdoc.PivotAxes `json:"axes,omitempty"`
-	SourceSheet   string             `json:"sourceSheet,omitempty"`
-	SourceRef     string             `json:"sourceRef,omitempty"`
-	Areas         []editdoc.Area     `json:"areas,omitempty"`
-	RefreshReason string             `json:"refreshReason,omitempty"`
+	Part            string                        `json:"part"`
+	Name            string                        `json:"name"`
+	Sheet           string                        `json:"sheet"`
+	Fields          []string                      `json:"fields,omitempty"`
+	Row             string                        `json:"row,omitempty"`
+	Data            string                        `json:"data,omitempty"`
+	Aggregate       string                        `json:"aggregate,omitempty"`
+	Axes            *editdoc.PivotAxes            `json:"axes,omitempty"`
+	SourceSheet     string                        `json:"sourceSheet,omitempty"`
+	SourceRef       string                        `json:"sourceRef,omitempty"`
+	Areas           []editdoc.Area                `json:"areas,omitempty"`
+	CalculatedItems []editdoc.PivotCalculatedItem `json:"calculatedItems,omitempty"`
+	ValueFilters    []editdoc.PivotValueFilter    `json:"valueFilters,omitempty"`
+	RefreshReason   string                        `json:"refreshReason,omitempty"`
 }
 
 type pivotMember struct {
-	XMLName xml.Name
-	V       string `xml:"v,attr"`
+	XMLName    xml.Name
+	V          string `xml:"v,attr"`
+	Calculated string `xml:"f,attr"`
 }
 
 type cacheFieldXML struct {
@@ -39,11 +42,12 @@ type cacheFieldXML struct {
 }
 
 type pivotItemXML struct {
-	X      int    `xml:"x,attr"`
-	Type   string `xml:"t,attr"`
-	Hidden string `xml:"h,attr"`
-	Detail string `xml:"sd,attr"`
-	Name   string `xml:"n,attr"`
+	X          int    `xml:"x,attr"`
+	Type       string `xml:"t,attr"`
+	Hidden     string `xml:"h,attr"`
+	Detail     string `xml:"sd,attr"`
+	Calculated string `xml:"f,attr"`
+	Name       string `xml:"n,attr"`
 }
 
 type pivotFieldXML struct {
@@ -83,6 +87,7 @@ type pivotTableXML struct {
 	MissingCaption string `xml:"missingCaption,attr"`
 	RowGrand       string `xml:"rowGrandTotals,attr"`
 	ColGrand       string `xml:"colGrandTotals,attr"`
+	CustomListSort string `xml:"customListSort,attr"`
 	Compact        string `xml:"compact,attr"`
 	Over           string `xml:"pageOverThenDown,attr"`
 	Wrap           int    `xml:"pageWrap,attr"`
@@ -98,7 +103,7 @@ type pivotTableXML struct {
 	RowFields  []pivotAxisField `xml:"rowFields>field"`
 	ColFields  []pivotAxisField `xml:"colFields>field"`
 	PageFields []pivotPageXML   `xml:"pageFields>pageField"`
-	Filters    *struct{}        `xml:"filters"`
+	Filters    []pivotFilterXML `xml:"filters>filter"`
 	DataFields []struct {
 		Fld      int    `xml:"fld,attr"`
 		Name     string `xml:"name,attr"`
@@ -116,8 +121,8 @@ func (t pivotTableXML) refreshArea(fields int) (cellRect, error) {
 	if len(t.DataFields) != 1 {
 		return r, errors.New("此布局需要一个值字段")
 	}
-	if t.Filters != nil {
-		return r, errors.New("此透视表使用标签或值筛选，可在 Excel 中刷新")
+	if _, err := t.valueFilters(fields); err != nil {
+		return r, err
 	}
 	v := t.DataFields[0]
 	if v.Fld < 0 || v.Fld >= fields {
@@ -252,6 +257,8 @@ func (p *xlsxPackage) cacheFields(ctx context.Context, part string) ([]cacheFiel
 
 func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 	caches := map[string][]cacheFieldXML{}
+	itemErrors := map[string]error{}
+	itemsByCache := map[string][]editdoc.PivotCalculatedItem{}
 	for _, part := range p.zip.File {
 		cache := p.pivotOutputs[part.Name]
 		if cache == "" {
@@ -260,9 +267,24 @@ func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 		fields, ok := caches[cache]
 		if !ok {
 			var err error
-			fields, _, err = p.cacheFields(ctx, cache)
+			var raw []byte
+			fields, raw, err = p.cacheFields(ctx, cache)
 			if err != nil {
 				return err
+			}
+			items, readErr := readCalculatedDefinitions(raw)
+			itemErrors[cache] = readErr
+			if readErr == nil {
+				for _, it := range items {
+					if it.field < 0 || it.field >= len(fields) {
+						return ErrXLSX
+					}
+					f := fields[it.field]
+					if f.Shared == nil || it.index < 0 || it.index >= len(f.Shared.Items) {
+						return ErrXLSX
+					}
+					itemsByCache[cache] = append(itemsByCache[cache], editdoc.PivotCalculatedItem{Field: f.Name, Name: f.Shared.Items[it.index].V, Formula: "=" + it.formula})
+				}
 			}
 			caches[cache] = fields
 		}
@@ -270,7 +292,7 @@ func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		info := PivotInfo{Part: part.Name, Name: t.Name, Sheet: p.pivotSheets[part.Name]}
+		info := PivotInfo{CalculatedItems: itemsByCache[cache], Part: part.Name, Name: t.Name, Sheet: p.pivotSheets[part.Name]}
 		if body, ok := parseRect(t.Area.Ref); ok {
 			pages, _ := t.oldPageAreas(body)
 			for _, area := range append(pages, body) {
@@ -286,12 +308,21 @@ func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 		if _, err = t.refreshArea(len(fields)); err == nil {
 			info.Axes, err = t.savedAxes(fields)
 		}
+		if err == nil && itemErrors[cache] != nil {
+			err = itemErrors[cache]
+		}
 		if err != nil {
 			info.RefreshReason = err.Error()
 		} else if !p.pivotSources[cache].refreshable {
 			info.RefreshReason = "此工作簿已禁用该缓存的刷新"
 		}
 		if info.Axes != nil {
+			filters, _ := t.valueFilters(len(fields))
+			for _, f := range filters {
+				cfg := f.spec
+				cfg.Field = fields[f.field].Name
+				info.ValueFilters = append(info.ValueFilters, cfg)
+			}
 			if len(info.Axes.Rows) > 0 {
 				info.Row = info.Axes.Rows[0]
 			}
