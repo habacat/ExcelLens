@@ -14,8 +14,8 @@ import (
 
 func releaseTestIndex(t testing.TB, idx *SheetIndex) {
 	t.Helper()
-	if idx.mappedRows != nil {
-		mapping := idx.mappedRows
+	if idx.RowsMapped() {
+		mapping := idx.mapping
 		t.Cleanup(func() {
 			runtime.SetFinalizer(mapping, nil)
 			mapping.release()
@@ -34,7 +34,7 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer writer.offsets.close()
-	for i := 0; i <= residentRowOffsets; i++ {
+	for i := 0; i <= MaxResidentRowOffsets; i++ {
 		if err := writer.row([]string{"ordinary", "0000123"}); err != nil {
 			t.Fatal(err)
 		}
@@ -59,15 +59,27 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	idx := &SheetIndex{XMLPath: f.Name(), IndexPath: filepath.Join(dir, "data.idx"), Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols, XMLSize: writer.count, HyperlinkStart: -1, rowSpool: writer.offsets.file, spooledRows: writer.offsets.count}
-	if err := saveIndex(idx); err != nil {
+	idx := &SheetIndex{XMLPath: f.Name(), IndexPath: filepath.Join(dir, "data.idx"), Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols, XMLSize: writer.count, HyperlinkStart: -1}
+	if err := writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
 		t.Fatal(err)
 	}
+	releaseTestIndex(t, idx)
 	loaded, err := loadIndex(idx.IndexPath, idx.XMLPath, "sheet")
 	if err != nil {
 		t.Fatal(err)
 	}
 	releaseTestIndex(t, loaded)
+	// Search probes used to slice only heap offsets. On a mapped sheet that
+	// silently searched the whole sheet even when the probe reported zero rows.
+	memory := &SheetIndex{RowIndex: NewRowIndex([]RowOffset{idx.RowAt(0), idx.RowAt(1), idx.RowAt(2)})}
+	for _, source := range []*SheetIndex{memory, idx, loaded} {
+		prefix := source.FirstRows(2)
+		if prefix.RowsMapped() != source.RowsMapped() || prefix.RowCount() != 2 || source.RowCount() < 3 ||
+			prefix.RowAt(1) != source.RowAt(1) || prefix.FindRowOffset(source.RowAt(2).Number) != prefix.RowCount() ||
+			prefix.FirstRows(-1).RowCount() != 0 || prefix.FirstRows(20).RowCount() != 2 {
+			t.Fatalf("invalid prefix for %d source rows (mapped=%t)", source.RowCount(), source.RowsMapped())
+		}
+	}
 	owner := &Workbook{indexes: map[string]*SheetIndex{"sheet": loaded}}
 	if !owner.HasMappedIndexes() {
 		t.Fatal("mapped cache was not protected")
@@ -76,7 +88,7 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	if owner.HasMappedIndexes() {
 		t.Fatal("discarded snapshot remained owned")
 	}
-	if loaded.mappedRows == nil || loaded.ResidentRows != nil || loaded.RowCount() != residentRowOffsets+2 {
+	if !loaded.RowsMapped() || loaded.resident != nil || loaded.RowCount() != MaxResidentRowOffsets+2 {
 		t.Fatal("large index was materialized", loaded.RowCount())
 	}
 	last := loaded.RowCount() - 1

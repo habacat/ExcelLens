@@ -222,8 +222,12 @@ func TestProvidedTruncatedTAR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if idx.MaxRow != 345030 || idx.MaxCol != 39 || !strings.Contains(wb.SourceInfo.Notice, "67 字节") {
+	if idx.RowCount() != 345030 || !idx.RowsMapped() || idx.MaxRow != 345030 || idx.MaxCol != 39 || !strings.Contains(wb.SourceInfo.Notice, "67 字节") {
 		t.Fatalf("recovered shape/tail differs: %d x %d / %s", idx.MaxRow, idx.MaxCol, wb.SourceInfo.Notice)
+	}
+	prefix := idx.FirstRows(4000)
+	if prefix.RowCount() != 4000 || prefix.RowAt(3999).Number != 4000 || prefix.FindRowOffset(4001) != prefix.RowCount() {
+		t.Fatal("real search sample did not stop at its 4000th indexed row")
 	}
 	t.Logf("recovery + index: %s; %d x %d; %s", time.Since(started), idx.MaxRow, idx.MaxCol, wb.SourceInfo.Notice)
 	// Every field, empty position and original row coordinate is checked

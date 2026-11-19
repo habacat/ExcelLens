@@ -9,10 +9,11 @@ import (
 )
 
 func TestSelectionRowViewMapsSmallRangesWithoutCopyingWholeFilter(t *testing.T) {
-	idx := &workbook.SheetIndex{ResidentRows: make([]workbook.RowOffset, 100)}
-	for i := range idx.ResidentRows {
-		idx.ResidentRows[i].Number = i + 1
+	offsets := make([]workbook.RowOffset, 100)
+	for i := range offsets {
+		offsets[i].Number = i + 1
 	}
+	idx := &workbook.SheetIndex{RowIndex: workbook.NewRowIndex(offsets)}
 	rng := rand.New(rand.NewSource(20261115))
 	for sample := 0; sample < 50; sample++ {
 		order := rng.Perm(100)
@@ -40,7 +41,7 @@ func TestSelectionRowViewMapsSmallRangesWithoutCopyingWholeFilter(t *testing.T) 
 }
 
 func TestSourceSelectionRowsFrozenReversedAndSparse(t *testing.T) {
-	idx := &workbook.SheetIndex{ResidentRows: []workbook.RowOffset{{Number: 1}, {Number: 4}, {Number: 8}, {Number: 9}}}
+	idx := &workbook.SheetIndex{RowIndex: workbook.NewRowIndex([]workbook.RowOffset{{Number: 1}, {Number: 4}, {Number: 8}, {Number: 9}})}
 	filter := &FilterResult{Sorted: true, Rows: rowOrderFixture(t, idx.RowCount(), 2, 0, 1)}
 	for _, tc := range []struct {
 		row1, row2, visual1, visual2, through int

@@ -30,16 +30,17 @@ func FuzzRowViewSelectionMatchesLiteralVisibleSheet(f *testing.F) {
 		n, through := int(at(0)%40)+1, int(at(2)%31)
 		hidden := make([]bool, n+1)
 		layout := workbook.SourceLayout{}
-		idx := &workbook.SheetIndex{SourceFormat: "csv", MaxRow: n}
+		var offsets []workbook.RowOffset
 		for row := 1; row <= n; row++ {
 			hidden[row] = at(row+3)&1 != 0
 			if hidden[row] {
 				layout.RowStates = append(layout.RowStates, workbook.SourceAxisRange{Min: row, Max: row, Hidden: true, HiddenSet: true})
 			}
 			if row == 1 || row == n || at(row+4)&2 == 0 {
-				idx.ResidentRows = append(idx.ResidentRows, workbook.RowOffset{Number: row})
+				offsets = append(offsets, workbook.RowOffset{Number: row})
 			}
 		}
+		idx := &workbook.SheetIndex{SourceFormat: "csv", MaxRow: n, RowIndex: workbook.NewRowIndex(offsets)}
 		axis, err := layout.BuildAxisVisibility(context.Background(), "row", n, workbook.AxisViewSettings{})
 		if err != nil {
 			t.Fatal(err)

@@ -1,9 +1,6 @@
 package workbook
 
-import (
-	"os"
-	"sync"
-)
+import "sync"
 
 type SheetMeta struct {
 	Name     string `json:"name"`
@@ -93,20 +90,15 @@ type StyleInfo struct {
 }
 
 type SheetIndex struct {
-	SourceFormat string // supplied by its owning adapter, not encoded in the index
-	SheetPath    string
-	XMLPath      string
-	IndexPath    string
-	Dimension    string
-	MaxRow       int
-	MaxCol       int
-	XMLSize      int64
-	// ResidentRows is the backing storage for small indexes. Readers must use
-	// RowCount, RowAt or RowOffsets so mapped and resident sources behave alike.
-	ResidentRows   []RowOffset
-	mappedRows     *mappedRowIndex // large immutable indexes stay on disk
-	rowSpool       *os.File        // unpublished external-index build only
-	spooledRows    int
+	RowIndex
+	SourceFormat   string // supplied by its owning adapter, not encoded in the index
+	SheetPath      string
+	XMLPath        string
+	IndexPath      string
+	Dimension      string
+	MaxRow         int
+	MaxCol         int
+	XMLSize        int64
 	SharedAnchors  map[string]SharedFormulaAnchor
 	HyperlinkStart int64 // -2: legacy index (unknown), -1: absent, >=0: XML byte offset
 }

@@ -14,7 +14,7 @@ func TestProjectionRangeIterationAcrossMappedMixedUniformAndEmptyBlocks(t *testi
 	positions := make([]int, n)
 	var states []SourceAxisRange
 	for i := 0; i < n; i++ {
-		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: i + 1})
+		idx.resident = append(idx.resident, RowOffset{Number: i + 1})
 		positions[i] = i
 		if i >= 4096 && i < 8192 && i%3 == 0 || i >= 8192 && i < 12288 {
 			states = append(states, SourceAxisRange{Min: i + 1, Max: i + 1, Hidden: true, HiddenSet: true})

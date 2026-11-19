@@ -372,7 +372,7 @@ func (w *Workbook) HasMappedIndexes() bool {
 	w.indexMu.RLock()
 	defer w.indexMu.RUnlock()
 	for _, idx := range w.indexes {
-		if idx.mappedRows != nil {
+		if idx.RowsMapped() {
 			return true
 		}
 	}

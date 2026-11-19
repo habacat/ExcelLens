@@ -33,7 +33,7 @@ func TestInitialPreviewPreservesNativeValuesWithoutCreatingIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		full, err := wb.ReadRows(idx, 0, min(3, len(idx.ResidentRows)), 1, 40)
+		full, err := wb.ReadRows(idx, 0, min(3, idx.RowCount()), 1, 40)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +64,7 @@ func TestXLSXPreviewValuesStylesAndFormulasMatchIndexedRead(t *testing.T) {
 	}
 	for _, row := range preview {
 		at := idx.FindRowOffset(row.Number)
-		if at >= len(idx.ResidentRows) || idx.ResidentRows[at].Number != row.Number {
+		if at >= idx.RowCount() || idx.RowAt(at).Number != row.Number {
 			continue
 		}
 		full, err := wb.ReadRows(idx, at, 1, 1, 40)

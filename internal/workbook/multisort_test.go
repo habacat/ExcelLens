@@ -55,7 +55,7 @@ func TestMultiSortThreeKeysWithStableTies(t *testing.T) {
 	}
 	numbers := []int{}
 	for _, pos := range offsets {
-		numbers = append(numbers, idx.ResidentRows[pos].Number)
+		numbers = append(numbers, idx.RowAt(pos).Number)
 	}
 	want := []int{1, 3, 4, 5, 2}
 	if !reflect.DeepEqual(numbers, want) {

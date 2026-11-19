@@ -177,7 +177,7 @@ func TestSelectionQuickRejectsForeignStaleMalformedAndChangedSources(t *testing.
 
 func TestSelectionQuickBudgetBeforeIOAndCancellation(t *testing.T) {
 	idx := &workbook.SheetIndex{MaxRow: 400001, MaxCol: 16, XMLPath: filepath.Join(t.TempDir(), "absent"), XMLSize: formats.SelectionQuickSourceBytes + 1,
-		ResidentRows: []workbook.RowOffset{{Number: 1, Start: 0, End: formats.SelectionQuickSourceBytes + 1}}}
+		RowIndex: workbook.NewRowIndex([]workbook.RowOffset{{Number: 1, Start: 0, End: formats.SelectionQuickSourceBytes + 1}})}
 	req := selectionQuickRequest{Start: "A1", End: "A400001"}
 	if _, _, _, err := quickSelectionPlan(idx, selectionSnapshot{}, req); err == nil {
 		t.Fatal("excess cell count accepted")
@@ -187,7 +187,9 @@ func TestSelectionQuickBudgetBeforeIOAndCancellation(t *testing.T) {
 	if _, err := readSelectionQuick(context.Background(), &workbook.Workbook{}, plan, 1, 1, req); !errors.Is(err, errQuickCapacity) {
 		t.Fatal("oversized source reached IO", err)
 	}
-	idx.ResidentRows[0].End = idx.XMLSize + 1
+	corrupt := idx.RowAt(0)
+	corrupt.End = idx.XMLSize + 1
+	idx.RowIndex = workbook.NewRowIndex([]workbook.RowOffset{corrupt})
 	if _, err := readSelectionQuick(context.Background(), &workbook.Workbook{}, plan, 1, 1, req); err == nil || errors.Is(err, errQuickCapacity) {
 		t.Fatal("corrupt descriptor disguised as limit", err)
 	}

@@ -132,8 +132,8 @@ func run(count int, output string) error {
 	}); err != nil {
 		return err
 	}
-	if len(idx.ResidentRows) != 0 && count > 262144 {
-		return fmt.Errorf("large offsets remained resident")
+	if idx.RowsMapped() != (idx.RowCount() > workbook.MaxResidentRowOffsets) {
+		return fmt.Errorf("unexpected row index storage for %d rows", idx.RowCount())
 	}
 	indexStat, _ := os.Stat(idx.IndexPath)
 	dataStat, _ := os.Stat(idx.XMLPath)
@@ -277,7 +277,11 @@ func run(count int, output string) error {
 	if before != after {
 		return fmt.Errorf("source changed")
 	}
-	report := map[string]any{"version": buildinfo.Version, "result": "PASS", "rows": count + 1, "columns": 3, "sourceSHA256": before, "sourceUnchanged": true, "indexBytes": indexStat.Size(), "rowCacheBytes": dataStat.Size(), "residentOffsets": len(idx.ResidentRows), "phases": results, "billionRecordBenchmark": false, "desktopManualAcceptance": false}
+	resident := idx.RowCount()
+	if idx.RowsMapped() {
+		resident = 0
+	}
+	report := map[string]any{"version": buildinfo.Version, "result": "PASS", "rows": count + 1, "columns": 3, "sourceSHA256": before, "sourceUnchanged": true, "indexBytes": indexStat.Size(), "rowCacheBytes": dataStat.Size(), "residentOffsets": resident, "phases": results, "billionRecordBenchmark": false, "desktopManualAcceptance": false}
 	data, _ := json.MarshalIndent(report, "", "  ")
 	return os.WriteFile(filepath.Join(output, "result.json"), append(data, '\n'), 0600)
 }

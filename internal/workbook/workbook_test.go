@@ -55,8 +55,8 @@ func TestOpenBuildIndexReadRowsAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(idx.ResidentRows) != 3 {
-		t.Fatalf("want 3 indexed rows, got %d", len(idx.ResidentRows))
+	if idx.RowCount() != 3 {
+		t.Fatalf("want 3 indexed rows, got %d", idx.RowCount())
 	}
 	rows, err := wb.ReadRows(idx, 0, 3, 1, 3)
 	if err != nil {
@@ -108,7 +108,7 @@ func TestOpenBuildIndexReadRowsAndSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	cached := wb2.GetCachedIndex(meta.Path)
-	if cached == nil || len(cached.ResidentRows) != 3 {
+	if cached == nil || cached.RowCount() != 3 {
 		t.Fatal("expected reusable local index cache")
 	}
 }

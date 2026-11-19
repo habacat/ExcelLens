@@ -2,7 +2,6 @@ package workbook
 
 import (
 	"archive/zip"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -18,7 +17,10 @@ func TestRealSearchPerformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	zr, _ := zip.OpenReader(file)
+	zr, err := zip.OpenReader(file)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer zr.Close()
 	var biggest string
 	var size uint64
@@ -30,27 +32,25 @@ func TestRealSearchPerformance(t *testing.T) {
 			}
 		}
 	}
-	sh, _ := wb.FindSheet(biggest)
+	sh, ok := wb.FindSheet(biggest)
+	if !ok {
+		t.Fatal("no readable worksheet found")
+	}
 	t.Logf("largest sheet %q XML %.1f MB", biggest, float64(size)/1e6)
 	t0 := time.Now()
 	idx, err := wb.BuildIndex(sh, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("index %s rows=%d", time.Since(t0), len(idx.ResidentRows))
-	n := len(idx.ResidentRows)
-	if n > 20000 {
-		n = 20000
-	}
-	piece := *idx
-	piece.ResidentRows = idx.ResidentRows[:n]
+	t.Logf("index %s rows=%d", time.Since(t0), idx.RowCount())
+	piece := idx.FirstRows(20000)
 	for _, mode := range []string{"formula", "value"} {
 		t0 = time.Now()
-		result, truncated, err := wb.SearchSheet(&piece, sh.Name, "__non_existing_query_xyz_999", mode, 500, nil, nil)
+		result, truncated, err := wb.SearchSheet(piece, sh.Name, "__non_existing_query_xyz_999", mode, 500, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log(fmt.Sprintf("baseline %s %d rows took %s results=%d truncated=%v", mode, n, time.Since(t0), len(result), truncated))
+		t.Logf("baseline %s %d rows took %s results=%d truncated=%v", mode, piece.RowCount(), time.Since(t0), len(result), truncated)
 	}
 }
 
@@ -77,20 +77,17 @@ func TestRealSearchParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	piece := *idx
-	if len(piece.ResidentRows) > 60 {
-		piece.ResidentRows = piece.ResidentRows[:60]
-	}
+	piece := idx.FirstRows(60)
 	for _, tt := range []struct{ query, mode string }{{"INDEX(", "formula"}, {"__no_matching_xyz__", "formula"}, {"2000", "value"}, {"__no_matching_xyz__", "value"}, {"A1", "reference"}} {
 		t.Run(tt.mode+"-"+tt.query, func(t *testing.T) {
 			start := time.Now()
-			got, gt, err := wb.SearchSheet(&piece, sh.Name, tt.query, tt.mode, 80, nil, nil)
+			got, gt, err := wb.SearchSheet(piece, sh.Name, tt.query, tt.mode, 80, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			optimized := time.Since(start)
 			start = time.Now()
-			want, wt, err := wb.searchSheetLegacy(&piece, sh.Name, tt.query, tt.mode, 80, nil, nil)
+			want, wt, err := wb.searchSheetLegacy(piece, sh.Name, tt.query, tt.mode, 80, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

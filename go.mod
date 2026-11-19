@@ -2,6 +2,13 @@ module excellens
 
 go 1.27.4
 
+ignore (
+	./artifacts
+	./fortest
+	./release
+	./validation
+)
+
 require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/ulikunitz/xz v0.5.17

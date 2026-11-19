@@ -202,12 +202,14 @@ func TestCellExplanationRejectsStaleBindingsMalformedRequestsAndSourceChanges(t 
 }
 
 func TestCellExplanationCapacityBeforeRowIOAndBeforeEscapedResponse(t *testing.T) {
-	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.CellExplanationSourceBytes + 1, ResidentRows: []workbook.RowOffset{{Number: 2, End: formats.CellExplanationSourceBytes + 1}}}
+	idx := &workbook.SheetIndex{XMLPath: filepath.Join(t.TempDir(), "absent.xml"), XMLSize: formats.CellExplanationSourceBytes + 1, RowIndex: workbook.NewRowIndex([]workbook.RowOffset{{Number: 2, End: formats.CellExplanationSourceBytes + 1}})}
 	_, err := readCellExplanation(context.Background(), &workbook.Workbook{}, idx, cellExplanationRequest{Ref: "A2"}, 2, 1)
 	if !errors.Is(err, errCellExplanationCapacity) {
 		t.Fatal("oversized source reached IO", err)
 	}
-	idx.ResidentRows[0].Start = -1
+	corrupt := idx.RowAt(0)
+	corrupt.Start = -1
+	idx.RowIndex = workbook.NewRowIndex([]workbook.RowOffset{corrupt})
 	_, err = readCellExplanation(context.Background(), &workbook.Workbook{}, idx, cellExplanationRequest{Ref: "A2"}, 2, 1)
 	if err == nil || errors.Is(err, errCellExplanationCapacity) || !strings.Contains(err.Error(), "缓存范围") {
 		t.Fatal(err)

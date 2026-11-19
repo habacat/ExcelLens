@@ -10,15 +10,26 @@ import (
 	"runtime"
 )
 
-// Keep at most 6 MiB of row offsets on the Go heap. Larger indexes use the
-// same checksummed 20-byte records, mapped read-only after publication.
-const residentRowOffsets = 262144
+// MaxResidentRowOffsets limits the heap used by a published worksheet index.
+// Larger indexes map the same checksummed 20-byte records on disk.
+const MaxResidentRowOffsets = 1 << 18
 const diskRowOffsetBytes = 20
 
+// RowIndex provides the same read-only row positions for both storage modes.
+// A mapped prefix retains its owner so collection cannot unmap a live view.
+type RowIndex struct {
+	resident []RowOffset
+	records  []byte
+	mapping  *mappedRowIndex
+}
+
+// NewRowIndex takes ownership of sorted source offsets in memory.
+func NewRowIndex(rows []RowOffset) RowIndex {
+	return RowIndex{resident: rows}
+}
+
 type mappedRowIndex struct {
-	data  []byte
-	start int
-	count int
+	data []byte
 }
 
 func (m *mappedRowIndex) release() {
@@ -26,65 +37,77 @@ func (m *mappedRowIndex) release() {
 	m.data = nil
 }
 
-func mapIndexRows(path string, start, count int) (*mappedRowIndex, error) {
+func mapIndexRows(path string, start, count int) (RowIndex, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return RowIndex{}, err
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return nil, err
+		return RowIndex{}, err
 	}
-	if start < 0 || count < 0 || int64(count) > (st.Size()-int64(start))/diskRowOffsetBytes {
-		return nil, errors.New("行索引映射范围无效")
+	if start < 0 || int64(start) > st.Size() || count < 0 || int64(count) > (st.Size()-int64(start))/diskRowOffsetBytes {
+		return RowIndex{}, errors.New("行索引映射范围无效")
 	}
 	data, err := mapIndexFile(f, st.Size())
 	if err != nil {
-		return nil, err
+		return RowIndex{}, err
 	}
-	m := &mappedRowIndex{data: data, start: start, count: count}
+	m := &mappedRowIndex{data: data}
 	// The owner is retained by SheetIndex and every active iterator. No mapping
 	// is unmapped while a query still owns its immutable SheetIndex snapshot.
 	runtime.SetFinalizer(m, (*mappedRowIndex).release)
-	return m, nil
+	end := start + count*diskRowOffsetBytes
+	return RowIndex{mapping: m, records: data[start:end:end]}, nil
 }
 
 func indexRowsStart(dimension string) int { return 8 + 4 + len(dimension) + 4 + 4 + 8 + 8 }
 
-func (idx *SheetIndex) RowCount() int {
-	if idx.mappedRows != nil {
-		return idx.mappedRows.count
+func (idx *RowIndex) RowsMapped() bool { return idx.mapping != nil }
+
+func (idx *RowIndex) RowCount() int {
+	if idx.RowsMapped() {
+		return len(idx.records) / diskRowOffsetBytes
 	}
-	if idx.rowSpool != nil {
-		return idx.spooledRows
-	}
-	return len(idx.ResidentRows)
+	return len(idx.resident)
 }
 
-func (idx *SheetIndex) RowAt(i int) RowOffset {
-	if idx.mappedRows == nil {
-		return idx.ResidentRows[i]
+func (idx *RowIndex) RowAt(i int) RowOffset {
+	if !idx.RowsMapped() {
+		return idx.resident[i]
 	}
-	m := idx.mappedRows
-	if i < 0 || i >= m.count {
+	if i < 0 || i >= idx.RowCount() {
 		panic("row index out of range")
 	}
-	start := m.start + i*diskRowOffsetBytes
-	b := m.data[start : start+diskRowOffsetBytes]
+	start := i * diskRowOffsetBytes
+	b := idx.records[start : start+diskRowOffsetBytes]
 	row := RowOffset{Number: int(binary.LittleEndian.Uint32(b)), Start: int64(binary.LittleEndian.Uint64(b[4:])), End: int64(binary.LittleEndian.Uint64(b[12:]))}
-	runtime.KeepAlive(m)
+	runtime.KeepAlive(idx.mapping)
 	return row
 }
 
-func (idx *SheetIndex) RowOffsets() iter.Seq2[int, RowOffset] {
+func (idx *RowIndex) RowOffsets() iter.Seq2[int, RowOffset] {
 	return func(yield func(int, RowOffset) bool) {
-		for i := 0; i < idx.RowCount(); i++ {
+		for i := range idx.RowCount() {
 			if !yield(i, idx.RowAt(i)) {
 				return
 			}
 		}
 	}
+}
+
+// FirstRows limits indexed positions while retaining source coordinates,
+// worksheet metadata and shared formulas. Both storage modes share their data.
+func (idx SheetIndex) FirstRows(limit int) *SheetIndex {
+	count := max(0, min(limit, idx.RowCount()))
+	if idx.RowsMapped() {
+		end := count * diskRowOffsetBytes
+		idx.records = idx.records[:end:end]
+	} else {
+		idx.resident = idx.resident[:count:count]
+	}
+	return &idx
 }
 
 type rowOffsetBuilder struct {
@@ -104,8 +127,7 @@ func (b *rowOffsetBuilder) close() {
 	}
 }
 
-func writeRowOffset(w io.Writer, row RowOffset) error {
-	var data [diskRowOffsetBytes]byte
+func writeRowOffset(w io.Writer, data *[diskRowOffsetBytes]byte, row RowOffset) error {
 	binary.LittleEndian.PutUint32(data[:], uint32(row.Number))
 	binary.LittleEndian.PutUint64(data[4:], uint64(row.Start))
 	binary.LittleEndian.PutUint64(data[12:], uint64(row.End))
@@ -114,7 +136,7 @@ func writeRowOffset(w io.Writer, row RowOffset) error {
 }
 
 func (b *rowOffsetBuilder) append(row RowOffset) error {
-	if b.file == nil && b.count >= residentRowOffsets {
+	if b.file == nil && b.count >= MaxResidentRowOffsets {
 		f, err := os.CreateTemp(b.dir, ".offsets-*.tmp")
 		if err != nil {
 			return err
@@ -133,7 +155,7 @@ func (b *rowOffsetBuilder) append(row RowOffset) error {
 		}
 	} else {
 		if len(b.rows) == cap(b.rows) {
-			grown := make([]RowOffset, len(b.rows), min(residentRowOffsets, max(4096, cap(b.rows)*2)))
+			grown := make([]RowOffset, len(b.rows), min(MaxResidentRowOffsets, max(4096, cap(b.rows)*2)))
 			copy(grown, b.rows)
 			b.rows = grown
 		}
@@ -144,11 +166,7 @@ func (b *rowOffsetBuilder) append(row RowOffset) error {
 }
 
 func (b *rowOffsetBuilder) write(row RowOffset) error {
-	binary.LittleEndian.PutUint32(b.scratch[:], uint32(row.Number))
-	binary.LittleEndian.PutUint64(b.scratch[4:], uint64(row.Start))
-	binary.LittleEndian.PutUint64(b.scratch[12:], uint64(row.End))
-	_, err := b.out.Write(b.scratch[:])
-	return err
+	return writeRowOffset(b.out, &b.scratch, row)
 }
 
 func (b *rowOffsetBuilder) finish() error {

@@ -20,6 +20,8 @@ go run ./tools/project check -report validation/1.8.3/check.json
 
 `check` 依次校验工具链与版本、Go 格式、包依赖边界、文档链接、发布清单、离线 vendor 依赖、完整 Go 测试、`go vet`、JavaScript 语法与自动回归、生成的函数目录。失败返回非零退出码，发布构建复用同一入口。它不会访问网络、更新依赖或改写代码。
 
+`go.mod` 的 `ignore` 指令将根目录的 `artifacts/`、`fortest/`、`release/`、`validation/` 排除在 Go 包发现范围之外。这些目录可以在测试和构建期间存放工作簿、浏览器配置和发行件。真实样本测试通过显式文件路径读取输入。
+
 `fmt` 只格式化 `cmd/`、`internal/`、`tools/` 的 Go 文件。修改计算函数目录或依赖后运行：
 
 ```powershell

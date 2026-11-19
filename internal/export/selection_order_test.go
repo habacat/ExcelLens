@@ -18,7 +18,7 @@ func TestVisualSelectionExportPreservesBlankHeadersAndSourceOrder(t *testing.T) 
 	if err := os.WriteFile(path, []byte(row4+row8), 0600); err != nil {
 		t.Fatal(err)
 	}
-	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(row4 + row8)), MaxRow: 8, MaxCol: 1, ResidentRows: []workbook.RowOffset{{Number: 4, End: int64(len(row4))}, {Number: 8, Start: int64(len(row4)), End: int64(len(row4 + row8))}}}
+	idx := &workbook.SheetIndex{XMLPath: path, XMLSize: int64(len(row4 + row8)), MaxRow: 8, MaxCol: 1, RowIndex: workbook.NewRowIndex([]workbook.RowOffset{{Number: 4, End: int64(len(row4))}, {Number: 8, Start: int64(len(row4)), End: int64(len(row4 + row8))}})}
 	s := Selection{Sheet: workbook.SheetMeta{Name: "Data"}, Index: idx, FirstRow: 2, LastRow: 8, FirstCol: 1, LastCol: 1, Filtered: true, Compact: true, RowNumbers: []int{2, 3, 8, 4}}
 	wb := &workbook.Workbook{Format: "xlsx"}
 	var out bytes.Buffer

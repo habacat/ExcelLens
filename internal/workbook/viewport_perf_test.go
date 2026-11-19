@@ -21,7 +21,7 @@ func makeViewportBenchmark(b *testing.B) (*Workbook, *SheetIndex) {
 			fmt.Fprintf(&buf, `<c r="%s%d"><v>%d.%02d</v></c>`, ColumnName(col), row, row*col, col)
 		}
 		buf.WriteString("</row>")
-		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: row, Start: start, End: int64(buf.Len())})
+		idx.resident = append(idx.resident, RowOffset{Number: row, Start: start, End: int64(buf.Len())})
 	}
 	idx.XMLSize = int64(buf.Len())
 	if err := os.WriteFile(file, []byte(buf.String()), 0600); err != nil {
@@ -57,13 +57,13 @@ func BenchmarkFilteredSortThreeKeys(b *testing.B) {
 
 func BenchmarkCachedSort100k(b *testing.B) {
 	const n = 100000
-	idx := &SheetIndex{ResidentRows: make([]RowOffset, n), XMLSize: 1}
+	idx := &SheetIndex{RowIndex: NewRowIndex(make([]RowOffset, n)), XMLSize: 1}
 	wb := &Workbook{}
 	cols := []int{2, 4, 9}
 	for _, col := range cols {
 		view := beginColumnCache(n)
-		for i := range idx.ResidentRows {
-			idx.ResidentRows[i].Number = i + 1
+		for i := range idx.resident {
+			idx.resident[i].Number = i + 1
 			value := fmt.Sprintf("%06d", (i*1789+col*11)%20000)
 			view = writeColumnCache(view, i, CellData{Display: value}, true)
 		}

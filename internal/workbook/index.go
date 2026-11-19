@@ -87,7 +87,7 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 				idx := &SheetIndex{
 					SheetPath: meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 					Dimension: dim, MaxRow: maxRow, MaxCol: maxCol,
-					XMLSize: cached.Size(), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
+					XMLSize: cached.Size(), RowIndex: NewRowIndex(rows), SharedAnchors: anchors, HyperlinkStart: linkStart,
 				}
 				if err := saveIndex(idx); err != nil {
 					return nil, err
@@ -164,7 +164,7 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 	idx := &SheetIndex{
 		SheetPath: meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 		Dimension: dimension, MaxRow: maxRow, MaxCol: maxCol,
-		XMLSize: st.Size(), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: linkStart,
+		XMLSize: st.Size(), RowIndex: NewRowIndex(rows), SharedAnchors: anchors, HyperlinkStart: linkStart,
 	}
 	if err := saveIndex(idx); err != nil {
 		return nil, fmt.Errorf("保存行索引失败：%w", err)
@@ -238,6 +238,12 @@ func replaceFile(src, dst string) error {
 }
 
 func saveIndex(idx *SheetIndex) error {
+	return writeIndex(idx, idx.RowCount(), nil)
+}
+
+// A spill file belongs only to the writer. Publish an index for readers after
+// replacing the checksummed file and obtaining its final read-only mapping.
+func writeIndex(idx *SheetIndex, count int, spill *os.File) error {
 	tmp, err := os.CreateTemp(filepathDir(idx.IndexPath), ".rows-*.idx")
 	if err != nil {
 		return err
@@ -263,16 +269,18 @@ func saveIndex(idx *SheetIndex) error {
 	if err := writeU64(payload, uint64(idx.XMLSize)); err != nil {
 		return fail(err)
 	}
-	if err := writeU64(payload, uint64(idx.RowCount())); err != nil {
+	if err := writeU64(payload, uint64(count)); err != nil {
 		return fail(err)
 	}
-	if idx.rowSpool != nil {
-		if _, err := io.CopyN(payload, io.NewSectionReader(idx.rowSpool, 0, int64(idx.RowCount())*diskRowOffsetBytes), int64(idx.RowCount())*diskRowOffsetBytes); err != nil {
+	if spill != nil {
+		size := int64(count) * diskRowOffsetBytes
+		if _, err := io.CopyN(payload, io.NewSectionReader(spill, 0, size), size); err != nil {
 			return fail(err)
 		}
 	} else {
+		var record [diskRowOffsetBytes]byte
 		for _, row := range idx.RowOffsets() {
-			if err := writeRowOffset(payload, row); err != nil {
+			if err := writeRowOffset(payload, &record, row); err != nil {
 				return fail(err)
 			}
 		}
@@ -314,7 +322,17 @@ func saveIndex(idx *SheetIndex) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return replaceFile(name, idx.IndexPath)
+	if err := replaceFile(name, idx.IndexPath); err != nil {
+		return err
+	}
+	if count > MaxResidentRowOffsets {
+		rows, err := mapIndexRows(idx.IndexPath, indexRowsStart(idx.Dimension), count)
+		if err != nil {
+			return err
+		}
+		idx.RowIndex = rows
+	}
+	return nil
 }
 
 func loadIndex(indexPath, xmlPath, sheetPath string) (*SheetIndex, error) {
@@ -376,7 +394,7 @@ func loadIndex(indexPath, xmlPath, sheetPath string) (*SheetIndex, error) {
 		return nil, errors.New("行索引源坐标超出格式容量")
 	}
 	var rows []RowOffset
-	if count <= residentRowOffsets {
+	if count <= MaxResidentRowOffsets {
 		rows = make([]RowOffset, int(count))
 	}
 	var previousEnd int64
@@ -438,9 +456,9 @@ func loadIndex(indexPath, xmlPath, sheetPath string) (*SheetIndex, error) {
 	if _, err := br.ReadByte(); err != io.EOF {
 		return nil, errors.New("本机行索引包含多余数据")
 	}
-	idx := &SheetIndex{SheetPath: sheetPath, XMLPath: xmlPath, IndexPath: indexPath, Dimension: dim, MaxRow: int(maxRow), MaxCol: int(maxCol), XMLSize: int64(xmlSize), ResidentRows: rows, SharedAnchors: anchors, HyperlinkStart: hyperlinkStart}
-	if count > residentRowOffsets {
-		idx.mappedRows, err = mapIndexRows(indexPath, indexRowsStart(dim), int(count))
+	idx := &SheetIndex{SheetPath: sheetPath, XMLPath: xmlPath, IndexPath: indexPath, Dimension: dim, MaxRow: int(maxRow), MaxCol: int(maxCol), XMLSize: int64(xmlSize), RowIndex: NewRowIndex(rows), SharedAnchors: anchors, HyperlinkStart: hyperlinkStart}
+	if count > MaxResidentRowOffsets {
+		idx.RowIndex, err = mapIndexRows(indexPath, indexRowsStart(dim), int(count))
 		if err != nil {
 			return nil, err
 		}

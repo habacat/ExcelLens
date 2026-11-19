@@ -23,7 +23,7 @@ func TestFastViewportDecoderParity(t *testing.T) {
 	for i, line := range cases {
 		begin := int64(text.Len())
 		text.WriteString(line)
-		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: i + 1, Start: begin, End: int64(text.Len())})
+		idx.resident = append(idx.resident, RowOffset{Number: i + 1, Start: begin, End: int64(text.Len())})
 	}
 	if err := os.WriteFile(path, []byte(text.String()), 0600); err != nil {
 		t.Fatal(err)
@@ -81,15 +81,15 @@ func TestRealViewportDecoderParity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	sample := []int{0, 1, 9, 30, 100, 235, 500, 1000, len(idx.ResidentRows) - 1}
+	sample := []int{0, 1, 9, 30, 100, 235, 500, 1000, idx.RowCount() - 1}
 	// Exercise numerous independent physical rows without depending on the
 	// workbook's ordering, including distant cached-formula and style areas.
-	for k := 0; k < 128 && len(idx.ResidentRows) > 0; k++ {
-		sample = append(sample, (17+k*7849)%len(idx.ResidentRows))
+	for k := 0; k < 128 && idx.RowCount() > 0; k++ {
+		sample = append(sample, (17+k*7849)%idx.RowCount())
 	}
 	var buffer []byte
 	for _, i := range sample {
-		if i < 0 || i >= len(idx.ResidentRows) {
+		if i < 0 || i >= idx.RowCount() {
 			continue
 		}
 		for _, cols := range [][2]int{{1, 35}, {200, 235}, {500, 535}, {800, 835}} {
@@ -129,14 +129,14 @@ func TestFastSparseColumnsParity(t *testing.T) {
 	for _, line := range content {
 		start := int64(buf.Len())
 		buf.WriteString(line)
-		n := len(idx.ResidentRows) + 1
+		n := idx.RowCount() + 1
 		if n == 3 {
 			n = 20
 		}
 		if n == 2 {
 			n = 3
 		}
-		idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: n, Start: start, End: int64(buf.Len())})
+		idx.resident = append(idx.resident, RowOffset{Number: n, Start: start, End: int64(buf.Len())})
 	}
 	idx.XMLSize = int64(buf.Len())
 	if err := os.WriteFile(file, []byte(buf.String()), 0600); err != nil {
@@ -152,7 +152,7 @@ func TestFastSparseColumnsParity(t *testing.T) {
 	for _, includeFormula := range []bool{false, true} {
 		for _, formatting := range []bool{false, true} {
 			var reused []byte
-			for i := range idx.ResidentRows {
+			for i := range idx.RowCount() {
 				want, err := wb.readRowFromFileSelected(f, idx, i, 1, 14, selected, formatting, includeFormula)
 				if err != nil {
 					t.Fatal(err)
@@ -199,7 +199,7 @@ func TestRealFastSparseColumnParity(t *testing.T) {
 	defer f.Close()
 	selected := map[int]struct{}{2: {}, 19: {}, 132: {}, 500: {}, 884: {}}
 	var reused []byte
-	for i := 0; i < len(idx.ResidentRows); i += max(1, len(idx.ResidentRows)/72) {
+	for i := 0; i < idx.RowCount(); i += max(1, idx.RowCount()/72) {
 		want, err := wb.readRowFromFileSelected(f, idx, i, 2, 884, selected, true, false)
 		if err != nil {
 			t.Fatal(err)

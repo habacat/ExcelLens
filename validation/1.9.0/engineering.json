@@ -203,9 +203,31 @@
       }
     ]
   },
+  "rowIndex": {
+    "nativeFixtureRows": 262147,
+    "coldAndReopenedMapped": true,
+    "completeOffsetAnd64SampleRowsDigest": "3019772fcb37fe3125a454b5a174d0d1c7aa94a784e05b7177e2486cb48f00d6",
+    "boundedPrefixRows": 4000,
+    "ledgerSheets": 80,
+    "largestLedgerSheetRows": 10000,
+    "realMappedArchiveRows": 345030,
+    "checks": [
+      "cold and reopened indexes",
+      "bounded and nested prefixes",
+      "large native sheet search and decoder parity",
+      "real service reads"
+    ]
+  },
+  "packageDiscovery": {
+    "oldCommandFailedReadingLockedArtifact": true,
+    "currentCommandPassedWithSameLock": true,
+    "sameExplicitPackageSet": true,
+    "projectPackages": 38,
+    "dependenciesIncluded": 340
+  },
   "checks": {
     "windowsRaceSteps": 7,
-    "frontendTestsInWindowsRaceRun": 530,
+    "frontendTestsInWindowsRaceRun": 531,
     "additionalRegression": "sparse columns cannot satisfy an unfetched contiguous request",
     "desktopManual": "not performed",
     "wps": "not performed"

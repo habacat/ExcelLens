@@ -311,19 +311,11 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 		SourceFormat: w.Format,
 		SheetPath:    meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
 		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
-		XMLSize: writer.count, ResidentRows: writer.offsets.rows, HyperlinkStart: -1,
-		rowSpool: writer.offsets.file, spooledRows: writer.offsets.count,
+		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
 		SharedAnchors: make(map[string]SharedFormulaAnchor),
 	}
-	if err = saveIndex(idx); err != nil {
+	if err = writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
 		return nil, err
-	}
-	if idx.rowSpool != nil {
-		idx.mappedRows, err = mapIndexRows(idx.IndexPath, indexRowsStart(idx.Dimension), idx.spooledRows)
-		if err != nil {
-			return nil, err
-		}
-		idx.rowSpool = nil
 	}
 	w.indexMu.Lock()
 	w.indexes[meta.Path] = idx

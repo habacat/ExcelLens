@@ -220,17 +220,17 @@ func TestCalculatorFilteredScanMatchesIndependentSelectionPlanner(t *testing.T) 
 	idx := wb.GetCachedIndex(wb.Sheets[0].Path)
 	rng := rand.New(rand.NewSource(1700))
 	for iteration := 0; iteration < 80; iteration++ {
-		order := rng.Perm(len(idx.ResidentRows))
+		order := rng.Perm(idx.RowCount())
 		filter := &FilterResult{Rows: rowOrderFixture(t, idx.RowCount(), order...)}
 		frozen := rng.Intn(3)
 		visible := []int{}
 		for _, i := range order {
-			if idx.ResidentRows[i].Number > frozen {
+			if idx.RowAt(i).Number > frozen {
 				visible = append(visible, i)
 			}
 		}
 		v1, v2 := 1+rng.Intn(len(visible)), 1+rng.Intn(len(visible))
-		r1, r2 := idx.ResidentRows[visible[v1-1]].Number, idx.ResidentRows[visible[v2-1]].Number
+		r1, r2 := idx.RowAt(visible[v1-1]).Number, idx.RowAt(visible[v2-1]).Number
 		if frozen > 0 && iteration%3 == 0 {
 			r1 = 1
 			v1 = 1

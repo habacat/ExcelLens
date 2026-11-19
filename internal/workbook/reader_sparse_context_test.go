@@ -27,7 +27,7 @@ func TestReadRowsSparseContextParity(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.xml), 0600); err != nil {
 				t.Fatal(err)
 			}
-			idx := &SheetIndex{XMLPath: path, ResidentRows: []RowOffset{{Number: 1, Start: 0, End: int64(len(tc.xml))}}, XMLSize: int64(len(tc.xml)), SharedAnchors: map[string]SharedFormulaAnchor{}}
+			idx := &SheetIndex{XMLPath: path, RowIndex: NewRowIndex([]RowOffset{{Number: 1, Start: 0, End: int64(len(tc.xml))}}), XMLSize: int64(len(tc.xml)), SharedAnchors: map[string]SharedFormulaAnchor{}}
 			wb := &Workbook{Shared: []string{"shared content"}, Styles: []StyleInfo{{NumFmtID: 0}, {NumFmtID: 164}, {NumFmtID: 0}}, NumFmts: map[int]string{164: `#,##0.00;[Red](#,##0.00);"-"`}}
 			wide, err := wb.ReadRowsContext(context.Background(), idx, 0, 1, tc.cols[0], tc.cols[len(tc.cols)-1])
 			if err != nil {
@@ -71,7 +71,7 @@ func TestReadRowsSparseContextGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 	idx.XMLPath = path
-	idx.ResidentRows = []RowOffset{{Number: 1, Start: 0, End: int64(len(`<row r="1"><c r="A1"><v>3</v></c></row>`))}}
+	idx.resident = []RowOffset{{Number: 1, Start: 0, End: int64(len(`<row r="1"><c r="A1"><v>3</v></c></row>`))}}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := w.ReadRowsSparseContext(ctx, idx, []int{0}, []int{1})

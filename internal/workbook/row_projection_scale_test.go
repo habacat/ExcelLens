@@ -24,9 +24,9 @@ func TestRowProjectionMillionIndexedRecords(t *testing.T) {
 	}
 	const count = 1_000_000
 	const resident = 64 << 10 // lower developer budget deliberately exercises disk mapping
-	idx := &SheetIndex{MaxRow: count, MaxCol: 1, ResidentRows: make([]RowOffset, count)}
-	for i := range idx.ResidentRows {
-		idx.ResidentRows[i].Number = i + 1
+	idx := &SheetIndex{MaxRow: count, MaxCol: 1, RowIndex: NewRowIndex(make([]RowOffset, count))}
+	for i := range idx.resident {
+		idx.resident[i].Number = i + 1
 	}
 	positions := rand.New(rand.NewSource(20261115)).Perm(count)
 	root := t.TempDir()

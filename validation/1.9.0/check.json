@@ -7,32 +7,32 @@
     {
       "name": "project metadata, documentation and package boundaries",
       "result": "PASS",
-      "durationMs": 2212
+      "durationMs": 4733
     },
     {
       "name": "offline vendored dependency resolution",
       "result": "PASS",
-      "durationMs": 3848
+      "durationMs": 4995
     },
     {
       "name": "Go tests",
       "result": "PASS",
-      "durationMs": 101491
+      "durationMs": 123955
     },
     {
       "name": "Go vet",
       "result": "PASS",
-      "durationMs": 8384
+      "durationMs": 5599
     },
     {
       "name": "JavaScript syntax and regression tests",
       "result": "PASS",
-      "durationMs": 44813
+      "durationMs": 50428
     },
     {
       "name": "generated function catalog",
       "result": "PASS",
-      "durationMs": 8389
+      "durationMs": 757
     }
   ]
 }

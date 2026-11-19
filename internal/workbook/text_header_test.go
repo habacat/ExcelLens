@@ -50,7 +50,7 @@ func TestTXTHeaderRecognitionUsesParsedRecordsAndKeepsAllRows(t *testing.T) {
 			}, nil); err != nil {
 				t.Fatal(err)
 			}
-			if len(idx.ResidentRows) != len(reference) {
+			if idx.RowCount() != len(reference) {
 				t.Fatal("header detection changed source row count")
 			}
 			for i, fields := range reference {

@@ -70,7 +70,7 @@ func main() {
 		panic(err)
 	}
 	stats("index", start)
-	fmt.Printf("indexed_rows=%d maxRow=%d maxCol=%d\n", idx.RowCount(), idx.MaxRow, idx.MaxCol)
+	fmt.Printf("indexed_rows=%d maxRow=%d maxCol=%d mapped=%t\n", idx.RowCount(), idx.MaxRow, idx.MaxCol, idx.RowsMapped())
 	if *digestFlag {
 		h := sha256.New()
 		fmt.Fprintf(h, "%s|%d|%d|%d|%s\n", idx.Dimension, idx.MaxRow, idx.MaxCol, idx.XMLSize, meta.Name)
@@ -144,19 +144,12 @@ func main() {
 	}
 
 	if *search {
-		piece := workbook.SheetIndex{SourceFormat: idx.SourceFormat, SheetPath: idx.SheetPath,
-			XMLPath: idx.XMLPath, IndexPath: idx.IndexPath, Dimension: idx.Dimension,
-			MaxRow: idx.MaxRow, MaxCol: idx.MaxCol, XMLSize: idx.XMLSize,
-			SharedAnchors: idx.SharedAnchors, HyperlinkStart: idx.HyperlinkStart,
-			ResidentRows: make([]workbook.RowOffset, min(idx.RowCount(), 4000))}
-		for i := range piece.ResidentRows {
-			piece.ResidentRows[i] = idx.RowAt(i)
-		}
+		piece := idx.FirstRows(4000)
 		start = time.Now()
-		r, _, err := wb.SearchSheet(&piece, meta.Name, "__bench__never__matches__", "value", 20, nil, nil)
+		r, _, err := wb.SearchSheet(piece, meta.Name, "__bench__never__matches__", "value", 20, nil, nil)
 		if err != nil {
 			panic(err)
 		}
-		stats(fmt.Sprintf("search_4000(matches_%d)", len(r)), start)
+		stats(fmt.Sprintf("search_%d(matches_%d)", piece.RowCount(), len(r)), start)
 	}
 }

@@ -15,7 +15,12 @@ func TestBillionthRowCellAndFormulaKeepOriginalTextAndCoordinates(t *testing.T) 
 	idx := wb.GetCachedIndex(meta.Path)
 	// Move only the final index coordinate in this tiny sparse fixture. This
 	// exercises HTTP addressing without claiming a billion-record load test.
-	idx.ResidentRows[len(idx.ResidentRows)-1].Number = 1_000_000_000
+	offsets := make([]workbook.RowOffset, idx.RowCount())
+	for i, row := range idx.RowOffsets() {
+		offsets[i] = row
+	}
+	offsets[len(offsets)-1].Number = 1_000_000_000
+	idx.RowIndex = workbook.NewRowIndex(offsets)
 	idx.MaxRow = 1_000_000_000
 	idx.Dimension = "A1:B1000000000"
 	query := "/api/cell?sheet=" + url.QueryEscape(meta.Name) + "&ref=A1000000000"

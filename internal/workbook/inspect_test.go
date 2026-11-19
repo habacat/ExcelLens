@@ -25,7 +25,7 @@ func testInspectWorksheet(t *testing.T) (*Workbook, *SheetIndex) {
 	if err := os.WriteFile(file, []byte(xmlData), 0600); err != nil {
 		t.Fatal(err)
 	}
-	return &Workbook{}, &SheetIndex{XMLPath: file, XMLSize: int64(len(xmlData)), ResidentRows: rows, SharedAnchors: anchors, Dimension: dim, MaxRow: maxR, MaxCol: maxC}
+	return &Workbook{}, &SheetIndex{XMLPath: file, XMLSize: int64(len(xmlData)), RowIndex: NewRowIndex(rows), SharedAnchors: anchors, Dimension: dim, MaxRow: maxR, MaxCol: maxC}
 }
 func TestInspectSpecialMatchesAndBlankRows(t *testing.T) {
 	wb, idx := testInspectWorksheet(t)

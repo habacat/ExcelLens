@@ -23,7 +23,7 @@ func FuzzRowProjectionMatchesLiteralPermutation(f *testing.F) {
 		original := make([]bool, n)
 		positions := make([]int, n)
 		for i := 0; i < n; i++ {
-			idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: i*2 + 1})
+			idx.resident = append(idx.resident, RowOffset{Number: i*2 + 1})
 			positions[i] = i
 			original[i] = get(i+3)&1 != 0
 			if original[i] {

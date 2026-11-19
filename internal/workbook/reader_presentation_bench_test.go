@@ -27,7 +27,7 @@ func BenchmarkInlinePresentationViewport(b *testing.B) {
 				fmt.Fprintf(&source, `<c r="%s%d" t="inlineStr"><is>%s</is></c>`, ColumnName(col), row, body)
 			}
 			source.WriteString(`</row>`)
-			idx.ResidentRows = append(idx.ResidentRows, RowOffset{Number: row, Start: int64(start), End: int64(source.Len())})
+			idx.resident = append(idx.resident, RowOffset{Number: row, Start: int64(start), End: int64(source.Len())})
 		}
 		idx.XMLSize = int64(source.Len())
 		if err := os.WriteFile(idx.XMLPath, []byte(source.String()), 0600); err != nil {

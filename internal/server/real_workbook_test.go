@@ -46,8 +46,8 @@ func TestRealWorkbookReadonlySmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("sheet %s indexed: rows=%d maxcol=%d duration=%s", meta.Name, len(idx.ResidentRows), idx.MaxCol, time.Since(start))
-	if len(idx.ResidentRows) == 0 {
+	t.Logf("sheet %s indexed: rows=%d maxcol=%d duration=%s", meta.Name, idx.RowCount(), idx.MaxCol, time.Since(start))
+	if idx.RowCount() == 0 {
 		t.Fatal("sheet has no rows")
 	}
 	first := featureCall(t, a, "GET", "/api/sheet?sheet="+url.QueryEscape(meta.Name)+"&row=1&limit=3&col=1&cols=4", "")
