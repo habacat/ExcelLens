@@ -6,13 +6,28 @@ const context={window:{}};vm.createContext(context);
 vm.runInContext(fs.readFileSync(__dirname+'/multiselection.js','utf8'),context);
 const S=context.window.ExcelLensMultiSelection;
 const {test}=require('node:test');
-test('range seams use source or sorted visual positions and include a selected merged anchor',()=>{
-  const range=S.rectangle(S.cell(2,2),S.cell(4,4));
-  for(const [row,col,expected]of [[2,2,25],[2,3,17],[3,3,16],[4,4,22],[1,3,0]])assert.equal(S.borderMask([range],row,col,row),expected);
-  const sorted=S.rectangle(S.cell(100,2,7),S.cell(5,4,9),true);
-  assert.equal(S.borderMask([sorted],998,3,8,true),16);assert.equal(S.borderMask([sorted],5,4,9,true),22);
-  assert.equal(S.borderMask([range],2,2,2,false,{row:2,col:2,endRow:4,endCol:4}),31);
-  assert.equal(S.borderMask([],2,2,2),0);
+test('a sorted range crossing frozen rows keeps pinned and body coordinates distinct',()=>{
+  const range=S.rectangle(S.cell(2,2,2), S.cell(98,4,3),true);
+  assert.equal(S.contains(range,1,3,1,true,2),false);
+  for(const [row,visual] of [[2,2],[83,1],[98,3]])assert.equal(S.contains(range,row,3,visual,true,2),true);
+  assert.equal(S.contains(range,77,3,4,true,2),false);
+});
+test('frozen and scrolled panes draw only the actual edges and one endpoint',()=>{
+  const layer={children:[],appendChild(node){this.children.push(node);return node;},get lastElementChild(){return this.children.at(-1);}};
+  const document={createElement:()=>({style:{},remove(){layer.children.splice(layer.children.indexOf(this),1);}})};
+  const paint=vm.runInNewContext(fs.readFileSync(__dirname+'/range-frame.js','utf8')+';window.ExcelLensRangeFrame.paint',{window:{},document});
+  const view={width:220,height:120,left:15,top:10,rowHead:20,header:20,frozenWidth:40,frozenHeight:20,
+    colLeft:c=>(c-1)*40,rowBounds:r=>[(r-1)*20,r*20]};
+  const area=S.rectangle(S.cell(1,1),S.cell(5,4));
+  paint(layer,[area],view);
+  const frames=layer.children.filter(n=>n.className==='range-frame');
+  assert.equal(frames.length,4);assert.equal(layer.children.length,5);
+  assert.ok(frames[0].style.cssText.includes('border-width:var(--range-stroke) 0 0 var(--range-stroke)'));
+  assert.ok(frames[3].style.cssText.includes('border-width:0 var(--range-stroke) var(--range-stroke) 0'));
+  assert.ok(layer.lastElementChild.style.cssText.startsWith('left:165px;top:110px;'));
+  paint(layer,[area],{...view, width:110, height:80});
+  assert.ok(layer.children.every(n=>n.className==='range-frame'));
+  paint(layer,[],view);assert.equal(layer.children.length,0);
 });
 const a=S.cell(1,2),b=S.cell(3,4),r=S.rectangle(a,b);
 assert.equal(S.contains(r,2,3,0),true);

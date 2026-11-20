@@ -82,7 +82,7 @@ func (a pivotAggregate) statistic(method string) (float64, bool) {
 		return a.product, true
 	case "countNums":
 		return float64(a.numbers), true
-	case "stdDev", "stdDevP", "var", "varP":
+	case "stdDev", "stdDevP", "stdDevp", "var", "varP", "varp":
 		n := a.numbers
 		if method == "stdDev" || method == "var" {
 			n--

@@ -123,7 +123,8 @@ var cacheDefinitionElements = map[string][]string{
 	"calculatedItems":      {"calculatedItem"}, "calculatedItem": {"pivotArea"}, "pivotArea": {"references"}, "references": {"reference"}, "reference": {"x"},
 	"cacheSource": {"worksheetSource"},
 	"cacheFields": {"cacheField"},
-	"cacheField":  {"sharedItems"},
+	"cacheField":  {"sharedItems", "fieldGroup"},
+	"fieldGroup":  {"rangePr", "groupItems"}, "groupItems": {"s", "n", "d", "m"},
 	"sharedItems": {"s", "n", "b", "d", "e", "m"},
 }
 
@@ -226,7 +227,7 @@ func (p *xlsxPackage) checkPivotDefinition(ctx context.Context, part string, dat
 var pivotTableElements = map[string][]string{
 	"":                     {"pivotTableDefinition"},
 	"pivotTableDefinition": {"location", "pivotFields", "rowFields", "rowItems", "colFields", "colItems", "pageFields", "dataFields", "pivotTableStyleInfo", "filters", "chartFormats"},
-	"filters":              {"filter"}, "filter": {"autoFilter"}, "autoFilter": {"filterColumn"}, "filterColumn": {"top10", "customFilters"}, "customFilters": {"customFilter"},
+	"filters":              {"filter"}, "filter": {"autoFilter"}, "autoFilter": {"filterColumn"}, "filterColumn": {"top10", "customFilters", "filters", "dynamicFilter"}, "customFilters": {"customFilter"},
 	"chartFormats": {"chartFormat"}, "chartFormat": {"pivotArea"}, "pivotArea": {"references"}, "references": {"reference"}, "reference": {"x"},
 	"pivotFields": {"pivotField"},
 	"pivotField":  {"items"},
@@ -252,6 +253,9 @@ func (p *xlsxPackage) checkPivotTable(ctx context.Context, part string, data []b
 	err := walkXML(ctx, data, func(e xmlEvent) error {
 		if len(e.stack) >= 2 && e.stack[1] == (xml.Name{Space: mainNS, Local: "extLst"}) {
 			return checkKnownExtension(e, &extension, pivotExtension, pivotDefaultLayoutExtension)
+		}
+		if len(e.stack) >= 4 && e.stack[1].Local == "filters" && e.stack[2].Local == "filter" && e.stack[3] == (xml.Name{Space: mainNS, Local: "extLst"}) {
+			return checkExtension(e, 4, pivotDateFilterExtension)
 		}
 		if len(e.stack) >= 4 && e.stack[2].Local == "pivotField" && e.stack[3] == (xml.Name{Space: mainNS, Local: "extLst"}) {
 			return checkExtension(e, 4, pivotFieldExtension)

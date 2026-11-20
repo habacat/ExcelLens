@@ -77,6 +77,19 @@ def native_operation(book, change):
             else:
                 dest.Value2 = float(value['raw']) if value['kind'] == 'number' else value['raw']
         return
+    if kind == 'resizeTable':
+        table = sheet.ListObjects(change['name'])
+        area = sheet.Range(change['range'])
+        # Resize's COM parameter excludes the total when shrinking.
+        if table.ShowTotals and area.Row + area.Rows.Count < table.Range.Row + table.Range.Rows.Count:
+            area = sheet.Range(area.Cells(1, 1), area.Cells(area.Rows.Count - 1, area.Columns.Count))
+        table.Resize(area)
+        return
+    if kind in ('cutRange','copyRange'):
+        target = book.Worksheets(change['destinationSheet']).Range(change['destination'])
+        area = sheet.Range(change['range'])
+        (area.Cut if kind == 'cutRange' else area.Copy)(Destination=target)
+        return
     if kind in ('fixedArray', 'spillFormula', 'clearArray'):
         region = sheet.Range(change['range'])
         anchor = region.Cells(1, 1)

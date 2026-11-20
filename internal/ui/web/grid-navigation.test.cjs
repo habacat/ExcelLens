@@ -10,6 +10,35 @@ function section(first,last){
   return app.slice(start,end);
 }
 
+test('a clickable first preview paints the same single-cell frame as the indexed sheet',()=>{
+  const state={previewOnly:true,indexReady:false,selected:{row:3,col:2},selectedVisualIndex:3};
+  const classes=new Set(),frames=[];
+  const layer={childElementCount:1,parentElement:{classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);}}}};
+  const grid={clientWidth:500,clientHeight:300,scrollLeft:0};
+  const context={S:state,$:id=>id==='grid'?grid:layer,
+    window:{ExcelLensMultiSelection:{areas:()=>[]},ExcelLensRangeFrame:{paint:(_,areas)=>frames.push(JSON.stringify(areas))}},
+    activeMerge:()=>null,frozenPanes:{effective:()=>({rows:0,cols:0})},getVirtualScrollTop:()=>0,headerHeight:()=>20,
+    ROW_HEAD:28,colLeft:col=>(col-1)*64,sourceRowTop:row=>(row-1)*20};
+  const paint=vm.runInNewContext(section('function paintRangeFrames(', 'function decorateGridCell(')+';paintRangeFrames',context);
+  paint();
+  assert.ok(classes.has('has-cell-selection'));
+  assert.deepEqual(JSON.parse(frames[0]),[{row1:3,col1:2,row2:3,col2:2,visual1:3,visual2:3}]);
+  state.previewOnly=false;state.indexReady=true;paint();
+  assert.equal(frames[1],frames[0]);
+  state.indexReady=false;paint();
+  assert.equal(frames[2],'[]');assert.ok(!classes.has('has-cell-selection'));
+});
+
+test('navigation keeps wide cells and tall rows visible between frozen headers and the viewport edge',()=>{
+  const reveal=vm.runInNewContext(section('function revealCellOffset(', 'function scrollCellIntoView(')+';revealCellOffset');
+  for(const offset of [0,578]) {
+    assert.equal(reveal(offset,352,26,162,384,384),136);
+    assert.equal(reveal(offset,420,120,200,500,1000),80);
+  }
+  assert.equal(reveal(0,360,80,300,200,200),220);
+  assert.equal(reveal(75,100,100,140,64,64),75);
+});
+
 function harness({row=6,visual=2,pinned=0,rows=[[1,4],[2,6],[6,3]],total=6}={}){
   const state={book:'book',workbookKey:'key',sheet:'账表',sheetEpoch:1,indexReady:true,
     filtered:true,filterId:'sort',filterTotal:total,rowView:{id:'view'},
@@ -138,6 +167,7 @@ test('setting the active cell updates the selection outline inside the frozen pa
   const first=cell('A14'),second=cell('B14');
   const S={selected:{ref:'A14',row:14,col:1},lastHighlight:{},renderedRows:new Map()};
   const ctx={S,selectionQuick:null,transposeCenter:null,cellExplanation:null,profileCenter:null,
+    paintRangeFrames(){},
     window:{ExcelLensMultiSelection:{areas:()=>[]}},
     document:{querySelectorAll:selector=>selector==='.grid-region .pinned-cell'?[first,second]:[]}};
   vm.runInNewContext(section('function applySelectionClasses(','function selectCell(')+

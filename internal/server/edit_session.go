@@ -41,15 +41,18 @@ func openEditOutputs() (*editfile.Outputs, error) {
 }
 
 func (a *App) documentEditLayout(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile) (editfile.Layout, error) {
-	if layout.XLSX == nil || layout.XLSX.GridEditing && (len(layout.XLSX.Pivots) == 0 || layout.XLSX.PivotAxesReady) && (doc.Semantics == editdoc.CurrentSemantics || doc.Structures > 0) {
+	if layout.XLSX == nil {
 		return layout, nil
 	}
 	a.mu.RLock()
-	cached, key := a.legacyEditLayout, a.legacyEditBinding
+	cached, key := a.checkedEditLayout, a.editLayoutBinding
 	a.mu.RUnlock()
-	binding := doc.Binding + "/" + doc.Base.Source.Book
+	binding := doc.Binding + "/" + doc.Base.Source.Stamp
 	if key == binding && cached.GridEditing {
 		layout.XLSX = &cached
+		return layout, nil
+	}
+	if layout.XLSX.GridEditing && (len(layout.XLSX.Pivots) == 0 || layout.XLSX.PivotAxesReady && layout.XLSX.PivotMeasuresReady && layout.XLSX.PivotDatesReady) && (doc.Semantics >= editdoc.GridLayoutSemantics || doc.Structures > 0) {
 		return layout, nil
 	}
 	if f == nil {
@@ -65,7 +68,7 @@ func (a *App) documentEditLayout(ctx context.Context, doc *editdoc.Document, lay
 		return layout, err
 	}
 	a.mu.Lock()
-	a.legacyEditLayout, a.legacyEditBinding = updated, binding
+	a.checkedEditLayout, a.editLayoutBinding = updated, binding
 	a.mu.Unlock()
 	layout.XLSX = &updated
 	return layout, nil
@@ -137,6 +140,11 @@ func (a *App) startEdit(ctx context.Context, store *checkpoint.Store, book strin
 	}
 	base := editdoc.Base{Source: checkpoint.Source{Path: path, Book: book, Fingerprint: wb.Fingerprint, Format: format, Source: format, Stamp: proof}, Name: workbookDisplayName(wb), Layout: data}
 	entry, err := retryCheckpointBusy(ctx, func() (editdoc.Entry, error) { return editdoc.Create(ctx, store, base) })
+	if err == nil && layout.XLSX != nil {
+		a.mu.Lock()
+		a.checkedEditLayout, a.editLayoutBinding = *layout.XLSX, entry.Binding+"/"+proof
+		a.mu.Unlock()
+	}
 	return entry.Key, err
 }
 
@@ -147,10 +155,11 @@ func (a *App) editState(doc *editdoc.Document, layout editfile.Layout) (editStat
 		out.Encoding = l.Encoding
 		out.Sheets = []editSheet{{Name: l.Sheet, FirstRow: 1, FirstCol: 1, Rows: l.Rows, Cols: l.Columns}}
 	} else {
+		out.Tables = layout.XLSX.TableRanges()
 		out.Structured = layout.XLSX.Structured
 		out.ChartSheets, out.Pivots = layout.XLSX.ChartSheets, layout.XLSX.Pivots
 		for _, s := range layout.XLSX.Sheets {
-			out.Sheets = append(out.Sheets, editSheet{Name: s.Name, FirstRow: 1, FirstCol: 1, Rows: formats.ExcelRows, Cols: formats.ExcelColumns, ReadOnly: s.ReadOnly})
+			out.Sheets = append(out.Sheets, editSheet{Name: s.Name, FirstRow: 1, FirstCol: 1, Rows: formats.ExcelRows, Cols: formats.ExcelColumns, ReadOnly: s.ReadOnly, SourceRules: s.Rules > 0 || layout.XLSX.Native})
 		}
 	}
 	outputs, err := openEditOutputs()

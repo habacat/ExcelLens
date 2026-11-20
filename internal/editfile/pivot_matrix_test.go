@@ -126,3 +126,100 @@ func TestPivotPageOwnershipAndSchemaRebinding(t *testing.T) {
 		t.Fatalf("%s %v", out, err)
 	}
 }
+
+func TestPivotMeasureReorderKeepsFilterAndOriginalXML(t *testing.T) {
+	raw := []byte(`<pivotTableDefinition xmlns="` + mainNS + `"><dataFields count="3" xmlns:e="urn:test">
+		<dataField name="Total" fld="1"/><dataField name="Earlier" fld="1" subtotal="average"/>
+		<dataField name="Later" fld="1" subtotal="average" numFmtId="176" baseField="0"><extLst><e:format/></extLst></dataField>
+	</dataFields></pivotTableDefinition>`)
+	var table pivotTableXML
+	if err := xml.Unmarshal(raw, &table); err != nil {
+		t.Fatal(err)
+	}
+	plan := pivotPlan{table: table, rows: []int{0}, valueFilters: []pivotFilter{{field: 0, spec: editdoc.PivotValueFilter{Kind: "topCount", Measure: 2, Value: 1}}}}
+	fields := []cacheFieldXML{{Name: "Category"}, {Name: "Amount"}}
+	later, total := 2, 0
+	change := &editdoc.Structure{Kind: "configurePivot", Measures: []editdoc.PivotMeasure{
+		{Field: "Amount", Caption: "Peak & high", Aggregate: "max", SourceIndex: &later},
+		{Field: "Amount", Caption: "Total", Aggregate: "sum", SourceIndex: &total},
+	}}
+	if err := plan.configureMeasures(fields, change, &editdoc.PivotAxes{Rows: []string{"Category"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.configureValueFilter(fields, change); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.valueFilters) != 1 || plan.valueFilters[0].spec.Measure != 0 {
+		t.Fatalf("filter after reordering: %+v", plan.valueFilters)
+	}
+	out, err := plan.writeMeasures(t.Context(), raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved pivotTableXML
+	if err := xml.Unmarshal(out, &saved); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(saved.DataFields, plan.measures) || saved.DataFields[0].Number != "176" || !strings.Contains(string(out), `baseField="0"`) || !strings.Contains(string(out), `xmlns:e="urn:test"`) || !strings.Contains(string(out), "<e:format/>") {
+		t.Fatalf("measure lost original properties: %s", out)
+	}
+	plan.valueFilters = []pivotFilter{{field: 0, spec: editdoc.PivotValueFilter{Measure: 1}}}
+	if err := plan.configureValueFilter(fields, change); err != nil || len(plan.valueFilters) != 0 {
+		t.Fatalf("removed measure retained filter: %+v, %v", plan.valueFilters, err)
+	}
+}
+
+func TestDateGroupingKeepsValuesOnTheirSideOfGroupedFields(t *testing.T) {
+	s := pivotSchema{names: []string{"Date", "Team", "Month", "Year"}, newForOld: []int{0, 1}}
+	group := dateReplacement{base: 0, old: map[int]bool{0: true}, names: []string{"Year", "Month"}}
+	for pos := range 3 {
+		axis := slices.Insert([]pivotAxisField{{X: 0}, {X: 1}}, pos, pivotAxisField{X: pivotValuesField})
+		got, applied, position := group.axis(axis, s, true)
+		if !applied || !slices.Equal(got, []string{"Year", "Month", "Team"}) || position != []int{0, 2, 3}[pos] {
+			t.Fatalf("position %d became %d in %v", pos, position, got)
+		}
+	}
+}
+
+func TestUngroupSingleLevelStoredOnPhysicalDateField(t *testing.T) {
+	base := 0
+	fields := []cacheFieldXML{{Name: "Date", Group: &cacheDateGroup{Base: &base, Range: &cacheDateRange{Unit: "months"}}}}
+	header := editdoc.Address{Sheet: "Source", Row: 1, Col: 1}
+	values := objectValues{book: &CalculationBook{}, calculation: &Calculation{}, overlay: map[editdoc.Address]editdoc.Value{header: {Kind: "text", Raw: "Date"}}}
+	source := pivotSource{sheet: "Source", area: cellRect{1, 1, 3, 1}}
+	request := &editdoc.PivotDateGroup{Field: "Date"}
+	_, dates, err := planDateSchema(values, source, fields, request, true)
+	if err != nil || dates.replacement == nil || len(dates.levels) != 0 {
+		t.Fatalf("ungroup existing field: %+v, %v", dates, err)
+	}
+	fields[0].Group = nil
+	if _, _, err = planDateSchema(values, source, fields, request, true); err == nil {
+		t.Fatal("ungroup accepted a raw date")
+	}
+}
+
+func TestPivotNumberFormatMovesAcrossBlankIntersections(t *testing.T) {
+	const styles = `<styleSheet xmlns="` + mainNS + `"><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="176"/></cellXfs></styleSheet>`
+	p := xlsxPackage{styles: 2}
+	formats, err := measureFormats([]pivotDataField{{}, {Number: "176"}}, []pivotDataField{{Number: "176"}, {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	left := editdoc.Address{Sheet: "Report", Row: 2, Col: 1}
+	right := editdoc.Address{Sheet: "Report", Row: 2, Col: 2}
+	formats.output[left] = formats.byMeasure[0]
+	plan := pivotPlan{sheet: left.Sheet, old: cellRect{1, 1, 2, 2}, formats: formats}
+	plan.table.Area.Header = 1
+	targets := &sheetTargets{rows: []rowTarget{{row: 2, cells: []cellTarget{
+		{address: left, original: sheetCell{value: editdoc.Value{Kind: "blank"}}},
+		{address: right, original: sheetCell{value: editdoc.Value{Kind: "number", Raw: "12", Style: "1"}}},
+	}}}}
+	edits := map[editdoc.Address]editdoc.Value{left: {Kind: "blank"}, right: {Kind: "number", Raw: "12"}}
+	updates := map[string][]byte{"xl/styles.xml": []byte(styles)}
+	if err := p.applyPivotFormats(t.Context(), left.Sheet, []pivotPlan{plan}, targets, edits, updates); err != nil {
+		t.Fatal(err)
+	}
+	if edits[left].Style != "1" || edits[right].Style != "0" || edits[left].Kind != "blank" || string(updates["xl/styles.xml"]) != styles {
+		t.Fatalf("formatted blank or old column: %+v", edits)
+	}
+}

@@ -4,6 +4,7 @@ package workbook
 
 import (
 	"math"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -15,10 +16,30 @@ var sourceCreateFont = sourceGDI.NewProc("CreateFontW")
 var sourceSelectObject = sourceGDI.NewProc("SelectObject")
 var sourceDeleteObject = sourceGDI.NewProc("DeleteObject")
 var sourceTextExtent = sourceGDI.NewProc("GetTextExtentPoint32W")
+var metricsUser32 = syscall.NewLazyDLL("user32.dll")
+var sourceSystemDPI = metricsUser32.NewProc("GetDpiForSystem")
+var sourceThreadDPI = metricsUser32.NewProc("SetThreadDpiAwarenessContext")
+
+func installedFontDPI() float64 {
+	if sourceSystemDPI.Find() != nil || sourceThreadDPI.Find() != nil {
+		return 96
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	previous, _, _ := sourceThreadDPI.Call(^uintptr(1)) // DPI_AWARENESS_CONTEXT_SYSTEM_AWARE
+	if previous != 0 {
+		defer sourceThreadDPI.Call(previous)
+	}
+	dpi, _, _ := sourceSystemDPI.Call()
+	if dpi < 48 || dpi > 768 {
+		return 96
+	}
+	return float64(dpi)
+}
 
 // Excel column units use the maximum digit width of the Normal style font,
-// measured at 96 DPI. A memory DC reads installed font metrics without opening
-// a window or requiring Office/CGO. Layout remains in unzoomed CSS pixels.
+// measured at the system's actual raster size. Normalize the rounded glyph
+// width to CSS pixels only after measurement, as Excel does at 125% DPI.
 func measureSourceDigits(normal VisualStyle) float64 {
 	name, points := normal.FontName, normal.FontSize
 	if name == "" || !(points > 0 && points < 200) {
@@ -33,7 +54,8 @@ func measureSourceDigits(normal VisualStyle) float64 {
 		return 7
 	}
 	defer sourceDeleteDC.Call(dc)
-	height := int32(-math.Round(points * 96 / 72))
+	dpi := installedFontDPI()
+	height := int32(-math.Round(points * dpi / 72))
 	weight, italic := uintptr(400), uintptr(0)
 	if normal.Bold {
 		weight = 700
@@ -65,5 +87,5 @@ func measureSourceDigits(normal VisualStyle) float64 {
 	if maximum < 1 || maximum > 100 {
 		return 7
 	}
-	return float64(maximum)
+	return float64(maximum) * 96 / dpi
 }

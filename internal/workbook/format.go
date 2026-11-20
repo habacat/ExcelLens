@@ -1,6 +1,7 @@
 package workbook
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -87,6 +88,16 @@ func ColumnName(n int) string {
 // entirely or reference a missing XF. A missing style must not leak "-0".
 // Raw cache bytes are retained in CellData.Raw for lossless audit inspection.
 func (w *Workbook) formatNumeric(raw string, style int) string {
+	id := 0
+	if style >= 0 && style < len(w.Styles) {
+		id = w.Styles[style].NumFmtID
+	}
+	return w.FormatNumericID(raw, id)
+}
+
+// FormatNumericID also serves newly entered formulas whose built-in number
+// format has no cell XF in the source workbook yet.
+func (w *Workbook) FormatNumericID(raw string, fmtID int) string {
 	if raw == "" {
 		return raw
 	}
@@ -94,7 +105,7 @@ func (w *Workbook) formatNumeric(raw string, style int) string {
 	// reporting sheets. ExcelLens preserves its exact numeric source spelling,
 	// including long identifiers; the only normalization needed is an exact
 	// signed/decimal zero. Avoid converting every ordinary number to float64.
-	if style < 0 || style >= len(w.Styles) || w.Styles[style].NumFmtID == 0 {
+	if fmtID == 0 {
 		if isDecimalZero(raw) {
 			if v, err := strconv.ParseFloat(raw, 64); err == nil && v == 0 {
 				return "0"
@@ -117,10 +128,6 @@ func (w *Workbook) formatNumeric(raw string, style int) string {
 		v = 0
 		raw = "0"
 	}
-	if style < 0 || style >= len(w.Styles) {
-		return raw
-	}
-	fmtID := w.Styles[style].NumFmtID
 	format := w.NumFmts[fmtID]
 	if display, ok := formatDecimalDisplay(raw, format, fmtID); ok {
 		return display
@@ -786,6 +793,15 @@ func firstFormatToken(format string, wanted byte) int {
 	return -1
 }
 
+// GridShortDate supplies the regional spelling of Excel's built-ins to the
+// grid. Exported display text and source inspection retain their stable form.
+func (w *Workbook) GridShortDate(id int) string {
+	if (id == 14 || id == 22) && w.NumFmts[id] == "" && localShortDate != "yyyy-mm-dd" {
+		return localShortDate
+	}
+	return ""
+}
+
 func formatExcelDate(serial float64, date1904 bool, fmtID int) string {
 	if serial < 0 || serial > 2958465 {
 		return strconv.FormatFloat(serial, 'f', -1, 64)
@@ -819,11 +835,13 @@ func formatExcelDate(serial float64, date1904 bool, fmtID int) string {
 		}
 		return t.Format("2006-01-02 15:04")
 	case 45:
-		return t.Format("15:04")
+		return t.Format("04:05")
 	case 46:
-		return t.Format("15:04:05")
+		seconds := int64(math.Round(serial * 86400))
+		return fmt.Sprintf("%d:%02d:%02d", seconds/3600, seconds/60%60, seconds%60)
 	case 47:
-		return t.Format("15:04:05.000")
+		tenths := int64(math.Round(serial * 864000))
+		return fmt.Sprintf("%02d:%02d.%d", tenths/600%60, tenths/10%60, tenths%10)
 	default:
 		if fakeLeapDay {
 			return "1900-02-29"

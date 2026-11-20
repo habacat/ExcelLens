@@ -102,12 +102,8 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 		return nil, err
 	}
 	if layout.Native {
-		var expanded uint64
-		for _, entry := range p.zip.File {
-			expanded += entry.UncompressedSize64
-		}
-		if expanded > formats.EditOfficeLocalScanBytes {
-			return nil, ErrCalcCapacity
+		if err = p.checkCalculationSize(); err != nil {
+			return nil, err
 		}
 		p.layout.Native, p.layout.Structured = true, true
 	}
@@ -115,9 +111,6 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 		return nil, err
 	}
 	p.layout = layout
-	if p.displayPrecision || p.calendarErr != nil {
-		return nil, ErrCalcSettings
-	}
 	if layout.Native {
 		if err = p.inspectOfficeParts(ctx); err != nil {
 			return nil, err
@@ -126,6 +119,33 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 		if err = p.inspectLinkedParts(ctx, true); err != nil {
 			return nil, err
 		}
+	}
+	b, err := p.buildCalculationBook(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return b, f.Check()
+}
+
+func (p *xlsxPackage) checkCalculationSize() error {
+	var expanded uint64
+	for _, entry := range p.zip.File {
+		size := entry.UncompressedSize64
+		if raw, ok := p.revisedParts[entry.Name]; ok {
+			size = uint64(len(raw))
+		}
+		expanded += size
+	}
+	if expanded > formats.EditOfficeLocalScanBytes {
+		return ErrCalcCapacity
+	}
+	return nil
+}
+
+func (p *xlsxPackage) buildCalculationBook(ctx context.Context) (*CalculationBook, error) {
+	layout := p.layout
+	if p.displayPrecision || p.calendarErr != nil {
+		return nil, ErrCalcSettings
 	}
 	b := &CalculationBook{
 		source: xlsxPackage{layout: layout, names: p.names},
@@ -230,7 +250,7 @@ func NewCalculationBook(ctx context.Context, f *workbook.EditSourceFile, layout 
 			}
 		}
 	}
-	return b, f.Check()
+	return b, ctx.Err()
 }
 
 // A generator can save a foreign rounding result even for a formula with
@@ -283,9 +303,16 @@ func (b *CalculationBook) compile(ctx context.Context, a editdoc.Address, raw st
 	if err != nil {
 		return calculator.WorksheetFormula{}
 	}
-	return f.BindWorksheet(a.Row, a.Col, tag.kind == "array", func(name string) calculator.WorksheetName {
+	return b.bind(f, a, tag.kind == "array")
+}
+
+func (b *CalculationBook) bind(f calculator.EditableFormula, a editdoc.Address, array bool) calculator.WorksheetFormula {
+	return f.BindWorksheet(a.Sheet, a.Row, a.Col, array, func(name string) calculator.WorksheetName {
 		if ref, _, ok := b.source.layout.tableReference(name, a); ok {
 			return calculator.WorksheetName{Reference: &ref}
+		}
+		if code := b.source.layout.tableReferenceError(name, a); code != "" {
+			return calculator.WorksheetName{Constant: calculator.FormulaValue{Kind: "error", Text: code}}
 		}
 		n, ok := b.source.names[nameKey{a.Sheet, name}]
 		if !ok {
@@ -328,6 +355,7 @@ type Calculation struct {
 	ArrayMembers map[editdoc.Address]editdoc.Value
 	Visits       int
 	patches      map[editdoc.Address]editdoc.Value
+	programs     map[editdoc.Address]calculator.WorksheetFormula
 }
 
 func (c *Calculation) GeneratedStatus(a editdoc.Address) string {
@@ -371,6 +399,7 @@ type calcRevision struct {
 	waiting       map[editdoc.Address]bool
 	typed         map[editdoc.Address]calculator.FormulaValue
 	positions     map[calculator.WorksheetReference][]editdoc.Address
+	aggregates    map[calculator.WorksheetReference]calculator.RangeValue
 	positionCount int
 	resultBytes   int
 	arrays        *arrayPass
@@ -392,44 +421,28 @@ func compareCalcAddress(a, b editdoc.Address) int {
 
 // Calculate takes ownership of an immutable document snapshot. Previous must
 // belong to the same base and document; a cold restart can always pass nil.
-func (b *CalculationBook) calculatePass(ctx context.Context, patches map[editdoc.Address]editdoc.Value, previous *Calculation, arrays *arrayPass) (*Calculation, error) {
+func (b *CalculationBook) calculatePass(ctx context.Context, patches map[editdoc.Address]editdoc.Value, programs map[editdoc.Address]calculator.WorksheetFormula, previous *Calculation, arrays *arrayPass) (*Calculation, error) {
 	s := &calcRevision{
 		ctx: calculator.WithDateSystem(ctx, b.date1904), book: b, patches: patches, arrays: arrays,
-		added: map[calcColumn][]int{}, programs: map[editdoc.Address]calculator.WorksheetFormula{},
+		added: map[calcColumn][]int{}, programs: programs,
 		busy: map[editdoc.Address]bool{}, waiting: map[editdoc.Address]bool{}, typed: map[editdoc.Address]calculator.FormulaValue{},
 		positions: map[calculator.WorksheetReference][]editdoc.Address{},
-		result:    Calculation{Cells: map[editdoc.Address]CalculatedCell{}, patches: patches},
+		result:    Calculation{Cells: map[editdoc.Address]CalculatedCell{}, patches: patches, programs: programs},
 	}
 	roots := slices.Clone(b.missing)
 	overlay := newCalcDependencies()
-	formulaBytes, edges := 0, 0
 	for a, v := range patches {
 		if v.Kind == "" {
 			continue
 		}
 		roots = append(roots, a)
-		src, exists := b.cells[a]
+		_, exists := b.cells[a]
 		if !exists {
 			k := calcColumn{a.Sheet, a.Col}
 			s.added[k] = append(s.added[k], a.Row)
 		}
 		if v.Kind == "formula" {
-			formulaBytes += len(v.Raw)
-			if formulaBytes > formats.EditCalcFormulaBytes {
-				return nil, ErrCalcCapacity
-			}
-			tag := src.tag
-			if arrays != nil {
-				if request, ok := arrays.specs[a]; ok {
-					tag = request
-				}
-			}
-			form := b.compile(ctx, a, v.Raw, tag)
-			edges += len(form.References)
-			if edges > formats.EditCalcReferences {
-				return nil, ErrCalcCapacity
-			}
-			s.programs[a] = form
+			form := programs[a]
 			for _, ref := range form.References {
 				overlay.add(a, b.qualify(ref, a.Sheet))
 			}

@@ -22,6 +22,19 @@ function setup(){
 }
 const long='审计财务说明'.repeat(8);
 
+test('General fits its precision while fixed format keeps its digits and regional dates retain their source',()=>{
+  const h=setup(),n=h.node();
+  const cell={raw:'278606.25',display:'278606.25',type:'n',style:0};
+  h.presenter.paint(n,cell,{});
+  h.presenter.fitNumber(n,cell,80,0);assert.equal(n.textContent,'278606.3');
+  h.presenter.fitNumber(n,cell,100,0);assert.equal(n.textContent,cell.raw);
+  const fixed={...cell,displayNumFmt:2};h.presenter.paint(n,fixed,{});
+  h.presenter.fitNumber(n,fixed,80,0);assert.match(n.textContent,/^#+$/);
+  const date={raw:'60',display:'1900-02-29',type:'n',displayNumFmt:14,shortDate:'yyyy/m/d'};
+  assert.equal(h.presenter.value(date),'1900/2/29');assert.equal(date.display,'1900-02-29');
+  assert.equal(h.presenter.value({...date,type:'inlineStr',raw:date.display}),date.display);
+});
+
 test('source numeric overflow shows hashes instead of a misleading suffix and restores exact spans when widened',()=>{
   const h=setup(),cell={col:1,raw:'9007199254740993.31',display:'9,007,199,254,740,993.31',type:'n',style:0},before=JSON.stringify(cell),node=h.node();
   h.presenter.paint(node,cell,{});const original=node.childNodes[0];assert.equal(h.presenter.fitNumber(node,cell,100,14),true);assert.match(node.textContent,/^#+$/);assert.match(node.title,/9,007,199,254,740,993.31/);assert.equal(node._xlModel,cell);assert.equal(JSON.stringify(cell),before);
@@ -77,12 +90,11 @@ test('plain conditional superscripts share span budget and full text survives a 
 
 test('range tint remains distinct on colored fills while retaining source text contrast',()=>{
   const {sandbox}=setup(),fill=sandbox.window.ExcelLensCellView.selectionFill;
-  vm.runInNewContext(read('highlightmode.js'),sandbox);
   const rgb=hex=>[0,2,4].map(i=>parseInt(hex.slice(1+i,3+i),16));
   const luminance=c=>c.reduce((n,v,i)=>{v/=255;return n+[.2126,.7152,.0722][i]*(v<=.04045?v/12.92:((v+.055)/1.055)**2.4);},0);
   const contrast=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
-  for(const palette of [undefined,...Object.values(sandbox.window.ExcelLensHighlightMode.palettes)])for(const [background,foreground]of [['#ffffff','#304355'],['#2f79cf','#ffffff'],['#fff176','#304355'],['#008000','#ffffff'],['#000000','#ffffff'],['#dbe8f6','#304355'],['#e53935','#ffffff']]){
-    const base=rgb(background),text=rgb(foreground),parts=fill(background,foreground,palette).match(/[\d.]+/g).map(Number),alpha=parts[3];
+  for(const [background,foreground]of [['#ffffff','#304355'],['#2f79cf','#ffffff'],['#fff176','#304355'],['#008000','#ffffff'],['#000000','#ffffff'],['#dbe8f6','#304355'],['#e53935','#ffffff']]){
+    const base=rgb(background),text=rgb(foreground),parts=fill(background,foreground).match(/[\d.]+/g).map(Number),alpha=parts[3];
     const painted=base.map((c,i)=>c*(1-alpha)+parts[i]*alpha);
     assert(painted.reduce((n,c,i)=>n+Math.abs(c-base[i]),0)/3>=20,background+' did not show the range');
     const original=contrast(luminance(base),luminance(text)),selected=contrast(luminance(painted),luminance(text));

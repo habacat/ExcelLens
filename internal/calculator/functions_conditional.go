@@ -46,6 +46,16 @@ func wildcardPattern(s string, whole bool) (*regexp.Regexp, error) {
 	return regexp.Compile("(?is)" + b.String())
 }
 
+// FilterCriterion compiles a customFilter operator and its operand once for
+// row visibility changes. Excel wildcards use the same escaping as COUNTIF.
+func FilterCriterion(operator, operand string) (func(FormulaValue) bool, error) {
+	prefix, ok := map[string]string{"": "=", "equal": "=", "notEqual": "<>", "lessThan": "<", "lessThanOrEqual": "<=", "greaterThan": ">", "greaterThanOrEqual": ">="}[operator]
+	if !ok {
+		return nil, errors.New("无法识别筛选运算符")
+	}
+	return compileCriterion(TextValue(prefix + operand))
+}
+
 type criterion func(FormulaValue) bool
 
 func compileCriterion(v FormulaValue) (criterion, error) {

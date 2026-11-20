@@ -1,0 +1,254 @@
+{
+  "result": "PASS",
+  "nativeExcel": {
+    "version": "16.0",
+    "build": 20326
+  },
+  "source": "October sales expense workbook with original pivots and Sichuan expense records with Excel-created pivots. All three input hashes verified.",
+  "cases": {
+    "sc-axis": {
+      "states": 6,
+      "open": 12145,
+      "refresh": 12145,
+      "savedReopen": 12145,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 16,
+      "colGrand": 6,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-label": {
+      "states": 6,
+      "open": 8325,
+      "refresh": 8325,
+      "savedReopen": 8325,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-group": {
+      "states": 6,
+      "open": 1960,
+      "refresh": 1960,
+      "savedReopen": 1960,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 6,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-combined": {
+      "states": 6,
+      "open": 3432,
+      "refresh": 3432,
+      "savedReopen": 3432,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-ungroup": {
+      "states": 6,
+      "open": 8745,
+      "refresh": 8745,
+      "savedReopen": 8745,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-regroup": {
+      "states": 6,
+      "open": 1545,
+      "refresh": 1545,
+      "savedReopen": 1545,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "october": {
+      "states": 6,
+      "open": 304,
+      "refresh": 304,
+      "savedReopen": 304,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 16,
+      "colGrand": 0,
+      "cacheValues": 672,
+      "numberFormatCells": 0
+    },
+    "oct-label": {
+      "states": 6,
+      "open": 124,
+      "refresh": 124,
+      "savedReopen": 124,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 0,
+      "cacheValues": 672,
+      "numberFormatCells": 0
+    },
+    "oct-two": {
+      "states": 6,
+      "open": 615,
+      "refresh": 615,
+      "savedReopen": 615,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 16,
+      "colGrand": 0,
+      "cacheValues": 115098,
+      "numberFormatCells": 0
+    },
+    "group-history": {
+      "states": 6,
+      "open": 7080,
+      "refresh": 7080,
+      "savedReopen": 7080,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "label-history": {
+      "states": 6,
+      "open": 9657,
+      "refresh": 9657,
+      "savedReopen": 9657,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "refresh-history": {
+      "states": 6,
+      "open": 7992,
+      "refresh": 7992,
+      "savedReopen": 7992,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "changed-source": {
+      "states": 6,
+      "open": 2520,
+      "refresh": 2520,
+      "savedReopen": 2520,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-subtotals": {
+      "states": 6,
+      "open": 1964,
+      "refresh": 1964,
+      "savedReopen": 1964,
+      "rowSub": 18,
+      "colSub": 48,
+      "rowGrand": 6,
+      "colGrand": 16,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    },
+    "sc-measure-edit": {
+      "states": 6,
+      "open": 1848,
+      "refresh": 1848,
+      "savedReopen": 1848,
+      "rowSub": 12,
+      "colSub": 54,
+      "rowGrand": 6,
+      "colGrand": 18,
+      "cacheValues": 22944,
+      "numberFormatCells": 1404
+    },
+    "sc-fixed": {
+      "states": 6,
+      "open": 1820,
+      "refresh": 1820,
+      "savedReopen": 1820,
+      "rowSub": 0,
+      "colSub": 0,
+      "rowGrand": 6,
+      "colGrand": 6,
+      "cacheValues": 22944,
+      "numberFormatCells": 0
+    }
+  },
+  "workbookStates": 96,
+  "comparisons": {
+    "open": 70076,
+    "refresh": 70076,
+    "savedReopen": 70076,
+    "rowSub": 30,
+    "colSub": 102,
+    "rowGrand": 126,
+    "colGrand": 196,
+    "cacheValues": 414714,
+    "numberFormatCells": 1404
+  },
+  "actualExcelCommands": [
+    "Clear Pivot Filters, Undo, Redo",
+    "Ungroup, Undo, Redo",
+    "Refresh, Undo, Redo",
+    "Summarize second value field by Maximum, Undo, Redo"
+  ],
+  "otherExcelHistory": "Compared against independently performed native before/after changes.",
+  "browser": {
+    "cases": [
+      "oct-label",
+      "oct-two",
+      "october",
+      "sc-axis",
+      "sc-combined",
+      "sc-fixed",
+      "sc-group",
+      "sc-label",
+      "sc-measure-edit",
+      "sc-subtotals"
+    ],
+    "steps": 70,
+    "downloads": 60,
+    "reopenedInApp": 10,
+    "allZipPartsIdenticalToService": 60,
+    "browserVersion": "Chrome/157.0.8103.79"
+  },
+  "numericComparison": "Exact types and formula text. Numbers within relative 2e-15 or absolute 1e-12.",
+  "additional": {
+    "nativeRefreshFixtures": 36,
+    "aggregateFunctionsTogether": 11,
+    "dateGroupingWithValuesBeforeAndAfter": 4,
+    "selectionScreens": 14,
+    "ribbonAggregateChange": {
+      "states": 6,
+      "cells": 1404,
+      "cacheValues": 22944
+    }
+  },
+  "desktopManual": false,
+  "wpsInterop": false
+}

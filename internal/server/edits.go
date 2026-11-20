@@ -31,6 +31,7 @@ type editRequest struct {
 	Mode      string               `json:"mode"`
 	Step      string               `json:"step"`
 	SkipBlank bool                 `json:"skipBlank"`
+	Direct    bool                 `json:"direct,omitempty"`
 	Clipboard *editClipboard       `json:"clipboard"`
 	Rule      *editdoc.Rule        `json:"rule"`
 	Proof     string               `json:"proof"`
@@ -51,25 +52,27 @@ type editListItem struct {
 }
 
 type editSheet struct {
-	Name     string `json:"name"`
-	FirstRow int    `json:"firstRow"`
-	FirstCol int    `json:"firstCol"`
-	Rows     int    `json:"rows"`
-	Cols     int    `json:"cols"`
-	ReadOnly string `json:"readOnly,omitempty"`
+	Name        string `json:"name"`
+	FirstRow    int    `json:"firstRow"`
+	FirstCol    int    `json:"firstCol"`
+	Rows        int    `json:"rows"`
+	Cols        int    `json:"cols"`
+	ReadOnly    string `json:"readOnly,omitempty"`
+	SourceRules bool   `json:"sourceRules,omitempty"`
 }
 
 type editState struct {
-	ChartSheets  []string             `json:"chartSheets,omitempty"`
-	Pivots       []editfile.PivotInfo `json:"pivots,omitempty"`
-	Book         string               `json:"book"`
-	OriginalBook string               `json:"originalBook"`
-	Document     editdoc.Info         `json:"document"`
-	Format       string               `json:"format"`
-	Sheets       []editSheet          `json:"sheets"`
-	Encoding     string               `json:"encoding,omitempty"`
-	Structured   bool                 `json:"structured,omitempty"`
-	Artifacts    []editArtifact       `json:"artifacts"`
+	Tables       []editfile.TableRange `json:"tables,omitempty"`
+	ChartSheets  []string              `json:"chartSheets,omitempty"`
+	Pivots       []editfile.PivotInfo  `json:"pivots,omitempty"`
+	Book         string                `json:"book"`
+	OriginalBook string                `json:"originalBook"`
+	Document     editdoc.Info          `json:"document"`
+	Format       string                `json:"format"`
+	Sheets       []editSheet           `json:"sheets"`
+	Encoding     string                `json:"encoding,omitempty"`
+	Structured   bool                  `json:"structured,omitempty"`
+	Artifacts    []editArtifact        `json:"artifacts"`
 }
 
 func editError(w http.ResponseWriter, err error) {
@@ -187,6 +190,17 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	unlock := a.lockCacheRead()
 	defer unlock()
+	if command == "list-areas" {
+		// Immutable reader metadata uses its own cache and never holds the
+		// document lease while scanning a large worksheet.
+		areas, err := a.editListAreas(ctx, req)
+		if err != nil {
+			editError(w, err)
+		} else {
+			writeJSON(w, areas)
+		}
+		return
+	}
 	store, err := openEditDocuments()
 	if err != nil {
 		editError(w, err)
@@ -221,6 +235,14 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		editError(w, err)
 		return
 	}
+	root := a.rootApp()
+	root.calculationMu.Lock()
+	var index *editfile.CalculationBook
+	if entry := root.calculation; entry != nil && entry.stamp == doc.Base.Source.Stamp {
+		index = entry.book
+	}
+	root.calculationMu.Unlock()
+	layout = layout.WithSourceCells(&a.editSourceCells, doc.Binding+"/"+doc.Base.Source.Stamp, index)
 	var body any
 	switch command {
 	case "state":
@@ -229,6 +251,8 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		body, err = a.editRead(ctx, doc, layout, req)
 	case "grid":
 		body, err = a.editGrid(ctx, doc, layout, req)
+	case "input-kinds":
+		body, err = editInputKinds(ctx, doc, layout, req)
 	case "choices":
 		body, err = editChoices(ctx, doc, layout, req)
 	case "pivot-items", "pivot-layout":
@@ -243,6 +267,16 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		body, err = a.editSave(ctx, doc, layout, req)
 	default:
 		err = editdoc.ErrInvalid
+	}
+	if req.Direct && errors.Is(err, editdoc.ErrNoChange) {
+		switch command {
+		case "commit":
+			if req.Operation.Action == "change" {
+				body, err = editCommitResult{doc.Info, doc.Revision, false, doc.Base.Source.Book}, nil
+			}
+		case "preview":
+			body, err = editBatchPreview{}, nil
+		}
 	}
 	if err != nil {
 		editError(w, err)

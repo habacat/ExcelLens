@@ -9,12 +9,14 @@
     return {row1:a.row,row2:b.row,col1:a.col,col2:b.col,
       visual1:filtered?a.visual||a.row:0,visual2:filtered?b.visual||b.row:0};
   }
-  function contains(area,row,col,visual,filtered=false){
+  const position=(row,visual,through)=>row<=through?row:through+visual;
+  function contains(area,row,col,visual,filtered=false,through=0){
     if(!area)return false;
     if(col<Math.min(area.col1,area.col2)||col>Math.max(area.col1,area.col2))return false;
-    return filtered ?
-      visual>0&&visual>=Math.min(area.visual1,area.visual2)&&visual<=Math.max(area.visual1,area.visual2):
-      row>=Math.min(area.row1,area.row2)&&row<=Math.max(area.row1,area.row2);
+    if(!filtered)return row>=Math.min(area.row1,area.row2)&&row<=Math.max(area.row1,area.row2);
+    const a=position(area.row1,area.visual1,through),b=position(area.row2,area.visual2,through);
+    const index=position(row,visual,through);
+    return visual>0&&index>=Math.min(a,b)&&index<=Math.max(a,b);
   }
   function areas(state,includeSingle=false){
     const result=[...(state.multiRanges||[])];
@@ -23,23 +25,6 @@
       result.push(rectangle(cell(state.selected.row,state.selected.col,state.selectedVisualIndex),
         cell(state.selected.row,state.selected.col,state.selectedVisualIndex),state.filtered));
     return result;
-  }
-  // Bit 16 denotes membership; lower bits mark the rectangle's outer seams.
-  // This stays O(number of areas), regardless of the selected row count.
-  function borderMask(list,row,col,visual,filtered=false,merge=null){
-    let mask=0;
-    for(const area of list){
-      if(!contains(area,row,col,visual,filtered))continue;
-      const index=filtered?visual:row,end=filtered?visual:merge?.endRow||row;
-      const first=filtered?Math.min(area.visual1,area.visual2):Math.min(area.row1,area.row2);
-      const last=filtered?Math.max(area.visual1,area.visual2):Math.max(area.row1,area.row2);
-      mask|=16;
-      if(index===first)mask|=1;
-      if((merge?.endCol||col)>=Math.max(area.col1,area.col2))mask|=2;
-      if(end>=last)mask|=4;
-      if(col===Math.min(area.col1,area.col2))mask|=8;
-    }
-    return mask;
   }
   function points(area, colName){
     // In a sorted view each visual index belongs to its original endpoint.
@@ -66,5 +51,5 @@
     if(found===-1)return null;
     return areas.filter((_,i)=>i!==found);
   }
-  window.ExcelLensMultiSelection={LIMIT,cell,rectangle,contains,areas,points,rowCount,removeSingleton,borderMask};
+  window.ExcelLensMultiSelection={LIMIT,cell,rectangle,contains,areas,points,rowCount,removeSingleton};
 })();

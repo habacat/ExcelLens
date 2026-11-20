@@ -20,6 +20,7 @@ type PivotChoices struct {
 // The first page reads only enough rows to answer it. Later pages reuse the
 // distinct values already visited. Changing the search reuses the same values.
 type PivotItemList struct {
+	group                 *dateBuckets
 	view                  objectValues
 	sheet                 string
 	col, nextRow, lastRow int
@@ -32,6 +33,15 @@ type PivotItemList struct {
 
 func (b *CalculationBook) NewPivotItemList(calc *Calculation, patches map[editdoc.Address]editdoc.Value, info PivotInfo, field string) (*PivotItemList, error) {
 	col := slices.Index(info.Fields, field)
+	var group *dateBuckets
+	if g, found := info.GroupFields[field]; found {
+		col = slices.Index(info.Fields, g.Source)
+		b, err := (pivotDateLevel{rule: g.rule()}).buckets(g.Start, g.End, g.English)
+		if err != nil {
+			return nil, err
+		}
+		group = &b
+	}
 	area, ok := parseRect(info.SourceRef)
 	if !ok || col < 0 || col > area.lastCol-area.firstCol {
 		return nil, ErrTarget
@@ -44,7 +54,7 @@ func (b *CalculationBook) NewPivotItemList(calc *Calculation, patches map[editdo
 	if area.lastRow-area.firstRow > formats.EditCalcSourceCells {
 		return nil, ErrCalcCapacity
 	}
-	return &PivotItemList{view: view, sheet: info.SourceSheet, col: area.firstCol + col,
+	return &PivotItemList{group: group, view: view, sheet: info.SourceSheet, col: area.firstCol + col,
 		nextRow: area.firstRow + 1, lastRow: area.lastRow, seen: map[pivotValue]bool{}}, nil
 }
 
@@ -98,6 +108,14 @@ func (p *PivotItemList) Page(ctx context.Context, query string, offset int) (Piv
 		item, err := p.view.book.pivotCell(cell)
 		if err != nil {
 			return out, err
+		}
+		if b := p.group; b != nil {
+			i := len(b.values) - 1
+			if item.kind == "d" {
+				t, _ := editdoc.ISODateTime(item.raw)
+				i = b.index(t)
+			}
+			item = b.values[i]
 		}
 		if !p.seen[item] {
 			p.seen[item] = true

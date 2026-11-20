@@ -2,7 +2,7 @@
   'use strict';
   const el = suffix => document.getElementById('editCopy' + suffix);
 
-  const rangeKinds = new Set(['mergeCells', 'unmergeCells', 'fixedArray', 'spillFormula', 'clearArray']);
+  const rangeKinds = new Set(['mergeCells', 'unmergeCells', 'fixedArray', 'spillFormula', 'clearArray', 'resizeTable']);
   const arrayFormulaKinds = new Set(['fixedArray', 'spillFormula']);
 
   class EditTools {
@@ -11,6 +11,8 @@
       this.calculatedItems = new window.ExcelLensPivotCalculatedItems(item => this.commit({kind:'pivotCalculatedItem', pivot:el('Pivot').value, calculatedItem:item}));
       this.valueFilters = new window.ExcelLensPivotValues(filter => this.commit({kind:'pivotValueFilter', pivot:el('Pivot').value, valueFilter:filter}));
       this.pivotLayout = new window.ExcelLensPivotLayout(editor);
+      this.measures=new window.ExcelLensPivotMeasures(editor,this.pivotLayout);
+      this.criteria=new window.ExcelLensPivotCriteria((kind,key,spec)=>this.commit({kind,pivot:el('Pivot').value,[key]:spec}));
       this.selected = 'Copy';
       this.tabs = [...el('Tools').querySelectorAll('[role="tab"]')];
       this.options = new Map(this.tabs.map(tab => {
@@ -30,6 +32,7 @@
         if (id === 'Range') el('ReplaceContents').checked = false;
         editor.controls();
       });
+      el('TableName').addEventListener('change',()=>{ this.structureFields(editor.cell); editor.controls(); });
       el('ApplyStructure').addEventListener('click', () => this.commit(this.structureInput()));
       el('Pivot').addEventListener('change', () => {
         this.pivotFields();
@@ -40,7 +43,7 @@
       el('PivotRefresh').addEventListener('click', () => this.commit({kind:'refreshPivot', pivot:el('Pivot').value}));
       el('PivotApply').addEventListener('click', () => this.commit({
         kind:'configurePivot', pivot:el('Pivot').value, axes:this.pivotLayout.axes,
-        data:el('PivotData').value, aggregate:el('PivotAggregate').value, filterMode:el('PivotFilter').value,
+        measures:this.measures.items, valuesAxis:this.measures.items.length>1?this.measures.axis:undefined, filterMode:el('PivotFilter').value,
         item:el('PivotFilter').value === 'item' ? el('PivotItem').value : ''
       }));
       el('Charts').addEventListener('click', () => this.commit({kind:'refreshCharts'}));
@@ -48,9 +51,33 @@
 
     async commit(change) {
       if (!change) return;
-      const returnToGrid = !!change.range || this.contextualPivot && ['configurePivot', 'refreshPivot', 'pivotValueFilter', 'pivotCalculatedItem'].includes(change.kind);
+      const returnToGrid = !!change.range || this.contextualPivot && ['configurePivot', 'refreshPivot', 'pivotValueFilter', 'pivotCalculatedItem','pivotLabelFilter','pivotDateGroup','pivotDateFilter'].includes(change.kind);
       const saved = await this.editor.commitStructure({...change, sheet:el('Sheet').value});
       if (saved && returnToGrid) this.editor.close();
+    }
+
+    tableAt(cell) {
+      const a=cell?.address||cell, shape=this.editor.grid.shape;
+      if (!a || !shape) return null;
+      return this.editor.data?.tables?.find(table=>{
+        if (table.sheet!==shape.name) return false;
+        const [start,end=start]=table.ref.split(':').map(ref=>window.ExcelLensEditModel.target(ref,shape));
+        return a.row>=start.row && a.row<=end.row && a.col>=start.col && a.col<=end.col;
+      });
+    }
+
+    entryRefAfterResize(sheet,ref,operation,next) {
+      if (!operation.expandTable || !operation.changes?.length) return ref;
+      const a=operation.changes[0], shape=this.editor.grid.shape;
+      if (!shape || sheet!==a.sheet) return ref;
+      const point=window.ExcelLensEditModel.target(ref,shape);
+      const old=this.editor.data.tables?.find(t=>{
+        if (t.sheet!==sheet || !t.totals) return false;
+        const [lo,hi=lo]=t.ref.split(':').map(v=>window.ExcelLensEditModel.target(v,shape));
+        return a.row===hi.row+1 && a.col>=lo.col && a.col<=hi.col && operation.changes.every(c=>c.row>=a.row);
+      });
+      const current=old && next.tables?.find(t=>t.name===old.name);
+      return current && current.ref!==old.ref && point.row===a.row ? this.editor.colName(point.col)+(point.row-1) : ref;
     }
 
     pivotAt(cell) {
@@ -102,7 +129,7 @@
       el('ToolSelect').value = active || '';
       el('ToolSelect').disabled = blocked;
       if (active === 'Objects' && !blocked) this.resolvePivotLayout();
-      for (const id of ['StructureKind','NewName','At','Count','Before','Range','ArrayFormula','ReplaceContents','Pivot','PivotFields','PivotData','PivotAggregate','PivotFilter','PivotItem','PivotRefresh','PivotApply','Charts']) {
+      for (const id of ['StructureKind','TableName','NewName','At','Count','Before','Range','ArrayFormula','ReplaceContents','Pivot','PivotFields','PivotFilter','PivotItem','PivotRefresh','PivotApply','Charts']) {
         el(id).disabled = blocked || editor.invalidated;
       }
       el('PivotFilter').parentElement.hidden = !this.pivotLayout.axes?.rows.length;
@@ -112,7 +139,7 @@
         el('PivotFields').disabled = el('PivotRefresh').disabled = true;
       }
       const applyingLayout = active === 'Objects' && !el('Work').hidden && !el('PivotFields').hidden;
-      el('PivotApply').hidden = !applyingLayout;
+      this.criteria.dateFilter.footer(applyingLayout,el('PivotFields').disabled);
       el('PivotApply').disabled = el('PivotFields').disabled || !el('PivotItem').hidden && !el('PivotItem').value;
       el('Save').classList.toggle('primary-button', !applyingLayout);
       el('Save').classList.toggle('mini-button', applyingLayout);
@@ -122,6 +149,14 @@
     bindCell(cell) {
       if (this.meta?.error) this.meta=null;
       const sheet = el('Sheet').value;
+      const tables=(this.editor.data?.tables||[]).filter(table=>table.sheet===sheet);
+      const table=this.tableAt(cell), previousTable=el('TableName').value;
+      el('TableName').replaceChildren(...tables.map(t=>new Option(t.name,t.name)));
+      if (table) el('TableName').value=table.name;
+      else if (tables.some(t=>t.name===previousTable)) el('TableName').value=previousTable;
+      const resize=el('StructureKind').querySelector('[value="resizeTable"]');
+      resize.hidden=resize.disabled=!tables.length;
+      if (!tables.length && el('StructureKind').value==='resizeTable') el('StructureKind').value='mergeCells';
       if (cell && this.chooseRangeKind) {
         this.chooseRangeKind = false;
         if (cell.array) el('StructureKind').value = cell.array.dynamic ? 'spillFormula' : 'fixedArray';
@@ -145,12 +180,11 @@
       el('PivotReason').hidden = !el('PivotReason').textContent;
       el('PivotFields').hidden = !info?.data || !!info.refreshReason;
       this.pivotLayout.bind(el('PivotFields').hidden ? null : info);
+      this.measures.bind(el('PivotFields').hidden ? null : info);
+      this.criteria.bind(el('PivotFields').hidden ? null : info);
       this.valueFilters.bind(el('PivotFields').hidden ? null : info);
       this.calculatedItems.bind(el('PivotFields').hidden ? null : info);
       if (el('PivotFields').hidden) return;
-      el('PivotData').replaceChildren(...info.fields.map(field => new Option(field, field)));
-      el('PivotData').value = info.data;
-      el('PivotAggregate').value = info.aggregate;
       el('PivotFilter').value = 'keep';
       el('PivotItem').value = '';
       el('PivotItem').hidden = true;
@@ -183,6 +217,7 @@
       const rename = kind === 'renameSheet', rows = kind.endsWith('Rows');
       const range = rangeKinds.has(kind);
       el('RangeField').hidden = !range;
+      el('TableField').hidden = kind!=='resizeTable';
       el('ArrayFormulaField').hidden = !arrayFormulaKinds.has(kind);
       el('ArrayFormula').value = cell?.array?.formula || (cell?.value?.kind === 'formula' ? cell.value.raw : '');
       el('MergeConsent').hidden = kind !== 'mergeCells' && kind !== 'fixedArray';
@@ -192,6 +227,9 @@
       const fullArray = cell?.array?.range;
       el('Range').value = fullArray && (!selected.includes(':') || selected === fullArray) && (arrayFormulaKinds.has(kind) || kind === 'clearArray')
         ? (kind === 'spillFormula' ? fullArray.split(':')[0] : fullArray) : selected;
+      if (kind==='resizeTable') {
+        el('Range').value=this.editor.data?.tables?.find(t=>t.name===el('TableName').value)?.ref||'';
+      }
       el('NewNameField').hidden = !rename;
       el('AtField').hidden = el('CountField').hidden = rename||range;
       el('BeforeField').hidden = !kind.startsWith('move');
@@ -205,13 +243,20 @@
       const sheet = el('Sheet').value, kind = el('StructureKind').value;
       if (!sheet) return null;
       if (rangeKinds.has(kind)) {
-        const range = el('Range').value.trim().toUpperCase(), parts = range.split(':');
+        const raw=el('Range').value.trim().toUpperCase();
+        const range=kind==='resizeTable' ? raw.split(':').map(ref=>ref.trim().replace(/^\$?([A-Z]{1,3})\$?([1-9]\d*)$/,'$1$2')).join(':') : raw;
+        const parts=range.split(':');
         if (parts.length > 2) return null;
         try {
           const [a, b = a] = parts.map(ref => window.ExcelLensEditModel.target(ref, this.editor.shape));
           if (a.row > b.row || a.col > b.col || kind === 'mergeCells' && a.row === b.row && a.col === b.col) return null;
         } catch { return null; }
         const result = {kind, range};
+        if (kind==='resizeTable') {
+          const table=this.editor.data?.tables?.find(t=>t.sheet===sheet && t.name===el('TableName').value);
+          if (!table || table.ref===range) return null;
+          result.name=table.name;
+        }
         if (arrayFormulaKinds.has(kind)) {
           result.formula = el('ArrayFormula').value.trim();
           if (!result.formula.startsWith('=') || result.formula.length < 2) return null;

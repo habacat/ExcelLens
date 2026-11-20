@@ -1,0 +1,117 @@
+{
+  "workPackage": "Range cut and merged-range paste",
+  "branch": "codex/range-transfer",
+  "baseline": "7a4924e",
+  "date": "2026-11-20",
+  "nativeExcel": {
+    "version": "16.0",
+    "build": 20326,
+    "sourceFiles": 2,
+    "derivedReportWithNamesAndChart": 1,
+    "sourceSHA256Unchanged": [
+      "7f3f24d2722f3cc01326ecd14c28eff4b7f8cf88773997cb2c9696059d8bf0a5",
+      "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea"
+    ]
+  },
+  "comparison": {
+    "states": 19,
+    "workbookCellVisits": 6090683,
+    "formulaExpressions": 149446,
+    "cacheComparisons": 298892,
+    "ownershipAndNumberFormatVisits": 5437,
+    "withinNumericTolerance": 0,
+    "valuesTypesFormulasAndMergeAddresses": "matched",
+    "numericTolerance": "8 ULP or absolute error 1e-12 for saved formula caches; whole-workbook Value2 compared by type and the same tolerance",
+    "cases": {
+      "cross": {
+        "states": 3,
+        "workbookCellVisits": 2028257,
+        "formulaExpressions": 49806,
+        "cacheComparisons": 99612,
+        "ownershipAndNumberFormatVisits": 651,
+        "withinNumericTolerance": 0
+      },
+      "headers": {
+        "states": 3,
+        "workbookCellVisits": 2028049,
+        "formulaExpressions": 49806,
+        "cacheComparisons": 99612,
+        "ownershipAndNumberFormatVisits": 1059,
+        "withinNumericTolerance": 0
+      },
+      "merge-overlap": {
+        "states": 3,
+        "workbookCellVisits": 3110,
+        "formulaExpressions": 3,
+        "cacheComparisons": 6,
+        "ownershipAndNumberFormatVisits": 684,
+        "withinNumericTolerance": 0
+      },
+      "merged-copy": {
+        "states": 4,
+        "workbookCellVisits": 5012,
+        "formulaExpressions": 4,
+        "cacheComparisons": 8,
+        "ownershipAndNumberFormatVisits": 1528,
+        "withinNumericTolerance": 0
+      },
+      "merge-collision": {
+        "states": 3,
+        "workbookCellVisits": 2023095,
+        "formulaExpressions": 49806,
+        "cacheComparisons": 99612,
+        "ownershipAndNumberFormatVisits": 552,
+        "withinNumericTolerance": 0
+      },
+      "witness": {
+        "states": 3,
+        "workbookCellVisits": 3160,
+        "formulaExpressions": 21,
+        "cacheComparisons": 42,
+        "ownershipAndNumberFormatVisits": 963,
+        "withinNumericTolerance": 0
+      }
+    }
+  },
+  "referenceMatrix": {
+    "shapes": 5,
+    "placements": 80,
+    "operandsPerPlacement": 4050,
+    "comparisons": 324000,
+    "mismatches": 0
+  },
+  "browser": {
+    "groups": 7,
+    "steps": 32,
+    "generatedArtifacts": 19,
+    "checks": [
+      "Ctrl+X/C/V",
+      "context menu",
+      "cross-sheet recalculation",
+      "overlapping and repeated paste",
+      "Escape and partial destination rejection",
+      "undo/redo",
+      "open downloaded workbook as a new grid"
+    ]
+  },
+  "nativeHistory": "Excel Ribbon Cut or Copy, Paste, Undo, Redo; state captured with SaveCopyAs. For the second tiled paste the native clipboard was re-armed from the first pasted block in the same workbook.",
+  "nameAndChart": "Defined name, SERIES formula, XValues, Values, and dependent results matched in changed, undo and redo states.",
+  "formatDifference": {
+    "count": 4,
+    "sheet": "Sheet1",
+    "cells": [
+      "$J$21",
+      "$T$21",
+      "$J$23",
+      "$T$23"
+    ],
+    "behavior": "Excel Redo normalizes the hidden number format of four covered cells to General. ExcelLens restores the exact original paste, including each covered cell’s accounting format. Compared against the native first paste and redo separately."
+  },
+  "ownershipLimits": [
+    "Protected sheets",
+    "Excel tables and pivot headers/results",
+    "Array-owned ranges",
+    "Notes, hyperlinks, conditional formats and validation rules inside the transfer area"
+  ],
+  "evidenceDirectory": "validation/range-transfer/private/"
+}

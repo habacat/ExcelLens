@@ -139,7 +139,7 @@
     columnSelection: null, columnAnchor: 0
   };
 
-  const cellPresenter = new window.ExcelLensCellView.Presenter({state:S,applyStyle:applyCellStyle,colName,scale:()=>scale(),fontStack,merge:activeMerge,richLimits:fileFormats.richText,numericPadding:node=>node.classList.contains('auto-filter-header')?32:S.showStyles&&fileFormats.source(S.source?.format).styled?4:14});
+  const cellPresenter = new window.ExcelLensCellView.Presenter({state:S,applyStyle:applyCellStyle,colName,scale:()=>scale(),fontStack,merge:activeMerge,richLimits:fileFormats.richText,numericPadding:node=>node.classList.contains('auto-filter-header')?32:S.showStyles&&fileFormats.source(S.source?.format).styled?5*scale():14});
   const frozenPresenter = new window.ExcelLensCellView.Presenter(cellPresenter.o);
   let frozenPanes, pictures;
   let autoFilterUI;
@@ -412,7 +412,6 @@
     if (!S.showStyles || !visual) { applyDisplayFont(node, ""); return; }
     if (visual.background) p.setProperty("--xl-fill", visual.background);
     const ink=window.ExcelLensConditional?.color(cell,visual)??(cell.valueColor||visual.color);
-    p.setProperty('--range-fill',window.ExcelLensCellView.selectionFill(visual.background,S.showFormulas&&cell.hasFormula?'#315d8b':ink,highlightMode?.palette));
     if (ink) p.setProperty("--xl-color", ink);
     applyDisplayFont(node, visual.fontName);
     if (visual.fontSize) p.fontSize = `${visual.fontSize * (4 / 3) * S.zoom / 100}px`;
@@ -668,7 +667,7 @@
       const data = await load(activity);
       if (!current()) return false;
       activity?.stage('正在准备工作表', 60, 65);
-      await acceptOpenedWorkbook(data, data.fileName || name, data.fileSize || size, activity);
+      await acceptOpenedWorkbook(data, {fallbackName:name, fallbackSize:size, activity});
       await activity?.paintIfDue?.();
       return true;
     } catch (error) {
@@ -710,7 +709,7 @@
     }), file.name, file.size).catch(error => toast(error.message,'error'));
   }
 
-  async function acceptOpenedWorkbook(data, fallbackName = data.fileName || "", fallbackSize = data.fileSize || 0, activity) {
+  async function acceptOpenedWorkbook(data, {fallbackName = "", fallbackSize = 0, activity, revisionRef = ""} = {}) {
       if (editCopy?.grid.active) editCopy.grid.leave();
       archiveCenter?.use(data.archive);
       if(data.archiveOnly){archiveCenter.present(data.archive);setStatus("请选择压缩包内的文件");return;}
@@ -779,7 +778,7 @@
       showWorkspace();
       await loadStylePalette();
       const active = S.sheets[S.activeTab] || S.sheets[0];
-      if (active) await selectSheet(active.name, '', false, null, activity);
+      if (active) await selectSheet(active.name, revisionRef, false, null, activity);
       else { renderSheetTabs(); setStatus("工作簿中没有工作表"); }
       bookmarkCenter.load(true).catch(() => {});
       refreshSearchHistory().catch(() => {});
@@ -892,6 +891,7 @@
     S.selected = null;
     S.wholeRowSelected = false;
     S.range = null; S.multiRanges = []; S.rangeAnchor = null;
+    paintRangeFrames([]);
     S.columnSelection = null; S.columnAnchor = 0;
     selectionStats?.clear();
     S.selectedVisualIndex = 1;
@@ -1865,16 +1865,37 @@
   }
 
   function paintRangeCell(node,row,col,visual,list=window.ExcelLensMultiSelection.areas(S)){
-    const mask=list.length?window.ExcelLensMultiSelection.borderMask(list,row,col,visual,S.filtered,activeMerge(row,col)):0;
-    if(mask){
+    if (editCopy?.grid.active) editCopy.grid.ranges.paintCut(node,S.sheet,row,col);
+    const through=S.filtered?S.selectedFrozenThrough||0:0;
+    const inside=list.some(area=>window.ExcelLensMultiSelection.contains(area,row,col,visual,S.filtered,through));
+    if(inside){
       const style=cellPresenter.style(node._xlModel,node._xlRowStyle)||{},foreground=S.showFormulas&&node._xlModel?.hasFormula?'#315d8b':S.showStyles?(window.ExcelLensConditional?.color(node._xlModel,style)??(node._xlModel?.valueColor||style.color)):undefined;
-      const colorKey=[highlightMode?.color||'blue',style.background||'',foreground||''].join('|');
-      if(node._xlRangeColor!==colorKey){node._xlRangeColor=colorKey;node.style.setProperty('--range-fill',window.ExcelLensCellView.selectionFill(style.background,foreground,highlightMode?.palette));}
+      const colorKey=[style.background||'',foreground||''].join('|');
+      if(node._xlRangeColor!==colorKey){node._xlRangeColor=colorKey;node.style.setProperty('--range-fill',window.ExcelLensCellView.selectionFill(style.background,foreground));}
     }
-    if(node._xlRangeMask===mask)return;
-    node._xlRangeMask=mask;node.classList.toggle('range-cell',Boolean(mask));
-    if(mask)node.style.setProperty('--range-border-width',[1,2,4,8].map(bit=>mask&bit?'2px':'0px').join(' '));
-    else node.style.removeProperty('--range-border-width');
+    if(node._xlInRange!==inside) {node._xlInRange=inside;node.classList.toggle('range-cell',inside);}
+  }
+
+  function paintRangeFrames(areas = window.ExcelLensMultiSelection.areas(S)) {
+    const layer=$('rangeFrames');
+    const visible=S.indexReady || S.previewOnly;
+    layer.parentElement.classList.toggle('has-range',Boolean(visible && areas.length));
+    const single=visible && !areas.length && S.selected;
+    layer.parentElement.classList.toggle('has-cell-selection',Boolean(single));
+    if (single) {
+      const merge=activeMerge(single.row,single.col);
+      areas=[{row1:merge?.row??single.row,col1:merge?.col??single.col,row2:merge?.endRow??single.row,col2:merge?.endCol??single.col,
+        visual1:S.selectedVisualIndex,visual2:S.selectedVisualIndex}];
+    }
+    if (!layer.childElementCount && !areas.length) return;
+    const pinned=S.indexReady ? frozenPanes.effective() : {rows:0,cols:0}, grid=$('grid');
+    const frozenHeight=sourceRowTop(pinned.rows+1);
+    window.ExcelLensRangeFrame.paint(layer,visible ? areas : [],{
+      width:grid.clientWidth,height:grid.clientHeight,left:grid.scrollLeft,top:getVirtualScrollTop(),
+      header:headerHeight(),rowHead:ROW_HEAD,frozenWidth:colLeft(pinned.cols+1),frozenHeight,colLeft,
+      rowBounds:(row,visual)=>S.filtered && row>pinned.rows
+        ? [frozenHeight+rowTop(visual),frozenHeight+rowTop(visual+1)] : [sourceRowTop(row),sourceRowTop(row+1)]
+    });
   }
 
   function decorateGridCell(cell, row, col, ref) {
@@ -2175,6 +2196,7 @@
     // Range highlight has a bounded visible intersection; only scan its DOM
     // when entering/leaving/changing a range, never on normal arrow presses.
     const areas=window.ExcelLensMultiSelection.areas(S);
+    paintRangeFrames(areas);
     const pinnedCells=document.querySelectorAll('.grid-region .pinned-cell');
     for(const node of pinnedCells){
       node.classList.toggle('selected',node.dataset.ref===selectedRef);
@@ -2196,9 +2218,7 @@
     S.lastHighlight={col:selectedCol,ref:selectedRef,hadRange:Boolean(areas.length)};
   }
 
-  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false) {
-    if(S.columnSelection){S.columnSelection=null;S.columnAnchor=0;paintColumnSelection();}
-    S.wholeRowSelected = false;
+  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false, keepSelection = false) {
     const normalizedRef = ref || cell?.ref || `${colName(colNumber)}${rowNumber}`;
     const col = colNumber || cell?.col || parseRef(normalizedRef)?.col || 1;
     const row = rowNumber || parseRef(normalizedRef)?.row || 1;
@@ -2210,13 +2230,17 @@
       document.querySelectorAll(".grid-cell.precedent").forEach(node => node.classList.remove("precedent"));
     }
     S.selected = { ...normalized, ref: normalizedRef, row, col, sheet: S.sheet };
-    S.range = null; S.multiRanges = [];
-    selectionStats?.clear();
-    S.rangeAnchor = {row,col,visual:visualIndex||row};
-    $("selectionStatus").textContent = "";
+    if (!keepSelection) {
+      if(S.columnSelection){S.columnSelection=null;S.columnAnchor=0;paintColumnSelection();}
+      S.wholeRowSelected = false;
+      S.range = null; S.multiRanges = [];
+      selectionStats?.clear();
+      S.rangeAnchor = {row,col,visual:visualIndex||row};
+      $("selectionStatus").textContent = "";
+    }
     S.selectedVisualIndex = visualIndex || row;
     S.selectedFrozenThrough=S.filtered?frozenPanes.effective().rows:0;
-    $("nameBox").value = normalizedRef;
+    if (!keepSelection || !S.range) $("nameBox").value = normalizedRef;
     formulaInspector?.show(normalized,S.sheet);
     $("formulaValue").textContent = normalized.cacheMissing ? "无缓存" : (normalized.display ?? "");
     $("formulaValue").title = `保存结果：${normalized.cacheMissing ? "无缓存" : (normalized.display ?? "")}\n原始值：${normalized.raw ?? ""}`;
@@ -2231,11 +2255,11 @@
     editCopy?.grid.selection();
   }
 
-  function selectCellByAddress(ref, visualIndex) {
+  function selectCellByAddress(ref, visualIndex, keepSelection = false) {
     const parsed = parseRef(ref);
     if (!parsed) return;
     const cell = S.cellMap.get(parsed.ref) || S.frozenCellMap.get(parsed.ref) || { ref: parsed.ref, col: parsed.col, raw: "", display: "", hasFormula: false };
-    selectCell(cell, parsed.row, parsed.col, parsed.ref, visualIndex || parsed.row);
+    selectCell(cell, parsed.row, parsed.col, parsed.ref, visualIndex || parsed.row, keepSelection, keepSelection);
   }
 
   function selectInitialCell() {
@@ -2291,6 +2315,16 @@
       (!S.filtered||pinnedRows===frozenPanes.effective().rows);
   }
 
+  function revealCellOffset(offset, extent, inset, start, size, leadingMargin) {
+    const available = extent - inset;
+    if (available <= 0) return offset;
+    if (size >= available) return Math.max(0, start - inset);
+    const slack = available - size;
+    if (start < offset + inset) return Math.max(0, start - inset - Math.min(slack, leadingMargin));
+    if (start + size > offset + extent) return start + size - extent + Math.min(slack, size);
+    return offset;
+  }
+
   // A row of zero is an unresolved position in the filtered body. Use its
   // visual index for scrolling, then resolve the source row from the tile.
   function scrollCellIntoView(row,col,visual,pinned) {
@@ -2300,13 +2334,11 @@
     if(!row||row>pinned.rows){
       const header=headerHeight(),frozenHeight=sourceRowTop(pinned.rows+1);
       const cellTop=header+rowTop(visual)+(S.filtered?frozenHeight:0),height=rowHeight(visual);
-      if(cellTop<viewTop+header+frozenHeight)top=Math.max(0,cellTop-header-frozenHeight-height*2);
-      else if(cellTop+height>viewTop+grid.clientHeight)top=cellTop-grid.clientHeight+height*2;
+      top=revealCellOffset(viewTop,grid.clientHeight,header+frozenHeight,cellTop,height,height*2);
     }
     if(col>pinned.cols){
       const cellLeft=ROW_HEAD+colLeft(col),width=colWidth(col);
-      if(cellLeft<viewLeft+ROW_HEAD+colLeft(pinned.cols+1))left=Math.max(0,cellLeft-ROW_HEAD-colLeft(pinned.cols+1)-width);
-      else if(cellLeft+width>viewLeft+grid.clientWidth)left=cellLeft-grid.clientWidth+width*2;
+      left=revealCellOffset(viewLeft,grid.clientWidth,ROW_HEAD+colLeft(pinned.cols+1),cellLeft,width,width);
     }
     if(top!==viewTop||left!==viewLeft)grid.scrollTo({top:scrollTopToPhysical(top),left,behavior:'auto'});
   }
@@ -2385,13 +2417,14 @@
 	return true;
   }
 
-  async function moveSelection(rowDelta, colDelta, extend = false) {
+  async function moveSelection(rowDelta, colDelta, extend = false, keepAnchor = false) {
     if (!S.selected) {
       selectInitialCell();
       return;
     }
-    let targetRow = S.selected.row;
-    let targetVisual = S.selectedVisualIndex;
+    const editingRange = extend && keepAnchor && S.range;
+    let targetRow = editingRange ? S.range.row2 : S.selected.row;
+    let targetVisual = editingRange ? S.range.visual2 || targetRow : S.selectedVisualIndex;
     const pinned = frozenPanes.effective();
     const current=beginGridNavigation(pinned.rows);
     let preceding=extend?S.multiRanges.slice():[];
@@ -2403,9 +2436,11 @@
       if(extend)anchor={row:targetRow,col:S.selected.col,visual:targetVisual};
     }
     const originVisual=targetVisual;
-    let targetCol = Math.max(1, Math.min(16384, S.selected.col + colDelta));
-    const fromMerge=activeMerge(S.selected.row,S.selected.col);
+    const originCol = editingRange ? S.range.col2 : S.selected.col;
+    let targetCol = Math.max(1, Math.min(16384, originCol + colDelta));
+    const fromMerge=activeMerge(targetRow,originCol);
     if(fromMerge&&colDelta===1)targetCol=Math.min(16384,fromMerge.endCol+1);
+    if(colDelta && S.hiddenColumns.has(targetCol)) targetCol=(colDelta>0 ? nextVisibleColumn(targetCol) : previousVisibleColumn(targetCol)) || originCol;
     if (S.filtered) {
       if(rowDelta){
         if(targetRow<=pinned.rows){
@@ -2434,7 +2469,7 @@
     if(!targetRow&&S.window?.excludeThroughRow===pinned.rows)targetRow=S.rowNumberByVisual.get(targetVisual);
     if(!targetRow)return;
     const targetRef = `${colName(targetCol)}${targetRow}`;
-    selectCell(cellAt(targetRow,targetCol),targetRow,targetCol,targetRef,targetVisual);
+    if (!extend || !keepAnchor) selectCell(cellAt(targetRow,targetCol),targetRow,targetCol,targetRef,targetVisual);
     if (extend){S.multiRanges=preceding;extendRange(anchor,targetRow,targetCol,targetVisual);}
   }
 
@@ -2533,7 +2568,8 @@
   // Multiple cells can be highlighted and copied without touching workbook values.
   function inSelectedRange(row,col,visualIndex=0){
     const selection=window.ExcelLensMultiSelection;
-    return selection.areas(S).some(area=>selection.contains(area,row,col,visualIndex,S.filtered));
+    const through=S.filtered?frozenPanes.effective().rows:0;
+    return selection.areas(S).some(area=>selection.contains(area,row,col,visualIndex,S.filtered,through));
   }
 
   function extendRange(anchor,row,col,visualIndex=0) {
@@ -2555,14 +2591,14 @@
     selectionStats?.schedule();
   }
 
-  async function writeClipboardPayload(content) {
+  async function writeClipboardPayload(content,cut=false) {
     if(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
       try {
         await navigator.clipboard.write([new ClipboardItem({
           'text/plain':new Blob([content.text],{type:'text/plain'}),
           'text/html':new Blob([content.html],{type:'text/html'})
         })]);
-        toast('已复制','success');
+        if (!cut) toast('已复制','success');
         return true;
       } catch { /* Some browsers only allow HTML during a native copy event. */ }
     }
@@ -2577,9 +2613,10 @@
     };
     document.addEventListener('copy',onCopy,true);
     try {
-      if (document.execCommand('copy') && rich) { toast('已复制','success'); return true; }
+      if (document.execCommand('copy') && rich) { if (!cut) toast('已复制','success'); return true; }
     } catch { /* A text-only clipboard can still accept the TSV. */ }
     finally { document.removeEventListener('copy',onCopy,true); }
+    if (cut) throw Error('浏览器未写入剪切区域，请重新剪切');
     const copied=await copyText(content.text);
     if(copied)toast('已复制为纯文本，当前浏览器未写入表格格式','warning');
     return copied;
@@ -2634,14 +2671,36 @@
         return payload;
       }};
   }
-  async function copySelection(plain=false) {
-    const activity=globalThis.ExcelLensActivity?.begin('正在复制选区');
+  async function copySelection(plain=false,cut=false) {
+    const activity=globalThis.ExcelLensActivity?.begin(cut?'正在剪切选区':'正在复制选区');
+    const ranges=editCopy?.grid.active ? editCopy.grid.ranges : null;
+    const epoch=ranges ? (ranges.copyEpoch=(ranges.copyEpoch||0)+1) : 0;
     try{
-      const snapshot=captureClipboardSelection({withMerges:!plain}),payload=await snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled});if(!snapshot.current())return;
+      const snapshot=captureClipboardSelection({withMerges:!plain});
+      const [payload,typed]=await Promise.all([
+        snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled}),
+        !plain && editCopy?.grid.active ? editCopy.grid.ranges.copySnapshot(snapshot,cut) : null
+      ]);
+      if(!snapshot.current() || ranges && ranges.copyEpoch!==epoch)return;
+      if(cut && !typed)throw Error('剪切需要一个连续、完整可见且未超出编辑容量的工作表区域');
       const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard,snapshot.mergeAt);
-      if(plain)await copyText(content.text);
-      else await writeClipboardPayload(content);
+      if (typed) {
+        typed.text=content.text.replaceAll('\r\n','\n');
+        content.html=content.html.replace('<table ','<table id="'+typed.marker+'" ');
+      }
+      const copied=plain ? await copyText(content.text) : await writeClipboardPayload(content,cut);
+      if (cut && !snapshot.current()) return false;
+      if (copied && snapshot.current() && editCopy?.grid.active && ranges) {
+        if (ranges.copyEpoch!==epoch) {
+          if (cut && typed && !ranges.copied) ranges.copied={...typed,inactive:true};
+          return false;
+        }
+        const repaintCut=typed?.cut || ranges.copied?.cut && !ranges.copied.inactive;
+        ranges.copied=typed;
+        if (repaintCut) editCopy.grid.view.redraw();
+      }
       if(!plain&&content.notices.length)toast(content.notices.join('；'),'warning');
+      return copied;
     }catch(err){if(err.name!=='AbortError')toast(err.message,'error');}finally{activity?.end();}
   }
 
@@ -3716,7 +3775,7 @@
 
   async function tracePrecedents() { await traceUI.open('precedents'); }
 
-  function traceVisibleRect(node){
+  function traceVisibleRect(node, forEditor=false){
     const grid=$('grid');if(!S.indexReady||grid.inert)return null;
     const row=node.closest('.grid-row');if(row&&row._xlSheetEpoch!==S.sheetEpoch)return null;
     const rect=node.getBoundingClientRect();if(!rect.width||!rect.height)return null;
@@ -3725,8 +3784,10 @@
     if(node.closest('#freezeCorner')){pane='corner';left=g.left+ROW_HEAD;top=g.top+hh;right=left+fw;bottom=top+fh;}
     else if(node.closest('#freezeTop')){pane='top';top=g.top+hh;bottom=top+fh;}
     else if(node.closest('#freezeLeft')){pane='left';left=g.left+ROW_HEAD;right=left+fw;}
-    left=Math.max(left,rect.left);top=Math.max(top,rect.top);right=Math.min(right,rect.right);bottom=Math.min(bottom,rect.bottom);
-    return right>left&&bottom>top?{left,top,right,bottom,pane}:null;
+    const visible={left:Math.max(left,rect.left),top:Math.max(top,rect.top),right:Math.min(right,rect.right),bottom:Math.min(bottom,rect.bottom),pane};
+    if (visible.right<=visible.left || visible.bottom<=visible.top) return null;
+    if (forEditor===true) visible.viewport={left,top,right:g.left+grid.clientWidth,bottom:g.top+grid.clientHeight};
+    return visible;
   }
 
   function renderGridFromCurrentWindow() {
@@ -3770,6 +3831,9 @@
     if (editCopy?.grid.active) return;
     const cellEl=event.target.closest?.(".grid-cell");
     const tooltip=$("cellTooltip");
+    if (dragAnchor || (S.range || S.multiRanges.length) && cellEl?.classList.contains('range-cell')) {
+      tooltip.hidden=true;hoverRef="";return;
+    }
     if(!cellEl) {tooltip.hidden=true;hoverRef="";return;}
     const ref=cellEl.dataset.ref;
     if (ref!==hoverRef || tooltip.hidden) {
@@ -3837,7 +3901,14 @@
   }
 
   let sizeContextTarget=null;
-  function hideCellMenu() { $("cellMenu").hidden = true; $("sizeContextMenu").hidden = true; }
+  function hideCellMenu() { $("cellMenu").hidden = true; $("sizeContextMenu").hidden = true; $("editGridMenu").hidden = true; }
+
+  function positionCellMenu(menu,x,y) {
+    hideCellMenu();
+    menu.hidden=false;
+    menu.style.left=Math.max(5,Math.min(x,window.innerWidth-menu.offsetWidth-8))+'px';
+    menu.style.top=Math.max(5,Math.min(y,window.innerHeight-menu.offsetHeight-8))+'px';
+  }
 
   function openCellMenu(event) {
     if(!S.indexReady){hideCellMenu();return;}
@@ -3864,9 +3935,7 @@
       $('sizeContextShowCol').textContent='显示隐藏列';
       $('sizeContextHideCol').hidden=kind!=='col'||!hasColumnOfType(span,false);
       $('sizeContextShowCol').hidden=kind!=='col'||!hasColumnOfType(span,true);
-      menu.hidden=false;
-      menu.style.left=Math.max(5,Math.min(event.clientX,window.innerWidth-menu.offsetWidth-8))+'px';
-      menu.style.top=Math.max(5,Math.min(event.clientY,window.innerHeight-menu.offsetHeight-8))+'px';
+      positionCellMenu(menu,event.clientX,event.clientY);
       return;
     }
     const cell = event.target.closest?.(".grid-cell,.pinned-cell");
@@ -3878,6 +3947,9 @@
     if (!S.range || !inSelectedRange(target.row,target.col,Number(cell.dataset.visualIndex))) {
       selectCell(cellAt(target.row,target.col),target.row,target.col,target.ref,Number(cell.dataset.visualIndex));
     }
+    if (editCopy?.grid.active) {
+      editCopy.grid.ranges.showMenu(event.clientX,event.clientY); return;
+    }
     $("menuCopyFormula").disabled = !S.selected?.hasFormula;
     $('menuFilterValue').disabled=!S.selected||S.selected.row<=(S.autoFilter?.row||1);
     $("menuTrace").disabled = !S.selected?.hasFormula;
@@ -3886,10 +3958,7 @@
       $('menuOpenHyperlink').textContent = S.selected.hyperlink.kind === 'internal' ?
         '\u8df3\u8f6c\u5230\u94fe\u63a5\u4f4d\u7f6e' : '\u6253\u5f00\u8d85\u94fe\u63a5';
     }
-    const menu = $("cellMenu");
-    menu.hidden = false;
-    menu.style.left = Math.max(5,Math.min(event.clientX,window.innerWidth-menu.offsetWidth-8)) + "px";
-    menu.style.top = Math.max(5,Math.min(event.clientY,window.innerHeight-menu.offsetHeight-8)) + "px";
+    positionCellMenu($("cellMenu"),event.clientX,event.clientY);
   }
 
   // Ctrl-click adds an independently selected cell; Ctrl-drag adds a rectangle.
@@ -3920,6 +3989,9 @@
       }
     }
     if(previous.length>=selection.LIMIT){toast('最多同时选择256处区域','warning');return;}
+    if(extend && oldAnchor && editCopy?.grid.active && !additive) {
+      extendRange(oldAnchor,point.row,point.col,point.visual); return;
+    }
     selectCell(dataCell,point.row,point.col,point.ref,point.visual);
     S.multiRanges=previous;
     if(extend){extendRange(oldAnchor,point.row,point.col,point.visual)}
@@ -3950,6 +4022,7 @@
     const parsed=parseRef(cell?.dataset.ref);
     if(!parsed)return;
     hideCellMenu();
+    $('cellTooltip').hidden=true;
     dragAnchor={...parsed,visual:Number(cell.dataset.visualIndex)||parsed.row};
     dragBase=(event.ctrlKey||event.metaKey)?window.ExcelLensMultiSelection.areas(S,true):
       (event.shiftKey?S.multiRanges.slice():[]);
@@ -4364,6 +4437,7 @@
       followGridScroll();
     }, { passive:false });
     $("grid").addEventListener("scroll", () => {
+      paintRangeFrames();
       if(S.sheetLoadingEpoch)return;
       hideCellMenu();
       followGridScroll();
@@ -4439,7 +4513,7 @@
     document.addEventListener("pointermove", updateRangeDrag);
     document.addEventListener("pointerup", endRangeDrag);
     document.addEventListener("pointercancel", endRangeDrag);
-    document.addEventListener("click", event => {if (!event.target.closest?.("#cellMenu,#sizeContextMenu")) hideCellMenu();});
+    document.addEventListener("click", event => {if (!event.target.closest?.(".cell-context-menu")) hideCellMenu();});
     $('sizeContextAdjust').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)promptResize(target.kind,target.index);});
     $('sizeContextReset').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)commitResize(target.kind,target.index,0);});
     $('sizeContextFit').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)autoFitSize(target.kind,target.index);});
@@ -4492,7 +4566,7 @@
       const file = event.dataTransfer?.files?.[0];
       if (file) uploadFile(file);
     });
-    new ResizeObserver(() => syncFreezeScrollGutters()).observe($("grid"));
+    new ResizeObserver(() => {syncFreezeScrollGutters();paintRangeFrames();}).observe($("grid"));
     window.addEventListener("resize", () => { if(S.previewOnly){updateCanvasSize();scheduleInitialPreview();return;} if (S.indexReady) { updateCanvasSize(); scheduleViewport(true); frozenPanes.schedule(true); } });
     // Exactly one keyboard dispatcher. Grid shortcuts bubble here, so a
     // non-modal search panel cannot trigger two actions or open a JS prompt.
@@ -4522,16 +4596,31 @@
           return start===end?start:start+':'+end;
         },
         merged:()=>S.selected&&mergedCells.at(S.selected.row,S.selected.col),
-        move:moveSelection, select:selectCellByAddress, copy:copySelection,
+        areas:()=>window.ExcelLensMultiSelection.areas(S,true),
+        expand:area=>mergedCells.expand(area), mergeAt:(row,col)=>mergedCells.at(row,col),
+        nextRow:nextVisibleRow, previousRow:previousVisibleRow,
+        nextCol:nextVisibleColumn, previousCol:previousVisibleColumn,
+        moveInside:async(row,col)=>{
+          const pinned=frozenPanes.effective(), current=beginGridNavigation(pinned.rows), range=S.range;
+          scrollCellIntoView(row,col,row,pinned);
+          if (!S.window || !windowContains(getViewportRequest())) await loadViewport(true);
+          if (current() && range===S.range) selectCell(cellAt(row,col),row,col,colName(col)+row,row,true,true);
+        },
+        visibleSelection:()=>{
+          const cells=fileFormats.editing.batchCells;
+          return captureClipboardSelection({purpose:'编辑',limits:{rows:cells,columns:cells,cells}});
+        },
+        move:(row,col,extend)=>moveSelection(row,col,extend,true), select:selectCellByAddress, copy:copySelection,
+        positionMenu:positionCellMenu,
         bounds:ref=>{
           for(const node of document.querySelectorAll(`.grid-region .grid-cell[data-ref="${ref}"]`)){
-            const rect=traceVisibleRect(node); if(rect)return {rect,node};
+            const rect=traceVisibleRect(node,true); if(rect)return {rect,node};
           }
           return null;
         },
         redraw:()=>{
           ++S.decorVersion; renderGridFromCurrentWindow(); frozenPanes?.schedule(true);
-          if(S.selected) selectCellByAddress(S.selected.ref,S.selectedVisualIndex);
+          if(S.selected) selectCellByAddress(S.selected.ref,S.selectedVisualIndex,true);
         }
       },
       limits: fileFormats.editing, colName, fmtBytes});

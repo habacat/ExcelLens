@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"excellens/internal/calculator"
 	"excellens/internal/editdoc"
@@ -39,6 +40,8 @@ func (b *CalculationBook) calculateArrays(ctx context.Context, patches map[editd
 		specs = make(map[editdoc.Address]sourceFormulaTag)
 	}
 	valueEdit := false
+	formulaBytes, edges := 0, 0
+	programs := make(map[editdoc.Address]calculator.WorksheetFormula)
 	for addr, v := range patches {
 		valueEdit = valueEdit || v.Kind != ""
 		if v.Kind == "" {
@@ -49,13 +52,36 @@ func (b *CalculationBook) calculateArrays(ctx context.Context, patches map[editd
 			delete(specs, addr)
 			continue
 		}
+		formulaBytes += len(v.Raw)
+		if formulaBytes > formats.EditCalcFormulaBytes {
+			return nil, ErrCalcCapacity
+		}
 		tag := cell.tag
+		if requested, ok := explicit[addr]; ok {
+			tag = requested
+		}
+		var program calculator.WorksheetFormula
+		reused := false
+		if previous != nil && explicit == nil && previous.patches[addr].Raw == v.Raw {
+			program, reused = previous.programs[addr]
+		}
+		if !reused {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			f, err := b.source.parseFormula(ctx, strings.TrimPrefix(v.Raw, "="), addr, nil)
+			if err == nil {
+				program = b.bind(f, addr, tag.kind == "array" || !f.Scalar)
+			}
+		}
+		programs[addr] = program
+		edges += len(program.References)
+		if edges > formats.EditCalcReferences {
+			return nil, ErrCalcCapacity
+		}
 		if tag.kind == "array" && !tag.dynamic {
 			specs[addr] = tag
-			continue
-		}
-		f := b.compile(ctx, addr, v.Raw, sourceFormulaTag{kind: "array"})
-		if f.MaySpill && f.Bound() {
+		} else if program.MaySpill && program.Bound() {
 			if !tag.dynamic {
 				tag = sourceFormulaTag{kind: "array", dynamic: true, area: anchorRect(addr)}
 			}
@@ -64,7 +90,7 @@ func (b *CalculationBook) calculateArrays(ctx context.Context, patches map[editd
 	}
 	maps.Copy(specs, explicit)
 	if len(specs) == 0 || !valueEdit && len(b.missing) == 0 && len(explicit) == 0 {
-		return b.calculatePass(ctx, patches, previous, nil)
+		return b.calculatePass(ctx, patches, programs, previous, nil)
 	}
 
 	// Resolve against an immutable ownership map for each pass. Re-evaluate
@@ -100,7 +126,7 @@ func (b *CalculationBook) calculateArrays(ctx context.Context, patches map[editd
 				delete(run.released, member)
 			}
 		}
-		calc, err := b.calculatePass(ctx, patches, nil, run)
+		calc, err := b.calculatePass(ctx, patches, programs, nil, run)
 		if err != nil {
 			return nil, err
 		}

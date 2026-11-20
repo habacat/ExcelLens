@@ -182,7 +182,10 @@
     </div>
 
     <main class="grid-region">
+      <span id="editGridMeasure" aria-hidden="true"></span>
       <textarea id="editGridInput" aria-label="单元格内编辑" spellcheck="false" rows="1" autocomplete="off" hidden></textarea>
+      <button id="editGridListButton" class="edit-grid-list-button" type="button" aria-label="选择列表值" title="选择列表值 (Alt+↓)" aria-haspopup="listbox" aria-expanded="false" aria-controls="editGridList" hidden><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <select id="editGridList" class="edit-grid-list" aria-label="单元格允许的值" size="5" hidden></select>
       <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
         <div id="gridCanvas" class="grid-canvas">
           <div id="columnHeaders" class="column-headers"></div>
@@ -218,6 +221,7 @@
       <div id="freezeLeft" class="freeze-left" hidden><div id="freezeLeftCells" class="freeze-left-cells"></div></div>
       <div id="freezeCorner" class="freeze-corner" hidden></div>
       <div id="freezeHeader" class="freeze-header" hidden></div>
+      <div id="rangeFrames" class="range-frames" aria-hidden="true"></div>
     </main>
 
       <div id="cellMenu" class="cell-context-menu" role="menu" hidden>
@@ -242,6 +246,15 @@
 		<button id="menuSelectionQuick" type="button" role="menuitem">选区快速分析（Ctrl+Q）</button>
 		<button id="menuTranspose" type="button" role="menuitem">转置阅读</button>
         <button id="menuBookmark" type="button" role="menuitem">标记此单元格...</button>
+      </div>
+      <div id="editGridMenu" class="cell-context-menu" role="menu" aria-label="编辑选区" hidden>
+        <button type="button" role="menuitem" data-edit-action="cut">剪切<kbd>Ctrl+X</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="copy">复制<kbd>Ctrl+C</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="paste">粘贴<kbd>Ctrl+V</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="down">向下填充<kbd>Ctrl+D</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="right">向右填充<kbd>Ctrl+R</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="clear">清除内容<kbd>Delete</kbd></button>
+        <button type="button" role="menuitem" data-edit-action="resize-table" hidden>调整表格范围…</button>
       </div>
       <div id="sizeContextMenu" class="cell-context-menu" role="menu" hidden>
         <button id="sizeContextHideCol" type="button" role="menuitem" hidden>隐藏此列</button>
@@ -313,7 +326,7 @@
       <div class="reading-mode-heading"><strong>行列与选区颜色</strong><button type="button" data-highlight-close aria-label="关闭高亮设置">×</button></div>
       <fieldset><legend class="sr-only">高亮颜色</legend>
         <label class="reading-option"><input type="radio" name="crosshairColor" value="blue"><span class="reading-swatch" style="--swatch:#3c7dc3"></span><span>蓝色</span></label>
-        <label class="reading-option"><input type="radio" name="crosshairColor" value="green"><span class="reading-swatch" style="--swatch:#278562"></span><span>绿色</span></label>
+        <label class="reading-option"><input type="radio" name="crosshairColor" value="green"><span class="reading-swatch" style="--swatch:#109968"></span><span>绿色</span></label>
         <label class="reading-option"><input type="radio" name="crosshairColor" value="amber"><span class="reading-swatch" style="--swatch:#b77a19"></span><span>琥珀</span></label>
         <label class="reading-option"><input type="radio" name="crosshairColor" value="purple"><span class="reading-swatch" style="--swatch:#8654b6"></span><span>紫色</span></label>
         <label class="reading-option"><input type="radio" name="crosshairColor" value="rose"><span class="reading-swatch" style="--swatch:#b95179"></span><span>玫红</span></label>
@@ -759,9 +772,11 @@
               <label class="edit-copy-field">操作<select id="editCopyStructureKind">
                 <option value="mergeCells">合并单元格</option><option value="unmergeCells">取消合并</option>
                 <option value="fixedArray">设置固定数组</option><option value="spillFormula">设置动态数组</option><option value="clearArray">清除数组</option>
+                <option value="resizeTable" hidden>调整表格范围</option>
                 <option value="renameSheet">重命名工作表</option><option value="insertRows">插入整行</option><option value="deleteRows">删除整行</option><option value="moveRows">移动整行</option>
                 <option value="insertColumns">插入整列</option><option value="deleteColumns">删除整列</option><option value="moveColumns">移动整列</option>
               </select></label>
+              <label class="edit-copy-field" id="editCopyTableField" hidden>表格<select id="editCopyTableName"></select></label>
               <label class="edit-copy-field" id="editCopyRangeField" hidden>单元格范围<input id="editCopyRange" placeholder="A1:C3" spellcheck="false"></label>
               <label class="edit-copy-field" id="editCopyNewNameField">新表名<input id="editCopyNewName" maxlength="31"></label>
               <label class="edit-copy-field" id="editCopyAtField" hidden><span id="editCopyAtLabel">起始行号</span><input id="editCopyAt" type="number" min="1" step="1"></label>
@@ -779,16 +794,51 @@
             </div>
             <p id="editCopyPivotReason" class="edit-copy-muted" hidden></p>
             <fieldset id="editCopyPivotFields" class="edit-pivot-layout" aria-label="透视字段布局" hidden>
+              <details id="editCopyPivotDateFilters" class="edit-pivot-detail" hidden><summary>日期筛选</summary>
+                <div class="edit-copy-fields">
+                  <label class="edit-copy-field">日期字段<select id="editCopyPivotDateFilterField"></select></label>
+                  <label class="edit-copy-field">条件<select id="editCopyPivotDateFilterKind"></select></label>
+                </div>
+                <div id="editCopyPivotDateFilterBounds" class="edit-copy-fields" hidden>
+                  <label class="edit-copy-field"><span id="editCopyPivotDateFilterStartLabel">日期</span><input id="editCopyPivotDateFilterStart" type="date" aria-describedby="editCopyPivotDateFilterError"></label>
+                  <label class="edit-copy-field">结束日期<input id="editCopyPivotDateFilterEnd" type="date" aria-describedby="editCopyPivotDateFilterError"></label>
+                  <label class="edit-date-precision"><input id="editCopyPivotDateFilterTime" type="checkbox">精确到时间</label>
+                </div>
+                <output id="editCopyPivotDateFilterError" class="edit-date-filter-error" aria-live="polite"></output>
+                <button id="editCopyPivotDateFilterClear" type="button" class="mini-button">清除日期筛选</button>
+              </details>
               <div id="editCopyPivotAxes" class="edit-pivot-axes"></div>
+              <section class="edit-pivot-axis"><span class="edit-pivot-heading">值字段</span><div class="edit-pivot-fields">
+                <div id="editCopyPivotMeasures" class="edit-pivot-fields"></div>
+                <select id="editCopyPivotAddMeasure" class="edit-pivot-add" aria-label="添加值字段"></select>
+                <div id="editCopyPivotValuesPositionFields" class="edit-copy-fields" hidden>
+                  <label class="edit-copy-field">值的排列<select id="editCopyPivotValuesAxis"><option value="columns">按列</option><option value="rows">按行</option></select></label>
+                  <label class="edit-copy-field">位置<select id="editCopyPivotValuesPosition"></select></label>
+                </div></div></section>
               <div class="edit-copy-fields">
-              <label class="edit-copy-field">值字段<select id="editCopyPivotData"></select></label>
-              <label class="edit-copy-field">汇总方式<select id="editCopyPivotAggregate"><option value="sum">求和</option><option value="count">计数</option><option value="average">平均值</option><option value="min">最小值</option><option value="max">最大值</option></select></label>
               <label class="edit-copy-field">行项目<select id="editCopyPivotFilter"><option value="keep">沿用当前筛选</option><option value="all">显示全部</option><option value="item">只显示指定项</option></select></label>
               <label class="edit-copy-field">指定项目<input id="editCopyPivotItem" maxlength="255" hidden></label>
               </div>
+              <details id="editCopyPivotLabels" class="edit-pivot-detail"><summary>标签筛选</summary><div class="edit-copy-fields">
+                <label class="edit-copy-field">字段<select id="editCopyPivotLabelField"></select></label><label class="edit-copy-field">条件<select id="editCopyPivotLabelKind"></select></label>
+                <label class="edit-copy-field">标签<input id="editCopyPivotLabelStart" maxlength="255"></label><label class="edit-copy-field">结束标签<input id="editCopyPivotLabelEnd" maxlength="255"></label>
+              </div><button type="button" id="editCopyPivotLabelApply" class="mini-button">应用标签筛选</button></details>
+              <details id="editCopyPivotDates" class="edit-pivot-detail"><summary>日期分组</summary><div class="edit-copy-fields">
+                <label class="edit-copy-field">日期字段<select id="editCopyPivotDateField"></select></label>
+                <label class="edit-copy-field" hidden>每组天数<input id="editCopyPivotInterval" type="number" min="1" max="32767" value="1"></label>
+              </div><div id="editCopyPivotDateUnits" class="edit-pivot-units" role="group" aria-label="分组单位"><label><input type="checkbox" value="years">年</label><label><input type="checkbox" value="quarters">季</label><label><input type="checkbox" value="months">月</label><label><input type="checkbox" value="days">日</label><label><input type="checkbox" value="hours">时</label><label><input type="checkbox" value="minutes">分</label><label><input type="checkbox" value="seconds">秒</label></div>
+              <details id="editCopyPivotBounds" class="edit-pivot-detail">
+                <summary>起止时间（自动）</summary>
+                <div class="edit-copy-fields">
+                  <label class="edit-copy-field">起始时间（留空自动）<input id="editCopyPivotDateStart" type="datetime-local" step="1"></label>
+                  <label class="edit-copy-field">结束时间（留空自动）<input id="editCopyPivotDateEnd" type="datetime-local" step="1"></label>
+                </div>
+              </details>
+              <button type="button" id="editCopyPivotDateApply" class="mini-button">应用分组</button></details>
               <details id="editCopyPivotValues" class="edit-pivot-detail">
                 <summary>值筛选</summary>
                 <div class="edit-copy-fields">
+                  <label class="edit-copy-field" id="editCopyValueMeasureField" hidden>依据的值<select id="editCopyValueMeasure"></select></label>
                   <label class="edit-copy-field">筛选字段<select id="editCopyValueField"></select></label>
                   <label class="edit-copy-field">条件<select id="editCopyValueKind"></select></label>
                   <label class="edit-copy-field"><span id="editCopyPivotThresholdLabel">数量</span><input id="editCopyValueStart" type="number" step="any"></label>
@@ -828,6 +878,7 @@
       <button id="editCopyCancel" class="mini-button" type="button" hidden>取消</button>
       <button id="editCopySave" type="button" class="primary-button compact">生成副本</button>
       <button id="editCopyPivotApply" type="button" class="primary-button compact" hidden>应用字段布局</button>
+      <button id="editCopyPivotDateFilterApply" type="button" class="primary-button compact" hidden>应用日期筛选</button>
     </footer>
   </dialog>
   <script src="/assets/cell-address.js"></script>
@@ -847,6 +898,7 @@
   <script src="/assets/multisort.js"></script>
   <script src="/assets/inspect.js"></script>
   <script src="/assets/multiselection.js"></script>
+  <script src="/assets/range-frame.js"></script>
   <script src="/assets/selectionstats.js"></script>
   <script src="/assets/conditional.js"></script>
   <script src="/assets/richtext.js"></script>
@@ -1006,8 +1058,13 @@
   </section>
   <script src="/assets/formats.js"></script>
   <script src="/assets/edit-copy-model.js"></script>
+  <script src="/assets/edit-grid-range.js"></script>
+  <script src="/assets/edit-grid-list.js"></script>
   <script src="/assets/edit-grid.js"></script>
   <script src="/assets/edit-pivot.js"></script>
+  <script src="/assets/edit-pivot-measures.js"></script>
+  <script src="/assets/edit-pivot-date-filter.js"></script>
+  <script src="/assets/edit-pivot-criteria.js"></script>
   <script src="/assets/edit-pivot-values.js"></script>
   <script src="/assets/edit-pivot-items.js"></script>
   <script src="/assets/edit-tools.js"></script>

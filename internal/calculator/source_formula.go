@@ -258,6 +258,14 @@ func checkLocalFormula(node *formulaNode, body string, sheet func(string) bool, 
 		return errLocalFormula
 	}
 	for _, child := range node.args {
+		if child.kind == "union" && node.kind == "function" && (node.op == "SUM" || node.op == "AVERAGE") {
+			for _, area := range child.args {
+				if err := checkLocalFormula(area, body, sheet, name, formula); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		if err := checkLocalFormula(child, body, sheet, name, formula); err != nil {
 			return err
 		}

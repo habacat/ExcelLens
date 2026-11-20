@@ -93,9 +93,10 @@ def manifest_for(version, commit=None):
     return json.loads((ROOT / "tools/release-files.json").read_text(encoding="utf-8"))
 
 
-def verify_windows(archive, version, tree=None):
+def verify_windows(archive, version, tree=None, *, candidate=False):
     directory = archive.parent
-    entries = manifest_for(version, tree[0] if tree else None)
+    entries = (json.loads((ROOT / "tools/release-files.json").read_text(encoding="utf-8"))
+               if candidate and not tree else manifest_for(version, tree[0] if tree else None))
     sources = {s.replace("{version}", version): s.replace("{version}", version) for s in entries}
     sources.update({"ExcelLens_icon.svg":"internal/branding/icon.svg", "ExcelLens_icon.ico":"internal/branding/icon.ico"})
     expected = set(sources) | {"ExcelLens.exe", "SHA256SUMS.txt", "BUILD_INFO.txt"}
@@ -151,6 +152,7 @@ def main():
     parser.add_argument("--dir", type=Path, default=ROOT / "release")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--source", action="store_true")
+    modes.add_argument("--candidate", action="store_true", help="Verify a StageOnly package against the development manifest")
     modes.add_argument("--finalize", action="store_true", help="Create and verify the tagged source ZIP and both asset checksums")
     parser.add_argument("--ref", help="Git tag or commit to verify")
     args = parser.parse_args()
@@ -164,8 +166,9 @@ def main():
         write_json(directory / "source-package.json", result)
     else:
         tree = source_tree(args.ref) if args.ref else None
-        result = verify_windows(directory / ("ExcelLens_" + version + "_Windows_x64_Full.zip"), version, tree)
-        write_json(ROOT / "validation" / version / "release-package.json", result)
+        result = verify_windows(directory / ("ExcelLens_" + version + "_Windows_x64_Full.zip"), version, tree, candidate=args.candidate)
+        receipt = directory / "candidate-package.json" if args.candidate else ROOT / "validation" / version / "release-package.json"
+        write_json(receipt, result)
     print(json.dumps(result, ensure_ascii=False))
 
 

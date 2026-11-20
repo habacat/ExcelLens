@@ -184,7 +184,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--real', nargs=3, action='append', default=[], metavar=('FILE','SHEET','RANGE'))
+    parser.add_argument('--real-only', action='store_true', help='run only the supplied workbook selections')
     args = parser.parse_args()
+    if args.real_only and not args.real:
+        parser.error('--real-only requires at least one --real selection')
     args.output = args.output.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     scratch = TemporaryDirectory(prefix='clipboard-source-',dir=args.output.parent)
@@ -207,6 +210,8 @@ def main():
         cases.extend(dict(file=str(sample),sheet='Grid',address='B2',edit=True,**options) for options in [
             dict(value='已修改标题',expected='已修改标题'), dict(history='undo',revision=3),
             dict(history='redo',revision=4,expected='已修改标题')])
+        if args.real_only:
+            cases.clear()
         cases.extend(dict(file=str(Path(file).resolve()),sheet=sheet,address=ref) for file,sheet,ref in args.real)
         hashes = {c['file']:hashlib.sha256(Path(c['file']).read_bytes()).hexdigest() for c in cases}
         target = excel.Workbooks.Add().Worksheets(1)

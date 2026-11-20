@@ -431,6 +431,7 @@ func readXLSGlobals(stream io.ReaderAt, size int64) (*xlsGlobals, error) {
 		if pattern != 0 {
 			v.Background = biffPaletteColor(uint16(xlsUint16(xf, 18)&0x7f), customPalette)
 		}
+		v.NumFmtID = int(xlsUint16(xf, 2))
 		g.visual = append(g.visual, v)
 	}
 	if len(g.styles) == 0 {

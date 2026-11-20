@@ -16,6 +16,8 @@ import (
 )
 
 type VisualStyle struct {
+	ShortDate      string  `json:"shortDate,omitempty"`
+	NumFmtID       int     `json:"numFmtId,omitempty"`
 	Color          string  `json:"color,omitempty"`
 	Background     string  `json:"background,omitempty"`
 	FontName       string  `json:"fontName,omitempty"`
@@ -399,6 +401,8 @@ func (w *Workbook) readStyles(f *zip.File) error {
 			visual.FontName = font.Name.Val
 			if size, e := strconv.ParseFloat(font.Size.Val, 64); e == nil && size >= 1 && size <= 409 {
 				visual.FontSize = size
+			} else if font.Size.Val == "" {
+				visual.FontSize = w.normalFont.FontSize
 			}
 			visual.Bold = enabled(font.Bold)
 			visual.Italic = enabled(font.Italic)
@@ -445,6 +449,8 @@ func (w *Workbook) readStyles(f *zip.File) error {
 			visual.Rotation = a.Rotation
 		}
 		w.Styles[i] = StyleInfo{NumFmtID: xf.NumFmtID, SectionColors: sectionTextColors(xf.NumFmtID, w.NumFmts[xf.NumFmtID])}
+		visual.NumFmtID = xf.NumFmtID
+		visual.ShortDate = w.GridShortDate(xf.NumFmtID)
 		w.VisualStyles[i] = visual
 	}
 	return nil
@@ -484,6 +490,18 @@ func XLSXCalendarStyle(data []byte, index int) (string, error) {
 		return "time", nil
 	}
 	return "", nil
+}
+
+// XLSXNumberLabels provides the reader's numeric display for text labels
+// generated from styled cells (for example, new table headers).
+func XLSXNumberLabels(styles *zip.File, date1904 bool) (func(string, int) string, error) {
+	w := Workbook{Date1904: date1904}
+	if styles != nil {
+		if err := w.readStyles(styles); err != nil {
+			return nil, err
+		}
+	}
+	return w.formatNumeric, nil
 }
 
 // CalendarNumberFormat is a source style whose numbers Excel can put into a

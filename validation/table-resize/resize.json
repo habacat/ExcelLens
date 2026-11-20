@@ -1,0 +1,402 @@
+{
+  "workPackage": "Excel table range and grid entry",
+  "baseline": "7a4924e",
+  "date": "2026-11-20",
+  "excel": {
+    "version": "16.0",
+    "build": 20326,
+    "sources": [
+      {
+        "originalTables": 10,
+        "sha256": "bdf578707ead773b860fa72637bf6b07202b6bd54eb9f707d0e13ef9d07d8220"
+      },
+      {
+        "originalTables": 12,
+        "sha256": "8027d1744eae7053246df04c1000686214d1e8da1ce8cfb5c0de74657989295a"
+      }
+    ],
+    "sourceHashesUnchanged": true,
+    "fixtures": "The original audit workbooks plus copies prepared in Excel with totals, calculated columns, rules, number formats, filtering, prior sorts and sheet protection. All operations use copies."
+  },
+  "grid": {
+    "scenarios": 31,
+    "steps": 142,
+    "reopenedDownloads": 31,
+    "probeSHA256": "f7be06f013b9e6e8fd5fecdf25a70978950622df86b527a305fa05ab4b2facbb",
+    "liveDisplayMatches": 20,
+    "liveDisplayWitnesses": "Five data, totals and cross-sheet cells at the applied, undo, redo and reopened states after uninterrupted keyboard entries."
+  },
+  "comparison": {
+    "states": 86,
+    "cells": 187794,
+    "formulas": 10036,
+    "cacheComparisons": 20072,
+    "roundedCaches": 0,
+    "numberFormats": 8761,
+    "rowVisibility": 700,
+    "validationCells": 104,
+    "tables": 878,
+    "cellCoverage": "Full rectangle from A1 through both used ranges on every worksheet. Exact cell types and Formula2. Value2 tolerance 2e-15 relative or 1e-12 absolute.",
+    "caches": "All formula caches compared both before Excel opens the download and after full native recalculation and resave. Tolerance is eight ULP or 1e-12 absolute.",
+    "tableCoverage": "Compare every table range, column ID, caption, calculated and totals formulas, totals function, autoFilter and last sort state before and after native resave. Local checks cover number formats, hidden rows and validation. Table formatting case also checks target alignment, protection, fill and bold.",
+    "mismatches": 0
+  },
+  "nativeExperiments": {
+    "operations": 30,
+    "referenceLayouts": 12,
+    "referenceFormulas": 11880,
+    "history": "Excel ribbon paste, two undo and two redo actions on the source with ten tables, compared at the complete operation boundaries. A separate calculated-column fixture used native Insert Table Row, Undo and Redo. Other undo and redo states use independently prepared Excel snapshots.",
+    "totalsShortcut": "Entering immediately below totals appends data above the totals row. Expected values are from growing the native table and entering at those resulting data addresses.",
+    "sort": "The recorded last sort retains its old range and keys after ListObject.Resize. The live autoFilter follows the new table."
+  },
+  "recovery": {
+    "result": "PASS",
+    "restarts": 2,
+    "revisions": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "retry": "same revision",
+    "conflict": 409,
+    "artifactSHA256": "644d4dd844be8c08f48a3125a229c208f6043b08206b5c181c4072d33a6b8ad7"
+  },
+  "cases": {
+    "rapid-enter": {
+      "states": [
+        "change2",
+        "undo",
+        "redo"
+      ],
+      "cells": 4687,
+      "formulas": 47,
+      "formats": 240,
+      "browserSteps": 24
+    },
+    "tab": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4694,
+      "formulas": 44,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "sort-grow": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4607,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "sort-drop": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4539,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "table-format": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 22686,
+      "formulas": 2994,
+      "formats": 861,
+      "browserSteps": 4
+    },
+    "format-input": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 22686,
+      "formulas": 2994,
+      "formats": 861,
+      "browserSteps": 4
+    },
+    "formatted": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4913,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "second-report": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 22604,
+      "formulas": 2994,
+      "formats": 861,
+      "browserSteps": 4
+    },
+    "protected-neighbor": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4539,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "protected-table": {
+      "states": [
+        "rejected"
+      ],
+      "cells": 1513,
+      "formulas": 9,
+      "formats": 80,
+      "browserSteps": 3
+    },
+    "typed": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4539,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "paste": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4539,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "total": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4708,
+      "formulas": 46,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "explicit": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4708,
+      "formulas": 46,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "shrink": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4694,
+      "formulas": 42,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "side-header": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4607,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "side-data": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4607,
+      "formulas": 27,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "native-insert": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4911,
+      "formulas": 125,
+      "formats": 162,
+      "browserSteps": 4
+    },
+    "relative": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4694,
+      "formulas": 44,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "width": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4766,
+      "formulas": 44,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "remove": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 42,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "block": {
+      "states": [
+        "rejected"
+      ],
+      "cells": 1560,
+      "formulas": 14,
+      "formats": 80,
+      "browserSteps": 3
+    },
+    "footer": {
+      "states": [
+        "rejected"
+      ],
+      "cells": 1560,
+      "formulas": 14,
+      "formats": 80,
+      "browserSteps": 3
+    },
+    "empty-gap": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 42,
+      "formats": 336,
+      "browserSteps": 4
+    },
+    "filtered-shrink": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 42,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "drop-filter": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 42,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "keep-filter": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 42,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "filter": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4680,
+      "formulas": 46,
+      "formats": 240,
+      "browserSteps": 4
+    },
+    "rule": {
+      "states": [
+        "rejected"
+      ],
+      "cells": 1560,
+      "formulas": 14,
+      "formats": 80,
+      "browserSteps": 3
+    },
+    "internal": {
+      "states": [
+        "change1",
+        "undo",
+        "redo"
+      ],
+      "cells": 4539,
+      "formulas": 31,
+      "formats": 240,
+      "browserSteps": 5
+    },
+    "chain": {
+      "states": [
+        "change1",
+        "change2",
+        "undo",
+        "redo"
+      ],
+      "cells": 6254,
+      "formulas": 62,
+      "formats": 320,
+      "browserSteps": 5
+    }
+  },
+  "acceptance": "Automated production Chromium grid and installed Microsoft Excel. Manual desktop and WPS acceptance were not run."
+}

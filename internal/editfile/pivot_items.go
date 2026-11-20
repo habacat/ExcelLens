@@ -16,11 +16,13 @@ import (
 // Cache indices identify typed source values. An axis item instead points to
 // a position in its pivotField's own, possibly manually ordered, item list.
 type pivotDimension struct {
+	calendar      bool
 	field         pivotFieldXML
 	name          string
 	values        []pivotValue
 	items         []pivotItemXML
 	positions     map[int]int
+	labelPass     map[int]bool
 	allowed       map[string]map[int]bool
 	pagePositions []int
 	page          bool
@@ -50,6 +52,20 @@ func (p pivotPlan) dimensions(r pivotRecords) (map[int]*pivotDimension, error) {
 				}
 			}
 			d := &pivotDimension{customSort: pivotOn(p.table.CustomListSort), field: field, name: r.fields[f].Name, values: r.dicts[f].values, positions: map[int]int{}, page: slices.Contains(p.pages, f)}
+			if remap, ok := r.datePositions[f]; ok {
+				d.calendar = true
+				d.field.Items = slices.Clone(field.Items)
+				d.field.Items = slices.DeleteFunc(d.field.Items, func(it pivotItemXML) bool {
+					_, found := remap[it.X]
+					return (it.Type == "" || it.Type == "data") && !found
+				})
+				for i := range d.field.Items {
+					it := &d.field.Items[i]
+					if it.Type == "" || it.Type == "data" {
+						it.X = remap[it.X]
+					}
+				}
+			}
 			if r.book != nil {
 				d.date1904 = r.book.date1904
 				d.dateStyle = r.dateStyles[f]
@@ -67,6 +83,9 @@ func (p pivotPlan) dimensions(r pivotRecords) (map[int]*pivotDimension, error) {
 				}
 			}
 			if err := d.applySelection(p, r.dicts[f], f); err != nil {
+				return nil, err
+			}
+			if err := p.matchLabels(f, d, collator); err != nil {
 				return nil, err
 			}
 			dims[f] = d
@@ -95,7 +114,15 @@ func (d *pivotDimension) orderItems(c *collate.Collator) error {
 			d.items = append(d.items, pivotItemXML{X: i})
 		}
 	}
-	if sortAll {
+	if d.calendar {
+		slices.SortStableFunc(d.items, func(a, b pivotItemXML) int {
+			order := cmp.Compare(a.X, b.X)
+			if d.field.Sort == "descending" {
+				return -order
+			}
+			return order
+		})
+	} else if sortAll {
 		var custom map[string]int
 		if d.customSort {
 			custom = matchingPivotOrder(d.values)

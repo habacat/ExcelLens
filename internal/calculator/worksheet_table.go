@@ -87,6 +87,9 @@ func (e *formulaEval) worksheetSubtotal(n *formulaNode) (FormulaValue, error) {
 	product := 1.0
 	for _, arg := range n.args[1:] {
 		if arg.kind != "ref" {
+			if arg.kind == "value" && arg.value.Kind == "error" {
+				return arg.value, nil
+			}
 			return FormulaValue{}, errors.New("#VALUE!")
 		}
 		r, err := e.get(arg.ref)

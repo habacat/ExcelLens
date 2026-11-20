@@ -22,24 +22,26 @@ import (
 // A structural operation consumes a materialized revision. All parts that do
 // not receive a splice retain their original compressed representation.
 func RewriteStructure(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile, op editdoc.Structure) (opc.Receipt, error) {
-	p, err := openXLSXPackage(src, src.Size())
+	return rewriteStructureFrom(ctx, dst, src, op, nil)
+}
+
+func rewriteStructureFrom(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile, op editdoc.Structure, prior *xlsxPackage) (opc.Receipt, error) {
+	p, err := openStructurePackage(ctx, src)
 	if err != nil {
 		return opc.Receipt{}, err
 	}
-	if err = p.inspect(ctx); err != nil {
-		return opc.Receipt{}, err
-	}
-	if err = p.inspectGrid(ctx); err != nil {
-		return opc.Receipt{}, err
-	}
 	switch op.Kind {
+	case "resizeTable":
+		return p.resizeTable(ctx, dst, src, op, nil)
+	case "cutRange", "copyRange":
+		return p.transferRange(ctx, dst, src, op, prior)
 	case "fixedArray", "spillFormula", "clearArray":
 		return p.rewriteArray(ctx, dst, src, op)
 	}
 	if op.Kind == "mergeCells" || op.Kind == "unmergeCells" {
 		return p.rewriteMerge(ctx, dst, src, op)
 	}
-	if op.Kind == "refreshPivot" || op.Kind == "configurePivot" || op.Kind == "pivotValueFilter" || op.Kind == "pivotCalculatedItem" {
+	if op.Kind == "refreshPivot" || op.Kind == "configurePivot" || op.Kind == "pivotValueFilter" || op.Kind == "pivotCalculatedItem" || op.Kind == "pivotLabelFilter" || op.Kind == "pivotDateGroup" || op.Kind == "pivotDateFilter" {
 		return p.rewritePivot(ctx, dst, src, op)
 	}
 	if op.Kind == "refreshCharts" {
@@ -124,6 +126,17 @@ func RewriteStructure(ctx context.Context, dst io.Writer, src *workbook.EditSour
 		}
 		return opc.Change{Write: func(_ io.Reader, w io.Writer) error { _, e := w.Write(out); return e }}, nil
 	})
+}
+
+func openStructurePackage(ctx context.Context, src *workbook.EditSourceFile) (*xlsxPackage, error) {
+	p, err := openXLSXPackage(src, src.Size())
+	if err == nil {
+		err = p.inspect(ctx)
+	}
+	if err == nil {
+		err = p.inspectGrid(ctx)
+	}
+	return p, err
 }
 
 func patchedChange(ctx context.Context, data []byte, ps []xmlPatch) (opc.Change, error) {

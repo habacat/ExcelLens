@@ -110,8 +110,8 @@ func (b *CalculationBook) ArrayChange(ctx context.Context, doc *editdoc.Document
 	for a := range calc.Arrays {
 		if v, ok := ordinary[a]; ok && v.Kind == "formula" {
 			delete(ordinary, a)
-			if v.Style != "" && v.Style != b.cells[a].value.Style {
-				ordinary[a] = editdoc.Value{Style: v.Style}
+			if v.Style != "" && (v.Style != b.cells[a].value.Style || v.NumberStyle != "" || v.BuiltinFormat != 0) {
+				ordinary[a] = editdoc.Value{Style: v.Style, NumberStyle: v.NumberStyle, BuiltinFormat: v.BuiltinFormat}
 			}
 		}
 	}

@@ -2,7 +2,6 @@ package editfile
 
 import (
 	"archive/zip"
-	"bytes"
 	"cmp"
 	"context"
 	"io"
@@ -15,7 +14,7 @@ import (
 // Both cell-edit strategies produce offsets into original worksheet parts.
 // The package layer owns byte preservation and integrity for either strategy.
 func (p *xlsxPackage) writePackage(ctx context.Context, dst io.Writer, source *workbook.EditSourceFile, proof string, result XLSXResult, plan func(string) ([]xmlPatch, error)) (XLSXResult, error) {
-	receipt, err := opc.Rewrite(ctx, dst, p.zip, func(part *zip.File) (opc.Change, error) {
+	receipt, err := opc.RewriteWithAdditions(ctx, dst, p.zip, result.addedParts, func(part *zip.File) (opc.Change, error) {
 		if result.removedCalcChain && part.Name == calcChainPart {
 			return opc.Change{Remove: true}, nil
 		}
@@ -38,11 +37,50 @@ func (p *xlsxPackage) writePackage(ctx context.Context, dst io.Writer, source *w
 // XML offsets always refer to the uncompressed source bytes. Ordered splices
 // apply equally to a retained VML fragment and a streamed worksheet.
 func writeXMLPatches(ctx context.Context, dst io.Writer, source []byte, patches []xmlPatch) error {
-	return writePartPatches(ctx, dst, bytes.NewReader(source), int64(len(source)), patches)
+	pos := 0
+	for _, p := range patches {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if p.from < pos || p.to < p.from || p.to > len(source) {
+			return ErrXLSX
+		}
+		if p.from != pos {
+			if _, err := dst.Write(source[pos:p.from]); err != nil {
+				return err
+			}
+		}
+		if p.data != "" {
+			if _, err := io.WriteString(dst, p.data); err != nil {
+				return err
+			}
+		}
+		pos = p.to
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err := dst.Write(source[pos:])
+	return err
 }
 
 func writePartPatches(ctx context.Context, out io.Writer, src io.Reader, size int64, ps []xmlPatch) error {
 	pos := 0
+	// A recalculated sheet can have thousands of splices. Reuse the copy
+	// buffer and limiter across them instead of allocating for each XML span.
+	limited := io.LimitedReader{R: src}
+	buf := make([]byte, 32<<10)
+	copySpan := func(dst io.Writer, size int) error {
+		if size == 0 {
+			return nil
+		}
+		limited.N = int64(size)
+		_, err := io.CopyBuffer(dst, &limited, buf)
+		if err == nil && limited.N != 0 {
+			return io.ErrUnexpectedEOF
+		}
+		return err
+	}
 	for _, patch := range ps {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -50,10 +88,10 @@ func writePartPatches(ctx context.Context, out io.Writer, src io.Reader, size in
 		if patch.from < pos || patch.to < patch.from || int64(patch.to) > size {
 			return ErrXLSX
 		}
-		if _, err := io.CopyN(out, src, int64(patch.from-pos)); err != nil {
+		if err := copySpan(out, patch.from-pos); err != nil {
 			return err
 		}
-		if _, err := io.CopyN(io.Discard, src, int64(patch.to-patch.from)); err != nil {
+		if err := copySpan(io.Discard, patch.to-patch.from); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(out, patch.data); err != nil {

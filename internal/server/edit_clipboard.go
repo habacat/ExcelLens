@@ -19,9 +19,11 @@ import (
 const editClipboardFormat = "ExcelLens.EditSelection"
 
 type editClipboardCell struct {
-	Value   *editdoc.Value `json:"value,omitempty"`
-	Formula string         `json:"formula,omitempty"`
-	Style   string         `json:"style,omitempty"`
+	Value         *editdoc.Value `json:"value,omitempty"`
+	Formula       string         `json:"formula,omitempty"`
+	Style         string         `json:"style,omitempty"`
+	NumberStyle   string         `json:"numberStyle,omitempty"`
+	BuiltinFormat int            `json:"builtinFormat,omitempty"`
 }
 
 type editClipboard struct {
@@ -105,8 +107,8 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 		if derived, ok := calc.ArrayMembers[addr]; ok {
 			value = derived
 		}
-		item := editClipboardCell{Style: value.Style}
-		value.Style = ""
+		item := editClipboardCell{Style: value.Style, NumberStyle: value.NumberStyle, BuiltinFormat: value.BuiltinFormat}
+		value.Style, value.NumberStyle, value.BuiltinFormat = "", "", 0
 		if value.Kind == "formula" {
 			item.Formula = value.Raw
 			_, item.Value = calc.FormulaResult(addr, source)
@@ -141,7 +143,7 @@ func (a *App) validEditProof(doc *editdoc.Document, proof string, plan any) bool
 
 func (a *App) checkEditStyleProof(doc *editdoc.Document, proof string, changes []editdoc.Change) error {
 	for _, c := range changes {
-		if c.Value.Style != "" {
+		if c.Value.Style != "" || c.Value.NumberStyle != "" || c.Value.BuiltinFormat != 0 {
 			if !a.validEditProof(doc, proof, changes) {
 				return errors.New("格式变更需要当前修订的预览，请重新预览")
 			}
@@ -184,6 +186,8 @@ func (a *App) previewEditCells(ctx context.Context, doc *editdoc.Document, layou
 				preview.LastValue = c.Value.Raw
 			}
 		}
+	} else if req.Mode == "fill-down" || req.Mode == "fill-right" || req.Mode == "fill-entry" {
+		preview, err = a.planGridFill(ctx, doc, layout, first, req)
 	} else if fill {
 		targets, err = editFillTargets(layout, first, req.End)
 		anchors = []editdoc.Address{first}
@@ -223,7 +227,18 @@ func (a *App) previewEditCells(ctx context.Context, doc *editdoc.Document, layou
 		}
 	}
 	var kept []editdoc.Change
-	if tableEdits {
+	var growth *editfile.TableGrowth
+	if tableEdits && req.Direct && req.Mode == "all" {
+		growth, err = layout.GridTableTail(ctx, f, preview.Changes)
+		if err != nil {
+			return preview, err
+		}
+	}
+	if growth != nil {
+		// Authenticated same-book clipboard payload. Its whole rectangle is
+		// needed for append; validation runs against the resized revision.
+		kept = preview.Changes
+	} else if tableEdits {
 		plan, planErr := layout.PrepareChanges(ctx, f, preview.Changes, doc)
 		kept, err = plan.Changes, planErr
 	} else {
@@ -232,17 +247,19 @@ func (a *App) previewEditCells(ctx context.Context, doc *editdoc.Document, layou
 	if err != nil {
 		return preview, err
 	}
-	preview.Changes = kept
+	if req.Mode != "fill-entry" {
+		preview.Changes = kept
+	}
 	if len(kept) == 0 {
 		return preview, editdoc.ErrNoChange
 	}
-	data, _ := json.Marshal(kept)
+	data, _ := json.Marshal(preview.Changes)
 	if len(data)+1024 > formats.EditRequestBytes {
 		return preview, errEditRequestCapacity
 	}
-	for _, c := range kept {
+	for _, c := range preview.Changes {
 		if c.Value.Style != "" {
-			preview.Proof = a.editPlanProof(doc, kept)
+			preview.Proof = a.editPlanProof(doc, preview.Changes)
 			break
 		}
 	}
@@ -297,23 +314,47 @@ func (a *App) planClipboard(ctx context.Context, doc *editdoc.Document, layout e
 		if layout.XLSX == nil {
 			return editBatchPreview{}, errors.New("此格式只能保存文本字段")
 		}
-	case "styles":
+	case "styles", "all":
 		if layout.XLSX == nil || clip.Source != doc.Base.Source.Stamp || !hmac.Equal([]byte(clip.Proof), []byte(a.editClipboardProof(*clip))) {
-			return editBatchPreview{}, errors.New("仅格式粘贴需要从同一工作簿重新复制")
+			return editBatchPreview{}, errors.New("粘贴单元格格式需要从同一工作簿重新复制")
 		}
 	default:
 		return editBatchPreview{}, editdoc.ErrInvalid
 	}
 	last := editdoc.Address{Sheet: first.Sheet, Row: first.Row + clip.Rows - 1, Col: first.Col + clip.Cols - 1}
+	if req.Mode == "all" && req.End != "" {
+		end, err := editAddress(first.Sheet, req.End)
+		if err != nil || end.Row < last.Row || end.Col < last.Col || (end.Row-first.Row+1)%clip.Rows != 0 || (end.Col-first.Col+1)%clip.Cols != 0 {
+			return editBatchPreview{}, errors.New("选择与复制区域匹配的矩形")
+		}
+		last = end
+	}
 	if !layout.Contains(first) || !layout.Contains(last) {
 		return editBatchPreview{}, editfile.ErrTarget
 	}
-	preview := editBatchPreview{Changes: make([]editdoc.Change, 0, len(clip.Cells)), Last: last}
-	for i, c := range clip.Cells {
-		r, col := i/clip.Cols, i%clip.Cols
+	height, width := last.Row-first.Row+1, last.Col-first.Col+1
+	if height > formats.EditBatchCells/width {
+		return editBatchPreview{}, errEditRequestCapacity
+	}
+	preview := editBatchPreview{Changes: make([]editdoc.Change, 0, height*width), Last: last}
+	size := 1024
+	for i := 0; i < height*width; i++ {
+		if err := ctx.Err(); err != nil {
+			return preview, err
+		}
+		r, col := i/width, i%width
+		sr, sc := r%clip.Rows, col%clip.Cols
+		c := clip.Cells[sr*clip.Cols+sc]
 		target := editdoc.Address{Sheet: first.Sheet, Row: first.Row + r, Col: first.Col + col}
 		var v editdoc.Value
-		switch req.Mode {
+		mode := req.Mode
+		if mode == "all" {
+			mode = "values"
+			if c.Formula != "" {
+				mode = "formulas"
+			}
+		}
+		switch mode {
 		case "values":
 			if c.Value == nil {
 				return preview, fmt.Errorf("%s%d 当前没有可复制的结果", workbook.ColumnName(clip.Start.Col+col), clip.Start.Row+r)
@@ -336,15 +377,27 @@ func (a *App) planClipboard(ctx context.Context, doc *editdoc.Document, layout e
 			if err != nil {
 				return preview, err
 			}
-			expression, err := formula.Shift(first.Row-clip.Start.Row, first.Col-clip.Start.Col)
+			expression, err := formula.Shift(target.Row-clip.Start.Row-sr, target.Col-clip.Start.Col-sc)
 			if err != nil {
 				return preview, err
 			}
 			v = editdoc.Value{Kind: "formula", Raw: expression}
 		case "styles":
-			v.Style = c.Style
+			v.Style, v.NumberStyle, v.BuiltinFormat = c.Style, c.NumberStyle, c.BuiltinFormat
 		}
-		preview.Changes = append(preview.Changes, editdoc.Change{Address: target, Value: v})
+		if req.Mode == "all" {
+			v.Style, v.NumberStyle, v.BuiltinFormat = c.Style, c.NumberStyle, c.BuiltinFormat
+			if v.Style == "" {
+				v.Style = "0"
+			}
+		}
+		change := editdoc.Change{Address: target, Value: v}
+		data, _ := json.Marshal(change)
+		size += len(data) + 1
+		if size > formats.EditRequestBytes {
+			return preview, errEditRequestCapacity
+		}
+		preview.Changes = append(preview.Changes, change)
 	}
 	if len(preview.Changes) == 0 {
 		return preview, editdoc.ErrNoChange

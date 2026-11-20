@@ -38,6 +38,7 @@ func (r cellRect) addresses(sheet string) ([]editdoc.Address, error) {
 func addressRef(a editdoc.Address) string { return workbook.ColumnName(a.Col) + strconv.Itoa(a.Row) }
 
 type gridOwners struct {
+	namespaces                 transferNamespaces
 	merges                     []cellRect
 	arrays                     map[editdoc.Address]sourceFormulaTag
 	mergeFrom, mergeTo, insert int
@@ -56,6 +57,9 @@ func sheetOwners(ctx context.Context, data []byte, sheet string) (gridOwners, er
 		}
 		switch t := e.token.(type) {
 		case xml.StartElement:
+			if len(e.stack) <= 3 {
+				g.namespaces.observe(e, t)
+			}
 			switch {
 			case len(e.stack) == 2 && e.local() == "sheetProtection":
 				g.protected = isTrue(attribute(t, "", "sheet"))
@@ -150,6 +154,7 @@ func (p *xlsxPackage) rangeCells(ctx context.Context, s rangeSheet, addresses []
 		return nil, err
 	}
 	var ps []xmlPatch
+	size := len(data)
 	dimension := t.dimension
 	for _, row := range t.rows {
 		var added strings.Builder
@@ -160,6 +165,10 @@ func (p *xlsxPackage) rangeCells(ctx context.Context, s rangeSheet, addresses []
 			}
 			if !change {
 				continue
+			}
+			size += len(value) - (cell.original.to - cell.original.from)
+			if size > formats.EditXLSXPartBytes {
+				return nil, fmt.Errorf("工作表超过 %d MB 区域编辑容量", formats.EditXLSXPartBytes>>20)
 			}
 			if cell.original.value.Kind == "missing" {
 				r, c := cell.address.Row, cell.address.Col
@@ -183,7 +192,10 @@ func (p *xlsxPackage) rangeCells(ctx context.Context, s rangeSheet, addresses []
 		}
 	}
 	if len(ps) > 0 && t.emptyDataClose != "" {
-		ps = append(ps, xmlPatch{t.emptyDataStart, t.emptyDataStart, ">"}, xmlPatch{t.emptyDataStart, t.emptyDataStart + 2, t.emptyDataClose})
+		// The first row starts at the slash of <sheetData/>. Equal-offset
+		// inserts are stable, so the opening delimiter must precede all rows.
+		ps = append([]xmlPatch{{t.emptyDataStart, t.emptyDataStart, ">"}}, ps...)
+		ps = append(ps, xmlPatch{t.emptyDataStart, t.emptyDataStart + 2, t.emptyDataClose})
 	}
 	if t.dimensionEnd != 0 && dimension != t.dimension {
 		more, err := setXMLAttribute(data, t.dimensionStart, t.dimensionEnd, "ref", pivotRectRef(dimension))

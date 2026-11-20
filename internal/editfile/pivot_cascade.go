@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"time"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/opc"
@@ -56,6 +57,7 @@ func (p *xlsxPackage) refreshPivotCaches(ctx context.Context, dst io.Writer, tar
 }
 
 func (p *xlsxPackage) refreshCacheRoots(ctx context.Context, dst io.Writer, targets []string, op *editdoc.Structure, values objectValues, chartParts []string) (opc.Receipt, error) {
+	p.pivotAsOf = calendarDay(time.Now())
 	chartKeys, err := p.linkedPivotCharts(ctx)
 	if err != nil {
 		return opc.Receipt{}, err
@@ -117,7 +119,6 @@ func (p *xlsxPackage) renderCacheGraph(ctx context.Context, dst io.Writer, root,
 			}
 			overlay[a] = v
 			changes[a.Sheet][a] = v
-
 		}
 		// Explicitly refreshed pivot outputs are authoritative inputs for
 		// formula recalculation, including formulas that feed another cache.
@@ -143,7 +144,7 @@ func (p *xlsxPackage) renderCacheGraph(ctx context.Context, dst io.Writer, root,
 		if len(changes[s.Name]) == 0 {
 			continue
 		}
-		raw, err := p.pivotSheet(ctx, s, changes[s.Name], plans)
+		raw, err := p.pivotSheet(ctx, s, changes[s.Name], plans, updates)
 		if err != nil {
 			return opc.Receipt{}, false, err
 		}

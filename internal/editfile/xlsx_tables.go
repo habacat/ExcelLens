@@ -70,6 +70,7 @@ type tableElement struct{ from, openEnd, endStart, to int }
 type columnMarkup struct {
 	column, formula, total tableElement
 	childStart             int
+	dataDxf, dataStyle     string
 }
 
 func parseTable(ctx context.Context, data []byte, sheet, part, rel string) (xlsxTable, []columnMarkup, error) {
@@ -126,6 +127,8 @@ func parseTable(ctx context.Context, data []byte, sheet, part, rel string) (xlsx
 				m := &markup[col]
 				m.column = tableElement{from: e.from, openEnd: e.to}
 				c := &tab.Columns[col]
+				m.dataDxf = attribute(el, "", "dataDxfId")
+				m.dataStyle = attribute(el, "", "dataCellStyle")
 				c.Function = attribute(el, "", "totalsRowFunction")
 				c.Label = attribute(el, "", "totalsRowLabel")
 				if attribute(el, "", "queryTableFieldId") != "" {

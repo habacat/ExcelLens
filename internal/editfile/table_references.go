@@ -58,44 +58,9 @@ func (l XLSXLayout) tableReference(raw string, a editdoc.Address) (calculator.Wo
 	if !ok || inner == "" {
 		return ref, "", false
 	}
-	item := ""
-	if strings.HasPrefix(inner, "@") {
-		item = "#This Row"
-		inner = inner[1:]
-	}
-	var fields []string
-	if strings.HasPrefix(inner, "[") {
-		for {
-			word, rest, ok := tableSpecifier(inner)
-			if !ok {
-				return ref, "", false
-			}
-			if strings.HasPrefix(word, "#") {
-				if item != "" || len(fields) != 0 {
-					return ref, "", false
-				}
-				item = word
-				if rest != "" && !strings.HasPrefix(rest, ",") {
-					return ref, "", false
-				}
-			} else {
-				fields = append(fields, word)
-				if rest != "" && (!strings.HasPrefix(rest, ":") || len(fields) != 1) {
-					return ref, "", false
-				}
-			}
-			if rest == "" {
-				break
-			}
-			inner = rest[1:]
-		}
-	} else if strings.HasPrefix(inner, "#") {
-		if item != "" {
-			return ref, "", false
-		}
-		item = inner
-	} else if inner != "" {
-		fields = append(fields, inner)
+	item, fields, ok := tableSelector(inner)
+	if !ok {
+		return ref, "", false
 	}
 	switch strings.ToUpper(item) {
 	case "":
@@ -158,4 +123,102 @@ func (l XLSXLayout) tableReference(raw string, a editdoc.Address) (calculator.Wo
 		sel = "[" + sel + "]"
 	}
 	return ref, t.Name + sel, true
+}
+
+// A valid table selector may have no range in the current layout. Preserve
+// its expression and return Excel's error until that range exists again.
+func (l XLSXLayout) tableReferenceError(raw string, a editdoc.Address) string {
+	name, rest, ok := strings.Cut(raw, "[")
+	if !ok {
+		return ""
+	}
+	inner, ok := strings.CutSuffix(rest, "]")
+	if !ok {
+		return ""
+	}
+	item, fields, ok := tableSelector(inner)
+	if !ok {
+		return ""
+	}
+	for _, t := range l.Tables {
+		if name == "" {
+			if a.Sheet != t.Sheet || !t.bounds().contains(a.Row, a.Col) {
+				continue
+			}
+		} else if !strings.EqualFold(name, t.Name) {
+			continue
+		}
+		for _, word := range fields {
+			match := false
+			for _, field := range t.Columns {
+				if strings.EqualFold(field.Name, tableCaptionUnescape.Replace(word)) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return ""
+			}
+		}
+		first, last := t.dataRows()
+		switch strings.ToUpper(item) {
+		case "#THIS ROW":
+			if a.Row < first || a.Row > last {
+				return "#VALUE!"
+			}
+		case "#TOTALS":
+			if t.Totals == 0 {
+				return "#REF!"
+			}
+		case "#HEADERS":
+			if t.Headers == 0 {
+				return "#REF!"
+			}
+		}
+		return ""
+	}
+	return ""
+}
+
+func tableSelector(inner string) (string, []string, bool) {
+	item := ""
+	if strings.HasPrefix(inner, "@") {
+		item = "#This Row"
+		inner = inner[1:]
+	}
+	var fields []string
+	if strings.HasPrefix(inner, "[") {
+		for {
+			word, rest, ok := tableSpecifier(inner)
+			if !ok {
+				return "", nil, false
+			}
+			if strings.HasPrefix(word, "#") {
+				if item != "" || len(fields) != 0 {
+					return "", nil, false
+				}
+				item = word
+				if rest != "" && !strings.HasPrefix(rest, ",") {
+					return "", nil, false
+				}
+			} else {
+				fields = append(fields, word)
+				if rest != "" && (!strings.HasPrefix(rest, ":") || len(fields) != 1) {
+					return "", nil, false
+				}
+			}
+			if rest == "" {
+				break
+			}
+			inner = rest[1:]
+		}
+	} else if strings.HasPrefix(inner, "#") {
+		if item != "" {
+			return "", nil, false
+		}
+		item = inner
+	} else if inner != "" {
+		fields = append(fields, inner)
+	}
+	return item, fields, true
 }

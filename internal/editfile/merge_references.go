@@ -46,6 +46,18 @@ func relocatedFormula(body, scope string, from, to editdoc.Address) (string, err
 }
 
 func (p *xlsxPackage) mergedReferences(ctx context.Context, data []byte, sheet string, from, to editdoc.Address, changed map[editdoc.Address]editdoc.Value) ([]byte, error) {
+	return p.rewriteFormulaBodies(ctx, data, sheet, func(old, scope string, cell editdoc.Address, isCell bool) (string, error) {
+		next, err := relocatedFormula(old, scope, from, to)
+		if isCell && next != old && err == nil {
+			changed[cell] = editdoc.Value{Kind: "formula", Raw: "=" + next}
+		}
+		return next, err
+	})
+}
+
+// Pass the containing cell only for a worksheet formula. Workbook names,
+// validation expressions, table templates and chart series have their own scope.
+func (p *xlsxPackage) rewriteFormulaBodies(ctx context.Context, data []byte, sheet string, rewrite func(string, string, editdoc.Address, bool) (string, error)) ([]byte, error) {
 	var ps []xmlPatch
 	var body strings.Builder
 	var cell editdoc.Address
@@ -63,7 +75,7 @@ func (p *xlsxPackage) mergedReferences(ctx context.Context, data []byte, sheet s
 			}
 			switch e.local() {
 			case "f", "definedName", "formula", "formula1", "formula2", "totalsRowFormula", "calculatedColumnFormula":
-				if t.Name.Space != mainNS && t.Name.Space != chartNS {
+				if t.Name.Space != mainNS && t.Name.Space != chartNS && t.Name.Space != "http://schemas.microsoft.com/office/excel/2006/main" {
 					return nil
 				}
 				expr, scope, offset, depth = e.local(), sheet, e.to, len(e.stack)
@@ -83,15 +95,12 @@ func (p *xlsxPackage) mergedReferences(ctx context.Context, data []byte, sheet s
 				return nil
 			}
 			old := body.String()
-			next, err := relocatedFormula(old, scope, from, to)
+			next, err := rewrite(old, scope, cell, expr == "f" && e.parent() == "c")
 			if err != nil {
 				return err
 			}
 			if next != old {
 				ps = append(ps, xmlPatch{offset, e.from, escapedXML(next)})
-				if expr == "f" && e.parent() == "c" {
-					changed[cell] = editdoc.Value{Kind: "formula", Raw: "=" + next}
-				}
 			}
 			expr = ""
 		}

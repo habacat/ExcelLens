@@ -1,13 +1,12 @@
 /* Crosshair colors are display-only; changing them never reloads a sheet. */
 (() => {
   'use strict';
-  const colors=Object.freeze({blue:{name:'蓝色',color:'#3c7dc3',deep:'#103469',light:'#d7eaff',night:'#9acbff'},green:{name:'绿色',color:'#278562',deep:'#0c4b37',light:'#d4f2e4',night:'#8bd3ad'},amber:{name:'琥珀',color:'#b77a19',deep:'#67420d',light:'#fff0c9',night:'#e4c780'},purple:{name:'紫色',color:'#8654b6',deep:'#492768',light:'#edddff',night:'#c4a6ec'},rose:{name:'玫红',color:'#b95179',deep:'#701e40',light:'#ffe0ec',night:'#e1a0bc'}});
+  const colors=Object.freeze({blue:{name:'蓝色',color:'#3c7dc3'},green:{name:'绿色',color:'#109968'},amber:{name:'琥珀',color:'#b77a19'},purple:{name:'紫色',color:'#8654b6'},rose:{name:'玫红',color:'#b95179'}});
   const enabledKey='ExcelLens.crosshairEnabled',colorKey='ExcelLens.crosshairColor';
   class HighlightMode {
-    static get palettes(){return colors;}
     constructor({toggle,button,panel,onChange}){
       this.toggle=toggle;this.button=button;this.panel=panel;this.root=document.documentElement;this.onChange=onChange;
-      let enabled=true,color='blue';try{enabled=localStorage.getItem(enabledKey)!=='false';color=localStorage.getItem(colorKey)||'blue';}catch{}
+      let enabled=true,color='green';try{enabled=localStorage.getItem(enabledKey)!=='false';color=localStorage.getItem(colorKey)||'green';}catch{}
       this.apply(enabled,color,false);
       toggle.addEventListener('change',()=>this.apply(toggle.checked,this.color));
       button.addEventListener('click',()=>{if(!panel.hidden)this.close();else{panel.hidden=false;button.setAttribute('aria-expanded','true');panel.querySelector('input:checked')?.focus();}});
@@ -17,13 +16,12 @@
       document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!panel.contains(event.target)&&!button.contains(event.target))this.close(false);});
     }
     apply(enabled,color,persist=true){
-      this.enabled=Boolean(enabled);this.color=Object.hasOwn(colors,color)?color:'blue';
-      this.palette=colors[this.color];
+      this.enabled=Boolean(enabled);this.color=Object.hasOwn(colors,color)?color:'green';
+      const palette=colors[this.color];
       this.toggle.checked=this.enabled;this.root?.setAttribute('data-crosshair-enabled',String(this.enabled));
       this.root?.style.setProperty('--crosshair-color',colors[this.color].color);
-      this.root?.style.setProperty('--selection-color',this.palette.color);
-      this.root?.style.setProperty('--selection-night-fill',this.palette.night+'1f');
-      this.root?.style.setProperty('--selection-active-fill',this.palette.color+'1f');
+      this.root?.style.setProperty('--selection-color',palette.color);
+      this.root?.style.setProperty('--selection-active-fill',palette.color+'1f');
       this.button.title='行列与选区颜色：'+colors[this.color].name;this.button.setAttribute('aria-label',this.button.title);
       for(const input of this.panel.querySelectorAll('input[name="crosshairColor"]'))input.checked=input.value===this.color;
       if(persist)try{localStorage.setItem(enabledKey,String(this.enabled));localStorage.setItem(colorKey,this.color);}catch{}

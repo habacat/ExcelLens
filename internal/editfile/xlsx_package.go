@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/flate"
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/formats"
@@ -61,20 +64,24 @@ type GeneratedArea struct {
 }
 
 type XLSXLayout struct {
-	ChartSheets    []string            `json:"chartSheets,omitempty"`
-	Pivots         []PivotInfo         `json:"pivots,omitempty"`
-	PivotAxesReady bool                `json:"pivotAxesReady,omitempty"`
-	Tables         []xlsxTable         `json:"tables,omitempty"`
-	Inputs         map[string][]string `json:"inputs,omitempty"`
-	Generated      []GeneratedArea     `json:"generated,omitempty"`
-	Size           int64               `json:"size"`
-	Sheets         []XLSXSheet         `json:"sheets"`
-	Rules          []editdoc.Rule      `json:"rules,omitempty"`
-	GridEditing    bool                `json:"gridEditing,omitempty"`
-	Structured     bool                `json:"structured,omitempty"`
-	Native         bool                `json:"native,omitempty"`
-	MacroEnabled   bool                `json:"macroEnabled,omitempty"`
-	RecalcOnOpen   bool                `json:"recalcOnOpen,omitempty"`
+	checkedSource      string
+	checkedLayout      [sha256.Size]byte
+	ChartSheets        []string            `json:"chartSheets,omitempty"`
+	Pivots             []PivotInfo         `json:"pivots,omitempty"`
+	PivotMeasuresReady bool                `json:"pivotMeasuresReady,omitempty"`
+	PivotDatesReady    bool                `json:"pivotDatesReady,omitempty"`
+	PivotAxesReady     bool                `json:"pivotAxesReady,omitempty"`
+	Tables             []xlsxTable         `json:"tables,omitempty"`
+	Inputs             map[string][]string `json:"inputs,omitempty"`
+	Generated          []GeneratedArea     `json:"generated,omitempty"`
+	Size               int64               `json:"size"`
+	Sheets             []XLSXSheet         `json:"sheets"`
+	Rules              []editdoc.Rule      `json:"rules,omitempty"`
+	GridEditing        bool                `json:"gridEditing,omitempty"`
+	Structured         bool                `json:"structured,omitempty"`
+	Native             bool                `json:"native,omitempty"`
+	MacroEnabled       bool                `json:"macroEnabled,omitempty"`
+	RecalcOnOpen       bool                `json:"recalcOnOpen,omitempty"`
 }
 
 func (l XLSXLayout) Valid() bool {
@@ -142,8 +149,11 @@ func (l XLSXLayout) HasSheet(name string) bool {
 }
 
 type xlsxPackage struct {
+	pivotAsOf          time.Time // local civil date shared by every cache in a refresh
 	zip                *zip.Reader
 	files              map[string]*zip.File
+	revisedParts       map[string][]byte                 // pending structural revision, before ZIP publication
+	numberStyleSources map[editdoc.Address]editdoc.Value // before composition with the destination XF
 	layout             XLSXLayout
 	styles             int
 	unlockedStyles     map[string]bool
@@ -260,6 +270,12 @@ func emptyXLSXDirectory(f *zip.File, name string) bool {
 }
 
 func (p *xlsxPackage) readPart(ctx context.Context, name string) ([]byte, error) {
+	if raw, ok := p.revisedParts[name]; ok {
+		if len(raw) > formats.EditXLSXPartBytes {
+			return nil, ErrCalcCapacity
+		}
+		return raw, ctx.Err()
+	}
 	f := p.files[name]
 	if f == nil {
 		return nil, ErrXLSX
@@ -700,7 +716,21 @@ func InspectXLSX(ctx context.Context, f *workbook.EditSourceFile, wb *workbook.W
 			}
 		}
 	}
-	return p.layout, proof, VerifySource(ctx, f, proof)
+	if err = VerifySource(ctx, f, proof); err != nil {
+		return XLSXLayout{}, "", err
+	}
+	p.layout.checkedSource, p.layout.checkedLayout = proof, p.layout.signature()
+	return p.layout, proof, nil
+}
+
+// The seal lives only in memory. A restored layout or edited metadata takes
+// the full preflight path. The generated workbook always has its own checks.
+func (l *XLSXLayout) signature() [sha256.Size]byte {
+	data, err := json.Marshal(l)
+	if err != nil {
+		return [sha256.Size]byte{}
+	}
+	return sha256.Sum256(data)
 }
 
 func (p *xlsxPackage) inspectGrid(ctx context.Context) error {
@@ -713,6 +743,8 @@ func (p *xlsxPackage) inspectGrid(ctx context.Context) error {
 		}
 	}
 	p.layout.PivotAxesReady = len(p.pivotOutputs) > 0
+	p.layout.PivotMeasuresReady = p.layout.PivotAxesReady
+	p.layout.PivotDatesReady = p.layout.PivotAxesReady
 	return p.inspectPivotFields(ctx)
 }
 

@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  const bytes = value => new TextEncoder().encode(value).length;
+  const utf8 = new TextEncoder();
+  const bytes = value => utf8.encode(value).length;
 
   function target(ref, sheet) {
     const hit = /^([A-Z]{1,3})([1-9][0-9]{0,8})$/.exec(ref.trim().toUpperCase());
@@ -43,9 +44,15 @@
   }
 
   function bounded(changes, limits) {
-    if (!changes.length) throw Error('没有可提交的单元格');
-    if (changes.length > limits.batchCells || bytes(JSON.stringify(changes)) + 512 > limits.requestBytes) throw Error('区域超出一次编辑容量，请缩小范围');
-    return changes;
+    let size = 514;
+    const result = [];
+    for (const change of changes) {
+      size += bytes(JSON.stringify(change)) + (result.length ? 1 : 0);
+      if (result.length === limits.batchCells || size > limits.requestBytes) throw Error('区域超出一次编辑容量，请缩小范围');
+      result.push(change);
+    }
+    if (!result.length) throw Error('没有可提交的单元格');
+    return result;
   }
 
   function paste(text, first, sheet, skipBlank, limits, parse) {
@@ -103,5 +110,5 @@
     return value('text', raw, limits);
   }
 
-  window.ExcelLensEditModel = {target, encode, decode, value, gridValue, paste, fill};
+  window.ExcelLensEditModel = {target, encode, decode, value, gridValue, bounded, paste, fill};
 })();

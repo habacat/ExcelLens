@@ -14,8 +14,11 @@ import (
 )
 
 type Layout struct {
-	Text *TextLayout `json:"text,omitempty"`
-	XLSX *XLSXLayout `json:"xlsx,omitempty"`
+	Text     *TextLayout `json:"text,omitempty"`
+	XLSX     *XLSXLayout `json:"xlsx,omitempty"`
+	cache    *SourceCellCache
+	cacheKey string
+	index    *CalculationBook
 }
 
 type ArrayOwner struct {
@@ -33,6 +36,18 @@ type SourceCell struct {
 	ReadOnly  string
 	formula   sourceFormulaTag
 	names     map[nameKey]nameTarget
+}
+
+// FillStyle copies the displayed style within a worksheet. A protected
+// worksheet keeps each destination's own style, including its lock bit.
+func (c SourceCell) FillStyle(current editdoc.Value) string {
+	if c.protected {
+		return ""
+	}
+	if current.Style == "" {
+		return "0"
+	}
+	return current.Style
 }
 
 func (l Layout) Contains(a editdoc.Address) bool {
@@ -93,6 +108,9 @@ func (l Layout) Read(ctx context.Context, f *workbook.EditSourceFile, targets []
 			cells[address] = SourceCell{Value: value}
 		}
 		return cells, nil
+	}
+	if l.cache != nil {
+		return l.cache.read(ctx, f, l, targets)
 	}
 	return ReadXLSXCells(ctx, f, *l.XLSX, targets)
 }

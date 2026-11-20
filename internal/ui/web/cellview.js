@@ -5,6 +5,25 @@
   const occupied=cell=>!!cell&&(!!cell.hasFormula||String(cell.raw??'')!==''||String(cell.display??'')!=='');
   const textTypes=new Set(['s','str','inlineStr','text','string']);
   const numeric=/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+  // General reduces visible precision as the column narrows. A fixed number
+  // format has to keep its specified decimal places, currency and percent sign.
+  function fitGeneralNumber(text, fits) {
+    const n=Number(text);
+    if(!Number.isFinite(n)||n===0)return '';
+    const x=Math.abs(n), integerDigits=x<1?1:Math.floor(Math.log10(x))+1;
+    if(x<1e11 && x>=1e-9) {
+      for(let places=Math.min(14,15-integerDigits);places>=0;places--) {
+        const candidate=n.toFixed(places).replace(/(\.\d*?[1-9])0+$|\.0+$/,'$1');
+        if(Number(candidate)!==0 && fits(candidate))return candidate;
+      }
+    }
+    for(let places=6;places>=0;places--) {
+      const [mantissa,exponent]=n.toExponential(places).split('e');
+      const candidate=mantissa.replace(/(\.\d*?[1-9])0+$|\.0+$/,'$1')+'E'+exponent[0]+exponent.slice(1).padStart(2,'0');
+      if(fits(candidate))return candidate;
+    }
+    return '';
+  }
   const selectionFills=new Map();
   const rgb=(value,fallback)=>{
     const hex=/^#([\da-f]{6})$/i.exec(value||'');
@@ -12,29 +31,23 @@
   };
   const luminance=color=>color.reduce((sum,c,i)=>{const v=c/255;return sum+[.2126,.7152,.0722][i]*(v<=.04045?v/12.92:((v+.055)/1.055)**2.4);},0);
   const contrast=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
-  function selectionFill(background,foreground,palette){
-    const key=(background||'')+'|'+(foreground||'')+'|'+(palette?.deep||'')+'|'+(palette?.light||'');
+  function selectionFill(background,foreground){
+    const key=(background||'')+'|'+(foreground||'');
     if(selectionFills.has(key))return selectionFills.get(key);
-    const base=rgb(background,[255,255,255]),text=rgb(foreground,[48,67,85]),light=luminance(text);
-    const required=Math.min(4.5,contrast(light,luminance(base))*.9);
-    const candidates=[rgb(palette?.deep,[16,52,105]),rgb(palette?.light,[215,234,255])].map(color=>{
-      let alpha=.34,painted,readable;
-      do{
-        painted=color.map((c,i)=>base[i]*(1-alpha)+c*alpha);
-        readable=contrast(light,luminance(painted))>=required;
-        if(readable||alpha===0)break;
-        alpha=Math.max(0,Number((alpha-.04).toFixed(2)));
-      }while(true);
-      // A same-hue source fill can need a stronger tint. Increase only while
-      // the original text stays readable; never add internal grid borders.
-      while(palette&&painted.reduce((sum,c,i)=>sum+Math.abs(c-base[i]),0)/3<22&&alpha<.58){
-        const next=Math.min(.58,Number((alpha+.04).toFixed(2))),nextPaint=color.map((c,i)=>base[i]*(1-next)+c*next);
-        if(contrast(light,luminance(nextPaint))<required)break;
-        alpha=next;painted=nextPaint;
+    const base=rgb(background,[255,255,255]),ink=luminance(rgb(foreground,[48,67,85]));
+    const required=Math.min(4.5,contrast(ink,luminance(base))*.9);
+    const mean=base.reduce((sum,c)=>sum+c,0)/3;
+    const preferred=mean>=128?0:255;
+    let result='rgba(0,0,0,0)';
+    for(const gray of [preferred,255-preferred]){
+      const distance=Math.abs(gray-mean);
+      if(distance<20)continue;
+      const alpha=Math.min(1,25/distance);
+      const painted=base.map(c=>c+(gray-c)*alpha);
+      if(contrast(ink,luminance(painted))>=required){
+        result=`rgba(${gray},${gray},${gray},${alpha})`;break;
       }
-      return {color,alpha,readable,distance:painted.reduce((sum,c,i)=>sum+(c-base[i])**2,0)};
-    }).sort((a,b)=>Number(b.readable)-Number(a.readable)||b.distance-a.distance);
-    const result=`rgba(${candidates[0].color.join(',')},${candidates[0].alpha})`;
+    }
     if(selectionFills.size>=256)selectionFills.delete(selectionFills.keys().next().value);
     selectionFills.set(key,result);return result;
   }
@@ -58,7 +71,16 @@
     allowed(cell){return (!cell?.richText&&!window.ExcelLensConditional?.needsInline(cell,this.style(cell)))||!this.richPlan||this.richPlan.get(cell)===true;}
     paintKey(){const s=this.o.state;return [s.showStyles,s.showFormulas,s.fontOverride,this.o.scale()].join('|');}
     needsPaint(node,cell,row){return node._xlPaintKey!==this.paintKey()||node._xlRichAllowed!==this.allowed(cell)||node._xlRowPresentationNotice!==(row?.presentationNotice||'');}
-    value(cell){return value(cell,this.o.state.showFormulas,this.o.state.showStyles);}
+    value(cell){
+      const s=this.o.state,text=value(cell,s.showFormulas,s.showStyles);
+      if(!cell || s.showFormulas&&cell.hasFormula || cell.conditional?.display!=null)return text;
+      const pattern=cell.displayNumFmt==null?s.styles?.[cell.style]?.shortDate:cell.shortDate;
+      if(!pattern || (cell.type && cell.type!=='n') || !numeric.test(String(cell.raw)))return text;
+      const parts=/^(\d{4})-(\d\d)-(\d\d)(.*)$/.exec(text);
+      if(!parts)return text;
+      const fields={y:parts[1].slice(-2),yy:parts[1].slice(-2),yyyy:parts[1],m:String(+parts[2]),mm:parts[2],d:String(+parts[3]),dd:parts[3]};
+      return pattern.replace(/y+|m+|d+/g,t=>fields[t]??t)+parts[4];
+    }
     style(cell,rowStyle=0){const s=this.o.state;return window.ExcelLensConditional?.visual(cell,s.styles,rowStyle,s.showStyles)??(s.showStyles?s.styles?.[Number(cell?.style??rowStyle)||0]:null);}
     paint(node,cell,row){
       if(node._xlNumericOriginal)node.title=node._xlNumericOriginalTitle||'';
@@ -134,7 +156,16 @@
       padding=padding??(this.o.numericPadding?this.o.numericPadding(node):node.classList.contains('auto-filter-header')?32:14);const available=Math.max(0,width-padding);
       if(!(width>0)||!Number.isFinite(measured.width)||measured.width<=available+.25)return restore();
       if(!node._xlNumericSpan){const original=node._xlRichNode||[...node.childNodes].find(n=>n.nodeType===3);if(!original)return false;const span=document.createElement('span');span.className='cell-number-overflow';node._xlNumericOriginal=original;node._xlNumericOriginalTitle=node.title||'';node._xlNumericSpan=span;original.replaceWith(span);}
-      node._xlNumericSpan.textContent='#'.repeat(Math.min(128,Math.max(1,Math.floor(available/Math.max(1,measured.hash)))));node.title=[node._xlNumericOriginalTitle,'宽度不足，完整显示值：'+text].filter(Boolean).join('；');return true;
+      let fitted='';
+      if(text===String(cell.raw) && !cell.conditional?.display && !(cell.displayNumFmt??s.styles?.[cell.style]?.numFmtId)) {
+        if(measured.fitWidth!==available) {
+          this.measure.font=font;
+          measured.fitted=fitGeneralNumber(text, candidate=>this.measure.measureText(candidate).width<=available+.25);
+          measured.fitWidth=available;
+        }
+        fitted=measured.fitted;
+      }
+      node._xlNumericSpan.textContent=fitted||'#'.repeat(Math.min(128,Math.max(1,Math.floor(available/Math.max(1,measured.hash)))));node.title=[node._xlNumericOriginalTitle,'宽度不足，完整显示值：'+text].filter(Boolean).join('；');return true;
     }
     overflow(node,cell,values,layouts,position){
       if(this.fitNumber(node,cell,parseFloat(node.style.width)||layouts[position]?.width||0))return;

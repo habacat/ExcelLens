@@ -268,8 +268,6 @@
   background-image:linear-gradient(var(--selection-night-fill,#9acbff1f),var(--selection-night-fill,#9acbff1f))!important;
   color:color-mix(in srgb,var(--xl-color,var(--reading-ink)) 8%,var(--reading-ink));
 }
-:root[data-reading-tone="dark"] .grid-region .grid-cell.range-cell::before {border-color:var(--selection-color,#3c7dc3);}
-:root[data-reading-tone="dark"] .grid-region .grid-cell.range-cell.selected {box-shadow:inset 0 0 0 2px var(--selection-color,#3c7dc3);}
 :root[data-reading-tone="dark"] .text-table-view :is(.table-column-head,.table-header-row .grid-cell,.pinned-cell.auto-filter-header) {background-color:var(--reading-surface);color:var(--reading-ink);}
 :root[data-reading-tone="dark"] :is(.column-filter,.table-column-letter) {color:var(--reading-muted);}
 :root[data-reading-tone="dark"] .column-filter:hover {background:var(--reading-active);color:var(--reading-accent);}
@@ -311,7 +309,7 @@
  * its state in CSS also updates frozen and cached cells without a repaint. */
 :root {
   --crosshair-color:#3c7dc3;
-  --selection-color:#3c7dc3;--selection-night-fill:#9acbff1f;--selection-active-fill:#3c7dc31f;
+  --selection-color:#109968;--selection-night-fill:rgba(255,255,255,.12);--selection-active-fill:#3c7dc31f;
   --crosshair-row-fill:color-mix(in srgb,var(--crosshair-color) 8%,transparent);
   --crosshair-column-fill:color-mix(in srgb,var(--crosshair-color) 11%,transparent);
   --crosshair-both-fill:color-mix(in srgb,var(--crosshair-color) 17%,transparent);
@@ -370,11 +368,12 @@
 .status-strip #gridStatus,.status-strip #selectionStatus {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .status-strip .quick-stats {min-width:0;overflow:hidden;}
 
-/* One chosen hue owns all explicit selection edges, fills and crosshairs.
- * The crosshair switch only controls its two auxiliary bands. */
+/* A rectangle shares one perimeter. The active cell keeps its worksheet fill. */
 :root .grid-region .grid-cell.selected {outline-color:var(--selection-color);background-image:linear-gradient(var(--selection-active-fill),var(--selection-active-fill))!important;}
-:root .grid-region .grid-cell.range-cell::before {border-color:var(--selection-color);}
-:root .grid-region .grid-cell.range-cell.selected {box-shadow:inset 0 0 0 2px var(--selection-color);}
+:root .grid-region:is(.has-cell-selection,.has-range) .grid-cell.selected {outline:0;box-shadow:none;background-image:none!important;}
+.grid-region.has-range {--crosshair-row-fill:transparent;--crosshair-column-fill:transparent;--crosshair-both-fill:transparent;}
+:root[data-reading-preset] .grid-region {--range-grid-line:color-mix(in srgb,var(--reading-grid-line,#e6e6e6) 90%,#000);}
+:root[data-reading-tone="dark"] .grid-region {--range-grid-line:color-mix(in srgb,var(--reading-grid-line) 84%,#fff);}
 :root .grid-region :is(.column-head.active,.pinned-row-head.active,.grid-row.active-row .row-head) {background:color-mix(in srgb,var(--selection-color) 18%,var(--reading-surface,#f4f6f8));color:var(--reading-ink,#234a6a);}
 :root .grid-region .column-head.column-selected {background:color-mix(in srgb,var(--selection-color) 20%,var(--reading-surface,#f4f6f8))!important;color:var(--reading-ink,#234a6a);box-shadow:inset 0 -2px 0 var(--selection-color);}
 :root .grid-region .grid-row.whole-row-selected .grid-cell:not(.selected):not(.range-cell),

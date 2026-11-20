@@ -192,7 +192,7 @@ func (p *xlsxPackage) worksheetPatches(ctx context.Context, data []byte, targets
 			if err := p.layout.validateStoredValue(ctx, target.address, edit, SourceCell{formula: original.formula, names: p.names}, numberCheck); err != nil {
 				return nil, nil, false, err
 			}
-			if err := p.layout.checkCellEdit(target.address, original.readOnly, original.protected, edit); err != nil {
+			if err := p.layout.checkCellEdit(target.address, original.readOnly, original.protected, original.value.Style, p.logicalEdit(target.address, edit)); err != nil {
 				return nil, nil, false, err
 			}
 			v := edit.Apply(original.value)
@@ -369,6 +369,7 @@ type XLSXResult struct {
 	PivotCachesAfterCalc int
 	cells                map[editdoc.Address]savedCell
 	removedCalcChain     bool
+	addedParts           map[string][]byte
 }
 
 func WriteXLSX(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile, layout XLSXLayout, proof string, edits map[editdoc.Address]editdoc.Value, ruleEdits []editdoc.Rule) (XLSXResult, error) {
@@ -394,6 +395,14 @@ func writeXLSX(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile,
 	if err != nil {
 		return result, err
 	}
+	edits, styles, err := p.materializeNumberStyles(ctx, edits)
+	if err != nil {
+		return result, err
+	}
+	result.addedParts, err = p.installEntryStyles(ctx, styles, patches)
+	if err != nil {
+		return result, err
+	}
 	if p.layout.Native || layout.Native {
 		if !p.layout.Native || !layout.Native || layout.MacroEnabled != p.layout.MacroEnabled || !slices.Equal(p.layout.Sheets, layout.Sheets) || len(ruleEdits) != 0 {
 			return result, ErrBinding
@@ -407,8 +416,12 @@ func writeXLSX(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile,
 	if layout.Structured {
 		p.layout.Structured = true
 		p.layout.GridEditing = layout.GridEditing
-		err = p.inspectWorksheets(ctx)
-		if err != nil {
+		if layout.checkedSource != "" && layout.checkedSource == proof && layout.checkedLayout == layout.signature() {
+			if err = VerifySource(ctx, src, proof); err != nil {
+				return result, err
+			}
+			p.layout = layout
+		} else if err = p.inspectWorksheets(ctx); err != nil {
 			return result, err
 		}
 		if !slices.Equal(p.layout.Sheets, layout.Sheets) || !slices.Equal(p.layout.Rules, layout.Rules) {
@@ -564,10 +577,11 @@ func writeXLSX(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile,
 			if err != nil {
 				return result, err
 			}
-			patches[name], err = calcChainReferencePatch(ctx, data, name)
+			ps, err := calcChainReferencePatch(ctx, data, name)
 			if err != nil {
 				return result, err
 			}
+			patches[name] = append(patches[name], ps...)
 		}
 	}
 	return p.writePackage(ctx, dst, src, proof, result, func(part string) ([]xmlPatch, error) {

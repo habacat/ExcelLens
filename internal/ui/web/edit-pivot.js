@@ -27,6 +27,7 @@
 
   class PivotLayout {
     constructor(editor) { this.editor = editor; }
+    action(label,path,click){return action(label,path,click);}
     bind(info) {
       this.info = info;
       this.axes = info ? structuredClone(info.axes || {rows:info.row ? [info.row] : []}) : null;
@@ -99,7 +100,7 @@
     }
     updated(key,index) {
       if(!this.axes.rows.length){el('Filter').value='keep';el('Item').value='';}
-      this.draw();this.editor.controls();this.focus(key,index);
+      this.draw();this.editor.tools.measures.positions();this.editor.controls();this.focus(key,index);
     }
     pageFilter(page) {
       const box=document.createElement('details');box.className='edit-pivot-filter';

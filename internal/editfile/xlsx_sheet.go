@@ -211,6 +211,9 @@ func (p *xlsxPackage) scanSheet(ctx context.Context, data []byte, shape XLSXShee
 		}
 		switch token := e.token.(type) {
 		case xml.StartElement:
+			if !p.layout.Native && token.Name == (xml.Name{Space: mainNS, Local: "dataValidation"}) && len(strings.Fields(attribute(token, "", "sqref"))) > 1 {
+				return errOfficeWorksheet
+			}
 			if !p.layout.Native && len(e.stack) == 2 && token.Name.Space == mainNS && slices.Contains([]string{"extLst", "hyperlinks", "phoneticPr", "conditionalFormatting", "dataConsolidate", "cellWatches", "rowBreaks", "colBreaks", "ignoredErrors"}, local) {
 				return errOfficeWorksheet
 			}

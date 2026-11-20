@@ -65,7 +65,7 @@ func (s pivotSchema) index(old int) (int, error) {
 	return s.newForOld[old], nil
 }
 
-func (s pivotSchema) reorder(ctx context.Context, raw []byte, container, child string, replacement func(int, int, []byte) ([]byte, error)) ([]byte, error) {
+func reorderPivotChildren(ctx context.Context, raw []byte, container, child string, oldCount int, origins []int, replacement func(int, int, []byte) ([]byte, error)) ([]byte, error) {
 	var children [][]byte
 	var parent xmlEvent
 	start, end := 0, 0
@@ -94,16 +94,19 @@ func (s pivotSchema) reorder(ctx context.Context, raw []byte, container, child s
 	if err != nil {
 		return nil, err
 	}
-	if len(children) != len(s.newForOld) || parent.to == 0 || end < parent.to {
+	if len(children) != oldCount || parent.to == 0 || end < parent.to {
 		return nil, ErrXLSX
 	}
-	ps, err := setXMLAttribute(raw, parent.from, parent.to, "count", strconv.Itoa(len(s.names)))
+	ps, err := setXMLAttribute(raw, parent.from, parent.to, "count", strconv.Itoa(len(origins)))
 	if err != nil {
 		return nil, err
 	}
 	var body bytes.Buffer
-	for i, old := range s.oldForNew {
+	for i, old := range origins {
 		var orig []byte
+		if old < -1 || old >= len(children) {
+			return nil, ErrXLSX
+		}
 		if old >= 0 {
 			orig = children[old]
 		}
@@ -122,7 +125,7 @@ func (s pivotSchema) cache(ctx context.Context, raw []byte, old []cacheFieldXML)
 		return old, raw, nil
 	}
 	fields := make([]cacheFieldXML, len(s.names))
-	next, err := s.reorder(ctx, raw, "cacheFields", "cacheField", func(i, k int, orig []byte) ([]byte, error) {
+	next, err := reorderPivotChildren(ctx, raw, "cacheFields", "cacheField", len(s.newForOld), s.oldForNew, func(i, k int, orig []byte) ([]byte, error) {
 		if k >= 0 {
 			fields[i] = old[k]
 		}
@@ -150,7 +153,7 @@ func (s pivotSchema) table(ctx context.Context, raw []byte) ([]byte, error) {
 	if !s.changed {
 		return raw, nil
 	}
-	raw, err := s.reorder(ctx, raw, "pivotFields", "pivotField", func(i, k int, orig []byte) ([]byte, error) {
+	raw, err := reorderPivotChildren(ctx, raw, "pivotFields", "pivotField", len(s.newForOld), s.oldForNew, func(i, k int, orig []byte) ([]byte, error) {
 		if k >= 0 {
 			return orig, nil
 		}
@@ -189,6 +192,9 @@ func (s pivotSchema) table(ctx context.Context, raw []byte) ([]byte, error) {
 		if err != nil {
 			return ErrXLSX
 		}
+		if key == "x" && k == pivotValuesField {
+			return nil
+		}
 		n, err := s.index(k)
 		if err != nil {
 			return err
@@ -225,6 +231,21 @@ func (s pivotSchema) info(old PivotInfo) PivotInfo {
 	}
 	info := old
 	info.Fields = s.names
+	if old.ValuesAxis != nil {
+		v := *old.ValuesAxis
+		original := old.Axes.Columns
+		if v.Axis == "rows" {
+			original = old.Axes.Rows
+		}
+		pos := 0
+		for _, f := range original[:min(len(original), max(0, v.Position))] {
+			if names[f] != "" {
+				pos++
+			}
+		}
+		v.Position = pos
+		info.ValuesAxis = &v
+	}
 	axes := &editdoc.PivotAxes{}
 	for _, f := range old.Axes.Rows {
 		if n := names[f]; n != "" {
@@ -240,6 +261,14 @@ func (s pivotSchema) info(old PivotInfo) PivotInfo {
 		if n := names[page.Field]; n != "" {
 			page.Field = n
 			axes.Pages = append(axes.Pages, page)
+		}
+	}
+	info.Measures = slices.Clone(old.Measures)
+	for i := range info.Measures {
+		m := &info.Measures[i]
+		m.Field = names[m.Field]
+		if m.Field == "" {
+			info.RefreshReason = "透视源已移除值字段"
 		}
 	}
 	info.Data = names[info.Data]
@@ -263,5 +292,11 @@ func (b *CalculationBook) CurrentPivotInfo(calc *Calculation, patches map[editdo
 	if err != nil {
 		return info, err
 	}
+	for i, n := range info.Fields {
+		if g, ok := info.GroupFields[n]; ok && g.Source != n {
+			s.appendField(n, i)
+		}
+	}
+	s.changed = !slices.Equal(s.names, info.Fields)
 	return s.info(info), nil
 }

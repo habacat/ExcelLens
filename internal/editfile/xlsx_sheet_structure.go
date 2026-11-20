@@ -417,6 +417,9 @@ func (p *xlsxPackage) parseFormula(ctx context.Context, body string, a editdoc.A
 			useSheet(ref.Sheet)
 			return ref.Top == ref.Bottom && ref.Left == ref.Right, true
 		}
+		if p.layout.tableReferenceError(name, a) != "" {
+			return true, true
+		}
 		target, ok := p.names[nameKey{sheet, name}]
 		if !ok {
 			target, ok = p.names[nameKey{"", name}]
@@ -517,14 +520,14 @@ func (p *xlsxPackage) inspectWorksheets(ctx context.Context) error {
 	return nil
 }
 
-func (l XLSXLayout) checkCellEdit(a editdoc.Address, locked string, protected bool, value editdoc.Value) error {
+func (l XLSXLayout) checkCellEdit(a editdoc.Address, locked string, protected bool, baseStyle string, value editdoc.Value) error {
 	if !l.Structured {
 		return nil
 	}
 	if locked != "" {
 		return fmt.Errorf("%s%d 只读（%s）", workbook.ColumnName(a.Col), a.Row, locked)
 	}
-	if protected && value.Style != "" {
+	if protected && value.Style != "" && (value.Style != baseStyle || value.NumberStyle == "" && value.BuiltinFormat == 0) {
 		return errStructuredStyle
 	}
 	return nil

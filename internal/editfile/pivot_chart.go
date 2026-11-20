@@ -17,6 +17,7 @@ import (
 
 type pivotChartSeries struct {
 	title, tx, val string
+	measure        int
 	values         []editdoc.Value
 	items          []int
 }
@@ -131,6 +132,8 @@ func chartPath(c pivotCube, axis []int, line pivotLine, cap pivotCaptions) ([]st
 func (d *pivotChartData) bind(p pivotPlan, c pivotCube, rows, cols []pivotLine, grid pivotCanvas, body cellRect, top, left int, cap pivotCaptions) error {
 	d.sheet, d.name, d.part = p.sheet, p.table.Name, p.part
 	d.fields = slices.Clone(p.cols)
+	valuesAt := slices.Index(d.fields, pivotValuesField)
+	d.fields = slices.DeleteFunc(d.fields, func(f int) bool { return f == pivotValuesField })
 	d.category = seriesRef(p.sheet, cellRect{top, body.firstCol, body.lastRow, max(body.firstCol, left-1)})
 	points := chartLines(rows)
 	for _, i := range points {
@@ -148,7 +151,10 @@ func (d *pivotChartData) bind(p pivotPlan, c pivotCube, rows, cols []pivotLine, 
 		if err != nil {
 			return err
 		}
-		s := pivotChartSeries{title: strings.Join(path, " - "), items: items}
+		if valuesAt >= 0 && valuesAt < len(items) {
+			items = slices.Delete(items, valuesAt, valuesAt+1)
+		}
+		s := pivotChartSeries{title: strings.Join(path, " - "), items: items, measure: cols[j].measure}
 		if len(path) == 0 {
 			s.title = p.dataCaptionForChart()
 		}
@@ -194,7 +200,7 @@ func (d pivotChartData) formats(ctx context.Context, raw []byte) ([]byte, error)
 		for i := slots[chart]; i < len(d.series); i++ {
 			series := d.series[i]
 			added++
-			fmt.Fprintf(&b, `<chartFormat xmlns="%s" chart="%d" format="%d" series="1"><pivotArea type="data" outline="0" fieldPosition="0"><references count="%d"><reference field="4294967294" count="1" selected="0"><x v="0"/></reference>`, mainNS, chart, i, 1+len(series.items))
+			fmt.Fprintf(&b, `<chartFormat xmlns="%s" chart="%d" format="%d" series="1"><pivotArea type="data" outline="0" fieldPosition="0"><references count="%d"><reference field="4294967294" count="1" selected="0"><x v="%d"/></reference>`, mainNS, chart, i, 1+len(series.items), series.measure)
 			fields := slices.Clone(d.fields[:len(series.items)])
 			slices.Sort(fields)
 			for _, field := range fields {

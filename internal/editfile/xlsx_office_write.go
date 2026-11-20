@@ -15,7 +15,7 @@ func (p *xlsxPackage) writeOffice(ctx context.Context, dst io.Writer, source *wo
 	var changes []editdoc.Change
 	for a, v := range edits {
 		bySheet[a.Sheet] = append(bySheet[a.Sheet], a)
-		changes = append(changes, editdoc.Change{Address: a, Value: v})
+		changes = append(changes, editdoc.Change{Address: a, Value: p.logicalEdit(a, v)})
 	}
 	touchedText, editedFormula, hasRules := false, false, false
 	for _, sheet := range p.layout.Sheets {
@@ -127,7 +127,7 @@ func (p *xlsxPackage) writeOffice(ctx context.Context, dst io.Writer, source *wo
 			if err != nil {
 				return result, err
 			}
-			patches[part] = ps
+			patches[part] = append(patches[part], ps...)
 		}
 	}
 	return p.writePackage(ctx, dst, source, proof, result, func(part string) ([]xmlPatch, error) { return patches[part], nil })

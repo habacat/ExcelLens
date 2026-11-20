@@ -130,14 +130,17 @@ type SourceRowReference struct {
 }
 
 type CellData struct {
-	Ref              string                   `json:"ref"`
-	Col              int                      `json:"col"`
-	Raw              string                   `json:"raw"`
-	Display          string                   `json:"display"`
-	Formula          string                   `json:"formula,omitempty"`
-	HasFormula       bool                     `json:"hasFormula"`
-	Type             string                   `json:"type,omitempty"`
-	Style            int                      `json:"style"`
+	ShortDate  string `json:"shortDate,omitempty"`
+	Ref        string `json:"ref"`
+	Col        int    `json:"col"`
+	Raw        string `json:"raw"`
+	Display    string `json:"display"`
+	Formula    string `json:"formula,omitempty"`
+	HasFormula bool   `json:"hasFormula"`
+	Type       string `json:"type,omitempty"`
+	Style      int    `json:"style"`
+	// A draft can combine the target's visual XF with another number format.
+	DisplayNumFmt    *int                     `json:"displayNumFmt,omitempty"`
 	ValueColor       string                   `json:"valueColor,omitempty"`
 	CacheMissing     bool                     `json:"cacheMissing,omitempty"`
 	SharedFormula    bool                     `json:"sharedFormula,omitempty"`

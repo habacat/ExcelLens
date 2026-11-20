@@ -24,7 +24,7 @@ const searchCheckpointDriver = "source-search"
 
 func searchCheckpointSemantics(format string) uint32 {
 	if format == "xlsx" {
-		return 2 // Stored hits include translated shared formulas, including on earlier sheets.
+		return 3 // Includes the displayed values of elapsed-time number formats.
 	}
 	return 1
 }

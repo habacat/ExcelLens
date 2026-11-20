@@ -309,6 +309,11 @@ func (s *calcRevision) rangeValue(r calculator.WorksheetReference, failure func(
 		return s.rangeValue(calculator.WorksheetReference{Sheet: r.Sheet, Top: r.Top + row, Left: r.Left + col, Bottom: r.Top + row + height - 1, Right: r.Left + col + width - 1}, failure)
 	}
 	rv.Aggregate = func() (calculator.RangeValue, error) {
+		// The range, its calculated precedents and spill ownership are fixed
+		// for this pass. An edit, undo or spill resize starts with an empty map.
+		if cached, ok := s.aggregates[r]; ok {
+			return cached, s.ctx.Err()
+		}
 		total := calculator.RangeValue{Sum: new(big.Rat)}
 		var sum float64
 		err := rv.Visit(func(_ int, v calculator.FormulaValue) error {
@@ -332,6 +337,12 @@ func (s *calcRevision) rangeValue(r calculator.WorksheetReference, failure func(
 		})
 		if total.Sum.SetFloat64(sum) == nil && total.Fault == nil {
 			total.Fault = errors.New("#NUM!")
+		}
+		if err == nil && (rows > 1 || cols > 1) && len(s.aggregates) < 4096 {
+			if s.aggregates == nil {
+				s.aggregates = make(map[calculator.WorksheetReference]calculator.RangeValue)
+			}
+			s.aggregates[r] = total
 		}
 		return total, err
 	}

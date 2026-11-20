@@ -120,12 +120,34 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 				return nil
 			}
 			switch e.local() {
+			case "pivotTableDefinition":
+				onRows, position := "", ""
+				if v := p.valuesAxis; v != nil {
+					axis := p.cols
+					if v.Axis == "rows" {
+						axis = p.rows
+						onRows = "1"
+					}
+					if v.Position != len(axis)-1 {
+						position = strconv.Itoa(v.Position)
+					}
+				}
+				if err := set(e, "dataOnRows", onRows); err != nil {
+					return err
+				}
+				if err := set(e, "dataPosition", position); err != nil {
+					return err
+				}
 			case "location":
 				if e.parent() != "pivotTableDefinition" {
 					return nil
 				}
 				ref := pivotRectRef(area)
-				for _, a := range [][2]string{{"ref", ref}, {"firstHeaderRow", "1"}, {"firstDataRow", strconv.Itoa(dataRow)}, {"firstDataCol", strconv.Itoa(dataCol)}} {
+				headerRow := "1"
+				if slices.Equal(p.cols, []int{pivotValuesField}) {
+					headerRow = "0"
+				}
+				for _, a := range [][2]string{{"ref", ref}, {"firstHeaderRow", headerRow}, {"firstDataRow", strconv.Itoa(dataRow)}, {"firstDataCol", strconv.Itoa(dataCol)}} {
 					if err := set(e, a[0], a[1]); err != nil {
 						return err
 					}
@@ -169,7 +191,7 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 					return err
 				}
 				data := ""
-				if field == p.data {
+				if field == p.data || slices.ContainsFunc(p.measures, func(m pivotDataField) bool { return m.Fld == field }) {
 					data = "1"
 				}
 				if err := set(e, "dataField", data); err != nil {
@@ -197,15 +219,7 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 				if e.parent() == "pivotTableDefinition" {
 					insertAxes(e.from)
 				}
-			case "dataField":
-				if e.parent() != "dataFields" {
-					return nil
-				}
-				for _, a := range [][2]string{{"name", caption}, {"fld", strconv.Itoa(p.data)}, {"subtotal", p.aggregation}} {
-					if err := set(e, a[0], a[1]); err != nil {
-						return err
-					}
-				}
+
 			}
 		case xml.EndElement:
 			if e.parent() == "pivotTableDefinition" && isAxis(e.local()) {
@@ -237,10 +251,14 @@ func (p pivotPlan) layoutXML(ctx context.Context, c pivotCube, rows, cols []pivo
 	if err != nil {
 		return nil, err
 	}
+	data, err = p.writeMeasures(ctx, data, caption)
+	if err != nil {
+		return nil, err
+	}
 	return p.writeValueFilters(ctx, data)
 }
 
-func (p *xlsxPackage) pivotSheet(ctx context.Context, sheet XLSXSheet, edits map[editdoc.Address]editdoc.Value, plans []pivotPlan) ([]byte, error) {
+func (p *xlsxPackage) pivotSheet(ctx context.Context, sheet XLSXSheet, edits map[editdoc.Address]editdoc.Value, plans []pivotPlan, updates map[string][]byte) ([]byte, error) {
 	addresses := make([]editdoc.Address, 0, len(edits))
 	for a := range edits {
 		addresses = append(addresses, a)
@@ -311,6 +329,9 @@ func (p *xlsxPackage) pivotSheet(ctx context.Context, sheet XLSXSheet, edits map
 				return nil, fmt.Errorf("透视结果将覆盖 %s!%s%d", a.Sheet, workbook.ColumnName(a.Col), a.Row)
 			}
 		}
+	}
+	if err := p.applyPivotFormats(ctx, sheet.Name, plans, t, edits, updates); err != nil {
+		return nil, err
 	}
 	ps, _, _, err := p.worksheetPatches(ctx, data, t, edits, &sheet, validateStoredDouble)
 	if err != nil {

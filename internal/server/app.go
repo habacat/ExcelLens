@@ -24,10 +24,10 @@ import (
 )
 
 type App struct {
-	// A legacy document reuses its digest-verified layout within the browser session.
-	// mu protects the binding and its immutable layout together.
-	legacyEditBinding string
-	legacyEditLayout  editfile.XLSXLayout
+	// Keep the verified base layout and its binding together under mu.
+	editLayoutBinding string
+	checkedEditLayout editfile.XLSXLayout
+	editSourceCells   editfile.SourceCellCache
 	calculationMu     sync.Mutex
 	calculation       *editCalculationCache
 
@@ -423,7 +423,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/navigate", a.handleNavigate)
 	mux.HandleFunc("/api/open", a.handleOpen)
 	mux.HandleFunc("/api/edits", a.handleEditList)
-	for _, path := range []string{"start", "state", "base", "grid", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
+	for _, path := range []string{"start", "state", "base", "grid", "input-kinds", "list-areas", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
 		mux.HandleFunc("/api/edits/"+path, a.handleEditCommand)
 	}
 	mux.HandleFunc("/api/edits/download", a.handleEditDownload)

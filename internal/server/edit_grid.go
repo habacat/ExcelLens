@@ -12,6 +12,11 @@ import (
 	"excellens/internal/workbook"
 )
 
+type editGridRuleArea struct {
+	editdoc.Area
+	List bool `json:"list,omitempty"`
+}
+
 // The grid keeps the immutable reader tiles. On entry, undo or recovery it
 // loads the bounded sparse revision. An ordinary change needs only its delta.
 // A null cell means that coordinate has returned to its original source value.
@@ -105,7 +110,13 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 		if dest[addr.Sheet] == nil {
 			dest[addr.Sheet] = map[string]*workbook.CellData{}
 		}
-		dest[addr.Sheet][ref] = editGridFormula(wb, addr, ref, derived.Formula, derived.State, &derived.Value)
+		formula := derived.Formula
+		// The number engine deliberately skips styled, empty source cells.
+		// Reuse the edit grid's own source read for formulas entered there.
+		if source, ok := base[addr]; ok {
+			formula = changes[addr].Apply(source.Value)
+		}
+		dest[addr.Sheet][ref] = editGridFormula(wb, addr, ref, formula, derived.State, &derived.Value)
 	}
 	for addr, v := range calc.ArrayMembers {
 		ref := workbook.ColumnName(addr.Col) + strconv.Itoa(addr.Row)
@@ -124,16 +135,21 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 	if req.Mode != "projection" {
 		return result, nil
 	}
+	var rules []editGridRuleArea
+	for _, r := range doc.RuleChanges() {
+		rules = append(rules, editGridRuleArea{r.Area, r.Type == "list"})
+	}
 	return struct {
 		Cells      map[string]map[string]*workbook.CellData `json:"cells"`
 		Calculated map[string]map[string]*workbook.CellData `json:"calculated,omitempty"`
 		Affected   map[string]bool                          `json:"affected,omitempty"`
 		Generated  []editfile.GeneratedArea                 `json:"generated,omitempty"`
-	}{result, calculated, calc.Affected, calc.Generated}, nil
+		Rules      []editGridRuleArea                       `json:"rules,omitempty"`
+	}{result, calculated, calc.Affected, calc.Generated, rules}, nil
 }
 
 func editGridFormula(wb *workbook.Workbook, addr editdoc.Address, ref string, formula editdoc.Value, state string, value *editdoc.Value) *workbook.CellData {
-	v := editdoc.Value{Style: formula.Style}
+	v := editdoc.Value{Style: formula.Style, NumberStyle: formula.NumberStyle, BuiltinFormat: formula.BuiltinFormat}
 	if value != nil {
 		v.Kind, v.Raw = value.Kind, value.Raw
 	}
@@ -163,7 +179,20 @@ func editGridValue(wb *workbook.Workbook, addr editdoc.Address, ref string, v ed
 		cell.Type = "d"
 	case "number":
 		cell.Type = "n"
-		wb.PresentNumeric(cell)
+		if v.BuiltinFormat != 0 {
+			cell.Display = wb.FormatNumericID(cell.Raw, v.BuiltinFormat)
+			cell.DisplayNumFmt = &v.BuiltinFormat
+			cell.ShortDate = wb.GridShortDate(v.BuiltinFormat)
+		} else {
+			cell.Style, _ = strconv.Atoi(v.NumberFormatStyle())
+			wb.PresentNumeric(cell)
+			if cell.Style != style && cell.Style >= 0 && cell.Style < len(wb.Styles) {
+				id := wb.Styles[cell.Style].NumFmtID
+				cell.DisplayNumFmt = &id
+				cell.ShortDate = wb.GridShortDate(id)
+			}
+			cell.Style = style
+		}
 	case "boolean":
 		cell.Type = "b"
 	case "error":

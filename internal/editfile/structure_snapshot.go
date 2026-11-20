@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,9 +19,22 @@ import (
 // MaterializeStructure runs while the document lease is held. A confirmed
 // revision never shares a filename with a later branch of its undo history.
 func MaterializeStructure(ctx context.Context, dir string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, op editdoc.Structure) (string, error) {
-	return materializeRevision(ctx, dir, doc, layout, src, doc.Snapshot(), doc.ColumnFormulas(), func(write io.Writer, source *workbook.EditSourceFile) (opc.Receipt, error) {
-		return RewriteStructure(ctx, write, source, op)
-	})
+	write := func(prior *xlsxPackage) (string, error) {
+		return materializeRevision(ctx, dir, doc, layout, src, doc.Snapshot(), doc.ColumnFormulas(), func(w io.Writer, source *workbook.EditSourceFile) (opc.Receipt, error) {
+			return rewriteStructureFrom(ctx, w, source, op, prior)
+		})
+	}
+	if op.Kind != "copyRange" && op.Kind != "cutRange" {
+		return write(nil)
+	}
+	view, ok := doc.TransferSource(op.SourceRevision)
+	if !ok || op.Kind == "cutRange" && view != doc {
+		return "", errors.New("来源修订已变化，请重新复制或剪切")
+	}
+	if view == doc {
+		return write(nil)
+	}
+	return withPriorTransferSource(ctx, dir, view, write)
 }
 
 func materializeRevision(ctx context.Context, dir string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, values map[editdoc.Address]editdoc.Value, templates map[editdoc.Address]string, rewrite func(io.Writer, *workbook.EditSourceFile) (opc.Receipt, error)) (string, error) {

@@ -26,7 +26,7 @@ func TestSearchCachePreservesAdvancedRegexCase(t *testing.T) {
 	}
 	// Old results cannot be trusted, including a same-spelling key that had
 	// previously been overwritten by the other case variant.
-	for _, version := range []int{1, 2, 3} {
+	for version := 1; version < searchCacheSchema; version++ {
 		old, _ := json.Marshal(persistedSearch{Version: version, Sheet: "Data", Query: lower, Mode: "advanced", Scope: "current"})
 		if err := os.WriteFile(searchCachePath(wb, "Data", lower, "advanced", "current"), old, 0600); err != nil {
 			t.Fatal(err)

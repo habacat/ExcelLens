@@ -101,6 +101,22 @@ func editRuleAt(doc *editdoc.Document, layout editfile.Layout, address editdoc.A
 	return nil
 }
 
+func (a *App) editListAreas(ctx context.Context, req editRequest) ([]workbook.ListControlArea, error) {
+	wb := a.currentWorkbook()
+	if wb == nil || req.Book != sourceBookID(wb) {
+		return nil, checkpoint.ErrConflict
+	}
+	sheet, ok := wb.FindSheet(req.Sheet)
+	if !ok {
+		return nil, editfile.ErrTarget
+	}
+	index, err := wb.SourceDataRules(ctx, sheet, wb.GetCachedIndex(sheet.Path), nil)
+	if err != nil {
+		return nil, err
+	}
+	return index.ListControlAreas(), nil
+}
+
 func editChoices(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest) (any, error) {
 	if req.Revision != doc.Revision {
 		return nil, checkpoint.ErrConflict
@@ -178,7 +194,27 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil {
 			return editdoc.PreparedChanges{}, err
 		}
-		plan, err := layout.PrepareChanges(ctx, f, changes, doc)
+		if op.ExpandTable && layout.XLSX != nil {
+			growth, err := layout.GridTableTail(ctx, f, changes)
+			if err != nil {
+				return editdoc.PreparedChanges{}, err
+			}
+			if growth != nil {
+				base, err := verifiedRevision(ctx, doc, f, func(dir string) (string, error) {
+					return growth.Materialize(ctx, dir, doc, layout, f, changes, op.InferNumberFormat, op.EntryAnchor)
+				})
+				if err != nil {
+					return editdoc.PreparedChanges{}, err
+				}
+				return editdoc.PreparedChanges{NextBase: &base}, nil
+			}
+		}
+		var plan editdoc.PreparedChanges
+		if op.InferNumberFormat {
+			plan, err = layout.PrepareGridInput(ctx, f, changes, doc, op.EntryAnchor)
+		} else {
+			plan, err = layout.PrepareChanges(ctx, f, changes, doc)
+		}
 		if err != nil || layout.XLSX == nil || len(plan.Changes) == 0 {
 			return plan, err
 		}

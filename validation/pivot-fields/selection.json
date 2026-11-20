@@ -1,0 +1,350 @@
+{
+  "visualStates": 14,
+  "nativeReference": {
+    "outlineRGB": [
+      16,
+      153,
+      104
+    ],
+    "edgePixels": 3,
+    "cornerInkPixels": [
+      5,
+      5
+    ],
+    "separatorPixels": 1
+  },
+  "priorSingleEdgePixels": 2,
+  "comparison": "Paired single and range screenshots, all four edges; exact native 7x7 corner mask at 100 percent. Fractional DPI reports fully opaque pixels only.",
+  "states": {
+    "cell-1": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "range-1": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "cell-1.25": {
+      "dpi": 1.25,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          2
+        ]
+      ],
+      "comparedNativeCornerMask": false
+    },
+    "range-1.25": {
+      "dpi": 1.25,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          2
+        ]
+      ],
+      "comparedNativeCornerMask": false
+    },
+    "cell-1.5": {
+      "dpi": 1.5,
+      "solidEdgePixels": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": false
+    },
+    "range-1.5": {
+      "dpi": 1.5,
+      "solidEdgePixels": [
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": false
+    },
+    "clicked": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "keyboard": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "dark": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "purple": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "merged": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "editing": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "frozen": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    },
+    "real": {
+      "dpi": 1,
+      "solidEdgePixels": [
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          3
+        ]
+      ],
+      "comparedNativeCornerMask": true
+    }
+  },
+  "browserErrors": 0,
+  "differences": 0,
+  "coldFirstPreview": {
+    "before": {
+      "edgePixels": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "corner": false
+    },
+    "after": {
+      "edgePixels": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "corner": true
+    }
+  }
+}

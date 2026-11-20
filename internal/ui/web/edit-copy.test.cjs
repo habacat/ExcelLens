@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const context = vm.createContext({window: {}, TextEncoder});
-for (const file of ['clipboard.js', 'edit-copy-model.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), context);
+for (const file of ['clipboard.js', 'edit-copy-model.js','edit-grid-range.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), context);
 const model = context.window.ExcelLensEditModel;
 const limits = {cellBytes: 1024, batchCells: 100, requestBytes: 8192};
 const sheet = {name: '台账', firstRow: 1, firstCol: 1, rows: 8, cols: 4};
@@ -51,4 +51,31 @@ test('equal-step fill keeps exact decimal text and one source axis', () => {
   assert.equal(plan.changes[0].value.raw, '9007199254740993.24');
   assert.equal(plan.changes[2].value.raw, '9007199254740993.22');
   assert.throws(() => model.fill(a, model.target('C2', sheet), {kind: 'text', raw: '1'}, '', false, false, limits), /同行/);
+});
+
+test('a repeated clipboard field stops expanding at the serialized request limit', () => {
+  let visited = 0;
+  function* repeated() {
+    for (let row=1; row<=10000; row++) {
+      visited++;
+      yield {sheet:'预算',row,col:1,value:{kind:'text',raw:'引号"与换行\n'.repeat(28)}};
+    }
+  }
+  assert.throws(()=>model.bounded(repeated(),{batchCells:10000,requestBytes:2048}),/容量/);
+  assert.ok(visited > 0 && visited < 10);
+});
+
+test('clearing a sorted range edits only returned source rows and keeps covered merge members', async () => {
+  const range = Object.create(context.window.ExcelLensGridRangeEditor.prototype);
+  let committed;
+  const doc = {id:'one',binding:'bound',revision:'4'};
+  range.owner = {data:{document:doc},limits,commit:(_,changes)=>{committed=changes; return true;}};
+  range.grid = {active:true,selected:{sheet:'台账'},shape:sheet};
+  range.view = {
+    ready:()=>true, filtered:()=>true, areas:()=>[{}],
+    mergeAt:(r,c)=>r===5 && c<=2 ? {row:5,col:1,endRow:5,endCol:2} : null,
+    visibleSelection:()=>({firstColumn:1,lastColumn:2,current:()=>true,read:async()=>({rows:[{row:5},{row:2}]})})
+  };
+  assert.equal(await range.clear(),true);
+  assert.deepEqual(Array.from(committed,c=>[c.row,c.col,c.value.kind]),[[5,1,'blank'],[2,1,'blank'],[2,2,'blank']]);
 });

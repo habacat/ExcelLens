@@ -31,7 +31,7 @@ func (b EditBatch) Validate(ctx context.Context, changes []editdoc.Change, doc *
 			return nil, nil, err
 		}
 		if b.layout.XLSX != nil {
-			if err := b.layout.XLSX.checkCellEdit(c.Address, source.ReadOnly, source.protected, c.Value); err != nil {
+			if err := b.layout.XLSX.checkCellEdit(c.Address, source.ReadOnly, source.protected, source.Value.Style, c.Value); err != nil {
 				return nil, nil, err
 			}
 		}

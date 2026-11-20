@@ -145,12 +145,18 @@ func (b EditBatch) choices(rule validatedRule, doc *editdoc.Document, proposed m
 }
 
 func (b EditBatch) ListChoices(address editdoc.Address, doc *editdoc.Document) ([]string, error) {
+	if reason := b.cells[address].ReadOnly; reason != "" {
+		return nil, errors.New(reason)
+	}
 	for _, rule := range b.rules {
-		if rule.Reference && rule.Contains(address) {
-			return b.choices(rule, doc, nil)
+		if rule.Type == "list" && rule.Contains(address) {
+			if rule.Reference {
+				return b.choices(rule, doc, nil)
+			}
+			return rule.choices, nil
 		}
 	}
-	return nil, errors.New("当前格没有引用列表")
+	return nil, errors.New("当前格没有可选列表")
 }
 
 func (l Layout) referenceRules(rules []editdoc.Rule) ([]validatedRule, error) {

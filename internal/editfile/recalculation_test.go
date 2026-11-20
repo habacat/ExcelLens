@@ -73,6 +73,43 @@ func TestRevisionCalculationUsesSparseRangesAndRebindsDependencies(t *testing.T)
 	}
 }
 
+func TestRepeatedAreasShareOneAggregatePerCalculationPass(t *testing.T) {
+	b := calculationFixture(t, func(parts map[string]string) {
+		var rows strings.Builder
+		for r := 1; r <= 64; r++ {
+			fmt.Fprintf(&rows, "<row r=\"%d\"><c r=\"A%d\"><v>1</v></c></row>", r, r)
+		}
+		parts["xl/worksheets/sheet1.xml"] = "<worksheet xmlns=\"" + mainNS + "\"><sheetData>" + rows.String() + "</sheetData></worksheet>"
+		parts["xl/worksheets/sheet2.xml"] = "<worksheet xmlns=\"" + mainNS + "\"><sheetData/></worksheet>"
+	})
+	input := editdoc.Address{Sheet: "数据", Row: 1, Col: 1}
+	formulas := map[editdoc.Address]editdoc.Value{}
+	for r := 1; r <= 32; r++ {
+		a := editdoc.Address{Sheet: "摘要", Row: r, Col: 2}
+		formulas[a] = editdoc.Value{Kind: "formula", Raw: "=SUM((数据!A1:A64,数据!A1:A64))"}
+	}
+	first := formulas
+	changed := maps.Clone(first)
+	changed[input] = editdoc.Value{Kind: "number", Raw: "2"}
+	var previous *Calculation
+	for i, patch := range []map[editdoc.Address]editdoc.Value{first, changed, first, changed} {
+		next, err := b.Calculate(t.Context(), patch, previous)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"128", "130", "128", "130"}[i]
+		for a := range formulas {
+			if next.Cells[a].Value.Raw != want {
+				t.Fatalf("step %d %v: %+v, want %s", i, a, next.Cells[a], want)
+			}
+		}
+		if next.Visits > 128 {
+			t.Fatalf("step %d revisited shared range: %d visits", i, next.Visits)
+		}
+		previous = next
+	}
+}
+
 func TestRevisionCalculationResolvesLongChainsAndCycles(t *testing.T) {
 	const rows = 820
 	b := calculationFixture(t, func(p map[string]string) {

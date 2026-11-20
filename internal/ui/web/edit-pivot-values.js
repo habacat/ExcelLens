@@ -12,7 +12,7 @@
   ];
   class PivotValues {
     constructor(apply) {
-      this.field = el('ValueField'); this.kind = el('ValueKind');
+      this.measure=el('ValueMeasure');this.field = el('ValueField'); this.kind = el('ValueKind');
       this.start = el('ValueStart'); this.end = el('ValueEnd'); this.apply = el('ValueApply');
       this.kind.replaceChildren(...modes.map(([value, label]) => new Option(label, value)));
       this.field.addEventListener('change', () => this.select());
@@ -27,6 +27,9 @@
       if (this.info === info) return;
       this.info = info;
       const fields = [...(info?.axes?.rows || []), ...(info?.axes?.columns || [])];
+      const measures=info?.measures||[];
+      el('ValueMeasureField').hidden=measures.length<2;
+      this.measure.replaceChildren(...measures.map((m,i)=>new Option(m.caption||m.field,String(i))));
       const previous = this.field.value;
       this.field.replaceChildren(...fields.map(value => new Option(value, value)));
       if (fields.includes(previous)) this.field.value = previous;
@@ -35,6 +38,7 @@
     }
     select() {
       const filter = this.info?.valueFilters?.find(item => item.field === this.field.value);
+      this.measure.value=String(filter?.measure||0);
       this.kind.value = filter?.kind || 'topCount';
       this.start.value = filter?.value ?? 10;
       this.end.value = filter?.second ?? '';
@@ -49,7 +53,7 @@
       if (kind.endsWith('Count') && (!Number.isInteger(value) || value < 1)) return null;
       if (kind.endsWith('Percent') && (value <= 0 || value > 100)) return null;
       if (kind.endsWith('Sum') && value <= 0) return null;
-      const filter = {field, kind, value};
+      const filter = {field, kind, value};if(this.measure.selectedIndex>0)filter.measure=this.measure.selectedIndex;
       if (kind.endsWith('Between')) {
         filter.second = this.end.valueAsNumber;
         if (!Number.isFinite(filter.second) || filter.second < value) return null;

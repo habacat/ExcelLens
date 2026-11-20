@@ -86,6 +86,46 @@ func writeEditBook(t *testing.T, change func(map[string]string)) string {
 	return path
 }
 
+func TestFormulaNumberFormatReusesXFWithoutChangingProtectionOrAlignment(t *testing.T) {
+	const base = `<xf numFmtId="0" fontId="3" borderId="2" applyAlignment="1"><alignment horizontal="right"/><protection locked="0"/></xf>`
+	const percent = `<xf numFmtId="10" applyNumberFormat="1"/>`
+	styles := `<styleSheet xmlns="` + mainNS + `"><cellXfs count="2">` + base + percent + `</cellXfs></styleSheet>`
+	addr := editdoc.Address{Sheet: "数据", Row: 2, Col: 1}
+	v := editdoc.Value{Kind: "formula", Raw: "=B2+1", Style: "0", NumberStyle: "1"}
+	for pass := 0; pass < 2; pass++ {
+		path := writeEditBook(t, func(parts map[string]string) { parts["xl/styles.xml"] = styles })
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := openXLSXPackage(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = p.readStyles(t.Context(), []byte(styles)); err != nil {
+			t.Fatal(err)
+		}
+		edits, patches, err := p.materializeNumberStyles(t.Context(), map[editdoc.Address]editdoc.Value{addr: v})
+		if err != nil || edits[addr].Style != "2" || edits[addr].NumberStyle != "" {
+			t.Fatal(edits, err)
+		}
+		if pass == 1 {
+			if len(patches) != 0 {
+				t.Fatal("reopening the saved workbook added a duplicate style")
+			}
+			continue
+		}
+		var dst strings.Builder
+		if err = writeXMLPatches(t.Context(), &dst, []byte(styles), patches); err != nil {
+			t.Fatal(err)
+		}
+		styles = dst.String()
+		if !strings.Contains(styles, base+percent) || strings.Count(styles, `<alignment horizontal="right"/><protection locked="0"/>`) != 2 || !strings.Contains(styles, `<cellXfs count="3">`) {
+			t.Fatal(styles)
+		}
+	}
+}
+
 func TestXLSXEditsPreservePartsTypesAndCoordinates(t *testing.T) {
 	isolateEditFileStorage(t)
 	path := writeEditBook(t, func(parts map[string]string) {

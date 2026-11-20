@@ -73,5 +73,12 @@
   "validation/1.9.1/range-editing.json",
   "validation/1.9.1/pivot-editing.json",
   "validation/1.9.1/interaction.json",
+  "validation/range-transfer/transfer.json",
+  "validation/table-resize/resize.json",
+  "validation/table-resize/selection.json",
+  "validation/pivot-fields/pivot.json",
+  "validation/pivot-fields/selection.json",
+  "validation/formula-formats/verification.json",
+  "validation/1.10.0/pivot-date-filters.json",
   "docs/releases/{version}.md"
 ]

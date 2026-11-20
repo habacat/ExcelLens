@@ -343,6 +343,32 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 			return nil, err
 		}
 		p.space()
+		if p.strictNames && p.pos < len(p.text) && p.text[p.pos] == ',' {
+			var areas []*formulaNode
+			for {
+				switch n.kind {
+				case "ref", "name":
+					areas = append(areas, n)
+				case "union":
+					areas = append(areas, n.args...)
+				default:
+					return nil, p.fail("联合区域需要单元格或区域引用")
+				}
+				if p.pos >= len(p.text) || p.text[p.pos] != ',' {
+					break
+				}
+				p.pos++
+				n, err = p.expression(0)
+				if err != nil {
+					return nil, err
+				}
+				p.space()
+			}
+			n, err = p.newNode(&formulaNode{kind: "union", args: areas})
+			if err != nil {
+				return nil, err
+			}
+		}
 		if p.pos >= len(p.text) || p.text[p.pos] != ')' {
 			return nil, p.fail("缺少右括号")
 		}

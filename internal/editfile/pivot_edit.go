@@ -14,6 +14,13 @@ import (
 )
 
 type pivotPlan struct {
+	measures            []pivotDataField
+	measureOrigins      []int
+	formats             pivotNumberFormats
+	valuesAxis          *editdoc.PivotValuesAxis
+	labelFilters        []pivotLabel
+	dates               []pivotDateFilter
+	date1904            bool
 	chart               *pivotChartData
 	part, sheet         string
 	table               pivotTableXML
@@ -28,12 +35,13 @@ type pivotPlan struct {
 	oldPages            []cellRect
 }
 
-func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cacheFieldXML, schema pivotSchema, change *editdoc.Structure) (pivotPlan, error) {
+func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cacheFieldXML, schema pivotSchema, dates pivotCalendarLayout, change *editdoc.Structure) (pivotPlan, error) {
 	t, raw, err := p.readPivot(ctx, part)
 	plan := pivotPlan{part: part, sheet: p.pivotSheets[part], table: t, xml: raw, keepFilter: true, selections: map[int][]editdoc.PivotItem{}}
 	if err != nil {
 		return plan, err
 	}
+	original := t
 	plan.old, err = t.refreshArea(len(schema.newForOld))
 	if err != nil {
 		return plan, err
@@ -59,6 +67,20 @@ func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cache
 	axes, err := t.savedAxes(fields)
 	if err != nil {
 		return plan, err
+	}
+	plan.valuesAxis = t.valuesAxis()
+	if d := dates.replacement; d != nil {
+		onTarget := change != nil && change.Kind == "pivotDateGroup"
+		var row, col bool
+		var rowPosition, colPosition int
+		axes.Rows, row, rowPosition = d.axis(original.RowFields, schema, onTarget)
+		axes.Columns, col, colPosition = d.axis(original.ColFields, schema, onTarget)
+		if plan.valuesAxis != nil {
+			plan.valuesAxis.Position = max(rowPosition, colPosition)
+		}
+		if onTarget && !row && !col {
+			return plan, errors.New("请先把日期字段放入行或列区域")
+		}
 	}
 	v := t.DataFields[0]
 	plan.data, plan.aggregation = v.Fld, v.Subtotal
@@ -97,8 +119,8 @@ func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cache
 			return plan, errors.New("请选择用于行项目筛选的首个行字段")
 		}
 	}
-	if plan.data < 0 || plan.data >= len(fields) || !slices.Contains([]string{"sum", "count", "average", "min", "max"}, plan.aggregation) {
-		return plan, errors.New("透视字段或汇总方式无效")
+	if err = plan.configureMeasures(fields, change, axes); err != nil {
+		return plan, err
 	}
 	seen := map[int]bool{}
 	add := func(name string, dest *[]int) error {
@@ -136,7 +158,12 @@ func (p *xlsxPackage) planPivot(ctx context.Context, part string, fields []cache
 	if err = plan.configureValueFilter(fields, change); err != nil {
 		return plan, err
 	}
-	return plan, nil
+	if err = plan.configureLabels(fields, change); err != nil {
+		return plan, err
+	}
+	plan.date1904 = p.date1904
+	err = plan.configureDates(fields, dates.levels, change, p.pivotAsOf)
+	return plan, err
 }
 
 func (p *xlsxPackage) rewritePivot(ctx context.Context, dst io.Writer, src *workbook.EditSourceFile, op editdoc.Structure) (opc.Receipt, error) {
@@ -165,7 +192,7 @@ func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string
 	if err := walkXML(ctx, definition, func(e xmlEvent) error {
 		if tag, ok := e.token.(xml.StartElement); ok && tag.Name.Space == mainNS {
 			switch tag.Name.Local {
-			case "calculatedMembers", "fieldGroup", "cacheHierarchies", "dimensions", "measureGroups":
+			case "calculatedMembers", "cacheHierarchies", "dimensions", "measureGroups":
 				return errors.New("此缓存含计算项目、分组或数据模型，请在 Excel 中刷新")
 			}
 		}
@@ -182,14 +209,30 @@ func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string
 	if recordPart == "" {
 		return nil, errors.New("透视缓存没有已保存的记录部件")
 	}
-	names := make([]string, len(fields))
-	for i, f := range fields {
+	for _, f := range fields {
 		if f.Formula != "" {
 			return nil, errors.New("此缓存含计算字段")
 		}
-		names[i] = f.Name
 	}
-	schema, err := readPivotSchema(values, p.pivotSources[cache], names)
+	var requested *editdoc.PivotDateGroup
+	english := false
+	for _, item := range p.layout.Pivots {
+		if p.pivotOutputs[item.Part] == cache {
+			table, _, e := p.readPivot(ctx, item.Part)
+			if e != nil {
+				return nil, e
+			}
+			english = table.DataCaption == "Values"
+			break
+		}
+	}
+	if op != nil && op.Kind == "pivotDateGroup" && p.pivotOutputs[target] == cache {
+		requested = op.DateGroup
+		if requested == nil {
+			return nil, ErrTarget
+		}
+	}
+	schema, dates, err := planDateSchema(values, p.pivotSources[cache], fields, requested, english)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +250,7 @@ func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string
 		if f.Name == target {
 			change = op
 		}
-		plan, err := p.planPivot(ctx, f.Name, fields, schema, change)
+		plan, err := p.planPivot(ctx, f.Name, fields, schema, dates, change)
 		if err != nil {
 			return nil, fmt.Errorf("%s：%w", f.Name, err)
 		}
@@ -227,7 +270,10 @@ func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string
 		}
 		plans = append(plans, plan)
 	}
-	records, err := loadPivotRecords(ctx, values, p.pivotSources[cache], fields, dimensions)
+	for _, g := range dates.levels {
+		dimensions[g.base] = true
+	}
+	records, err := loadPivotRecords(ctx, values, p.pivotSources[cache], fields[:dates.physical], dimensions)
 	if err != nil {
 		return nil, err
 	}
@@ -247,9 +293,18 @@ func (p *xlsxPackage) renderPivotCache(ctx context.Context, cache, target string
 	if err != nil {
 		return nil, err
 	}
+	newDef, err = dates.project(ctx, newDef, fields, &records)
+	if err != nil {
+		return nil, err
+	}
 	updates[cache], updates[recordPart] = newDef, newRecords
 	final := &pivotCacheChanges{cells: map[editdoc.Address]editdoc.Value{}, plans: plans}
-	for _, plan := range plans {
+	for i := range plans {
+		plan := &plans[i]
+		plan.formats, err = measureFormats(plan.table.DataFields, plan.measures)
+		if err != nil {
+			return nil, err
+		}
 		if chartKeys[chartKey(plan.sheet, plan.table.Name)] {
 			plan.chart = new(pivotChartData)
 		}

@@ -11,6 +11,13 @@ import (
 )
 
 type PivotInfo struct {
+	DateFilters     []editdoc.PivotDateFilter     `json:"dateFilters,omitempty"`
+	GroupFields     map[string]PivotGroupField    `json:"groupFields,omitempty"`
+	Measures        []editdoc.PivotMeasure        `json:"measures,omitempty"`
+	ValuesAxis      *editdoc.PivotValuesAxis      `json:"valuesAxis,omitempty"`
+	LabelFilters    []editdoc.PivotLabelFilter    `json:"labelFilters,omitempty"`
+	DateGroups      []editdoc.PivotDateGroup      `json:"dateGroups,omitempty"`
+	DateFields      []string                      `json:"dateFields,omitempty"`
 	Part            string                        `json:"part"`
 	Name            string                        `json:"name"`
 	Sheet           string                        `json:"sheet"`
@@ -34,9 +41,12 @@ type pivotMember struct {
 }
 
 type cacheFieldXML struct {
-	Name    string `xml:"name,attr"`
-	Formula string `xml:"formula,attr"`
-	Shared  *struct {
+	Database string          `xml:"databaseField,attr"`
+	Group    *cacheDateGroup `xml:"fieldGroup"`
+	Name     string          `xml:"name,attr"`
+	Formula  string          `xml:"formula,attr"`
+	Shared   *struct {
+		Date  string        `xml:"containsDate,attr"`
 		Items []pivotMember `xml:",any"`
 	} `xml:"sharedItems"`
 }
@@ -78,22 +88,31 @@ type pivotPageXML struct {
 	Item  *int `xml:"item,attr"`
 }
 
+type pivotDataField struct {
+	Fld      int    `xml:"fld,attr"`
+	Name     string `xml:"name,attr"`
+	Subtotal string `xml:"subtotal,attr"`
+	Show     string `xml:"showDataAs,attr"`
+	Number   string `xml:"numFmtId,attr"`
+}
+
 type pivotTableXML struct {
-	Name           string `xml:"name,attr"`
-	DataCaption    string `xml:"dataCaption,attr"`
-	GrandCaption   string `xml:"grandTotalCaption,attr"`
-	RowCaption     string `xml:"rowHeaderCaption,attr"`
-	ColCaption     string `xml:"colHeaderCaption,attr"`
-	MissingCaption string `xml:"missingCaption,attr"`
-	RowGrand       string `xml:"rowGrandTotals,attr"`
-	ColGrand       string `xml:"colGrandTotals,attr"`
-	CustomListSort string `xml:"customListSort,attr"`
-	Compact        string `xml:"compact,attr"`
-	Over           string `xml:"pageOverThenDown,attr"`
-	Wrap           int    `xml:"pageWrap,attr"`
-	Headers        string `xml:"showHeaders,attr"`
-	MergeLabels    string `xml:"mergeItem,attr"`
-	Area           struct {
+	Name            string `xml:"name,attr"`
+	MultipleFilters string `xml:"multipleFieldFilters,attr"`
+	DataCaption     string `xml:"dataCaption,attr"`
+	GrandCaption    string `xml:"grandTotalCaption,attr"`
+	RowCaption      string `xml:"rowHeaderCaption,attr"`
+	ColCaption      string `xml:"colHeaderCaption,attr"`
+	MissingCaption  string `xml:"missingCaption,attr"`
+	RowGrand        string `xml:"rowGrandTotals,attr"`
+	ColGrand        string `xml:"colGrandTotals,attr"`
+	CustomListSort  string `xml:"customListSort,attr"`
+	Compact         string `xml:"compact,attr"`
+	Over            string `xml:"pageOverThenDown,attr"`
+	Wrap            int    `xml:"pageWrap,attr"`
+	Headers         string `xml:"showHeaders,attr"`
+	MergeLabels     string `xml:"mergeItem,attr"`
+	Area            struct {
 		Ref      string `xml:"ref,attr"`
 		Header   int    `xml:"firstDataRow,attr"`
 		Col      int    `xml:"firstDataCol,attr"`
@@ -104,13 +123,8 @@ type pivotTableXML struct {
 	ColFields  []pivotAxisField `xml:"colFields>field"`
 	PageFields []pivotPageXML   `xml:"pageFields>pageField"`
 	Filters    []pivotFilterXML `xml:"filters>filter"`
-	DataFields []struct {
-		Fld      int    `xml:"fld,attr"`
-		Name     string `xml:"name,attr"`
-		Subtotal string `xml:"subtotal,attr"`
-		Show     string `xml:"showDataAs,attr"`
-	} `xml:"dataFields>dataField"`
-	Fields []pivotFieldXML `xml:"pivotFields>pivotField"`
+	DataFields []pivotDataField `xml:"dataFields>dataField"`
+	Fields     []pivotFieldXML  `xml:"pivotFields>pivotField"`
 }
 
 func (t pivotTableXML) refreshArea(fields int) (cellRect, error) {
@@ -118,18 +132,28 @@ func (t pivotTableXML) refreshArea(fields int) (cellRect, error) {
 	if !ok || len(t.Fields) != fields {
 		return r, ErrXLSX
 	}
-	if len(t.DataFields) != 1 {
-		return r, errors.New("此布局需要一个值字段")
+	if len(t.DataFields) > 256 {
+		return r, errors.New("值字段数超出 Excel 上限")
+	}
+	if len(t.DataFields) == 0 {
+		return r, errors.New("此布局没有值字段")
 	}
 	if _, err := t.valueFilters(fields); err != nil {
 		return r, err
 	}
-	v := t.DataFields[0]
-	if v.Fld < 0 || v.Fld >= fields {
-		return r, ErrXLSX
+	if _, err := t.labels(fields); err != nil {
+		return r, err
 	}
-	if v.Show != "" && v.Show != "normal" {
-		return r, errors.New("此透视表使用特殊值显示方式，可在 Excel 中刷新")
+	for _, v := range t.DataFields {
+		if !validMeasureMethod(v.method()) {
+			return r, errors.New("此值字段的汇总方式不受支持")
+		}
+		if v.Fld < 0 || v.Fld >= fields {
+			return r, ErrXLSX
+		}
+		if v.Show != "" && v.Show != "normal" {
+			return r, errors.New("此透视表使用特殊值显示方式，可在 Excel 中刷新")
+		}
 	}
 	if isTrue(t.MergeLabels) {
 		return r, errors.New("此透视表使用合并标签，可在 Excel 中刷新")
@@ -147,6 +171,13 @@ func (t pivotTableXML) refreshArea(fields int) (cellRect, error) {
 	}
 	for _, axis := range [][]pivotAxisField{t.RowFields, t.ColFields} {
 		for _, f := range axis {
+			if f.X == pivotValuesField {
+				if seen[f.X] {
+					return r, ErrXLSX
+				}
+				seen[f.X] = true
+				continue
+			}
 			if err := check(f.X); err != nil {
 				return r, err
 			}
@@ -163,9 +194,15 @@ func (t pivotTableXML) refreshArea(fields int) (cellRect, error) {
 func (t pivotTableXML) savedAxes(fields []cacheFieldXML) (*editdoc.PivotAxes, error) {
 	axes := &editdoc.PivotAxes{}
 	for _, f := range t.RowFields {
+		if f.X == pivotValuesField {
+			continue
+		}
 		axes.Rows = append(axes.Rows, fields[f.X].Name)
 	}
 	for _, f := range t.ColFields {
+		if f.X == pivotValuesField {
+			continue
+		}
 		axes.Columns = append(axes.Columns, fields[f.X].Name)
 	}
 	for _, p := range t.PageFields {
@@ -305,6 +342,7 @@ func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 		for _, f := range fields {
 			info.Fields = append(info.Fields, f.Name)
 		}
+		info.dateInfo(fields, t.DataCaption == "Values")
 		if _, err = t.refreshArea(len(fields)); err == nil {
 			info.Axes, err = t.savedAxes(fields)
 		}
@@ -317,6 +355,23 @@ func (p *xlsxPackage) inspectPivotFields(ctx context.Context) error {
 			info.RefreshReason = "此工作簿已禁用该缓存的刷新"
 		}
 		if info.Axes != nil {
+			dates, dateErr := t.dateFilters(len(fields), p.date1904)
+			if dateErr != nil {
+				info.RefreshReason = dateErr.Error()
+			}
+			for _, f := range dates {
+				s := f.spec
+				s.Field = fields[f.field].Name
+				info.DateFilters = append(info.DateFilters, s)
+			}
+			info.Measures = t.measureInfo(fields)
+			info.ValuesAxis = t.valuesAxis()
+			labels, _ := t.labels(len(fields))
+			for _, f := range labels {
+				s := f.spec
+				s.Field = fields[f.field].Name
+				info.LabelFilters = append(info.LabelFilters, s)
+			}
 			filters, _ := t.valueFilters(len(fields))
 			for _, f := range filters {
 				cfg := f.spec

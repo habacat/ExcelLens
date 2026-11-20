@@ -46,7 +46,7 @@
       el('PreviewFill').addEventListener('click', () => this.preview('fill'));
       el('ApplyBatch').addEventListener('click', () => {
         const plan = this.previewed;
-        if (plan) this.commit(plan.rule ? 'rule' : 'change', plan.changes, plan.proof, plan.rule);
+        if (plan) this.commit(plan.rule ? 'rule' : 'change', plan.changes, {proof:plan.proof,rule:plan.rule});
       });
       el('PreviewRule').addEventListener('click', () => this.previewRule());
       for (const id of ruleInputs) el(id).addEventListener('input', () => { this.clearPreview(); this.ruleControls(); });
@@ -125,22 +125,27 @@
 
     advanced(tool) {
       if (!this.grid.view.ready()) return false;
+      const table=tool==='Table';
       const range = tool === 'Range';
-      const pivot = !range && this.tools.pivotAt(this.grid.selected);
+      const pivot = !table && !range && this.tools.pivotAt(this.grid.selected);
       this.tools.contextualPivot = !!pivot;
-      el('Title').textContent = range ? '区域编辑' : pivot ? '透视布局' : '更多编辑';
+      el('Title').textContent = table ? '调整表格范围' : range ? '区域编辑' : pivot ? '透视布局' : '更多编辑';
       this.openDialog('editCopyDialog');
       el('Work').hidden = false; el('ListView').hidden = true;
       const {sheet, ref} = this.context();
       el('Sheet').value = sheet; el('Address').value = ref || '';
       this.cell = null; this.clearPreview(); this.setCell(null);
       if (pivot) this.tools.openPivot(pivot);
+      if (table) { this.tools.selected='Structure'; el('StructureKind').value='resizeTable'; }
       if (range) {
         this.tools.selected = 'Structure';
         this.tools.chooseRangeKind = true;
         el('StructureKind').value = this.grid.view.merged() ? 'unmergeCells' : 'mergeCells';
       }
-      return this.run('正在读取选区…', signal => this.fetchCell(signal));
+      return this.run('正在读取选区…', signal=>this.fetchCell(signal)).then(ok=>{
+        if (ok && table && el('Dialog').open) { el('Range').focus(); el('Range').select(); }
+        return ok;
+      });
     }
 
     list() {
@@ -328,10 +333,10 @@
       } catch (error) { this.status(error.message, true); }
     }
 
-    commit(action, changes, proof, rule, direct = false, structure) {
+    commit(action, changes, {proof,rule,direct=false,structure,inferNumberFormat=false,entryAnchor,expandTable=false} = {}) {
       if (this.abort || !this.data || !this.pending && (!action || action === 'change' && !changes?.length)) return;
       const doc = this.data.document;
-      const request = this.pending || {document: keyOf(doc), proof, operation: {action, changes, rule, structure, revision: doc.revision, request: crypto.randomUUID().replaceAll('-', '')}};
+      const request = this.pending || {document: keyOf(doc), proof, direct, operation: {action, changes, rule, structure, entryAnchor, expandTable:expandTable||undefined, inferNumberFormat:inferNumberFormat || undefined, revision: doc.revision, request: crypto.randomUUID().replaceAll('-', '')}};
       this.pending = request;
       return this.run('正在保存编辑…', async signal => {
         let result;
@@ -343,12 +348,15 @@
         this.pending = null; this.clearPreview();
         this.data.document = result.document;
         this.renderState();
+        if (direct && result.committed === request.operation.revision && result.document.revision === result.committed) {
+          this.grid.status(''); return;
+        }
         try {
           if (this.grid.active && result.book !== this.context().book) {
             const {sheet,ref} = this.context(), names = this.data.sheets.map(s => s.name);
             const next = await this.post('state', {document:keyOf(result.document)}, signal);
             const active = next.sheets.some(s => s.name === sheet) ? sheet : next.sheets[names.indexOf(sheet)]?.name;
-            await this.bindGridBase(next, signal, active, ref);
+            await this.bindGridBase(next, signal, active, this.tools.entryRefAfterResize(sheet,ref,request.operation,next));
             await this.grid.enter(next, signal);
           } else if (this.grid.active) {
             // A replay can return an earlier receipt after another page has
@@ -366,7 +374,7 @@
     }
 
     commitStructure(structure) {
-      return this.commit('structure', undefined, undefined, undefined, false, structure);
+      return this.commit('structure', undefined, {structure});
     }
 
     async bindGridBase(data, signal, preferredSheet, ref) {
@@ -374,8 +382,13 @@
       const base = await this.post('base', {document:keyOf(data.document), revision:data.document.revision, book:this.context().book}, signal);
       const index = base.sheets.findIndex(s => s.name === preferredSheet);
       if (index >= 0) base.activeTab = index;
-      await this.adopt(base);
-      await this.activate(data, this.context().sheet, ref, signal, false);
+      this.grid.rebinding = this.data?.document.id === data.document.id && this.data.document.binding === data.document.binding;
+      try {
+        await this.adopt(base, {revisionRef:ref});
+        await this.activate(data, this.context().sheet, ref, signal, false);
+      } finally {
+        this.grid.rebinding = false;
+      }
       return true;
     }
 

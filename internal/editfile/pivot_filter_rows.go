@@ -110,16 +110,29 @@ func (f pivotFilter) passing(group map[int]*pivotAggregate, method string) map[i
 }
 
 func (p pivotPlan) filteredRows(ctx context.Context, r pivotRecords, dims map[int]*pivotDimension, registerAxes func([]pivotValue)) ([][]pivotValue, error) {
-	rows := make([][]pivotValue, 0, len(r.rows))
-	source, err := p.calculatedRows(ctx, r, dims)
+	dates, err := p.dateMasks(ctx, r, dims)
 	if err != nil {
 		return nil, err
 	}
+	rows := make([][]pivotValue, 0, len(r.rows))
+	source, err := p.measureRecords(ctx, r, dims)
+	if err != nil {
+		return nil, err
+	}
+records:
 	for _, record := range source {
+		for _, mask := range dates {
+			if !mask.pass[record[mask.column]] {
+				continue records
+			}
+		}
 		visible := true
 		for f, d := range dims {
+			if f == pivotValuesField {
+				continue
+			}
 			pos := d.positions[r.dicts[f].index[record[f]]]
-			if isTrue(d.items[pos].Hidden) || d.page && len(d.pagePositions) == 1 && pos != d.pagePositions[0] {
+			if d.labelPass != nil && !d.labelPass[pos] || isTrue(d.items[pos].Hidden) || d.page && len(d.pagePositions) == 1 && pos != d.pagePositions[0] {
 				visible = false
 				break
 			}
@@ -176,7 +189,8 @@ func (p pivotPlan) filteredRows(ctx context.Context, r pivotRecords, dims map[in
 				a = &pivotAggregate{}
 				groups[key][pos] = a
 			}
-			value, err := pivotMeasure(rec[p.data], r)
+			m := p.measureAt(filter.spec.Measure)
+			value, err := measureValue(rec, r, m, filter.spec.Measure)
 			if err != nil {
 				return nil, err
 			}
@@ -184,7 +198,7 @@ func (p pivotPlan) filteredRows(ctx context.Context, r pivotRecords, dims map[in
 		}
 		d.allowed = make(map[string]map[int]bool, len(groups))
 		for key, g := range groups {
-			d.allowed[key] = filter.passing(g, p.aggregation)
+			d.allowed[key] = filter.passing(g, p.measureAt(filter.spec.Measure).method())
 		}
 		next := rows[:0]
 		for i, path := range paths {

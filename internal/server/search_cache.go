@@ -16,9 +16,9 @@ import (
 
 // Search caches contain only *completed* searches. They are tied to the
 // workbook's content fingerprint (CacheDir) and invalidated when it changes.
-// v4 uses the actual shifted whole-row/column references in shared formulas.
+// v5 uses the corrected built-in elapsed-time display.
 // Earlier completed searches are recomputed on demand from the original index.
-const searchCacheSchema = 4
+const searchCacheSchema = 5
 const maxCachedSearches = 32
 const maxSearchCacheBytes = 3 << 20
 

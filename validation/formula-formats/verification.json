@@ -1,0 +1,290 @@
+{
+  "status": "verified",
+  "excel": {
+    "version": "16.0",
+    "build": 20326,
+    "locale": "zh-CN",
+    "systemDPI": 120
+  },
+  "entryFormats": {
+    "nativeWorkbooks": 11,
+    "recorded": 4930,
+    "acceptedAndCompared": 4820,
+    "outsideEditableGrammar": 110,
+    "numberFormatDifferences": 0
+  },
+  "formulaInputs": {
+    "browserSteps": {
+      "group-input": 20,
+      "mixed-active": 20,
+      "mixed-other": 20,
+      "oct-average": 8,
+      "oct-sum": 8,
+      "oct-union": 8,
+      "protected-reentry": 8,
+      "sc-cross": 8,
+      "sc-date": 8,
+      "small-date": 8,
+      "small-rate": 8,
+      "small-target": 8
+    },
+    "totalSteps": 132,
+    "cases": 15,
+    "savedWorkbooks": 45,
+    "savedXMLCoordinates": 183,
+    "formulaCachesDeferredWithRecalculationFlag": 123,
+    "excelOpenComparisons": 183,
+    "excelSaveAndReopenComparisons": 183,
+    "identicalPartsFinalBuild": 936,
+    "minimalStyleVariants": [
+      "missing",
+      "empty",
+      "formats-only",
+      "without-cell-xfs"
+    ],
+    "checked": "Formula2, Value2, NumberFormat, rendered text, original fonts, fill, alignment, borders and protection in the native before/after reference states. Browser verifies original-width and full text, undo, redo and reopening."
+  },
+  "completeWorkbook": {
+    "sourceSHA256": "7f3f24d2722f3cc01326ecd14c28eff4b7f8cf88773997cb2c9696059d8bf0a5",
+    "sourceUnchanged": true,
+    "restartBeforeRedo": true,
+    "comparisons": 66408,
+    "states": [
+      {
+        "stage": "base",
+        "formulaCells": 16602,
+        "comparison": {
+          "exact": 15689,
+          "within8ULP": 894,
+          "withinAbsoluteTolerance": 19
+        }
+      },
+      {
+        "stage": "edit",
+        "formulaCells": 16602,
+        "comparison": {
+          "exact": 15694,
+          "within8ULP": 891,
+          "withinAbsoluteTolerance": 17
+        }
+      },
+      {
+        "stage": "undo",
+        "formulaCells": 16602,
+        "comparison": {
+          "exact": 15689,
+          "within8ULP": 894,
+          "withinAbsoluteTolerance": 19
+        }
+      },
+      {
+        "stage": "redo",
+        "formulaCells": 16602,
+        "comparison": {
+          "exact": 15694,
+          "within8ULP": 891,
+          "withinAbsoluteTolerance": 17
+        }
+      }
+    ],
+    "numericTolerance": "exact binary64, then up to 8 ULP, then absolute tolerance 1e-12. Other types compare exactly."
+  },
+  "performance": {
+    "processRuns": 38,
+    "nativeFormulaComparisons": 49342,
+    "method": "Fresh isolated processes per run. Identical source bytes, alternating baseline/candidate order. Timings are loopback HTTP end-to-end, including serialization and verified artifact publication. Median times are milliseconds. Single and batch are commits; projection timings include the edit grid read and calculation. Every workbook part matches the baseline after decompression.",
+    "oracleTolerance": "8 ULP or absolute 1e-12. Source SHA-256 checked before and after. Results depend on workbook structure and local workload.",
+    "cases": {
+      "october-entry": {
+        "formulaCells": 257,
+        "pairedRounds": 7,
+        "identicalExportParts": 45,
+        "medianMs": {
+          "before": {
+            "start": 1001.13,
+            "initialProjection": 1031.51,
+            "single": 68.99,
+            "singleProjection": 43.08,
+            "batch": 68.46,
+            "batchProjection": 58.06,
+            "precedent": 63.37,
+            "recalculation": 52.29,
+            "save": 1502.33,
+            "repeatSave": 22.12,
+            "undo": 34.94,
+            "undoProjection": 57.47,
+            "redo": 31.83,
+            "redoProjection": 59.91
+          },
+          "after": {
+            "start": 700.25,
+            "initialProjection": 925.07,
+            "single": 63.39,
+            "singleProjection": 11.27,
+            "batch": 72.89,
+            "batchProjection": 29.1,
+            "precedent": 55.05,
+            "recalculation": 36.47,
+            "save": 839.99,
+            "repeatSave": 28.41,
+            "undo": 33.97,
+            "undoProjection": 41.72,
+            "redo": 46.81,
+            "redoProjection": 31.3
+          }
+        },
+        "commitAndProjectionMedianMs": {
+          "before": {
+            "single": 116.21,
+            "batch": 138.59,
+            "inputAndRecalculation": 108.86,
+            "undo": 92.81,
+            "redo": 94.11
+          },
+          "after": {
+            "single": 85.98,
+            "batch": 101.99,
+            "inputAndRecalculation": 98.86,
+            "undo": 71.19,
+            "redo": 78.11
+          }
+        }
+      },
+      "october-shared-ranges": {
+        "formulaCells": 513,
+        "pairedRounds": 5,
+        "identicalExportParts": 45,
+        "medianMs": {
+          "before": {
+            "start": 619.02,
+            "initialProjection": 768.63,
+            "single": 377.67,
+            "singleProjection": 38.28,
+            "batch": 370.85,
+            "batchProjection": 808.97,
+            "precedent": 68.52,
+            "recalculation": 700.15,
+            "save": 1203.21,
+            "repeatSave": 26.22,
+            "undo": 29.12,
+            "undoProjection": 742.54,
+            "redo": 40.67,
+            "redoProjection": 726.26
+          },
+          "after": {
+            "start": 607.36,
+            "initialProjection": 770.72,
+            "single": 69.39,
+            "singleProjection": 13.42,
+            "batch": 71.44,
+            "batchProjection": 49.63,
+            "precedent": 51.2,
+            "recalculation": 43.55,
+            "save": 766.98,
+            "repeatSave": 31.04,
+            "undo": 38.44,
+            "undoProjection": 33.46,
+            "redo": 37.57,
+            "redoProjection": 45.78
+          }
+        },
+        "commitAndProjectionMedianMs": {
+          "before": {
+            "single": 409.1,
+            "batch": 1182.52,
+            "inputAndRecalculation": 779.21,
+            "undo": 765.67,
+            "redo": 771.39
+          },
+          "after": {
+            "single": 84.19,
+            "batch": 123.81,
+            "inputAndRecalculation": 93.2,
+            "undo": 79.92,
+            "redo": 83.35
+          }
+        }
+      },
+      "sichuan-entry": {
+        "formulaCells": 257,
+        "pairedRounds": 7,
+        "identicalExportParts": 12,
+        "medianMs": {
+          "before": {
+            "start": 59.52,
+            "initialProjection": 7.64,
+            "single": 77.25,
+            "singleProjection": 33.18,
+            "batch": 45.52,
+            "batchProjection": 53.93,
+            "precedent": 54.68,
+            "recalculation": 45.52,
+            "save": 128.48,
+            "repeatSave": 10.83,
+            "undo": 32.8,
+            "undoProjection": 42.66,
+            "redo": 20.92,
+            "redoProjection": 39.57
+          },
+          "after": {
+            "start": 53.06,
+            "initialProjection": 9.6,
+            "single": 86.33,
+            "singleProjection": 21.47,
+            "batch": 58.66,
+            "batchProjection": 18.25,
+            "precedent": 20.48,
+            "recalculation": 18.78,
+            "save": 117.79,
+            "repeatSave": 20.64,
+            "undo": 35.49,
+            "undoProjection": 18.57,
+            "redo": 24.61,
+            "redoProjection": 18.24
+          }
+        },
+        "commitAndProjectionMedianMs": {
+          "before": {
+            "single": 113.27,
+            "batch": 98.71,
+            "inputAndRecalculation": 101.16,
+            "undo": 76.37,
+            "redo": 62.95
+          },
+          "after": {
+            "single": 101.36,
+            "batch": 78.33,
+            "inputAndRecalculation": 43.49,
+            "undo": 54.06,
+            "redo": 41.76
+          }
+        }
+      }
+    }
+  },
+  "boundaries": [
+    "Ordinary saved formulas use the existing on-open native recalculation contract.",
+    "Undo and redo are compared against independent Excel before/after input snapshots.",
+    "No WPS or manual desktop acceptance."
+  ],
+  "historyRecovery": {
+    "result": "PASS",
+    "semantics": 8,
+    "lastRevision": "5",
+    "verified": "old source XF, undo, redo, new DATE entry, second restart, save, Microsoft Excel reopen"
+  },
+  "projectCheck": {
+    "go": "go1.27.4",
+    "steps": [
+      "project metadata, documentation and package boundaries",
+      "offline vendored dependency resolution",
+      "Go tests",
+      "Go vet",
+      "JavaScript syntax and regression tests",
+      "generated function catalog",
+      "Go race detector"
+    ],
+    "frontendTests": 543,
+    "result": "PASS"
+  }
+}

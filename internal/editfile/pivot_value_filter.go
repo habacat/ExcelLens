@@ -14,11 +14,19 @@ import (
 )
 
 type pivotFilterXML struct {
-	Field   int    `xml:"fld,attr"`
-	Type    string `xml:"type,attr"`
-	ID      uint32 `xml:"id,attr"`
-	Order   int    `xml:"evalOrder,attr"`
-	Measure *int   `xml:"iMeasureFld,attr"`
+	String1    string `xml:"stringValue1,attr"`
+	String2    string `xml:"stringValue2,attr"`
+	Field      int    `xml:"fld,attr"`
+	Type       string `xml:"type,attr"`
+	ID         uint32 `xml:"id,attr"`
+	Order      int    `xml:"evalOrder,attr"`
+	Measure    *int   `xml:"iMeasureFld,attr"`
+	Extensions []struct {
+		URI string `xml:"uri,attr"`
+		Day *struct {
+			Use string `xml:"useWholeDay,attr"`
+		} `xml:"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main pivotFilter"`
+	} `xml:"extLst>ext"`
 	Columns []struct {
 		Col int `xml:"colId,attr"`
 		Top *struct {
@@ -29,6 +37,11 @@ type pivotFilterXML struct {
 			Op    string `xml:"operator,attr"`
 			Value string `xml:"val,attr"`
 		} `xml:"customFilters>customFilter"`
+		Dynamic *struct {
+			Kind string `xml:"type,attr"`
+			Low  string `xml:"val,attr"`
+			High string `xml:"maxVal,attr"`
+		} `xml:"dynamicFilter"`
 	} `xml:"autoFilter>filterColumn"`
 }
 
@@ -106,10 +119,13 @@ func (t pivotTableXML) valueFilters(fields int) ([]pivotFilter, error) {
 	var filters []pivotFilter
 	seen := map[int]bool{}
 	for _, v := range t.Filters {
-		if v.Field < 0 || v.Field >= fields || seen[v.Field] || v.Measure == nil || *v.Measure != 0 || len(v.Columns) != 1 || v.Columns[0].Col != 0 {
+		if isLabelKind(v.Type) || isPivotDateKind(v.Type) {
+			continue
+		}
+		if v.Field < 0 || v.Field >= fields || seen[v.Field] || v.Measure == nil || *v.Measure < 0 || *v.Measure >= len(t.DataFields) || len(v.Columns) != 1 || v.Columns[0].Col != 0 {
 			return nil, errors.New("此透视表的筛选未绑定到可重算的值字段")
 		}
-		f := editdoc.PivotValueFilter{Kind: v.Type}
+		f := editdoc.PivotValueFilter{Kind: v.Type, Measure: *v.Measure}
 		c := v.Columns[0]
 		switch v.Type {
 		case "count", "percent", "sum":
@@ -157,10 +173,14 @@ func (t pivotTableXML) valueFilters(fields int) ([]pivotFilter, error) {
 
 func (p *pivotPlan) configureValueFilter(fields []cacheFieldXML, change *editdoc.Structure) error {
 	// A field moved out of both axes can no longer have a value filter.
-	var id uint32
+	if p.measureOrigins != nil {
+		for i := range p.valueFilters {
+			f := &p.valueFilters[i]
+			f.spec.Measure = slices.Index(p.measureOrigins, f.spec.Measure)
+		}
+	}
 	p.valueFilters = slices.DeleteFunc(p.valueFilters, func(f pivotFilter) bool {
-		id = max(id, f.id)
-		return !slices.Contains(p.rows, f.field) && !slices.Contains(p.cols, f.field)
+		return f.spec.Measure < 0 || !slices.Contains(p.rows, f.field) && !slices.Contains(p.cols, f.field)
 	})
 	if change == nil || change.Kind != "pivotValueFilter" {
 		return nil
@@ -177,10 +197,13 @@ func (p *pivotPlan) configureValueFilter(fields []cacheFieldXML, change *editdoc
 	if f.Kind == "clear" {
 		return nil
 	}
+	if f.Measure < 0 || f.Measure >= max(1, len(p.measures)) {
+		return errors.New("请选择有效的值筛选度量")
+	}
 	if err := validatePivotFilter(f); err != nil {
 		return err
 	}
-	p.valueFilters = append(p.valueFilters, pivotFilter{spec: f, field: k, id: id + 1, order: -1})
+	p.valueFilters = append(p.valueFilters, pivotFilter{spec: f, field: k, id: p.table.nextFilterID(), order: -1})
 	return nil
 }
 
@@ -191,7 +214,7 @@ func (f pivotFilter) xml() string {
 		kind = f.spec.Kind
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, `<filter fld="%d" type="%s" evalOrder="%d" id="%d" iMeasureFld="0"><autoFilter ref="A1"><filterColumn colId="0">`, f.field, kind, f.order, f.id)
+	fmt.Fprintf(&out, `<filter fld="%d" type="%s" evalOrder="%d" id="%d" iMeasureFld="%d"><autoFilter ref="A1"><filterColumn colId="0">`, f.field, kind, f.order, f.id, f.spec.Measure)
 	if mode != "" {
 		out.WriteString("<top10")
 		if !top {
@@ -229,21 +252,21 @@ func (p pivotPlan) writeValueFilters(ctx context.Context, raw []byte) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	if slices.EqualFunc(p.valueFilters, original, func(a, b pivotFilter) bool {
+	oldLabels, err := p.table.labels(len(p.table.Fields))
+	if err != nil {
+		return nil, err
+	}
+	oldDates, err := p.table.dateFilters(len(p.table.Fields), p.date1904)
+	if err != nil {
+		return nil, err
+	}
+	if slices.EqualFunc(p.dates, oldDates, func(a, b pivotDateFilter) bool { a.spec.Field, b.spec.Field = "", ""; return a == b }) && slices.EqualFunc(p.labelFilters, oldLabels, func(a, b pivotLabel) bool { a.spec.Field, b.spec.Field = "", ""; return a == b }) && slices.EqualFunc(p.valueFilters, original, func(a, b pivotFilter) bool {
 		a.spec.Field, b.spec.Field = "", ""
 		return a == b
 	}) {
 		return raw, nil
 	}
-	var out strings.Builder
-	if len(p.valueFilters) > 0 {
-		fmt.Fprintf(&out, `<filters xmlns="%s" count="%d">`, mainNS, len(p.valueFilters))
-		for _, f := range p.valueFilters {
-			out.WriteString(f.xml())
-		}
-		out.WriteString("</filters>")
-	}
-	return replacePivotChild(ctx, raw, "filters", []string{"rowHierarchiesUsage", "colHierarchiesUsage", "extLst"}, out.String())
+	return p.patchFilters(ctx, raw)
 }
 
 // Replace a direct child or insert it before the first following schema

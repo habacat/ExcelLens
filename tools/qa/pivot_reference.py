@@ -60,9 +60,16 @@ def saved_pivot(path, sheet, area, name, records=False):
         definition=ET.fromstring(archive.read(cachepart))
         cache=definition.find(S+'cacheFields')
         fields=table.find(S+'pivotFields')
+        measures=[(f.get('name'),cache[int(f.get('fld'))].get('name'),f.get('subtotal','sum'),int(f.get('numFmtId','0'))) for f in table.find(S+'dataFields')]
         def item(f, pos):
+            if f == -2:
+                return 'measure', measures[pos][0]
             it=fields[f].find(S+'items')[pos]
-            shared=cache[f].find(S+'sharedItems')[int(it.get('x','0'))]
+            if it.get('t','data')!='data':
+                return 'subtotal',it.get('t')
+            members=cache[f].find(S+'fieldGroup/'+S+'groupItems')
+            if members is None:members=cache[f].find(S+'sharedItems')
+            shared=members[int(it.get('x','0'))]
             kind=shared.tag.split('}')[-1]
             value=shared.get('v')
             return kind,float(value) if kind=='n' else value
@@ -76,9 +83,9 @@ def saved_pivot(path, sheet, area, name, records=False):
                 if kind=='grand':current=[]
                 else:
                     current=previous[:int(it.get('r','0'))]+[int(x.get('v','0')) for x in it]
-                items.append((kind,tuple(item(f,v) for f,v in zip(indexes,current))))
+                items.append((kind,int(it.get('i','0')),tuple(item(f,v) for f,v in zip(indexes,current))))
                 previous=current
-            axes[axis]=([cache[i].get('name') for i in indexes],items)
+            axes[axis]=([('values',) if i==-2 else cache[i].get('name') for i in indexes],items)
         pages=[]
         for f in table.findall(S+'pageFields/'+S+'pageField'):
             k=int(f.get('fld'))
@@ -93,15 +100,32 @@ def saved_pivot(path, sheet, area, name, records=False):
         filters = []
         for f in table.findall(S+'filters/'+S+'filter'):
             column = f.find('.//'+S+'filterColumn')
-            filters.append((cache[int(f.get('fld'))].get('name'), f.get('type'), f.get('iMeasureFld'), [
-                (x.tag.split('}')[-1], tuple(sorted(x.attrib.items()))) for x in column.iter() if x is not column]))
+            kind = f.get('type')
+            # Native Excel may serialize the very same binary date serial with
+            # more decimal digits. Keep label and wildcard predicates as text.
+            def attributes(node):
+                numbers = node.tag == S+'dynamicFilter' or (kind.startswith('date') and node.tag == S+'customFilter')
+                return tuple(sorted((k, float(v) if numbers and k in ('val','maxVal') else v)
+                                    for k,v in node.attrib.items()))
+            day = f.find('.//{http://schemas.microsoft.com/office/spreadsheetml/2010/11/main}pivotFilter')
+            whole_day = day is not None and day.get('useWholeDay') in ('1','true')
+            filters.append((cache[int(f.get('fld'))].get('name'), kind, f.get('iMeasureFld'), whole_day, [
+                (x.tag.split('}')[-1], attributes(x)) for x in column.iter() if x is not column]))
         calculations = []
         for c in definition.findall(S+'calculatedItems/'+S+'calculatedItem'):
             ref = c.find('.//'+S+'reference')
             field = cache[int(ref.get('field'))]
             member = field.find(S+'sharedItems')[int(ref.find(S+'x').get('v','0'))]
             calculations.append((field.get('name'), member.get('v'), member.get('f'), c.get('formula')))
-        attrs = (attrs, filters, calculations)
+        groups=[]
+        for field in cache:
+            group=field.find(S+'fieldGroup')
+            rule=field.find(S+'fieldGroup/'+S+'rangePr')
+            if rule is not None:
+                bounds=(rule.get('startDate'),rule.get('endDate'),rule.get('autoStart','1'),rule.get('autoEnd','1'))
+                groups.append((field.get('name'),cache[int(group.get('base'))].get('name'),rule.get('groupBy'),int(rule.get('groupInterval','1')),bounds,
+                               [it.get('v') for it in group.find(S+'groupItems')]))
+        attrs = (attrs, filters, calculations, measures, groups)
         if not records:return values,axes,pages,attrs
         cachelinks=posixpath.join(posixpath.dirname(cachepart),'_rels',posixpath.basename(cachepart)+'.rels')
         rec=next(r for r in ET.fromstring(archive.read(cachelinks)) if r.get('Type').endswith('/pivotCacheRecords'))
@@ -111,7 +135,8 @@ def saved_pivot(path, sheet, area, name, records=False):
             if k=='n':v=float(v)
             if k=='b':v=v in ('true','1')
             return k,v
-        dictionaries=[[typed(el) for el in field.findall(S+'sharedItems/*')] for field in cache]
+        physical=[field for field in cache if field.get('databaseField','1') not in ('0','false')]
+        dictionaries=[[typed(el) for el in field.findall(S+'sharedItems/*')] for field in physical]
         rows=[]
         for row in raw.findall(S+'r'):
             vals=[]
@@ -122,7 +147,7 @@ def saved_pivot(path, sheet, area, name, records=False):
                 vals.append(v)
             rows.append(vals)
         assert len(rows)==int(raw.get('count'))==int(definition.get('recordCount'))
-        return values,axes,pages,attrs,([f.get('name') for f in cache],rows)
+        return values,axes,pages,attrs,([f.get('name') for f in physical],rows)
 
 
 def compare_saved_pivot(artifact, native, sheet, area, name, records=False):
@@ -146,6 +171,20 @@ def compare_saved_pivot(artifact, native, sheet, area, name, records=False):
         totals['cacheRecords']=len(ar)
         totals['cacheValues']=compared
     for axis,(fields,items) in expected[1].items():
-        totals[axis+'Grand']=sum(k=='grand' for k,_ in items)
-        totals[axis+'GroupOrSubtotal']=sum(k not in ('blank','grand') and 0<len(p)<len(fields) for k,p in items)
+        totals[axis+'Grand']=sum(k=='grand' for k,_,_ in items)
+        totals[axis+'GroupOrSubtotal']=sum(k not in ('blank','grand') and 0<len(p)<len(fields) for k,_,p in items)
     return totals
+
+
+if __name__ == '__main__':
+    import argparse
+    import json
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('artifact')
+    parser.add_argument('native')
+    parser.add_argument('sheet')
+    parser.add_argument('area')
+    parser.add_argument('pivot')
+    parser.add_argument('--records',action='store_true')
+    args=parser.parse_args()
+    print(json.dumps(compare_saved_pivot(args.artifact,args.native,args.sheet,args.area,args.pivot,args.records),indent=2))

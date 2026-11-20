@@ -23,8 +23,11 @@ import (
 
 const driver = "edit-document"
 
-// CurrentSemantics identifies the layout and transaction rules for new drafts.
-const CurrentSemantics = 7
+// GridLayoutSemantics is the first generation with the current coordinate
+// preflight. Generation 8 added a source XF for number formats. Generation 9
+// can also retain a formula's built-in format when no source XF supplies it.
+const GridLayoutSemantics = 7
+const CurrentSemantics = 9
 
 var (
 	ErrInvalid  = errors.New("编辑操作或单元格类型无效")
@@ -44,12 +47,32 @@ type Value struct {
 	Kind  string `json:"kind"`
 	Raw   string `json:"raw"`
 	Style string `json:"style,omitempty"`
+	// NumberStyle supplies only the number format. Style continues to own
+	// the destination font, border, alignment, protection and other XF data.
+	NumberStyle   string `json:"numberStyle,omitempty"`
+	BuiltinFormat int    `json:"builtinFormat,omitempty"`
 }
 
 func (v Value) Valid() bool {
-	if v.Style != "" {
-		i, err := strconv.Atoi(v.Style)
-		if err != nil || i < 0 || strconv.Itoa(i) != v.Style {
+	if (v.NumberStyle != "" || v.BuiltinFormat != 0) && v.Style == "" {
+		return false
+	}
+	if v.BuiltinFormat != 0 {
+		if v.NumberStyle != "" {
+			return false
+		}
+		switch v.BuiltinFormat {
+		case 14, 18, 46:
+		default:
+			return false
+		}
+	}
+	for _, id := range []string{v.Style, v.NumberStyle} {
+		if id == "" {
+			continue
+		}
+		i, err := strconv.Atoi(id)
+		if err != nil || i < 0 || strconv.Itoa(i) != id {
 			return false
 		}
 	}
@@ -96,17 +119,24 @@ func (v Value) Apply(base Value) Value {
 		v.Kind, v.Raw = base.Kind, base.Raw
 	}
 	if v.Style == "" {
-		v.Style = base.Style
+		v.Style, v.NumberStyle, v.BuiltinFormat = base.Style, base.NumberStyle, base.BuiltinFormat
 	}
 	return v
+}
+
+func (v Value) NumberFormatStyle() string {
+	if v.NumberStyle != "" {
+		return v.NumberStyle
+	}
+	return v.Style
 }
 
 func (v Value) difference(base Value) Value {
 	if (v.Kind == base.Kind || base.Kind == "missing" && v.Kind == "blank") && v.Raw == base.Raw {
 		v.Kind, v.Raw = "", ""
 	}
-	if v.Style == base.Style {
-		v.Style = ""
+	if v.Style == base.Style && v.NumberStyle == base.NumberStyle && v.BuiltinFormat == base.BuiltinFormat {
+		v.Style, v.NumberStyle, v.BuiltinFormat = "", "", 0
 	}
 	return v
 }
@@ -117,12 +147,15 @@ type Change struct {
 }
 
 type Operation struct {
-	Request   string     `json:"request"`
-	Revision  uint64     `json:"revision,string"`
-	Action    string     `json:"action"`
-	Changes   []Change   `json:"changes,omitempty"`
-	Rule      *Rule      `json:"rule,omitempty"`
-	Structure *Structure `json:"structure,omitempty"`
+	Request           string     `json:"request"`
+	Revision          uint64     `json:"revision,string"`
+	Action            string     `json:"action"`
+	ExpandTable       bool       `json:"expandTable,omitempty"`
+	InferNumberFormat bool       `json:"inferNumberFormat,omitempty"`
+	EntryAnchor       *Address   `json:"entryAnchor,omitempty"`
+	Changes           []Change   `json:"changes,omitempty"`
+	Rule              *Rule      `json:"rule,omitempty"`
+	Structure         *Structure `json:"structure,omitempty"`
 }
 
 type Key struct {

@@ -1,0 +1,111 @@
+{
+  "visualStates": 16,
+  "perimeterPixels": 8956,
+  "reference": "Supplied native Excel screenshot",
+  "originalTheme": {
+    "fill": [
+      230,
+      230,
+      230
+    ],
+    "gridline": [
+      208,
+      208,
+      208
+    ],
+    "outline": [
+      16,
+      153,
+      104
+    ],
+    "active": [
+      255,
+      255,
+      255
+    ]
+  },
+  "cases": {
+    "drag": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "forward": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "reverse": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "multiple": {
+      "perimeterSections": 2,
+      "cornerMarkers": 0,
+      "edgePixels": 0
+    },
+    "keyboard": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "dpi1.25": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 690
+    },
+    "dpi1.5": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 828
+    },
+    "editing": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "merged": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 432
+    },
+    "dark": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 0
+    },
+    "purple": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "frozen": {
+      "perimeterSections": 4,
+      "cornerMarkers": 1,
+      "edgePixels": 552
+    },
+    "scrolled": {
+      "perimeterSections": 4,
+      "cornerMarkers": 1,
+      "edgePixels": 500
+    },
+    "far": {
+      "perimeterSections": 1,
+      "cornerMarkers": 0,
+      "edgePixels": 0
+    },
+    "zoom": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 798
+    },
+    "real": {
+      "perimeterSections": 1,
+      "cornerMarkers": 1,
+      "edgePixels": 1844
+    }
+  },
+  "mismatches": 0,
+  "browserErrors": 0
+}

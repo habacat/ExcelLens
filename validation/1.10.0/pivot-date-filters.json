@@ -1,0 +1,111 @@
+{
+  "result": "PASS",
+  "excel": {
+    "version": "16.0",
+    "build": 20326
+  },
+  "filterChoices": {
+    "specified": 8,
+    "relative": 16,
+    "recurringMonthsAndQuarters": 16
+  },
+  "matrix": {
+    "dateSystems": [
+      1900,
+      1904
+    ],
+    "cases": 106,
+    "savedStates": 126
+  },
+  "edgeCases": {
+    "staleTodayRefreshUndoRedo": true,
+    "adjacentSecondComparisons": 3,
+    "missingDateComparisons": 6,
+    "twoDateFieldsAndReplaceExisting": 2,
+    "fractionalWholeDayNativeOperators": 8
+  },
+  "realReport": {
+    "description": "239 original expense records, 16 source columns, pivots created in an independent workbook copy",
+    "sourceHashUnchanged": true,
+    "scenarios": 9,
+    "applicationStates": 54,
+    "nativeRectangles": 63,
+    "area": "A1:V360",
+    "nativeCellComparisons": 498960,
+    "cacheValuesAcrossApplicationStates": 206496,
+    "numericExact": 11460,
+    "numericWithinTolerance": 135,
+    "maximumULPs": 2,
+    "maximumAbsoluteDifference": 1.1641532182693481e-10,
+    "numericTolerance": "relative 2e-15 or absolute 1e-12; text, types and formula expressions compared directly",
+    "multilevelFilteredAxisItems": {
+      "cacheRecords": 239,
+      "cacheValues": 3824,
+      "rowGrand": 1,
+      "rowGroupOrSubtotal": 4,
+      "colGrand": 1,
+      "colGroupOrSubtotal": 1
+    },
+    "cases": {
+      "real-month": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-between": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-exact": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-column-case": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-group": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-empty": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-both": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-clear": {
+        "nativeCells": 55440,
+        "states": 6
+      },
+      "real-subtotals": {
+        "nativeCells": 55440,
+        "states": 6
+      }
+    }
+  },
+  "browser": {
+    "real-between": {
+      "width": 360,
+      "steps": 9,
+      "downloadStates": 6
+    },
+    "real-exact": {
+      "width": 1280,
+      "steps": 8,
+      "downloadStates": 6
+    },
+    "real-group": {
+      "width": 840,
+      "steps": 8,
+      "downloadStates": 6
+    },
+    "real-clear": {
+      "width": 390,
+      "steps": 8,
+      "downloadStates": 6
+    }
+  },
+  "manualDesktopAndWPS": "not run"
+}

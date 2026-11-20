@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"excellens/internal/calculator"
 	"excellens/internal/editdoc"
@@ -80,13 +79,15 @@ func (d *pivotDictionary) add(v pivotValue) int {
 }
 
 type pivotRecords struct {
-	fields       []cacheFieldXML
-	rows         [][]pivotValue
-	dicts        []pivotDictionary
-	removedItems map[int]int
-	items        []pivotCalculated
-	dateStyles   []string
-	book         *CalculationBook
+	datePositions map[int]map[int]int
+	measureSource map[int]int
+	fields        []cacheFieldXML
+	rows          [][]pivotValue
+	dicts         []pivotDictionary
+	removedItems  map[int]int
+	items         []pivotCalculated
+	dateStyles    []string
+	book          *CalculationBook
 }
 
 func loadPivotRecords(ctx context.Context, values objectValues, source pivotSource, fields []cacheFieldXML, dimensions map[int]bool) (pivotRecords, error) {
@@ -242,16 +243,11 @@ func (r *pivotRecords) sharedItems(field int) string {
 	kinds := map[string]bool{}
 	minN, maxN := math.Inf(1), math.Inf(-1)
 	integers := true
-	var minDate, maxDate string
-	wholeDays := true
+	var dates pivotDateExtent
 	for v := range values {
 		kinds[v.kind] = true
 		if v.kind == "d" {
-			if minDate == "" || v.raw < minDate {
-				minDate = v.raw
-			}
-			maxDate = max(maxDate, v.raw)
-			wholeDays = wholeDays && strings.HasSuffix(v.raw, "T00:00:00")
+			dates.add(v.raw)
 		}
 		if v.kind == "n" {
 			n, _ := strconv.ParseFloat(v.raw, 64)
@@ -274,13 +270,7 @@ func (r *pivotRecords) sharedItems(field int) string {
 		out.WriteString(` containsBlank="1"`)
 	}
 	if kinds["d"] {
-		if wholeDays {
-			last, err := time.Parse(pivotDateLayout, maxDate)
-			if err == nil && maxDate < "9999-12-31" {
-				maxDate = last.AddDate(0, 0, 1).Format(pivotDateLayout)
-			}
-		}
-		fmt.Fprintf(&out, ` containsDate="1" minDate="%s" maxDate="%s"`, minDate, maxDate)
+		fmt.Fprintf(&out, ` containsDate="1" minDate="%s" maxDate="%s"`, dates.first, dates.last)
 	}
 	if !textGroup && !kinds["n"] {
 		out.WriteString(` containsNonDate="0"`)
@@ -340,7 +330,7 @@ func (r *pivotRecords) definition(ctx context.Context, data []byte) ([]byte, err
 					start = e.from
 					had = true
 				}
-			case "extLst":
+			case "fieldGroup", "extLst":
 				if e.parent() == "cacheField" && !had && index >= 0 && index < len(r.dicts) {
 					ps = append(ps, xmlPatch{e.from, e.from, r.sharedItems(index)})
 					had = true

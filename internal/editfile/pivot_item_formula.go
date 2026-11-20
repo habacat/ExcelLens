@@ -179,7 +179,7 @@ func compileItemFormula(ctx context.Context, body, field string, dict pivotDicti
 }
 
 func (expr itemExpression) evaluate(ctx context.Context, values map[int]calculator.FormulaValue) (pivotValue, error) {
-	form := expr.form.BindWorksheet(1, 1, false, func(name string) calculator.WorksheetName {
+	form := expr.form.BindWorksheet("", 1, 1, false, func(name string) calculator.WorksheetName {
 		i, _ := strconv.Atoi(strings.TrimPrefix(name, "_PIVOTITEM"))
 		v, ok := values[i]
 		if !ok {

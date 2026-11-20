@@ -23,6 +23,14 @@ type columnEdit struct {
 // PrepareChanges uses the same prospective column and the same rule checks
 // for the grid, paste, fill and transaction confirmation.
 func (l Layout) PrepareChanges(ctx context.Context, f *workbook.EditSourceFile, input []editdoc.Change, doc *editdoc.Document) (editdoc.PreparedChanges, error) {
+	return l.prepareChanges(ctx, f, input, doc, false, nil)
+}
+
+func (l Layout) PrepareGridInput(ctx context.Context, f *workbook.EditSourceFile, input []editdoc.Change, doc *editdoc.Document, anchor *editdoc.Address) (editdoc.PreparedChanges, error) {
+	return l.prepareChanges(ctx, f, input, doc, true, anchor)
+}
+
+func (l Layout) prepareChanges(ctx context.Context, f *workbook.EditSourceFile, input []editdoc.Change, doc *editdoc.Document, inferFormat bool, anchor *editdoc.Address) (editdoc.PreparedChanges, error) {
 	var plan editdoc.PreparedChanges
 	changes := slices.Clone(input)
 	columns := map[editdoc.Address]*columnEdit{}
@@ -90,9 +98,24 @@ func (l Layout) PrepareChanges(ctx context.Context, f *workbook.EditSourceFile, 
 	for i, change := range changes {
 		addresses[i] = change.Address
 	}
-	batch, err := l.ReadBatch(ctx, f, addresses, doc.RuleChanges())
+	var refs map[editdoc.Address]*entryFormatInput
+	var anchors []editdoc.Address
+	if inferFormat && l.XLSX != nil {
+		refs, anchors = l.XLSX.entryFormatReferences(ctx, input, addresses, anchor)
+		// Non-empty source cells already have a verified XF in the immutable
+		// calculation index. Only missing or styled empty anchors need XML.
+		if l.index != nil {
+			anchors = slices.DeleteFunc(anchors, func(a editdoc.Address) bool { _, ok := l.index.cells[a]; return ok })
+		}
+	}
+	batch, err := l.ReadBatch(ctx, f, addresses, doc.RuleChanges(), anchors...)
 	if err != nil {
 		return plan, err
+	}
+	if len(refs) > 0 {
+		if err := batch.inheritEntryFormats(ctx, f, changes, doc, refs); err != nil {
+			return plan, err
+		}
 	}
 	plan.Base, plan.Changes, err = batch.Validate(ctx, changes, doc)
 	// Confirmation replays the preview. Its extent matters even when a member

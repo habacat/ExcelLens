@@ -28,13 +28,42 @@ body.editing-copy .formula-toolbar > :not(.edit-toolbar-control),
 body.editing-copy :is(#quickStats,#selectionStatus,.auto-filter-button,#cellTooltip) { display: none !important; }
 textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 .formula-expanded textarea.formula-input { field-sizing: content; }
-#editGridInput {
-  position: absolute; z-index: 22; box-sizing: border-box; resize: none; margin: 0;
-  color: var(--reading-ink, #263849); background: var(--reading-paper, #fff);
-  border: 2px solid var(--reading-accent, #2e75b7); border-radius: 0; padding: 0 3px;
-  overflow: auto; outline: none; line-height: 1.25; white-space: pre-wrap;
+#editGridInput, #editGridMeasure {
+  position: absolute; box-sizing: border-box; margin: 0; padding: 0 3px;
+  border: 2px solid transparent; line-height: 1.25; white-space: pre-wrap;
+  overflow-wrap: anywhere; tab-size: 8; letter-spacing: normal;
 }
+#editGridMeasure {
+  inset: 0 auto auto 0; width: max-content; height: max-content;
+  visibility: hidden; pointer-events: none; user-select: none; overflow: hidden;
+}
+#editGridMeasure:empty { display: none; }
+#editGridInput {
+  z-index: 22; resize: none;
+  color: var(--reading-ink, #263849); background: var(--reading-paper, #fff);
+  border-color: var(--reading-accent, #2e75b7); border-radius: 0;
+  overflow: auto; outline: none; overscroll-behavior: contain;
+}
+#editGridInput, #editGridFormula { scrollbar-width: none; scrollbar-gutter: auto; }
+#editGridInput::-webkit-scrollbar, #editGridFormula::-webkit-scrollbar { display: none; width: 0; height: 0; }
 #editGridInput:not(.writing) { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.edit-grid-list-button, .edit-grid-list {
+  position: absolute; z-index: 23; box-sizing: border-box; margin: 0;
+  color: var(--reading-ink, #263849); background: var(--reading-paper, #fff);
+  border: 1px solid var(--reading-line, #bac9d6); border-radius: 3px;
+}
+.edit-grid-list-button:not([hidden]) { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; }
+.edit-grid-list-button .button-icon { width: 13px; height: 13px; }
+.edit-grid-list-button:hover, .edit-grid-list-button[aria-expanded="true"] { color: var(--reading-accent, #2e75b7); background: var(--reading-active, #eaf1f7); }
+.edit-grid-list { z-index: 24; padding: 3px; font: inherit; overflow: auto; box-shadow: 0 3px 12px #14263a28; }
+.edit-grid-list option { padding: 3px 6px; }
+.editing-copy .grid-region .grid-cell.cut-source::before {
+  content:""; position:absolute; inset:0; z-index:7; pointer-events:none;
+  border-style:dashed; border-width:var(--cut-edges); border-color:var(--selection-color,#2467a3);
+}
+#editGridMenu button:not([hidden]) { display:flex; justify-content:space-between; align-items:center; gap:24px; }
+#editGridMenu kbd { font:inherit; color:var(--reading-muted,#657583); }
+.edit-grid-list:focus-visible, .edit-grid-list-button:focus-visible { outline: 2px solid var(--reading-accent, #2e75b7); outline-offset: -1px; }
 body.editing-copy .edit-copy-coordinate, body.editing-copy #editCopyCellPanel > .edit-copy-cell-head,
 body.editing-copy #editCopyValue, body.editing-copy #editCopyTextHint, body.editing-copy .edit-copy-commit { display: none; }
 @media (max-width: 800px) {
@@ -98,6 +127,15 @@ body.editing-copy #editCopyValue, body.editing-copy #editCopyTextHint, body.edit
 .edit-pivot-expression input { width:100%; min-width:0; }
 .edit-pivot-detail > summary { cursor: pointer; font-weight: 600; padding-block: 5px; }
 .edit-pivot-detail[open] > summary { margin-bottom: 8px; }
+#editCopyPivotDateFilters { margin:0; }
+#editCopyPivotDateFilters > summary { overflow-wrap:anywhere; }
+#editCopyPivotDateFilters .edit-copy-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12em),1fr)); }
+#editCopyPivotDateFilters :is(select,input:not([type="checkbox"])) { width:100%; }
+.edit-date-precision { display:flex; align-items:center; gap:8px; flex-wrap:wrap; grid-column:1 / -1; }
+#editCopyPivotDateFilterClear, #editCopyPivotDateFilterBounds { margin-block-start:8px; }
+#editCopyPivotDateFilters [hidden] { display:none; }
+#editCopyPivotDateFilterBounds input { max-width:100%; min-width:0; }
+.edit-date-filter-error:not(:empty) { display:block; margin-block-start:6px; color:var(--reading-danger,#a23336); }
 .edit-pivot-detail input[type="number"] { width: 12ch; max-width: 100%; }
 .edit-copy-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; }
 .edit-copy-field { min-width: 0; display: grid; gap: 5px; color: var(--edit-muted); font-size: 12px; }
@@ -140,8 +178,14 @@ body.editing-copy #editCopyValue, body.editing-copy #editCopyTextHint, body.edit
 
 .edit-copy-fields select { max-width: 100%; }
 .edit-pivot-layout { min-width:0; margin:0; padding:0; border:0; display:grid; gap:14px; }
-.edit-copy-dialog:has(#editCopyWork[hidden]) #editCopyPivotApply { display:none; }
+.edit-copy-dialog:has(#editCopyWork[hidden]) :is(#editCopyPivotApply,#editCopyPivotDateFilterApply) { display:none; }
 .edit-pivot-axes { display:grid; gap:10px; }
+.edit-pivot-measure {display:grid;grid-template-columns:minmax(0,1.6fr) minmax(5.4em,1fr) auto;align-items:center;gap:5px;}
+.edit-pivot-measure select {width:100%;min-width:0;}
+.edit-measure-caption {grid-column:1/-1;min-width:0;}
+.edit-measure-caption summary {color:var(--edit-muted);overflow-wrap:anywhere;}
+.edit-pivot-units {display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0;}
+.edit-pivot-units label {display:inline-flex;align-items:center;gap:3px;}
 .edit-pivot-axis { display:grid; grid-template-columns:5em minmax(0,1fr); align-items:start; gap:8px; }
 .edit-pivot-heading { padding-top:7px; color:var(--edit-muted); font-size:12px; }
 .edit-pivot-fields,.edit-pivot-field { min-width:0; display:grid; gap:5px; }

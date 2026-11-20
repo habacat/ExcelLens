@@ -101,6 +101,26 @@ func (index *SourceDataRuleIndex) Summary() DataRuleSummary {
 	return value
 }
 
+type ListControlArea struct {
+	CellMerge
+	Hidden bool `json:"hidden,omitempty"`
+}
+
+// ListControlAreas exposes only selection geometry. Candidate values are
+// fetched from the editing revision when the user opens a particular list.
+func (index *SourceDataRuleIndex) ListControlAreas() []ListControlArea {
+	var areas []ListControlArea
+	for _, rule := range index.rules {
+		if !rule.SuppressDropDown && (rule.Type != "list" || rule.Status != "described" && !rule.RequiresListLookup()) {
+			continue
+		}
+		for _, span := range rule.Ranges {
+			areas = append(areas, ListControlArea{CellMerge: span, Hidden: rule.SuppressDropDown})
+		}
+	}
+	return areas
+}
+
 func cloneDataRule(value SourceDataRule) SourceDataRule {
 	value.Ranges = slices.Clone(value.Ranges)
 	value.InlineList = slices.Clone(value.InlineList)

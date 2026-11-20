@@ -37,35 +37,59 @@ func (n *pivotNode) path() []int {
 }
 
 type pivotLine struct {
-	node   *pivotNode
-	kind   string
-	values bool
+	node    *pivotNode
+	kind    string
+	values  bool
+	measure int
+}
+type pivotGroup struct {
+	row, col *pivotNode
+	measure  int
 }
 type pivotCube struct {
 	rowRoot, colRoot *pivotNode
-	groups           map[[2]*pivotNode]*pivotAggregate
+	groups           map[pivotGroup]*pivotAggregate
 	dims             map[int]*pivotDimension
 }
 
 func (p pivotPlan) cube(ctx context.Context, r pivotRecords) (pivotCube, error) {
 	dims, err := p.dimensions(r)
-	c := pivotCube{&pivotNode{}, &pivotNode{}, map[[2]*pivotNode]*pivotAggregate{}, dims}
+	c := pivotCube{&pivotNode{}, &pivotNode{}, map[pivotGroup]*pivotAggregate{}, dims}
 	if err != nil {
 		return c, err
 	}
-	work := int64(len(r.rows)) * int64(len(p.rows)+1) * int64(len(p.cols)+1)
-	if work > formats.EditCalcVisits {
-		return c, errors.New("透视层级组合超过单次计算上限")
+	measures := p.measures
+	if len(measures) == 0 {
+		measures = []pivotDataField{{Fld: p.data, Subtotal: p.aggregation}}
 	}
-	descend := func(n *pivotNode, axis []int, record []pivotValue) *pivotNode {
+	rowAxis, colAxis := p.displayAxes()
+	work := int64(len(r.rows)) * int64(len(rowAxis)+1) * int64(len(colAxis)+1) * int64(len(measures))
+	if work > formats.EditCalcVisits {
+		return c, ErrCalcCapacity
+	}
+	if len(measures) > 1 {
+		d := &pivotDimension{name: p.table.DataCaption, field: pivotFieldXML{Subtotal: "0", ShowAll: "0", Compact: p.table.Compact}}
+		for i, m := range measures {
+			d.items = append(d.items, pivotItemXML{X: i})
+			d.values = append(d.values, pivotValue{"s", m.Name})
+		}
+		c.dims[pivotValuesField] = d
+	}
+	descend := func(n *pivotNode, axis []int, record []pivotValue, measure int) *pivotNode {
 		for _, f := range axis {
-			n = n.child(dims[f].positions[r.dicts[f].index[record[f]]])
+			pos := measure
+			if f != pivotValuesField {
+				pos = dims[f].positions[r.dicts[f].index[record[f]]]
+			}
+			n = n.child(pos)
 		}
 		return n
 	}
 	rows, err := p.filteredRows(ctx, r, dims, func(record []pivotValue) {
-		descend(c.rowRoot, p.rows, record)
-		descend(c.colRoot, p.cols, record)
+		for i := range measures {
+			descend(c.rowRoot, rowAxis, record, i)
+			descend(c.colRoot, colAxis, record, i)
+		}
 	})
 	if err != nil {
 		return c, err
@@ -74,23 +98,26 @@ func (p pivotPlan) cube(ctx context.Context, r pivotRecords) (pivotCube, error) 
 		if err := ctx.Err(); err != nil {
 			return c, err
 		}
-		row, col := descend(c.rowRoot, p.rows, record), descend(c.colRoot, p.cols, record)
-		value, err := pivotMeasure(record[p.data], r)
-		if err != nil {
-			return c, err
-		}
-		for i := row; i != nil; i = i.parent {
-			for j := col; j != nil; j = j.parent {
-				key := [2]*pivotNode{i, j}
-				a := c.groups[key]
-				if a == nil {
-					if len(c.groups) >= formats.EditCalcSourceCells {
-						return c, errors.New("透视小计交叉项目超过单次刷新容量")
+		for idx, m := range measures {
+			row := descend(c.rowRoot, rowAxis, record, idx)
+			col := descend(c.colRoot, colAxis, record, idx)
+			value, err := measureValue(record, r, m, idx)
+			if err != nil {
+				return c, err
+			}
+			for i := row; i != nil; i = i.parent {
+				for j := col; j != nil; j = j.parent {
+					key := pivotGroup{i, j, idx}
+					g := c.groups[key]
+					if g == nil {
+						if len(c.groups) >= formats.EditCalcSourceCells {
+							return c, ErrCalcCapacity
+						}
+						g = &pivotAggregate{}
+						c.groups[key] = g
 					}
-					a = &pivotAggregate{}
-					c.groups[key] = a
+					g.addMeasure(value, len(record) > len(r.fields))
 				}
-				a.addMeasure(value, len(record) > len(r.fields))
 			}
 		}
 	}
@@ -102,9 +129,24 @@ func (p pivotPlan) cube(ctx context.Context, r pivotRecords) (pivotCube, error) 
 
 func (c pivotCube) lines(ctx context.Context, root *pivotNode, axis []int, rows, grand bool) ([]pivotLine, error) {
 	if len(axis) == 0 {
-		return []pivotLine{{root, "", true}}, nil
+		return []pivotLine{{node: root, values: true}}, nil
 	}
 	var lines []pivotLine
+	valuesDepth := slices.Index(axis, pivotValuesField)
+	appendLine := func(n *pivotNode, kind string, values bool) {
+		m := 0
+		if valuesDepth >= 0 {
+			if n.depth > valuesDepth {
+				m = n.path()[valuesDepth]
+			} else if values {
+				for index := range c.dims[pivotValuesField].items {
+					lines = append(lines, pivotLine{n, kind, true, index})
+				}
+				return
+			}
+		}
+		lines = append(lines, pivotLine{n, kind, values, m})
+	}
 	visited := 0
 	var visit func(*pivotNode) error
 	visit = func(parent *pivotNode) error {
@@ -128,7 +170,7 @@ func (c pivotCube) lines(ctx context.Context, root *pivotNode, axis []int, rows,
 			allowed = d.allowed[filterPath(parent.path())]
 		}
 		for _, pos := range order {
-			if d.allowed != nil && !allowed[pos] {
+			if d.labelPass != nil && !d.labelPass[pos] || d.allowed != nil && !allowed[pos] {
 				continue
 			}
 			visited++
@@ -144,27 +186,29 @@ func (c pivotCube) lines(ctx context.Context, root *pivotNode, axis []int, rows,
 			if n == nil {
 				n = &pivotNode{parent: parent, pos: pos, depth: depth + 1}
 			}
-			appendLine := func(kind string, values bool) { lines = append(lines, pivotLine{n, kind, values}) }
 			if depth == len(axis)-1 || !pivotOn(d.items[pos].Detail) {
-				appendLine("", true)
+				appendLine(n, "", true)
 				continue
 			}
 			subs := d.subtotalTypes()
+			if depth+1 == len(axis)-1 && valuesDepth == depth+1 {
+				subs = nil
+			}
 			outline := rows && pivotOn(d.field.Outline)
-			top := outline && pivotOn(d.field.Top) && len(subs) == 1 && subs[0] == "default"
+			top := (valuesDepth < 0 || depth >= valuesDepth) && outline && pivotOn(d.field.Top) && len(subs) == 1 && subs[0] == "default"
 			if outline {
-				appendLine("", top)
+				appendLine(n, "", top)
 			}
 			if err := visit(n); err != nil {
 				return err
 			}
 			if !top {
 				for _, subtotal := range subs {
-					appendLine(subtotal, true)
+					appendLine(n, subtotal, true)
 				}
 			}
 			if rows && isTrue(d.field.Blank) {
-				appendLine("blank", false)
+				appendLine(n, "blank", false)
 			}
 			if len(lines) > formats.EditCalcSourceCells {
 				return errors.New("透视输出超过单次刷新容量")
@@ -175,8 +219,8 @@ func (c pivotCube) lines(ctx context.Context, root *pivotNode, axis []int, rows,
 	if err := visit(root); err != nil {
 		return nil, err
 	}
-	if grand {
-		lines = append(lines, pivotLine{root, "grand", true})
+	if grand && !(len(axis) == 1 && valuesDepth == 0) {
+		appendLine(root, "grand", true)
 	}
 	return lines, nil
 }
@@ -201,6 +245,9 @@ func axisItemsXML(tag string, lines []pivotLine) string {
 		out.WriteString("<i")
 		if line.kind != "" {
 			fmt.Fprintf(&out, ` t="%s"`, line.kind)
+		}
+		if line.measure > 0 {
+			fmt.Fprintf(&out, ` i="%d"`, line.measure)
 		}
 		if repeat > 0 {
 			fmt.Fprintf(&out, ` r="%d"`, repeat)

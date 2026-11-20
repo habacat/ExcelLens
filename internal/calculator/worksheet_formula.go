@@ -102,7 +102,7 @@ func (e *formulaEval) operandText(v FormulaValue) (string, error) {
 // BindWorksheet resolves names and legacy implicit intersection before
 // collecting dependencies. The evaluator and the dependency index consequently
 // refer to the same cells, including positional criteria such as B:B in SUMIFS.
-func (f EditableFormula) BindWorksheet(row, col int, array bool, name func(string) WorksheetName) WorksheetFormula {
+func (f EditableFormula) BindWorksheet(sheet string, row, col int, array bool, name func(string) WorksheetName) WorksheetFormula {
 	result := WorksheetFormula{MaySpill: !f.Scalar}
 	var bind func(*formulaNode, bool) *formulaNode
 	bind = func(n *formulaNode, scalar bool) *formulaNode {
@@ -190,6 +190,19 @@ func (f EditableFormula) BindWorksheet(row, col int, array bool, name func(strin
 			bound.args[i] = bind(arg, wantScalar)
 			if bound.args[i] == nil {
 				return nil
+			}
+		}
+		if n.kind == "union" {
+			var first string
+			for i, area := range bound.args {
+				origin := area.ref.sheet
+				if origin == "" {
+					origin = sheet
+				}
+				if area.kind != "ref" || i > 0 && !strings.EqualFold(first, origin) {
+					return &formulaNode{kind: "value", value: errorValue(errors.New("#VALUE!"))}
+				}
+				first = origin
 			}
 		}
 		return &bound

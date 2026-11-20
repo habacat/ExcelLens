@@ -419,7 +419,22 @@ func (e *formulaEval) aggregate(n *formulaNode) (FormulaValue, error) {
 			high = new(big.Rat).Set(v)
 		}
 	}
-	for _, arg := range n.args {
+	args := n.args
+	for i, arg := range n.args {
+		if arg.kind == "union" {
+			// Each area contributes independently, even where addresses overlap.
+			args = append([]*formulaNode(nil), n.args[:i]...)
+			for _, part := range n.args[i:] {
+				if part.kind == "union" {
+					args = append(args, part.args...)
+				} else {
+					args = append(args, part)
+				}
+			}
+			break
+		}
+	}
+	for _, arg := range args {
 		if arg.kind == "ref" {
 			rv, err := e.get(arg.ref)
 			if err != nil {

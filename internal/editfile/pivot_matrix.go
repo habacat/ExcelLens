@@ -25,11 +25,15 @@ func (g pivotCanvas) text(row, col int, s string) {
 
 type pivotCaptions struct{ row, col, grand, all, multiple, blank, total string }
 
-func (p pivotPlan) captions(v objectValues) pivotCaptions {
+func (p pivotPlan) captionsForLanguage() pivotCaptions {
 	c := pivotCaptions{"行标签", "列标签", "总计", "(全部)", "(多项)", "(空白)", "汇总"}
 	if p.table.DataCaption == "Values" {
 		c = pivotCaptions{"Row Labels", "Column Labels", "Grand Total", "(All)", "(Multiple Items)", "(blank)", "Total"}
 	}
+	return c
+}
+func (p pivotPlan) captions(v objectValues) pivotCaptions {
+	c := p.captionsForLanguage()
 	if p.table.RowCaption != "" {
 		c.row = p.table.RowCaption
 	}
@@ -38,7 +42,7 @@ func (p pivotPlan) captions(v objectValues) pivotCaptions {
 	}
 	if p.table.GrandCaption != "" {
 		c.grand = p.table.GrandCaption
-	} else if len(p.table.RowFields) > 0 && pivotOn(p.table.ColGrand) {
+	} else if len(p.table.DataFields) == 1 && len(p.table.RowFields) > 0 && pivotOn(p.table.ColGrand) {
 		if old, err := v.cell(editdoc.Address{Sheet: p.sheet, Row: p.old.lastRow, Col: p.old.firstCol}); err == nil && old.Kind == "text" {
 			c.grand = old.Raw
 		}
@@ -85,12 +89,26 @@ func (d *pivotDimension) subtotalLabel(name, kind string, c pivotCaptions) strin
 	return name + " " + pivotMethodName(kind, c.total == "Total")
 }
 func pivotMethodName(method string, english bool) string {
+	switch method {
+	case "stdDevp":
+		method = "stdDevP"
+	case "varp":
+		method = "varP"
+	case "countNums":
+		if english {
+			return "Count Numbers"
+		}
+		return "数值计数"
+	}
 	if english {
 		return map[string]string{"sum": "Sum", "count": "Count", "countA": "Count", "average": "Average", "avg": "Average", "min": "Min", "max": "Max", "product": "Product", "stdDev": "StdDev", "stdDevP": "StdDevp", "var": "Var", "varP": "Varp"}[method]
 	}
 	return map[string]string{"sum": "求和", "count": "计数", "countA": "计数", "average": "平均值", "avg": "平均值", "min": "最小值", "max": "最大值", "product": "乘积", "stdDev": "标准偏差", "stdDevP": "总体标准偏差", "var": "方差", "varP": "总体方差"}[method]
 }
 func (p pivotPlan) dataCaption(r pivotRecords) string {
+	if len(p.measures) > 0 {
+		return p.measures[0].Name
+	}
 	d := p.table.DataFields[0]
 	method := d.Subtotal
 	if method == "" {
@@ -123,6 +141,9 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 	if err != nil {
 		return nil, nil, err
 	}
+	p.rows, p.cols = p.displayAxes()
+	multi := p.valuesAxis != nil
+	valuesOnlyCol := multi && slices.Equal(p.cols, []int{pivotValuesField})
 	rows, err := c.lines(ctx, c.rowRoot, p.rows, true, pivotOn(p.table.ColGrand))
 	if err != nil {
 		return nil, nil, err
@@ -130,6 +151,14 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 	cols, err := c.lines(ctx, c.colRoot, p.cols, false, pivotOn(p.table.RowGrand))
 	if err != nil {
 		return nil, nil, err
+	}
+	if len(p.labelFilters)+len(p.dates) > 0 {
+		if len(rows) == 0 {
+			rows = []pivotLine{{node: c.rowRoot}}
+		}
+		if len(cols) == 0 {
+			cols = []pivotLine{{node: c.colRoot}}
+		}
 	}
 	if len(rows) == 0 || len(cols) == 0 {
 		return nil, nil, errors.New("透视筛选没有可显示的项目")
@@ -141,10 +170,13 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 	dataCol := 0
 	if len(offsets) > 0 {
 		dataCol = offsets[len(offsets)-1] + 1
-	} else if len(p.cols) > 0 {
+	} else if !multi && len(p.cols) > 0 {
 		dataCol = 1
 	}
 	dataRow := 1 + len(p.cols)
+	if valuesOnlyCol {
+		dataRow = 1
+	}
 	pg := pageGrid(len(p.pages), p.table.Wrap, isTrue(p.table.Over))
 	body := p.old
 	if pg.rows > 0 {
@@ -188,11 +220,13 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 	firstRow, firstCol := body.firstRow, body.firstCol
 	top, left := firstRow+dataRow, firstCol+dataCol
 	headers := pivotOn(p.table.Headers)
-	if len(p.cols) > 0 {
-		if len(p.rows) > 0 {
-			grid.text(firstRow, firstCol, caption)
-		} else {
-			grid.text(top, firstCol, caption)
+	if len(p.cols) > 0 && !valuesOnlyCol {
+		if !multi {
+			row := firstRow
+			if len(p.rows) == 0 {
+				row = top
+			}
+			grid.text(row, firstCol, caption)
 		}
 		if headers {
 			if pivotOn(p.table.Compact) {
@@ -205,7 +239,7 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 				}
 			}
 		}
-	} else {
+	} else if !multi {
 		grid.text(firstRow, left, caption)
 	}
 	if headers && len(p.rows) > 0 {
@@ -214,7 +248,7 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 				continue
 			}
 			h := c.dims[f].name
-			if pivotOn(c.dims[f].field.Compact) && pivotOn(p.table.Compact) {
+			if (f != pivotValuesField || len(p.rows) > 1) && pivotOn(c.dims[f].field.Compact) && pivotOn(p.table.Compact) {
 				h = cap.row
 			}
 			grid.text(top-1, firstCol+offsets[i], h)
@@ -223,7 +257,11 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 	if err := c.writeAxisLabels(grid, rows, p.rows, offsets, true, top, firstCol, cap); err != nil {
 		return nil, nil, err
 	}
-	if err := c.writeAxisLabels(grid, cols, p.cols, nil, false, firstRow+1, left, cap); err != nil {
+	headerStart := firstRow + 1
+	if valuesOnlyCol {
+		headerStart = firstRow
+	}
+	if err := c.writeAxisLabels(grid, cols, p.cols, nil, false, headerStart, left, cap); err != nil {
 		return nil, nil, err
 	}
 	for i, row := range rows {
@@ -237,7 +275,11 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 			if !col.values {
 				continue
 			}
-			method := p.aggregation
+			measure := max(row.measure, col.measure)
+			if p.formats.output != nil && p.formats.byMeasure[measure] >= 0 {
+				p.formats.output[editdoc.Address{Sheet: p.sheet, Row: top + i, Col: left + j}] = p.formats.byMeasure[measure]
+			}
+			method := p.measureAt(measure).method()
 			custom := ""
 			for _, line := range []pivotLine{row, col} {
 				if line.kind != "" && line.kind != "default" && line.kind != "grand" {
@@ -255,7 +297,7 @@ func (p pivotPlan) render(ctx context.Context, r pivotRecords, values objectValu
 			if method == "" {
 				continue
 			}
-			group := c.groups[[2]*pivotNode{row.node, col.node}]
+			group := c.groups[pivotGroup{row.node, col.node, measure}]
 			if group != nil && group.count > 0 {
 				grid.set(top+i, left+j, group.value(method))
 			} else if p.table.MissingCaption != "" {
@@ -276,6 +318,7 @@ func (c pivotCube) writeAxisLabels(g pivotCanvas, lines []pivotLine, axis, offse
 	if len(axis) == 0 {
 		return nil
 	}
+	valuesDepth := slices.Index(axis, pivotValuesField)
 	var prev []int
 	for i, line := range lines {
 		path := line.node.path()
@@ -287,7 +330,16 @@ func (c pivotCube) writeAxisLabels(g pivotCanvas, lines []pivotLine, axis, offse
 			}
 		}
 		if line.kind == "grand" {
-			write(0, editdoc.Value{Kind: "text", Raw: cap.grand})
+			label := cap.grand
+			if valuesDepth >= 0 {
+				caption := c.dims[pivotValuesField].values[line.measure].raw
+				if cap.total == "Total" {
+					label = "Total " + caption
+				} else {
+					label = caption + "汇总"
+				}
+			}
+			write(0, editdoc.Value{Kind: "text", Raw: label})
 			continue
 		}
 		if line.kind == "blank" {
@@ -317,7 +369,12 @@ func (c pivotCube) writeAxisLabels(g pivotCanvas, lines []pivotLine, axis, offse
 					n, _ := strconv.ParseFloat(v.Raw, 64)
 					label = d.dateFormat.Display(n, d.date1904)
 				}
-				v = editdoc.Value{Kind: "text", Raw: d.subtotalLabel(label, line.kind, cap)}
+				if valuesDepth >= len(path) && line.kind == "default" {
+					label += " " + c.dims[pivotValuesField].values[line.measure].raw
+				} else {
+					label = d.subtotalLabel(label, line.kind, cap)
+				}
+				v = editdoc.Value{Kind: "text", Raw: label}
 			}
 			write(j, v)
 		}

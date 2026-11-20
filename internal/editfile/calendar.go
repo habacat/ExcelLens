@@ -33,7 +33,7 @@ func calendarProperties(el xml.StartElement) (bool, error) {
 	return isTrue(value), nil
 }
 
-func workbookCalendar(ctx context.Context, f *workbook.EditSourceFile, style string) (bool, string, error) {
+func workbookCalendar(ctx context.Context, f *workbook.EditSourceFile, v editdoc.Value) (bool, string, error) {
 	p, err := openXLSXPackage(f, f.Size())
 	if err != nil {
 		return false, "", err
@@ -52,6 +52,16 @@ func workbookCalendar(ctx context.Context, f *workbook.EditSourceFile, style str
 		date1904, err = calendarProperties(el)
 		return err
 	})
+	if err == nil && v.BuiltinFormat != 0 {
+		switch v.BuiltinFormat {
+		case 14:
+			return date1904, "date", nil
+		case 18:
+			return date1904, "time", nil
+		}
+		return date1904, "", nil
+	}
+	style := v.NumberFormatStyle()
 	if err != nil || style == "" || p.files["xl/styles.xml"] == nil {
 		return date1904, "", err
 	}
@@ -100,7 +110,7 @@ func parseClock(raw string) (time.Duration, error) {
 }
 
 func DateRuleBounds(ctx context.Context, f *workbook.EditSourceFile, rule editdoc.Rule) (editdoc.Rule, error) {
-	date1904, _, err := workbookCalendar(ctx, f, "")
+	date1904, _, err := workbookCalendar(ctx, f, editdoc.Value{})
 	if err != nil {
 		return rule, err
 	}
@@ -160,7 +170,7 @@ func CalendarFill(ctx context.Context, f *workbook.EditSourceFile, start editdoc
 	var date1904 bool
 	if native {
 		var kind string
-		date1904, kind, err = workbookCalendar(ctx, f, start.Style)
+		date1904, kind, err = workbookCalendar(ctx, f, start)
 		if err != nil {
 			return nil, "", err
 		}
@@ -205,7 +215,8 @@ func calendarDates(start editdoc.Value, native, date1904 bool, step int64, count
 	for i := range out {
 		day := first + step*int64(i+1)
 		if native {
-			out[i] = editdoc.Value{Kind: "number", Raw: strconv.FormatInt(day, 10), Style: start.Style}
+			out[i] = start
+			out[i].Raw = strconv.FormatInt(day, 10)
 		} else {
 			out[i] = editdoc.Value{Kind: "text", Raw: time.Unix(day*secondsPerDay, 0).UTC().Format(time.DateOnly)}
 		}
@@ -244,7 +255,8 @@ func calendarTimes(start editdoc.Value, native bool, step int64, count int) ([]e
 			if raw == "1" || raw == "0" && value.Sign() != 0 {
 				return nil, "", errors.New("时间数值舍入后超出当天范围或失去精度")
 			}
-			out[i] = editdoc.Value{Kind: "number", Raw: raw, Style: start.Style}
+			out[i] = start
+			out[i].Raw = raw
 		} else {
 			out[i] = editdoc.Value{Kind: "text", Raw: clockDisplay(value)}
 		}
