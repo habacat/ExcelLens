@@ -4,8 +4,6 @@ import (
 	"context"
 	"io"
 	"maps"
-	"os"
-	"path/filepath"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/opc"
@@ -23,6 +21,15 @@ type tableEntry struct {
 }
 
 func (g *TableGrowth) Materialize(ctx context.Context, dir string, doc *editdoc.Document, layout Layout, src *workbook.EditSourceFile, changes []editdoc.Change, infer bool, anchor *editdoc.Address) (string, error) {
+	return materializeRevision(ctx, dir, doc, layout, src, doc.Snapshot(), doc.ColumnFormulas(), func(w io.Writer, source *workbook.EditSourceFile) (opc.Receipt, error) {
+		p, err := openStructurePackage(ctx, source)
+		if err != nil {
+			return opc.Receipt{}, err
+		}
+		return g.write(ctx, dir, p, w, source, changes, infer, anchor)
+	})
+}
+func (g *TableGrowth) write(ctx context.Context, dir string, p *xlsxPackage, dst io.Writer, src *workbook.EditSourceFile, changes []editdoc.Change, infer bool, anchor *editdoc.Address) (opc.Receipt, error) {
 	input := tableEntry{dir: dir, infer: infer, changes: make([]editdoc.Change, len(changes))}
 	if anchor != nil {
 		a := *anchor
@@ -34,46 +41,22 @@ func (g *TableGrowth) Materialize(ctx context.Context, dir string, doc *editdoc.
 		if g.rowOffset != 0 && c.Value.Kind == "formula" {
 			raw, err := copyRangeFormula(c.Value.Raw, g.rowOffset, 0)
 			if err != nil {
-				return "", err
+				return opc.Receipt{}, err
 			}
 			c.Value.Raw = raw
 		}
 		input.changes[i] = c
 	}
 	op := editdoc.Structure{Kind: "resizeTable", Sheet: g.sheet, Name: g.table, Range: pivotRectRef(g.bounds)}
-	return materializeRevision(ctx, dir, doc, layout, src, doc.Snapshot(), doc.ColumnFormulas(), func(w io.Writer, source *workbook.EditSourceFile) (opc.Receipt, error) {
-		p, err := openStructurePackage(ctx, source)
-		if err != nil {
-			return opc.Receipt{}, err
-		}
-		return p.resizeTable(ctx, w, source, op, &input)
-	})
+	return p.resizeTable(ctx, dst, src, op, &input)
 }
 
 func (entry tableEntry) apply(ctx context.Context, p *xlsxPackage, updates map[string][]byte, roots map[editdoc.Address]editdoc.Value) error {
-	path := filepath.Join(entry.dir, ".table-entry")
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(path)
-	_, err = p.writeValueStructure(ctx, &boundedCopy{ctx: ctx, file: file}, maps.Clone(updates))
-	closeErr := file.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	src, err := workbook.OpenEditSource(path)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-	q, err := openStructurePackage(ctx, src)
-	if err != nil {
-		return err
-	}
+	return p.withRevisedFile(ctx, entry.dir, maps.Clone(updates), func(q *xlsxPackage, src *workbook.EditSourceFile) error {
+		return entry.applyTo(ctx, q, src, updates, roots)
+	})
+}
+func (entry tableEntry) applyTo(ctx context.Context, q *xlsxPackage, src *workbook.EditSourceFile, updates map[string][]byte, roots map[editdoc.Address]editdoc.Value) error {
 	layout := Layout{XLSX: &q.layout}
 	plan, err := layout.prepareChanges(ctx, src, entry.changes, &editdoc.Document{}, entry.infer, entry.anchor)
 	if err != nil {

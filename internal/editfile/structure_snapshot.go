@@ -4,14 +4,12 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"excellens/internal/editdoc"
-	"excellens/internal/formats"
 	"excellens/internal/opc"
 	"excellens/internal/workbook"
 )
@@ -85,23 +83,8 @@ func materializeRevision(ctx context.Context, dir string, doc *editdoc.Document,
 	if err = src.Check(); err != nil {
 		return "", err
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
+	if err = reserveRevision(ctx, doc, dir, next); err != nil {
 		return "", err
-	}
-	var bytes int64
-	for _, e := range entries {
-		if e.Name() == filepath.Base(next) || e.Name() == filepath.Base(current) {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			return "", err
-		}
-		bytes += info.Size()
-	}
-	if bytes > formats.EditStructureHistoryBytes {
-		return "", fmt.Errorf("工作簿结构历史超过 %d GB 上限", formats.EditStructureHistoryBytes>>30)
 	}
 	if err = os.Rename(pending, next); err != nil {
 		return "", err

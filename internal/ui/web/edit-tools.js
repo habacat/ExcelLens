@@ -8,6 +8,7 @@
   class EditTools {
     constructor(editor) {
       this.editor = editor;
+      this.sheetTabs=new window.ExcelLensEditSheetTabs(editor);
       this.calculatedItems = new window.ExcelLensPivotCalculatedItems(item => this.commit({kind:'pivotCalculatedItem', pivot:el('Pivot').value, calculatedItem:item}));
       this.valueFilters = new window.ExcelLensPivotValues(filter => this.commit({kind:'pivotValueFilter', pivot:el('Pivot').value, valueFilter:filter}));
       this.pivotLayout = new window.ExcelLensPivotLayout(editor);
@@ -51,7 +52,7 @@
 
     async commit(change) {
       if (!change) return;
-      const returnToGrid = !!change.range || this.contextualPivot && ['configurePivot', 'refreshPivot', 'pivotValueFilter', 'pivotCalculatedItem','pivotLabelFilter','pivotDateGroup','pivotDateFilter'].includes(change.kind);
+      const returnToGrid = change.kind.endsWith('Sheet') || !!change.range || this.contextualPivot && ['configurePivot', 'refreshPivot', 'pivotValueFilter', 'pivotCalculatedItem','pivotLabelFilter','pivotDateGroup','pivotDateFilter'].includes(change.kind);
       const saved = await this.editor.commitStructure({...change, sheet:el('Sheet').value});
       if (saved && returnToGrid) this.editor.close();
     }
@@ -214,7 +215,7 @@
 
     structureFields(cell) {
       const kind = el('StructureKind').value;
-      const rename = kind === 'renameSheet', rows = kind.endsWith('Rows');
+      const sheetAction=kind.endsWith('Sheet'),nameRequired=sheetAction&&kind!=='deleteSheet', rows = kind.endsWith('Rows');
       const range = rangeKinds.has(kind);
       el('RangeField').hidden = !range;
       el('TableField').hidden = kind!=='resizeTable';
@@ -230,12 +231,15 @@
       if (kind==='resizeTable') {
         el('Range').value=this.editor.data?.tables?.find(t=>t.name===el('TableName').value)?.ref||'';
       }
-      el('NewNameField').hidden = !rename;
-      el('AtField').hidden = el('CountField').hidden = rename||range;
+      el('NewNameField').hidden = !nameRequired;
+      el('AtField').hidden = el('CountField').hidden = sheetAction||range;
       el('BeforeField').hidden = !kind.startsWith('move');
       el('AtLabel').textContent = rows ? '起始行号' : '起始列号';
       el('At').value = cell ? (rows ? cell.address.row : cell.address.col) : '';
       el('NewName').value = el('Sheet').value;
+      if(kind==='newSheet'||kind==='copySheet'){
+        el('NewName').value=this.sheetTabs.nextName(kind,el('Sheet').value);
+      }
       el('ApplyStructure').textContent = el('StructureKind').selectedOptions[0].textContent;
     }
 
@@ -264,7 +268,8 @@
         if (!el('MergeConsent').hidden && el('ReplaceContents').checked) result.replaceContents = true;
         return result;
       }
-      if (kind === 'renameSheet') {
+      if (kind === 'deleteSheet') return this.editor.data.sheets.length>1 ? {kind} : null;
+      if (kind.endsWith('Sheet')) {
         const name = el('NewName').value;
         return name.trim() && name !== sheet ? {kind, name} : null;
       }

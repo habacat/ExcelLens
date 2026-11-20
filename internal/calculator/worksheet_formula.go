@@ -40,6 +40,7 @@ type WorksheetName struct {
 }
 
 type WorksheetFormula struct {
+	Volatile   bool
 	Subtotal   bool
 	MaySpill   bool
 	root       *formulaNode
@@ -141,6 +142,10 @@ func (f EditableFormula) BindWorksheet(sheet string, row, col int, array bool, n
 			result.References = append(result.References, a)
 			return n
 		case "function":
+			switch n.op {
+			case "OFFSET", "TODAY", "NOW":
+				result.Volatile = true
+			}
 			if n.op == "SUBTOTAL" {
 				result.Subtotal = true
 			}
@@ -213,6 +218,39 @@ func (f EditableFormula) BindWorksheet(sheet string, row, col int, array bool, n
 
 func worksheetRangeArgument(op string, i int) bool {
 	switch op {
+	case "LET":
+		return i%2 == 1
+	case "XLOOKUP":
+		return i == 1 || i == 2
+	case "XMATCH":
+		return i == 1
+	case "LOOKUP":
+		return i > 0
+	case "OFFSET", "ISREF", "RANK", "RANK.AVG", "RANK.EQ":
+		if strings.HasPrefix(op, "RANK") {
+			return i == 1
+		}
+		return i == 0
+	case "MINIFS", "MAXIFS":
+		return i == 0 || i%2 == 1
+	case "TEXTJOIN":
+		return i >= 2
+	case "LARGE", "SMALL", "PERCENTILE", "PERCENTILE.INC", "PERCENTILE.EXC", "QUARTILE", "QUARTILE.INC", "QUARTILE.EXC", "IRR":
+		return i == 0
+	case "FORECAST", "FORECAST.LINEAR", "NPV":
+		return i > 0
+	case "XIRR":
+		return i < 2
+	case "XNPV":
+		return i > 0
+	case "MIRR":
+		return i == 0
+	case "NETWORKDAYS", "WORKDAY":
+		return i == 2
+	case "NETWORKDAYS.INTL", "WORKDAY.INTL":
+		return i == 3
+	case "COUNTBLANK", "SUMSQ", "MEDIAN", "MODE", "MODE.SNGL", "AVEDEV", "DEVSQ", "STDEV", "STDEV.S", "STDEVP", "STDEV.P", "VAR", "VAR.S", "VARP", "VAR.P", "GEOMEAN", "HARMEAN", "CORREL", "PEARSON", "RSQ", "SLOPE", "INTERCEPT", "STEYX", "COVARIANCE.P", "COVARIANCE.S", "COVAR", "SUMX2MY2", "SUMX2PY2", "SUMXMY2", "XOR", "GCD", "LCM", "CONCAT":
+		return true
 	case "SUM", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA", "PRODUCT", "SUMPRODUCT", "AND", "OR":
 		return true
 	case "SUBTOTAL":

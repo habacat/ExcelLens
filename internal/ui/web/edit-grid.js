@@ -14,32 +14,39 @@
       this.measure = el('Measure');
       this.queue = [];
       this.region = document.querySelector('.grid-region');
+      this.entry = new window.ExcelLensWorksheetFormulaEntry(this);
+      this.fillHandle = new window.ExcelLensFillHandle(this);
       this.choices = new window.ExcelLensGridValidationList(this);
       this.statusNode = el('Status');
       for (const field of [this.input, this.formula]) {
         field.addEventListener('beforeinput', event => {
-          if (!this.active || this.draft || this.moving) return;
-          if (!this.begin(field === this.input, field)) event.preventDefault();
+          if (!this.active || this.moving) return;
+          if (!this.draft && !this.begin(field === this.input, field)) { event.preventDefault(); return; }
+          this.entry.beforeInput(event, field);
         });
         field.addEventListener('compositionstart', () => {
           if (!this.draft && !this.moving) this.begin(field === this.input, field);
+          if (this.entry.enabled) this.entry.record(field);
           this.composing = true;
         });
-        field.addEventListener('compositionend', () => { this.composing = false; });
+        field.addEventListener('compositionend', () => { this.composing = false; if (this.draft) this.entry.changed(field); });
         field.addEventListener('input', () => {
           if (!this.draft) return;
           this.draft.text = field.value;
           this.draft.typed = true;
           (field === this.input ? this.formula : this.input).value = field.value;
+          this.entry.changed(field);
           this.schedulePosition();
         });
       }
       this.formula.addEventListener('focus', () => {
         if (this.active && !this.draft && !this.moving) this.begin(false, this.formula);
+        if (this.draft) this.draft.field = this.formula;
       });
       el('Kind').addEventListener('change', () => {
         if (!this.draft) this.begin(false, this.input);
         this.focus();
+        if (this.draft) this.entry.changed(this.entry.field);
       });
       el('Undo').onclick = () => this.history('undo');
       el('Redo').onclick = () => this.history('redo');
@@ -50,15 +57,24 @@
       el('Refresh').onclick = () => this.reload();
       el('Retry').onclick = () => this.act(null);
       this.region.addEventListener('pointerdown', e => {
+        if (this.active && this.entry.begin(e)) { e.stopImmediatePropagation(); e.preventDefault(); return; }
         if (!this.active || !this.blocked || !e.target.closest('.grid-cell')) return;
         // Resolve the clicked source coordinate on click, after the previous
         // draft has been confirmed. The reader's drag must not change it first.
         e.stopImmediatePropagation(); e.preventDefault();
       }, true);
       this.region.addEventListener('click', e => {
+        if (this.active && this.entry.handledClick) {
+          this.entry.handledClick = false; e.preventDefault(); e.stopImmediatePropagation(); return;
+        }
         const node = e.target.closest('.grid-cell');
         if (!this.active || !node) return;
         e.preventDefault(); e.stopImmediatePropagation();
+        if (e.detail===0 && this.view.ready() && !this.moving && !this.owner.pending && !this.stale && this.entry.canPoint()) {
+          const point=this.entry.point(node);
+          if (point) { this.entry.writePoint(point,point); this.focus(); }
+          return;
+        }
         if (this.view.dragged()) { this.focus(); return; }
         if (this.view.ready()) this.act(() => {
           this.view.selectPoint(node,e);
@@ -114,6 +130,7 @@
     }
 
     leave() {
+      if (this.fillHandle.drag) this.fillHandle.reset();
       this.choices.reset();
       this.ranges.copied = null;
       this.ranges.menu.hidden = true;
@@ -212,7 +229,7 @@
     }
 
     focus() {
-      if (this.active && !document.querySelector('dialog:modal')) this.input.focus({preventScroll:true});
+      if (this.active && !document.querySelector('dialog:modal')) (this.draft?.field || this.input).focus({preventScroll:true});
     }
     selection() {
       if (!this.active || this.draft) return;
@@ -227,13 +244,13 @@
     }
     schedulePosition() {
       if (this.active && (this.draft || !this.choices.button.hidden || this.choices.tree?.root) && !this.frame) {
-        this.frame = requestAnimationFrame(() => { this.frame = 0; this.position(); this.choices.position(); });
+        this.frame = requestAnimationFrame(() => { this.frame = 0; this.position(); this.choices.position(); this.entry.completion.position(); });
       }
     }
     position() {
       const draft = this.draft;
       if (!draft) return;
-      const found = this.view.bounds(draft.ref);
+      const found = draft.address.sheet === this.owner.context().sheet && this.view.bounds(draft.ref);
       this.input.style.opacity = found ? '' : '0';
       this.input.style.pointerEvents = found ? '' : 'none';
       if (!found) return;
@@ -274,7 +291,8 @@
         if (shape.readOnly) throw Error(shape.readOnly);
         const raw = textOf(cell), escaped = raw.includes('\r');
         const initial = model.encode(raw, escaped);
-        const d = {address, ref:cell.ref, revision:doc.revision, initial, escaped, text:replace ? '' : initial, kind:kindOf(cell)};
+        const d = {address, ref:cell.ref, revision:doc.revision, initial, escaped, text:replace ? '' : initial, kind:kindOf(cell),
+          field, pointKeys:replace, origin:this.view.captureOrigin()};
         this.draft = d;
         this.choices.dismiss(); this.choices.position();
         this.input.value = this.formula.value = d.text;
@@ -283,6 +301,7 @@
         if (field === this.input) {
           this.focus(); this.input.setSelectionRange(d.text.length, d.text.length);
         }
+        this.entry.changed(field);
         const request = {document:keyOf(doc), revision:doc.revision, sheet:address.sheet, ref:d.ref};
         d.ready = this.owner.post('read', request).then(source => {
           if (this.draft !== d) return false;
@@ -296,6 +315,7 @@
           d.initial = model.encode(actual, d.escaped);
           if (unchanged && d.text !== d.initial) {
             this.input.value = this.formula.value = d.text = d.initial;
+            this.entry.changed(d.field);
             this.schedulePosition();
           }
           return true;
@@ -311,9 +331,17 @@
     }
     cancelDraft() {
       this.draft = null; this.composing = false;
+      this.entry.reset();
       this.measuredText = null; this.measure.textContent = '';
       this.input.classList.remove('writing'); this.input.removeAttribute('style');
       this.selection();
+    }
+    async returnToDraft(d) {
+      return !d || d.address.sheet === this.owner.context().sheet || await this.view.restoreOrigin(d);
+    }
+    draftValue(d) {
+      const text = this.entry.enabled ? window.ExcelLensFormulaInput.close(d.text) : d.text;
+      return model.gridValue(model.decode(text,d.escaped),el('Kind').value,d.kind,this.owner.data.encoding,this.owner.limits);
     }
 
     async finish() {
@@ -323,9 +351,11 @@
         this.cancelDraft(); return true;
       }
       if (!d) return !this.stale;
+      if (this.entry.pendingStep && await this.entry.pendingStep === false) return false;
+      if (!await this.returnToDraft(d) || this.draft !== d) return false;
       if (!this.dirty) { this.cancelDraft(); return true; }
       if (!await d.ready || this.draft !== d || this.stale) return false;
-      const value = model.gridValue(model.decode(d.text, d.escaped), el('Kind').value, d.kind, this.owner.data.encoding, this.owner.limits);
+      const value = this.draftValue(d);
       const initial = model.decode(d.initial, d.escaped);
       if (d.kind !== value.kind || initial !== value.raw || d.typed && value.kind === 'formula') {
         const saved = await this.owner.commit('change', [{...d.address, value}], {direct:true,inferNumberFormat:true,expandTable:!this.view.filtered()});
@@ -394,8 +424,10 @@
       const draft = this.draft;
       return this.act(async () => {
         if (!draft) return true;
+        if (this.entry.pendingStep && await this.entry.pendingStep === false) return false;
         if (!await draft.ready || this.draft !== draft || this.stale) return false;
-        const value = model.gridValue(model.decode(draft.text,draft.escaped),el('Kind').value,draft.kind,this.owner.data.encoding,this.owner.limits);
+        if (!await this.returnToDraft(draft) || this.draft !== draft) return false;
+        const value = this.draftValue(draft);
         const saved = await this.ranges.fill('fill-entry',{...draft.address,value});
         if (saved) { this.cancelDraft(); this.focus(); }
         return saved;
@@ -424,6 +456,7 @@
         else if ('text' in task) {
           if (!this.draft && !this.begin(true, this.input)) { this.queue.length = 0; return; }
           this.draft.text += task.text; this.input.value = this.formula.value = this.draft.text;
+          this.entry.changed(this.input);
           this.schedulePosition();
         } else this.step(task.key, task.shift);
       }
@@ -464,7 +497,15 @@
         } else if (!(ctrl && lower === 'v')) take();
         return;
       }
-      if (key === 'Escape') { take(); if (!this.owner.pending) { this.cancelDraft(); this.ranges.cancelCut(); } this.focus(); return; }
+      if (this.entry.key(e)) { take(); return; }
+      if (key === 'Escape') {
+        take();
+        if (!this.owner.pending) this.act(async () => {
+          if (!await this.returnToDraft(this.draft)) return false;
+          this.cancelDraft(); this.ranges.cancelCut(); this.focus();
+        },false);
+        return;
+      }
       if (ctrl && !e.altKey && !e.shiftKey && !this.draft && lower === 'c') { take(); this.view.copy(); return; }
       if (ctrl && !e.altKey && !e.shiftKey && !this.draft && lower === 'x') { take(); this.copyForCut(); return; }
       if (ctrl && !e.altKey && !e.shiftKey && !this.draft && ['d','r'].includes(lower)) {
@@ -485,8 +526,10 @@
       if (!ctrl && !e.altKey && key.length === 1 && !isFormula) {
         take();
         if (this.begin(true, this.input)) {
+          if (key === '=' && this.entry.allowsFormula) this.entry.record(this.input);
           this.draft.text = key; this.input.value = this.formula.value = key;
           this.input.setSelectionRange(key.length,key.length); this.schedulePosition();
+          this.entry.changed(this.input);
         }
       }
     }

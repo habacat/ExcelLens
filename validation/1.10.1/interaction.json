@@ -1,0 +1,254 @@
+{
+  "version": "1.10.1",
+  "delivery": "local trial",
+  "result": "PASS",
+  "formulaEntry": {
+    "baselineMissingPointAndCompletion": true,
+    "nativeExcel": "16.0",
+    "nativeBuild": 20326,
+    "cases": {
+      "simple": {
+        "states": [
+          "changed",
+          "undo",
+          "redo"
+        ],
+        "browserSteps": [
+          "origin draft kept across sheets",
+          "changed",
+          "undo",
+          "redo",
+          "draft undo/redo, whole column and disjoint references, cross-sheet Ctrl+Enter",
+          "formula bar, repeated and shift pick, keyboard range, double-click, quotes, function navigation, cancel",
+          "reopened formula"
+        ],
+        "cellsCompared": 2700,
+        "numericMaxUlps": 0,
+        "originalHashUnchanged": true
+      },
+      "real": {
+        "states": [
+          "changed",
+          "undo",
+          "redo"
+        ],
+        "browserSteps": [
+          "origin draft kept across sheets",
+          "changed",
+          "undo",
+          "redo",
+          "reopened formula"
+        ],
+        "cellsCompared": 1896,
+        "numericMaxUlps": 0,
+        "originalHashUnchanged": true
+      },
+      "narrow": {
+        "states": [
+          "changed",
+          "undo",
+          "redo"
+        ],
+        "browserSteps": [
+          "origin draft kept across sheets",
+          "changed",
+          "undo",
+          "redo",
+          "reopened formula"
+        ],
+        "cellsCompared": 2700,
+        "numericMaxUlps": 0,
+        "originalHashUnchanged": true
+      }
+    },
+    "totalCellsCompared": 7296,
+    "acceptedFormulaValuesAndFormatsMatch": true,
+    "guards": [
+      "CSV literal retained",
+      "locked draft rejected",
+      "unlocked input and IME preserved"
+    ]
+  },
+  "crosshair": {
+    "states": [
+      "reading",
+      "off",
+      "zoom",
+      "resized",
+      "frozen",
+      "editing",
+      "dark",
+      "range"
+    ],
+    "scales": [
+      1,
+      1.25
+    ],
+    "sampleRightExtensionCSSPixels": 494,
+    "sampleBottomExtensionCSSPixels": 85,
+    "previous": {
+      "rowCell": [
+        236,
+        247,
+        243
+      ],
+      "rowEnd": [
+        255,
+        255,
+        255
+      ],
+      "columnCell": [
+        229,
+        244,
+        239
+      ],
+      "columnEnd": [
+        255,
+        255,
+        255
+      ]
+    },
+    "currentPixels": {
+      "reading": {
+        "rowCell": [
+          236,
+          247,
+          243
+        ],
+        "rowEnd": [
+          236,
+          247,
+          243
+        ],
+        "columnCell": [
+          229,
+          244,
+          239
+        ],
+        "columnEnd": [
+          229,
+          244,
+          238
+        ]
+      },
+      "frozen": {
+        "rowCell": [
+          236,
+          247,
+          243
+        ],
+        "rowEnd": [
+          236,
+          247,
+          243
+        ],
+        "columnCell": [
+          229,
+          244,
+          239
+        ],
+        "columnEnd": [
+          229,
+          244,
+          238
+        ]
+      },
+      "zoom": {
+        "rowCell": [
+          236,
+          247,
+          243
+        ],
+        "rowEnd": [
+          236,
+          247,
+          243
+        ],
+        "columnCell": [
+          229,
+          244,
+          239
+        ],
+        "columnEnd": [
+          229,
+          244,
+          238
+        ]
+      },
+      "resized": {
+        "rowCell": [
+          236,
+          247,
+          243
+        ],
+        "rowEnd": [
+          236,
+          247,
+          243
+        ],
+        "columnCell": [
+          229,
+          244,
+          239
+        ],
+        "columnEnd": [
+          229,
+          244,
+          238
+        ]
+      },
+      "editing": {
+        "rowCell": [
+          236,
+          247,
+          243
+        ],
+        "rowEnd": [
+          236,
+          247,
+          243
+        ],
+        "columnCell": [
+          229,
+          244,
+          239
+        ],
+        "columnEnd": [
+          229,
+          244,
+          238
+        ]
+      },
+      "dark": {
+        "rowCell": [
+          50,
+          50,
+          79
+        ],
+        "rowEnd": [
+          50,
+          50,
+          79
+        ],
+        "columnCell": [
+          56,
+          53,
+          85
+        ],
+        "columnEnd": [
+          56,
+          52,
+          85
+        ]
+      }
+    },
+    "disabledAndRangeHaveNoTails": true,
+    "csvCoveredAndExposed": true
+  },
+  "manualDesktopAndWPS": "not run",
+  "deliveryWorkbookPartsCompared": {
+    "simple": 30,
+    "real": 135,
+    "narrow": 30
+  }
+}

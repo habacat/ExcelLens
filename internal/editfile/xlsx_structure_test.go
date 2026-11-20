@@ -149,7 +149,7 @@ func TestXLSXStructuredPreflightRefusesUnprovenDependencies(t *testing.T) {
 		{"named pivot source", fixturePivotCache, `ref="A1:A2"`, `name="DataSet"`},
 		{"different cache", fixturePivot, `cacheId="1"`, `cacheId="2"`},
 		{"external pivot records", "xl/pivotTables/_rels/pivotTable1.xml.rels", `Target="../`, `TargetMode="External" Target="https://example.invalid/`},
-		{"indirect source", "xl/worksheets/sheet1.xml", "Bridge!A1", `INDIRECT("Edit!A1")`},
+		{"indirect source", "xl/worksheets/sheet1.xml", "Bridge!A1", `INDIRECT(Edit!A1)`},
 		{"orphaned shared formula", "xl/worksheets/sheet5.xml", `si="0"/`, `si="1"/`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -259,7 +259,7 @@ func TestStructuredSharedArrayAndSparseEdits(t *testing.T) {
 	for _, c := range []editdoc.Change{
 		{Address: edit(3, 2), Value: editdoc.Value{Kind: "number", Raw: "2"}},
 		{Address: edit(3, 1), Value: editdoc.Value{Kind: "blank"}},
-		{Address: edit(2, 10), Value: editdoc.Value{Kind: "formula", Raw: `=INDIRECT("A1")`}},
+		{Address: edit(2, 10), Value: editdoc.Value{Kind: "formula", Raw: `=INDIRECT(A1)`}},
 	} {
 		b, err := (Layout{XLSX: &l}).ReadBatch(t.Context(), f, []editdoc.Address{c.Address}, nil)
 		if err != nil {

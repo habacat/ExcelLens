@@ -27,6 +27,9 @@ type Structure struct {
 	DateFilter  *PivotDateFilter  `json:"dateFilter,omitempty"`
 	DateGroup   *PivotDateGroup   `json:"dateGroup,omitempty"`
 
+	Paste      *PortableRange `json:"paste,omitempty"`
+	TargetRows []int          `json:"targetRows,omitempty"`
+
 	DestinationSheet string `json:"destinationSheet,omitempty"`
 	Destination      string `json:"destination,omitempty"`
 	SourceRevision   uint64 `json:"sourceRevision,string,omitempty"`
@@ -154,6 +157,9 @@ func (d *Document) TransferSource(revision uint64) (*Document, bool) {
 }
 
 func (d *Document) OriginalBase() Base {
+	if d.origin.Source.Path != "" {
+		return d.origin
+	}
 	if len(d.workspaces) == 0 {
 		return d.Base
 	}

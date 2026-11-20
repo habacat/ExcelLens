@@ -320,6 +320,11 @@
   --crosshair-both-fill:color-mix(in srgb,var(--crosshair-color) 30%,transparent);
 }
 :root[data-crosshair-enabled="false"] {--crosshair-row-fill:transparent;--crosshair-column-fill:transparent;--crosshair-both-fill:transparent;}
+.crosshair-tails {position:absolute;inset:0;z-index:18;pointer-events:none;overflow:hidden;}
+.crosshair-tails[hidden], :root[data-crosshair-enabled="false"] .crosshair-tails, .has-range .crosshair-tails {display:none;}
+.crosshair-tails i {position:absolute;pointer-events:none;}
+.crosshair-tails .row-tail {background:var(--crosshair-row-fill);}
+.crosshair-tails .column-tail {background:var(--crosshair-column-fill);}
 :root .grid-region :is(.grid-row.active-row .grid-cell,.pinned-cell.crosshair-row):not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-row-fill),var(--crosshair-row-fill));}
 :root .grid-region .grid-cell.active-column:not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-column-fill),var(--crosshair-column-fill));}
 :root .grid-region :is(.grid-row.active-row .grid-cell.active-column,.pinned-cell.crosshair-row.active-column):not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-both-fill),var(--crosshair-both-fill));}

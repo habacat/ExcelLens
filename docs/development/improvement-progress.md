@@ -2,6 +2,6 @@
 
 ## 接续入口
 
-1.10.0 的透视日期筛选、整块剪切与合并粘贴、表格范围和表尾扩展、多值透视及公式自动数字格式均已实现。九组实表日期筛选从修改、撤销和重做到 Excel 另存重开，共逐格比较 498,960 次。[版本说明](../releases/1.10.0.md) · [核验收据](../../validation/1.10.0/pivot-date-filters.json)
+1.11.0 已实现四向填充柄、来自 Windows Excel 和其他标签页的粘贴、工作表函数与名称补全、整表新建复制删除以及长历史压缩。真实费用报表用于修改、撤销、重做和保存重开的原生对照。编辑交互及适用范围见[版本说明](../releases/1.11.0.md)和[逐项验证](../../validation/1.11.0/workbook-editing.json)。
 
-各项编辑的适用范围与操作路径见[编辑副本](../user/editing.md)，数据结构与事务边界见[工程设计](xlsx-grid-editing.md)。
+[编辑操作](../user/editing.md) · [剪贴板](../user/clipboard.md) · [工程设计](xlsx-grid-editing.md)

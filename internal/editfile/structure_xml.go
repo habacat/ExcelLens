@@ -31,6 +31,10 @@ func rewriteStructureFrom(ctx context.Context, dst io.Writer, src *workbook.Edit
 		return opc.Receipt{}, err
 	}
 	switch op.Kind {
+	case "pasteRange":
+		return p.pastePortableRange(ctx, dst, src, op)
+	case "newSheet", "copySheet", "deleteSheet":
+		return p.editSheetCollection(ctx, dst, op)
 	case "resizeTable":
 		return p.resizeTable(ctx, dst, src, op, nil)
 	case "cutRange", "copyRange":

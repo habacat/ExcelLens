@@ -15,30 +15,34 @@ import (
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/workbook"
 )
 
 type editRequest struct {
-	Document  editdoc.Key          `json:"document"`
-	Book      string               `json:"book"`
-	Revision  uint64               `json:"revision,string"`
-	Sheet     string               `json:"sheet"`
-	Pivot     string               `json:"pivot,omitempty"`
-	Field     string               `json:"field,omitempty"`
-	Search    string               `json:"search,omitempty"`
-	Offset    int                  `json:"offset,omitempty"`
-	Ref       string               `json:"ref"`
-	End       string               `json:"end"`
-	Mode      string               `json:"mode"`
-	Step      string               `json:"step"`
-	SkipBlank bool                 `json:"skipBlank"`
-	Direct    bool                 `json:"direct,omitempty"`
-	Clipboard *editClipboard       `json:"clipboard"`
-	Rule      *editdoc.Rule        `json:"rule"`
-	Proof     string               `json:"proof"`
-	Operation editdoc.Operation    `json:"operation"`
-	Options   editfile.TextOptions `json:"options"`
-	Artifact  string               `json:"artifact"`
-	Cells     []editdoc.Address    `json:"cells,omitempty"`
+	Document    editdoc.Key          `json:"document"`
+	Book        string               `json:"book"`
+	Revision    uint64               `json:"revision,string"`
+	Sheet       string               `json:"sheet"`
+	Pivot       string               `json:"pivot,omitempty"`
+	Field       string               `json:"field,omitempty"`
+	Search      string               `json:"search,omitempty"`
+	Offset      int                  `json:"offset,omitempty"`
+	Ref         string               `json:"ref"`
+	End         string               `json:"end"`
+	Destination string               `json:"destination,omitempty"`
+	VisibleRows []int                `json:"visibleRows,omitempty"`
+	Alternate   bool                 `json:"alternate,omitempty"`
+	Mode        string               `json:"mode"`
+	Step        string               `json:"step"`
+	SkipBlank   bool                 `json:"skipBlank"`
+	Direct      bool                 `json:"direct,omitempty"`
+	Clipboard   *editClipboard       `json:"clipboard"`
+	Rule        *editdoc.Rule        `json:"rule"`
+	Proof       string               `json:"proof"`
+	Operation   editdoc.Operation    `json:"operation"`
+	Options     editfile.TextOptions `json:"options"`
+	Artifact    string               `json:"artifact"`
+	Cells       []editdoc.Address    `json:"cells,omitempty"`
 }
 
 var errEditRequestCapacity = errors.New("编辑请求超过容量，请缩小区域")
@@ -253,6 +257,22 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		body, err = a.editGrid(ctx, doc, layout, req)
 	case "input-kinds":
 		body, err = editInputKinds(ctx, doc, layout, req)
+	case "native-paste":
+		body, err = a.nativePaste(ctx, doc, req)
+	case "formula-symbols":
+		if doc.Revision != req.Revision {
+			err = checkpoint.ErrConflict
+			break
+		}
+		if layout.XLSX == nil {
+			err = editfile.ErrTarget
+			break
+		}
+		var f *workbook.EditSourceFile
+		if f, err = openEditBase(ctx, doc); err == nil {
+			body, err = layout.XLSX.FormulaSymbols(ctx, f)
+			f.Close()
+		}
 	case "choices":
 		body, err = editChoices(ctx, doc, layout, req)
 	case "pivot-items", "pivot-layout":

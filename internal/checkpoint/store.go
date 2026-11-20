@@ -187,8 +187,8 @@ func (s *Store) usage() (tasks int, used int64, err error) {
 				if info == nil {
 					continue
 				}
-				if entry.Name() == "blocks" {
-					data = info.Size()
+				if entry.Name() == "blocks" || entry.Name() == "blocks.alt" {
+					data += info.Size()
 				} else {
 					metadata += info.Size()
 				}
@@ -413,7 +413,7 @@ func (s *Store) acquire(ctx context.Context, id, binding string, allowBackup boo
 	}
 	var data *os.File
 	if err == nil {
-		data, err = s.regular(filepath.Join(id, "blocks"), os.O_RDWR)
+		data, err = s.regular(filepath.Join(id, m.dataName()), os.O_RDWR)
 	}
 	if err != nil {
 		_ = releaseLock(lock)
@@ -484,7 +484,7 @@ func (s *Store) List() ([]Entry, error) {
 }
 
 func managedFile(name string) bool {
-	if name == ".lease" || name == "blocks" || name == "manifest" || name == "manifest.bak" {
+	if name == ".lease" || name == "blocks" || name == "blocks.alt" || name == "manifest" || name == "manifest.bak" {
 		return true
 	}
 	return stateTemporary(name)

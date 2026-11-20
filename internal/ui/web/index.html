@@ -150,7 +150,7 @@
 	  <button id="dataRulesOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="查看当前单元格或本表保存的数据验证条件">数据规则</button>
 	  <button id="recordCardOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行，适合宽表和长文本">记录卡片</button>
       <div class="fx-label edit-toolbar-control">fx</div>
-      <textarea id="editGridFormula" class="toolbar-field formula-input edit-toolbar-control" rows="1" aria-label="编辑栏" spellcheck="false" hidden></textarea>
+      <textarea id="editGridFormula" aria-autocomplete="list" aria-controls="editFormulaSuggestions" aria-expanded="false" class="toolbar-field formula-input edit-toolbar-control" rows="1" aria-label="编辑栏" spellcheck="false" hidden></textarea>
       <div id="formulaText" class="toolbar-field formula-input formula-inspector-input" role="textbox" aria-label="公式栏：点击高亮引用单元格，悬停引用显示保存值和公式" aria-readonly="true" tabindex="0" data-placeholder="选择单元格以查看公式或数值"></div>
       <button id="formulaExpandBtn" class="formula-expand-button edit-toolbar-control" type="button" aria-label="展开公式栏" aria-controls="formulaText editGridFormula" aria-expanded="false" title="展开公式栏（长公式换行显示）"></button>
       <select id="editGridKind" class="toolbar-field toolbar-select edit-toolbar-control" aria-label="输入类型" hidden><option value="auto">自动类型</option><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option></select>
@@ -183,7 +183,7 @@
 
     <main class="grid-region">
       <span id="editGridMeasure" aria-hidden="true"></span>
-      <textarea id="editGridInput" aria-label="单元格内编辑" spellcheck="false" rows="1" autocomplete="off" hidden></textarea>
+      <textarea id="editGridInput" aria-autocomplete="list" aria-controls="editFormulaSuggestions" aria-expanded="false" aria-label="单元格内编辑" spellcheck="false" rows="1" autocomplete="off" hidden></textarea>
       <button id="editGridListButton" class="edit-grid-list-button" type="button" aria-label="选择列表值" title="选择列表值 (Alt+↓)" aria-haspopup="listbox" aria-expanded="false" aria-controls="editGridList" hidden><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
       <select id="editGridList" class="edit-grid-list" aria-label="单元格允许的值" size="5" hidden></select>
       <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
@@ -221,7 +221,9 @@
       <div id="freezeLeft" class="freeze-left" hidden><div id="freezeLeftCells" class="freeze-left-cells"></div></div>
       <div id="freezeCorner" class="freeze-corner" hidden></div>
       <div id="freezeHeader" class="freeze-header" hidden></div>
+      <div id="crosshairTails" class="crosshair-tails" aria-hidden="true" hidden><i class="row-tail"></i><i class="column-tail"></i></div>
       <div id="rangeFrames" class="range-frames" aria-hidden="true"></div>
+      <div id="formulaEntryFrames" class="range-frames formula-entry-frames" aria-hidden="true"></div>
     </main>
 
       <div id="cellMenu" class="cell-context-menu" role="menu" hidden>
@@ -256,6 +258,12 @@
         <button type="button" role="menuitem" data-edit-action="clear">清除内容<kbd>Delete</kbd></button>
         <button type="button" role="menuitem" data-edit-action="resize-table" hidden>调整表格范围…</button>
       </div>
+      <div id="editSheetMenu" class="cell-context-menu" role="menu" aria-label="工作表操作" hidden>
+        <button type="button" role="menuitem" data-sheet-action="newSheet">新建工作表</button>
+        <button type="button" role="menuitem" data-sheet-action="copySheet">复制工作表</button>
+        <button type="button" role="menuitem" data-sheet-action="renameSheet">重命名…</button>
+        <button type="button" role="menuitem" data-sheet-action="deleteSheet">删除工作表…</button>
+      </div>
       <div id="sizeContextMenu" class="cell-context-menu" role="menu" hidden>
         <button id="sizeContextHideCol" type="button" role="menuitem" hidden>隐藏此列</button>
         <button id="sizeContextShowCol" type="button" role="menuitem" hidden>显示此列</button>
@@ -280,6 +288,7 @@
         <button id="sheetListBtn" class="sheet-list-button" title="全部工作表">☷</button>
         <button id="sheetPrevBtn" class="sheet-edge-button" type="button" aria-label="向左切换工作表" title="查看前面的工作表">‹</button>
         <div id="sheetTabs" class="sheet-tabs" role="tablist" aria-label="工作表"></div>
+        <button id="editSheetAdd" class="sheet-edge-button" type="button" aria-label="新建工作表" title="新建工作表">＋</button>
         <button id="sheetNextBtn" class="sheet-edge-button" type="button" aria-label="向右切换工作表" title="查看后面的工作表">›</button>
       </div>
       <div class="status-strip">
@@ -773,7 +782,7 @@
                 <option value="mergeCells">合并单元格</option><option value="unmergeCells">取消合并</option>
                 <option value="fixedArray">设置固定数组</option><option value="spillFormula">设置动态数组</option><option value="clearArray">清除数组</option>
                 <option value="resizeTable" hidden>调整表格范围</option>
-                <option value="renameSheet">重命名工作表</option><option value="insertRows">插入整行</option><option value="deleteRows">删除整行</option><option value="moveRows">移动整行</option>
+                <option value="renameSheet">重命名工作表</option><option value="newSheet">新建工作表</option><option value="copySheet">复制工作表</option><option value="deleteSheet">删除工作表</option><option value="insertRows">插入整行</option><option value="deleteRows">删除整行</option><option value="moveRows">移动整行</option>
                 <option value="insertColumns">插入整列</option><option value="deleteColumns">删除整列</option><option value="moveColumns">移动整列</option>
               </select></label>
               <label class="edit-copy-field" id="editCopyTableField" hidden>表格<select id="editCopyTableName"></select></label>
@@ -881,6 +890,11 @@
       <button id="editCopyPivotDateFilterApply" type="button" class="primary-button compact" hidden>应用日期筛选</button>
     </footer>
   </dialog>
+  <div id="editFormulaPopup" class="edit-formula-popup" hidden>
+    <div id="editFormulaSuggestions" role="listbox" aria-label="函数候选" hidden></div>
+    <div id="editFormulaHint" role="status" hidden></div>
+  </div>
+
   <script src="/assets/cell-address.js"></script>
   <script src="/assets/display-format.js"></script>
   <dialog id="taskRecoveryDialog" class="float-dialog task-recovery-dialog" aria-labelledby="taskRecoveryTitle">
@@ -1058,15 +1072,22 @@
   </section>
   <script src="/assets/formats.js"></script>
   <script src="/assets/edit-copy-model.js"></script>
+  <script src="/assets/edit-grid-paste.js"></script>
   <script src="/assets/edit-grid-range.js"></script>
   <script src="/assets/edit-grid-list.js"></script>
+  <script src="/assets/formula-entry-model.js"></script>
+  <script src="/assets/edit-formula-completion.js"></script>
+  <script src="/assets/edit-reference-view.js"></script>
+  <script src="/assets/edit-formula-entry.js"></script>
   <script src="/assets/edit-grid.js"></script>
+  <script src="/assets/edit-fill-handle.js"></script>
   <script src="/assets/edit-pivot.js"></script>
   <script src="/assets/edit-pivot-measures.js"></script>
   <script src="/assets/edit-pivot-date-filter.js"></script>
   <script src="/assets/edit-pivot-criteria.js"></script>
   <script src="/assets/edit-pivot-values.js"></script>
   <script src="/assets/edit-pivot-items.js"></script>
+  <script src="/assets/edit-sheet-tabs.js"></script>
   <script src="/assets/edit-tools.js"></script>
   <script src="/assets/edit-copy.js"></script>
   <script src="/assets/wire.js"></script>

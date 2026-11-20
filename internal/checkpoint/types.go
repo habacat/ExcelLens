@@ -44,20 +44,22 @@ type Definition struct {
 }
 
 type Manifest struct {
-	Version        int             `json:"version"`
-	ID             string          `json:"id"`
-	Revision       uint64          `json:"revision,string"`
-	Definition     Definition      `json:"definition"`
-	DefinitionHash string          `json:"definitionHash"`
-	Created        time.Time       `json:"created"`
-	Updated        time.Time       `json:"updated"`
-	Stage          string          `json:"stage"`
-	Cursor         json.RawMessage `json:"cursor"`
-	Records        int64           `json:"records,string"`
-	Blocks         uint64          `json:"blocks,string"`
-	DataBytes      int64           `json:"dataBytes,string"`
-	ChainHash      string          `json:"chainHash"`
-	Complete       bool            `json:"complete"`
+	CompactedAt     uint64          `json:"compactedAt,string,omitempty"`
+	AlternateBlocks bool            `json:"alternateBlocks,omitempty"`
+	Version         int             `json:"version"`
+	ID              string          `json:"id"`
+	Revision        uint64          `json:"revision,string"`
+	Definition      Definition      `json:"definition"`
+	DefinitionHash  string          `json:"definitionHash"`
+	Created         time.Time       `json:"created"`
+	Updated         time.Time       `json:"updated"`
+	Stage           string          `json:"stage"`
+	Cursor          json.RawMessage `json:"cursor"`
+	Records         int64           `json:"records,string"`
+	Blocks          uint64          `json:"blocks,string"`
+	DataBytes       int64           `json:"dataBytes,string"`
+	ChainHash       string          `json:"chainHash"`
+	Complete        bool            `json:"complete"`
 }
 
 // Advance acknowledges only complete driver records/stages. A zero-size,

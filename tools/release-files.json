@@ -80,5 +80,7 @@
   "validation/pivot-fields/selection.json",
   "validation/formula-formats/verification.json",
   "validation/1.10.0/pivot-date-filters.json",
+  "validation/1.10.1/interaction.json",
+  "validation/1.11.0/workbook-editing.json",
   "docs/releases/{version}.md"
 ]

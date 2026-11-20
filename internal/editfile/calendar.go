@@ -161,6 +161,32 @@ func excelDateText(day int64, date1904 bool) string {
 // CalendarFill is called only for an explicit fill preview. A native serial
 // requires the corresponding source format. Text is parsed as unambiguous ISO
 // and stays text. Each output keeps the spreadsheet date system of its source.
+func (l Layout) AutoFillIncrements(ctx context.Context, f *workbook.EditSourceFile) (func(editdoc.Value) float64, error) {
+	table, err := l.entryStyleTable(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	clocks := map[string]workbook.CalendarNumberFormat{}
+	if len(table.data) > 0 {
+		clocks, err = workbook.XLSXCalendarFormats(table.data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return func(v editdoc.Value) float64 {
+		if table.calendarDate(table.effectiveNumber(v)) {
+			return 1
+		}
+		if v.BuiltinFormat == 18 || v.BuiltinFormat == 46 {
+			return 1.0 / 24
+		}
+		if _, ok := clocks[v.NumberFormatStyle()]; ok {
+			return 1.0 / 24
+		}
+		return 0
+	}, nil
+}
+
 func CalendarFill(ctx context.Context, f *workbook.EditSourceFile, start editdoc.Value, mode, stepText string, count int) ([]editdoc.Value, string, error) {
 	step, err := strconv.ParseInt(stepText, 10, 32)
 	if err != nil || step == 0 || count < 1 || count > formats.EditBatchCells {

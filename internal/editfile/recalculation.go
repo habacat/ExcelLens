@@ -199,7 +199,7 @@ func (p *xlsxPackage) buildCalculationBook(ctx context.Context) (*CalculationBoo
 				for _, ref := range program.References {
 					b.deps.add(a, b.qualify(ref, a.Sheet))
 				}
-				if c.cache == nil || p.staleFormulaCaches || b.constantCacheDiffers(ctx, program, c) {
+				if program.Volatile || c.cache == nil || p.staleFormulaCaches || b.constantCacheDiffers(ctx, program, c) {
 					b.missing = append(b.missing, a)
 				}
 				if c.formula.kind == "array" && (!c.formula.area.single() || c.formula.dynamic && program.MaySpill) && program.Bound() {

@@ -15,8 +15,9 @@ test('a clickable first preview paints the same single-cell frame as the indexed
   const classes=new Set(),frames=[];
   const layer={childElementCount:1,parentElement:{classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);}}}};
   const grid={clientWidth:500,clientHeight:300,scrollLeft:0};
-  const context={S:state,$:id=>id==='grid'?grid:layer,
-    window:{ExcelLensMultiSelection:{areas:()=>[]},ExcelLensRangeFrame:{paint:(_,areas)=>frames.push(JSON.stringify(areas))}},
+  const context={S:state,$:id=>id==='grid'?grid:id==='rangeFrames'?layer:{childElementCount:0},
+    editCopy:null,colTotal:()=>260,sheetHeight:()=>180,
+    window:{ExcelLensMultiSelection:{areas:()=>[]},ExcelLensRangeFrame:{paintCrosshair(){},paint:(_,areas)=>frames.push(JSON.stringify(areas))}},
     activeMerge:()=>null,frozenPanes:{effective:()=>({rows:0,cols:0})},getVirtualScrollTop:()=>0,headerHeight:()=>20,
     ROW_HEAD:28,colLeft:col=>(col-1)*64,sourceRowTop:row=>(row-1)*20};
   const paint=vm.runInNewContext(section('function paintRangeFrames(', 'function decorateGridCell(')+';paintRangeFrames',context);

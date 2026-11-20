@@ -32,7 +32,7 @@ const CurrentSemantics = 9
 var (
 	ErrInvalid  = errors.New("编辑操作或单元格类型无效")
 	ErrNoChange = errors.New("没有可提交的修改")
-	ErrHistory  = errors.New("编辑历史已达上限，请保存副本后继续编辑新文件")
+	ErrHistory  = errors.New("当前修订内容超过编辑容量，请缩小变更范围")
 	version     = json.RawMessage(`{"version":1}`)
 	decimal     = regexp.MustCompile(`^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$`)
 )
@@ -188,9 +188,15 @@ type Entry struct {
 }
 
 func EntryFromManifest(m checkpoint.Manifest) (Entry, error) {
+	first := uint64(2)
+	maxBytes := int64(formats.EditHistoryBytes)
+	if m.CompactedAt != 0 {
+		first = m.CompactedAt
+		maxBytes += formats.CheckpointBlockBytes
+	}
 	if m.Definition.Kind != "edit" || m.Definition.Driver != driver || m.Definition.Semantics < 1 || m.Definition.Semantics > CurrentSemantics || len(m.Definition.Sources) != 1 ||
-		m.Stage != "draft" || !bytes.Equal(m.Cursor, version) || m.Complete || m.Revision != m.Blocks+1 || m.Records != int64(m.Blocks) ||
-		m.Blocks > formats.EditHistorySteps || m.DataBytes > formats.EditHistoryBytes {
+		m.Stage != "draft" || !bytes.Equal(m.Cursor, version) || m.Complete || m.Revision != first-1+m.Blocks || m.Records != int64(m.Blocks) ||
+		m.Blocks > formats.EditHistorySteps || m.DataBytes > maxBytes {
 		return Entry{}, checkpoint.ErrCorrupt
 	}
 	return Entry{
@@ -222,6 +228,9 @@ type receipt struct {
 }
 
 type Document struct {
+	origin             Base
+	archivedStructures int
+	blocks             uint64
 	Entry
 	lease      *checkpoint.Lease
 	dataSize   int64
@@ -258,7 +267,13 @@ func Load(ctx context.Context, store *checkpoint.Store, key Key) (*Document, err
 		return nil, err
 	}
 	d := &Document{Entry: entry, lease: lease, dataSize: m.DataBytes, value: make(map[Address]Value), templates: make(map[Address]string), rules: make(map[Area]Rule), receipts: make(map[string]receipt)}
+	d.origin = entry.Base
+	d.blocks = m.Blocks
 	err = lease.VisitCandidate(ctx, func(b checkpoint.Block, r io.Reader) error {
+		if m.CompactedAt != 0 && b.Sequence == 1 {
+			d.dataSize -= b.Bytes + 64
+			return d.restoreHistory(r, m.CompactedAt)
+		}
 		if b.Records != 1 || b.Bytes > 2*int64(formats.EditRequestBytes) {
 			return checkpoint.ErrCorrupt
 		}
@@ -268,7 +283,11 @@ func Load(ctx context.Context, store *checkpoint.Store, key Key) (*Document, err
 		if decoder.Decode(&tx) != nil || decoder.Decode(new(json.RawMessage)) != io.EOF || !d.validTransaction(tx) {
 			return checkpoint.ErrCorrupt
 		}
-		d.apply(tx, b.Sequence+1)
+		revision := b.Sequence + 1
+		if m.CompactedAt != 0 {
+			revision = m.CompactedAt + b.Sequence - 1
+		}
+		d.apply(tx, revision)
 		return nil
 	})
 	if err != nil {
@@ -303,7 +322,7 @@ func (d *Document) ValueAt(address Address, base Value) Value {
 
 func (d *Document) refreshInfo() {
 	d.Changed, d.Rules, d.Undo, d.Redo = len(d.value), len(d.rules), len(d.undo) != 0, len(d.redo) != 0
-	d.Structures = len(d.workspaces)
+	d.Structures = d.archivedStructures + len(d.workspaces)
 }
 
 func (d *Document) update(tx transaction, forward bool) {
@@ -489,9 +508,6 @@ func (d *Document) commit(ctx context.Context, op Operation, prepare func([]Chan
 	if op.Revision != d.Revision {
 		return 0, checkpoint.ErrConflict
 	}
-	if len(d.receipts) >= formats.EditHistorySteps {
-		return 0, ErrHistory
-	}
 	if (op.Structure != nil) != (op.Action == "structure") {
 		return 0, ErrInvalid
 	}
@@ -596,8 +612,13 @@ func (d *Document) commit(ctx context.Context, op Operation, prepare func([]Chan
 		return 0, ErrHistory
 	}
 	payload, err := json.Marshal(tx)
-	if err != nil || len(payload) > 2*formats.EditRequestBytes || d.dataSize+int64(len(payload))+128 > formats.EditHistoryBytes {
+	if err != nil || len(payload) > 2*formats.EditRequestBytes {
 		return 0, ErrHistory
+	}
+	if d.blocks >= formats.EditHistorySteps || d.dataSize+int64(len(payload))+128 > formats.EditHistoryBytes {
+		if err = d.Compact(ctx, retainedUndo); err != nil {
+			return 0, err
+		}
 	}
 	m, err := d.lease.Advance(ctx, checkpoint.Advance{
 		Revision: d.Revision, Stage: "draft", Cursor: version, Bytes: int64(len(payload)), Records: 1,
@@ -606,7 +627,8 @@ func (d *Document) commit(ctx context.Context, op Operation, prepare func([]Chan
 		return 0, err
 	}
 	d.apply(tx, m.Revision)
-	d.Revision, d.Updated, d.dataSize = m.Revision, m.Updated, m.DataBytes
+	d.Revision, d.Updated, d.blocks = m.Revision, m.Updated, m.Blocks
+	d.dataSize += int64(len(payload)) + 64
 	d.refreshInfo()
 	return d.Revision, nil
 }

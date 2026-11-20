@@ -64,6 +64,9 @@ func ParseLocalFormula(ctx context.Context, body string, sheet func(string) bool
 		return formula, errLocalFormula
 	}
 	formula.expression = "=" + body
+	if err := bindLetNames(node, nil); err != nil {
+		return formula, err
+	}
 	if err := checkLocalFormula(node, body, sheet, name, &formula); err != nil {
 		return EditableFormula{}, err
 	}
@@ -77,12 +80,22 @@ func ParseLocalFormula(ctx context.Context, body string, sheet func(string) bool
 func localFormulaScalar(node *formulaNode) bool {
 	args := node.args
 	switch node.kind {
+	case "localName":
+		return node.rows == 1
 	case "ref", "array":
 		row, col := singleFormulaAxes(node)
 		return row && col
 	case "value":
 		return true
 	case "function":
+		if node.op == "LET" {
+			return localFormulaScalar(args[len(args)-1])
+		}
+		if node.op == "XLOOKUP" && len(args) >= 3 {
+			lr, lc := singleFormulaAxes(args[1])
+			rr, rc := singleFormulaAxes(args[2])
+			return localFormulaScalar(args[0]) && (lc && rc || lr && rr) && (len(args) < 4 || localFormulaScalar(args[3]))
+		}
 		if _, _, ok := worksheetArrayName(node.op); ok {
 			return false
 		}
@@ -127,7 +140,10 @@ func localFormulaScalar(node *formulaNode) bool {
 	case "namedRange":
 		return false
 	}
-	for _, child := range args {
+	for i, child := range args {
+		if node.kind == "function" && worksheetRangeArgument(node.op, i) {
+			continue
+		}
 		if !localFormulaScalar(child) {
 			return false
 		}
@@ -201,7 +217,7 @@ func checkLocalFormula(node *formulaNode, body string, sheet func(string) bool, 
 			formula.references = append(formula.references, r)
 			from += len(address) + 1
 		}
-	case "value", "binary", "unary", "array":
+	case "value", "binary", "unary", "array", "localName":
 	case "name":
 		if name == nil {
 			return errLocalFormula
@@ -218,29 +234,33 @@ func checkLocalFormula(node *formulaNode, body string, sheet func(string) bool, 
 		}
 	case "function":
 		switch node.op {
-		case "ANCHORARRAY":
-			if len(node.args) != 1 || node.args[0].kind != "ref" || node.args[0].ref.end != "" {
+		case "INDIRECT":
+			// A literal local A1 address has a provable workbook dependency.
+			// Keep its text untouched on fill, while binding its target as a reference.
+			if len(node.args) < 1 || len(node.args) > 2 || node.args[0].kind != "value" || node.args[0].value.Kind != "text" {
 				return errLocalFormula
 			}
-		case "SEQUENCE", "TRANSPOSE", "FILTER", "SORT", "UNIQUE", "TAKE", "DROP", "CHOOSECOLS", "CHOOSEROWS", "HSTACK", "VSTACK", "TOCOL", "TOROW", "TEXTSPLIT":
-			spec := formulaFunctions[node.op]
-			if len(node.args) < spec.min || len(node.args) > spec.max {
+			if len(node.args) == 2 && (node.args[1].kind != "value" || node.args[1].value.Kind != "boolean" || !node.args[1].value.Bool) {
+				return errLocalFormula
+			}
+			raw := strings.TrimSpace(node.args[0].value.Text)
+			ref, ok := reference(raw)
+			if !ok || ref.length != len(raw) || ref.start == "#REF!" {
+				return errLocalFormula
+			}
+			bound := &formulaNode{kind: "ref", ref: ref}
+			if err := checkLocalFormula(bound, raw, sheet, name, &EditableFormula{}); err != nil {
+				return err
+			}
+			node.kind, node.ref, node.args = "ref", ref, nil
+			return nil
+		case "ANCHORARRAY":
+			if len(node.args) != 1 || node.args[0].kind != "ref" || node.args[0].ref.end != "" {
 				return errLocalFormula
 			}
 		case "ROW", "COLUMN":
 			// In a workbook the formula cell supplies the omitted reference.
 			if len(node.args) > 1 {
-				return errLocalFormula
-			}
-		case "SUM", "SUMIF", "SUMIFS", "COUNTIF", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA", "ROWS", "COLUMNS",
-			"IF", "IFERROR", "AND", "OR", "NOT", "TRUE", "FALSE", "LEN", "ABS", "MOD",
-			"ROUND", "ROUNDUP", "ROUNDDOWN", "VLOOKUP", "HLOOKUP", "MATCH", "INDEX", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS",
-			"LEFT", "RIGHT", "MID", "TRIM", "UPPER", "LOWER", "TEXT", "VALUE", "FIND", "SEARCH", "SUBSTITUTE", "EXACT", "CONCATENATE",
-			"ISNUMBER", "ISTEXT", "ISBLANK", "ISERROR", "ISNA", "NA", "DATE", "YEAR", "MONTH", "DAY", "TIME", "HOUR", "MINUTE", "SECOND",
-			"INT", "TRUNC", "SIGN", "SQRT", "LOG10", "POWER", "PRODUCT", "SUMPRODUCT":
-			spec, ok := formulaFunctions[node.op]
-			n := len(node.args)
-			if !ok || n < spec.min || n > spec.max || (node.op == "SUMIFS" || node.op == "AVERAGEIFS") && n%2 != 1 || node.op == "COUNTIFS" && n%2 != 0 {
 				return errLocalFormula
 			}
 		case "SUBTOTAL":
@@ -252,7 +272,14 @@ func checkLocalFormula(node *formulaNode, body string, sheet func(string) bool, 
 				return errLocalFormula
 			}
 		default:
-			return errLocalFormula
+			if !worksheetBuiltin(node.op) {
+				return errLocalFormula
+			}
+			spec, ok := formulaFunctions[node.op]
+			n := len(node.args)
+			if !ok || n < spec.min || n > spec.max || (node.op == "SUMIFS" || node.op == "AVERAGEIFS") && n%2 != 1 || node.op == "COUNTIFS" && n%2 != 0 {
+				return errLocalFormula
+			}
 		}
 	default:
 		return errLocalFormula

@@ -125,11 +125,12 @@
 
     advanced(tool) {
       if (!this.grid.view.ready()) return false;
+      const sheetAction=tool?.endsWith('Sheet');
       const table=tool==='Table';
       const range = tool === 'Range';
-      const pivot = !table && !range && this.tools.pivotAt(this.grid.selected);
+      const pivot = !sheetAction && !table && !range && this.tools.pivotAt(this.grid.selected);
       this.tools.contextualPivot = !!pivot;
-      el('Title').textContent = table ? '调整表格范围' : range ? '区域编辑' : pivot ? '透视布局' : '更多编辑';
+      el('Title').textContent = sheetAction ? ({renameSheet:'重命名工作表',deleteSheet:'删除工作表'}[tool]) : table ? '调整表格范围' : range ? '区域编辑' : pivot ? '透视布局' : '更多编辑';
       this.openDialog('editCopyDialog');
       el('Work').hidden = false; el('ListView').hidden = true;
       const {sheet, ref} = this.context();
@@ -137,12 +138,14 @@
       this.cell = null; this.clearPreview(); this.setCell(null);
       if (pivot) this.tools.openPivot(pivot);
       if (table) { this.tools.selected='Structure'; el('StructureKind').value='resizeTable'; }
+      if (sheetAction) { this.tools.selected='Structure'; el('StructureKind').value=tool; }
       if (range) {
         this.tools.selected = 'Structure';
         this.tools.chooseRangeKind = true;
         el('StructureKind').value = this.grid.view.merged() ? 'unmergeCells' : 'mergeCells';
       }
       return this.run('正在读取选区…', signal=>this.fetchCell(signal)).then(ok=>{
+        if(ok && sheetAction && !el('NewNameField').hidden) {el('NewName').focus();el('NewName').select();}
         if (ok && table && el('Dialog').open) { el('Range').focus(); el('Range').select(); }
         return ok;
       });
@@ -355,7 +358,9 @@
           if (this.grid.active && result.book !== this.context().book) {
             const {sheet,ref} = this.context(), names = this.data.sheets.map(s => s.name);
             const next = await this.post('state', {document:keyOf(result.document)}, signal);
-            const active = next.sheets.some(s => s.name === sheet) ? sheet : next.sheets[names.indexOf(sheet)]?.name;
+            const op=request.operation.structure;
+            const active = op && ['copySheet','newSheet'].includes(op.kind) ? op.name :
+              next.sheets.some(s => s.name === sheet) ? sheet : next.sheets[Math.min(names.indexOf(sheet),next.sheets.length-1)]?.name;
             await this.bindGridBase(next, signal, active, this.tools.entryRefAfterResize(sheet,ref,request.operation,next));
             await this.grid.enter(next, signal);
           } else if (this.grid.active) {

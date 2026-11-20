@@ -169,6 +169,9 @@ func cloneManifest(m Manifest) Manifest {
 }
 
 func validateManifest(m Manifest) error {
+	if (m.AlternateBlocks || m.CompactedAt != 0) && (m.CompactedAt == 0 || m.CompactedAt > m.Revision || m.Blocks == 0 || m.Definition.Kind != "edit") {
+		return ErrCorrupt
+	}
 	_, binding, err := prepareDefinition(m.Definition)
 	if err != nil || m.Version != Schema || !validID(m.ID) || m.Revision == 0 || m.DefinitionHash != binding || !validName(m.Stage) || !validHash(m.ChainHash) || m.Records < 0 || m.DataBytes < 0 || m.DataBytes > formats.CheckpointBytes || m.Blocks > uint64(m.DataBytes/blockHeaderBytes) || m.Created.IsZero() || m.Updated.Before(m.Created) {
 		return ErrCorrupt

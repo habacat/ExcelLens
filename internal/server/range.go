@@ -30,14 +30,16 @@ type clipboardRow struct {
 }
 
 type clipboardPayload struct {
-	WorkbookKey string         `json:"workbookKey,omitempty"`
-	Book        string         `json:"book,omitempty"`
-	Sheet       string         `json:"sheet,omitempty"`
-	StartCol    int            `json:"startCol"`
-	EndCol      int            `json:"endCol"`
-	Filtered    bool           `json:"filtered"`
-	Rows        []clipboardRow `json:"rows"`
-	Header      *clipboardRow  `json:"header,omitempty"`
+	Portable       *portableClipboard `json:"portable,omitempty"`
+	PortableNotice string             `json:"portableNotice,omitempty"`
+	WorkbookKey    string             `json:"workbookKey,omitempty"`
+	Book           string             `json:"book,omitempty"`
+	Sheet          string             `json:"sheet,omitempty"`
+	StartCol       int                `json:"startCol"`
+	EndCol         int                `json:"endCol"`
+	Filtered       bool               `json:"filtered"`
+	Rows           []clipboardRow     `json:"rows"`
+	Header         *clipboardRow      `json:"header,omitempty"`
 }
 
 func selectClipboardRows(idx *workbook.SheetIndex, filtered *FilterResult, row1, row2, visual1, visual2, excludedThrough int, views ...*sheetRowView) ([]int, []int, error) {
@@ -258,6 +260,14 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		for _, number := range numbers {
 			data := byRow[number]
 			payload.Rows = append(payload.Rows, clipboardRow{Row: number, Style: data.Style, Cells: data.Cells, PresentationNotice: data.PresentationNotice})
+		}
+		if r.URL.Query().Get("portable") == "1" && formats.EditOOXML(wb.Format) && len(numbers) > 0 {
+			clip, err := a.readerClipboard(r.Context(), wb, meta, idx, numbers, col1, colCount, byRow)
+			if err != nil {
+				payload.PortableNotice = "此选区只能复制显示内容：" + err.Error()
+			} else {
+				payload.Portable = clip
+			}
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(payload)

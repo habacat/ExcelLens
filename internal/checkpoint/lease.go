@@ -199,7 +199,7 @@ func (l *Lease) currentFiles() error {
 	if err != nil {
 		return err
 	}
-	onDisk, err := l.store.root.Lstat(filepath.Join(l.manifest.ID, "blocks"))
+	onDisk, err := l.store.root.Lstat(filepath.Join(l.manifest.ID, l.manifest.dataName()))
 	if err != nil || !onDisk.Mode().IsRegular() || !os.SameFile(info, onDisk) {
 		return ErrCorrupt
 	}

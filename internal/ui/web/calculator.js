@@ -2,15 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id),ROW=26,HEADER=26;
   const quote=sheet=>"'"+sheet.replace(/'/g,"''")+"'!";
-  function formulaContext(text,caret){
-    const before=text.slice(0,caret),stack=[];let quoted='',word='';
-    for(let i=0;i<before.length;i++){const c=before[i];if(quoted){if(c===quoted){if(before[i+1]===quoted){i++;continue;}quoted='';}continue;}if(c==='"'||c==="'"){quoted=c;word='';continue;}if(/[A-Za-z_]/.test(c)||word&&/[0-9.]/.test(c)){word+=c;continue;}if(c==='('){stack.push(word.toUpperCase());}else if(c===')')stack.pop();word='';}
-    if(quoted||!text.trimStart().startsWith('='))return null;
-    const match=before.match(/[A-Za-z_][A-Za-z0-9_.]*$/);
-    const rangeEnd=match&&/:\s*$/.test(before.slice(0,match.index));
-    return {prefix:rangeEnd?'':match?.[0]||'',start:match&&!rangeEnd?caret-match[0].length:caret,end:caret,fn:stack.at(-1)||''};
-  }
-  function closeFormula(text){let depth=0,quoted='';for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c===quoted){if(text[i+1]===quoted){i++;continue;}quoted='';}continue;}if(c==='"'||c==="'")quoted=c;else if(c==='(')depth++;else if(c===')')depth--;}return !quoted&&depth>0&&depth<=40?text+')'.repeat(depth):text;}
+  const {context:formulaContext, close:closeFormula}=window.ExcelLensFormulaInput;
   class Calculator {
     constructor(options){
       this.o=options;this.model=new window.ExcelLensCalculatorModel.FormulaTable();this.views=new Map();this.pool=[];this.jobs=new Map();this.waiting=new Map();this.running=0;this.editing=null;this.pick=null;this.notes=false;this.noteEdit=null;
@@ -189,5 +181,4 @@
     bindDrag(){const handle=$('calculatorDrag');let drag=null,frame=0,pending;const move=()=>{frame=0;if(!drag||!pending)return;this.host.style.left=drag.left+pending.x-drag.x+'px';this.host.style.top=drag.top+pending.y-drag.y+'px';this.clamp();};handle.addEventListener('pointerdown',event=>{if(event.button!==0||event.target.closest('button'))return;this.hideCompletion();const r=this.host.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:r.left,top:r.top};handle.setPointerCapture(event.pointerId);event.preventDefault();});handle.addEventListener('pointermove',event=>{if(!drag||event.pointerId!==drag.id)return;pending={x:event.clientX,y:event.clientY};if(!frame)frame=requestAnimationFrame(move);});const end=event=>{if(drag&&event.pointerId===drag.id){if(frame){cancelAnimationFrame(frame);move();}drag=null;pending=null;}};handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);}
   }
   window.ExcelLensCalculator=Calculator;
-  window.ExcelLensFormulaInput={context:formulaContext,close:closeFormula};
 })();

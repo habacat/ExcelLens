@@ -60,6 +60,9 @@ func (p *xlsxPackage) writeValueStructure(ctx context.Context, dst io.Writer, up
 		if !ok {
 			return opc.Change{}, nil
 		}
+		if next == nil {
+			return opc.Change{Remove: true}, nil
+		}
 		return opc.Change{Write: func(_ io.Reader, w io.Writer) error { _, err := w.Write(next); return err }}, nil
 	})
 }

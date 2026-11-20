@@ -443,7 +443,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 		name := strings.ToUpper(p.text[start:p.pos])
 		if !p.strictNames {
 			name = strings.TrimPrefix(strings.TrimPrefix(name, "_XLFN."), "_XLWS.")
-		} else if prefix, bare, ok := worksheetArrayName(name); ok && name == prefix+bare {
+		} else if prefix, bare, ok := worksheetStoragePrefix(name); ok && name == prefix+bare {
 			name = bare
 		}
 		p.space()
@@ -451,7 +451,7 @@ func (p *formulaParser) prefix() (*formulaNode, error) {
 			if name == "TRUE" || name == "FALSE" {
 				return p.newNode(&formulaNode{kind: "value", value: BoolValue(name == "TRUE")})
 			}
-			return p.newNode(&formulaNode{kind: "name", op: name})
+			return p.newNode(&formulaNode{kind: "name", op: name, refOffset: start})
 		}
 		if _, ok := formulaFunctions[name]; !ok && !(p.preserveSingle && (name == "ANCHORARRAY" || name == "_XLFN.SINGLE" || name == "SUBTOTAL")) {
 			return nil, fmt.Errorf("#NAME? %s", name)
@@ -561,7 +561,7 @@ func (e *formulaEval) eval(n *formulaNode) (FormulaValue, error) {
 			values[i] = v
 		}
 		return arrayValue(values, n.rows, n.cols), nil
-	case "name":
+	case "name", "localName":
 		if value, ok := e.names[n.op]; ok {
 			return value, nil
 		}

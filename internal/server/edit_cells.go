@@ -155,6 +155,11 @@ func editChangeAddresses(changes []editdoc.Change) []editdoc.Address {
 func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest) (any, error) {
 	op := req.Operation
 	if op.Action == "structure" {
+		if op.Structure != nil && op.Structure.Kind == "pasteRange" && !doc.HasReceipt(op.Request) {
+			if err := a.checkPortable(ctx, doc, op.Structure.Paste, req.Proof); err != nil {
+				return nil, err
+			}
+		}
 		committed, err := commitEditStructure(ctx, doc, layout, op)
 		if err != nil {
 			return nil, err

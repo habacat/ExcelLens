@@ -23,6 +23,14 @@ func (f EditableFormula) ArrayStorageFormula() string {
 	at := 0
 	var visit func(*formulaNode)
 	visit = func(n *formulaNode) {
+		if n.kind == "localName" {
+			offset := n.refOffset + 1
+			if !strings.HasPrefix(strings.ToUpper(f.expression[offset:]), "_XLPM.") {
+				b.WriteString(f.expression[at:offset])
+				b.WriteString("_xlpm.")
+				at = offset
+			}
+		}
 		if n.kind == "function" {
 			if n.op == "ANCHORARRAY" && n.refOffset == n.args[0].refOffset {
 				start := n.refOffset + 1
@@ -34,7 +42,7 @@ func (f EditableFormula) ArrayStorageFormula() string {
 				at = end + 1
 				return
 			}
-			prefix, _, ok := worksheetArrayName(n.op)
+			prefix, _, ok := worksheetStoragePrefix(n.op)
 			offset := n.refOffset + 1
 			if ok && !strings.HasPrefix(strings.ToUpper(f.expression[offset:]), "_XLFN.") {
 				b.WriteString(f.expression[at:offset])

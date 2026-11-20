@@ -15,6 +15,7 @@ const (
 	EditChangedCells                = 50_000
 	EditHistoryBytes                = 32 << 20
 	EditHistorySteps                = 4096
+	EditClipboardPackageBytes       = 128 << 20
 	EditRequestBytes                = 4 << 20
 	EditOutputVersions              = 8
 	EditValidationRules             = 512

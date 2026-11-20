@@ -31,7 +31,7 @@ func logicFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 		defer func() { e.names = previous }()
 		for i := 0; i < len(n.args)-1; i += 2 {
 			name := n.args[i]
-			if name.kind != "name" || name.op == "R" || name.op == "C" {
+			if name.kind != "name" && name.kind != "localName" || name.op == "R" || name.op == "C" {
 				return FormulaValue{}, errors.New("#NAME? LET 变量名不能是单元格地址")
 			}
 			value, err := e.eval(n.args[i+1])

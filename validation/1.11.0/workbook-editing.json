@@ -1,0 +1,196 @@
+{
+  "version": "1.11.0",
+  "result": "PASS",
+  "excelVersion": "16.0",
+  "excelBuild": "20326.0",
+  "worksheetFunctionCount": 243,
+  "nativeCases": {
+    "fill-down": {
+      "change": 7,
+      "undo": 7,
+      "redo": 7
+    },
+    "fill-up": {
+      "change": 6,
+      "undo": 6,
+      "redo": 6
+    },
+    "fill-left": {
+      "change": 6,
+      "undo": 6,
+      "redo": 6
+    },
+    "fill-right": {
+      "change": 5,
+      "undo": 5,
+      "redo": 5
+    },
+    "fill-date": {
+      "change": 5,
+      "undo": 5,
+      "redo": 5
+    },
+    "fill-time": {
+      "change": 4,
+      "undo": 4,
+      "redo": 4
+    },
+    "fill-code": {
+      "change": 5,
+      "undo": 5,
+      "redo": 5
+    },
+    "fill-week": {
+      "change": 5,
+      "undo": 5,
+      "redo": 5
+    },
+    "functions": {
+      "change": 8,
+      "undo": 8,
+      "redo": 8
+    },
+    "sheet-new": {
+      "change": 62,
+      "undo": 32,
+      "redo": 62
+    },
+    "sheet-copy": {
+      "change": 62,
+      "undo": 32,
+      "redo": 62
+    },
+    "sheet-delete": {
+      "change": 2,
+      "undo": 32,
+      "redo": 2
+    },
+    "sheet-copy-rich": {
+      "change": 217,
+      "undo": 32,
+      "redo": 217
+    },
+    "portable": {
+      "change": 24,
+      "undo": 24,
+      "redo": 24
+    },
+    "filtered": {
+      "change": 40,
+      "undo": 40,
+      "redo": 40
+    },
+    "table-tail": {
+      "change": 14,
+      "undo": 14,
+      "redo": 14
+    },
+    "native": {
+      "change": 24,
+      "undo": 24,
+      "redo": 24
+    },
+    "native-real": {
+      "change": 72,
+      "undo": 72,
+      "redo": 72
+    },
+    "pivot-copy": {
+      "change": 52,
+      "undo": 26,
+      "redo": 52
+    }
+  },
+  "states": 57,
+  "cellsComparedToIndependentNativeStates": 1619,
+  "cellsComparedAfterNativeSaveAndReopen": 1619,
+  "comparedFields": [
+    "saved value and type",
+    "ordinary formula",
+    "number format",
+    "merge ownership",
+    "font bold",
+    "solid fill"
+  ],
+  "calculatedReport": {
+    "formulasPerState": 16602,
+    "comparisons": 66408,
+    "stages": [
+      {
+        "state": "base",
+        "counts": {
+          "exact": 15689,
+          "within8ULP": 894,
+          "withinAbsoluteTolerance": 19
+        }
+      },
+      {
+        "state": "edit",
+        "counts": {
+          "exact": 15687,
+          "within8ULP": 896,
+          "withinAbsoluteTolerance": 19
+        }
+      },
+      {
+        "state": "undo",
+        "counts": {
+          "exact": 15689,
+          "within8ULP": 894,
+          "withinAbsoluteTolerance": 19
+        }
+      },
+      {
+        "state": "redo",
+        "counts": {
+          "exact": 15687,
+          "within8ULP": 896,
+          "withinAbsoluteTolerance": 19
+        }
+      }
+    ],
+    "absoluteTolerance": 1e-12,
+    "maximumULPsForRelativeComparison": 8,
+    "restartBeforeRedo": true
+  },
+  "clipboard": {
+    "nativeProcessToService": true,
+    "independentCrossWorkbookExcelPaste": true,
+    "readerAndEditTabCopy": true,
+    "visibleRowOriginVerified": true,
+    "windowsBrowserPaste": true
+  },
+  "browser": [
+    "open",
+    "drag",
+    "fill history",
+    "XLOOKUP",
+    "费用基数",
+    "金额",
+    "signed copy",
+    "cross-tab paste",
+    "paste history",
+    "reader copy",
+    "visible rows",
+    "sheet add",
+    "sheet duplicate",
+    "narrow"
+  ],
+  "history": {
+    "result": "PASS",
+    "consecutiveCommits": 4101,
+    "reopens": 2,
+    "retryRestoredRevision": 4102,
+    "elapsedMs": 47629
+  },
+  "sourceSHA256": [
+    "df8c2caf1aab15e3afba4e570a23526f770c945591bcd9c9f6795e2406d736ea",
+    "7f3f24d2722f3cc01326ecd14c28eff4b7f8cf88773997cb2c9696059d8bf0a5"
+  ],
+  "nativeRecheck": "A native Excel open failed once during a long run. The complete standalone change, undo, redo and reopen comparison passed in a fresh Excel instance.",
+  "windowsBrowserOutputCells": {
+    "contextMenu": 30,
+    "keyboard": 30
+  },
+  "manualDesktopAndWPS": "not run"
+}

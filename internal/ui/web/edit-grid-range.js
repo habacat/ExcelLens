@@ -42,24 +42,23 @@
       this.menu.querySelector('button').focus({preventScroll:true});
     }
     typedClipboard(raw,html) {
-      const copied=this.copied;
-      return copied && raw.replaceAll('\r\n','\n')===copied.text && html.includes('id="'+copied.marker+'"') ? copied : null;
+      return window.ExcelLensGridPaste.identify(raw,html,this.copied,this.owner.limits.requestBytes);
     }
     async pasteClipboard() {
-      const target=this.target(), selection=this.rectangle();
+      const target=this.target(), selection=this.rectangle(true);
       let raw='', html='';
       try {
         if (navigator.clipboard.read) {
           for (const item of await navigator.clipboard.read()) {
             if (!item.types.includes('text/plain')) continue;
             raw=await (await item.getType('text/plain')).text();
-            if (this.copied && item.types.includes('text/html')) html=await (await item.getType('text/html')).text();
+            if (item.types.includes('text/html')) html=await (await item.getType('text/html')).text();
             break;
           }
         } else raw=await navigator.clipboard.readText();
       } catch { throw Error('浏览器未读取剪贴板，请按 Ctrl+V 粘贴'); }
       this.current(target);
-      const now=this.rectangle();
+      const now=this.rectangle(true);
       if (Object.keys(selection).some(edge=>selection[edge]!==now[edge])) throw Error('选区已变化，请重新粘贴');
       const typed=this.typedClipboard(raw,html);
       if (!raw && !typed) throw Error('剪贴板没有可粘贴的单元格或文字');
@@ -76,10 +75,10 @@
       if (current.sheet !== target.sheet || current.document.id !== target.document.id ||
           current.document.binding !== target.document.binding || current.revision !== target.revision) throw Error('选区或修订已变化，请重新操作');
     }
-    rectangle() {
+    rectangle(allowVisible=false) {
       const ranges = this.view.areas();
       if (ranges.length !== 1) throw Error('请选择一个连续区域');
-      if (this.view.filtered() && (ranges[0].visual1 !== ranges[0].visual2 || ranges[0].col1 !== ranges[0].col2)) {
+      if (!allowVisible && this.view.filtered() && (ranges[0].visual1 !== ranges[0].visual2 || ranges[0].col1 !== ranges[0].col2)) {
         throw Error('请清除筛选或排序后按原地址填充或粘贴');
       }
       const rect = bounds(ranges[0]), merge = this.view.mergeAt(rect.top,rect.left);
@@ -206,28 +205,35 @@
       if (mask) node.style.setProperty('--cut-edges',[1,2,4,8].map(bit=>mask&bit?'2px':'0').join(' '));
       else node.style.removeProperty('--cut-edges');
     }
-    async copySnapshot(snapshot,cut=false) {
-      if (this.owner.data.encoding || this.view.filtered() || snapshot.rows*(snapshot.lastColumn-snapshot.firstColumn+1)>this.owner.limits.batchCells) return null;
+    async copySnapshot(snapshot,cut=false,visibleRows) {
+      if (this.owner.data.encoding || cut && this.view.filtered() || snapshot.rows*(snapshot.lastColumn-snapshot.firstColumn+1)>this.owner.limits.batchCells) return null;
       const first = model.target(snapshot.start,this.grid.shape), last = model.target(snapshot.end,this.grid.shape);
-      if (last.row-first.row+1 !== snapshot.rows) return null;
-      const target = this.target(), merged=this.hasMerge(first.row,last.row,first.col,last.col);
+      if (!visibleRows && last.row-first.row+1 !== snapshot.rows) return null;
+      const target = this.target(), merged=!visibleRows && this.hasMerge(first.row,last.row,first.col,last.col);
       const source={marker:'excellens-copy-'+crypto.randomUUID(),cut,merged,first,last,sheet:target.sheet,
         start:snapshot.start,end:snapshot.end,id:target.document.id,binding:target.document.binding,revision:target.revision};
-      if (cut || merged) return source;
+      if (cut) return source;
       try {
-        const clip = await this.owner.post('copy',{...target,ref:snapshot.start,end:snapshot.end});
+        const clip = await this.owner.post('copy',{...target,ref:snapshot.start,end:snapshot.end,mode:'grid',visibleRows});
         return {...source,clip};
       } catch (error) {
         // The normal HTML/TSV copy still works for a large typed payload.
-        if (error.status === 413) return null;
+        if (error.status === 413) return merged ? source : null;
         throw error;
       }
     }
     async paste(raw,typed) {
       const target = this.target();
-      const {top,bottom,left,right} = this.rectangle();
+      const rect=this.rectangle(true), {top,bottom,left,right}=rect;
       const {limits,data} = this.owner, textFile = !!data.encoding;
-      if (typed && typed.id === target.document.id && !textFile) {
+      const local=typed && typed.id===target.document.id;
+      if (!textFile && (!local || this.view.mappedRows() && !typed?.cut || typed?.clip?.portable?.range.sourceRows)) {
+        let portable=typed?.portable || typed?.clip?.portable;
+        if(typed?.external)portable=await window.ExcelLensGridPaste.native(this.owner,target,raw);
+        this.current(target);
+        if(portable)return window.ExcelLensGridPaste.pasteRange(this,target,rect,portable);
+      }
+      if (local && !textFile) {
         const ref = this.owner.colName(left)+top;
         const end = top===bottom && left===right ? undefined : this.owner.colName(right)+bottom;
         if (typed.inactive) return true;
@@ -255,7 +261,7 @@
           }
           return ok;
         }
-        const plan = await this.owner.post('preview',{...target,mode:'all',ref,end,clipboard:typed.clip,direct:true});
+        const plan = await this.owner.post('preview',{...target,mode:'all',ref,end,clipboard:{...typed.clip,portable:undefined},direct:true});
         this.current(target);
         if (!plan.changes?.length) return true;
         return this.owner.commit('change',plan.changes,{proof:plan.proof,direct:true,expandTable:!this.view.filtered()});
@@ -266,16 +272,13 @@
         maxCellLength:limits.cellBytes,maxTextLength:limits.requestBytes
       }) : [[raw]];
       const height = rows.length, width = Math.max(...rows.map(r=>r.length));
-      const selectedHeight = bottom-top+1, selectedWidth = right-left+1;
-      const multiple = selectedHeight > 1 || selectedWidth > 1;
-      if (multiple && (selectedHeight%height || selectedWidth%width)) throw Error('粘贴区域大小不一致，请选择一个起点或与复制区域匹配的矩形');
-      const h = multiple ? selectedHeight : height, w = multiple ? selectedWidth : width;
-      if (this.view.filtered() && h > 1) throw Error('请清除筛选或排序后按原地址粘贴多行');
-      this.checkSize(top,top+h-1,left,left+w-1);
+      const dest=await window.ExcelLensGridPaste.destination(this,rect,height,width);
+      this.current(target);
+      const h=dest.rows.length,w=dest.width;
       const addresses = [], values = [];
       for (let i=0; i<h; i++) {
         for (let j=0; j<w; j++) {
-          addresses.push({sheet:target.sheet,row:top+i,col:left+j});
+          addresses.push({sheet:target.sheet,row:dest.rows[i],col:left+j});
           values.push(rows[i%height][j%width] ?? '');
         }
       }

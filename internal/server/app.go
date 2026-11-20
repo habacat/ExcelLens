@@ -423,7 +423,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("/api/navigate", a.handleNavigate)
 	mux.HandleFunc("/api/open", a.handleOpen)
 	mux.HandleFunc("/api/edits", a.handleEditList)
-	for _, path := range []string{"start", "state", "base", "grid", "input-kinds", "list-areas", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
+	for _, path := range []string{"start", "state", "base", "grid", "input-kinds", "formula-symbols", "native-paste", "list-areas", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
 		mux.HandleFunc("/api/edits/"+path, a.handleEditCommand)
 	}
 	mux.HandleFunc("/api/edits/download", a.handleEditDownload)

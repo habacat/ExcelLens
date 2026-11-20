@@ -21,6 +21,10 @@ func (a *App) handleCalculatorFunctions(w http.ResponseWriter, r *http.Request) 
 		methodNotAllowed(w)
 		return
 	}
+	if r.URL.Query().Get("scope") == "worksheet" {
+		writeJSON(w, map[string]any{"items": calculator.WorksheetFunctions()})
+		return
+	}
 	writeJSON(w, map[string]any{"items": calculator.Functions()})
 }
 

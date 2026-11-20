@@ -20,7 +20,8 @@ const (
 )
 
 type cfbReader struct {
-	f        *os.File
+	f        io.ReaderAt
+	closer   io.Closer
 	size     int64
 	sector   int64
 	fat      []uint32
@@ -97,21 +98,46 @@ func (s *cfbStream) ReadAt(p []byte, off int64) (int, error) {
 	}
 	return completed, nil
 }
-func (c *cfbReader) Close() error { return c.f.Close() }
+func (c *cfbReader) Close() error {
+	if c.closer != nil {
+		return c.closer.Close()
+	}
+	return nil
+}
+
+// EmbeddedWorkbook opens the OOXML Package stream offered by Excel on copy.
+// The bounded FAT reader also handles fragmented and miniature streams.
+func EmbeddedWorkbook(r io.ReaderAt, size int64) (*io.SectionReader, error) {
+	c, err := parseCompound(r, size, func(name string) bool { return name == "package" })
+	if err != nil {
+		return nil, err
+	}
+	return io.NewSectionReader(c.workbook, 0, c.workbook.size), nil
+}
 func openCFB(path string) (*cfbReader, error) {
 	f, e := os.Open(path)
 	if e != nil {
 		return nil, e
 	}
-	c := &cfbReader{f: f}
-	bad := func(e error) (*cfbReader, error) { _ = f.Close(); return nil, e }
-	st, e := f.Stat()
-	if e != nil {
-		return bad(e)
+	st, err := f.Stat()
+	if err == nil {
+		var c *cfbReader
+		c, err = parseCompound(f, st.Size(), func(name string) bool { return name == "workbook" || name == "book" })
+		if err == nil {
+			c.closer = f
+			return c, nil
+		}
 	}
-	c.size = st.Size()
+	_ = f.Close()
+	return nil, err
+}
+
+func parseCompound(r io.ReaderAt, size int64, match func(string) bool) (*cfbReader, error) {
+	c := &cfbReader{f: r, size: size}
+	var e error
+	bad := func(e error) (*cfbReader, error) { return nil, e }
 	var hdr [512]byte
-	if _, e = f.ReadAt(hdr[:], 0); e != nil {
+	if _, e = r.ReadAt(hdr[:], 0); e != nil {
 		return bad(fmt.Errorf("不是有效的 OLE2/CFB 文件（文件头不完整）：%w", e))
 	}
 	if string(hdr[:8]) != "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" {
@@ -145,7 +171,7 @@ func openCFB(path string) (*cfbReader, error) {
 			return nil, errors.New("CFB 扇区索引越界")
 		}
 		b := make([]byte, c.sector)
-		_, e := f.ReadAt(b, (int64(id)+1)*c.sector)
+		_, e := r.ReadAt(b, (int64(id)+1)*c.sector)
 		return b, e
 	}
 	fatIDs := make([]uint32, 0, fatCount)
@@ -252,7 +278,7 @@ func openCFB(path string) (*cfbReader, error) {
 		case item[66] == 5:
 			rootFirst = first
 			rootSize = sz
-		case item[66] == 2 && (name == "workbook" || name == "book"):
+		case item[66] == 2 && match(name):
 			bookFirst = first
 			bookSize = sz
 		}

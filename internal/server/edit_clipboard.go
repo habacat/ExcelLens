@@ -27,17 +27,19 @@ type editClipboardCell struct {
 }
 
 type editClipboard struct {
-	Format  string              `json:"format"`
-	Version int                 `json:"version"`
-	Source  string              `json:"source,omitempty"`
-	Start   editdoc.Address     `json:"start"`
-	Rows    int                 `json:"rows"`
-	Cols    int                 `json:"cols"`
-	Cells   []editClipboardCell `json:"cells"`
-	Proof   string              `json:"proof,omitempty"`
+	Portable *portableClipboard  `json:"portable,omitempty"`
+	Format   string              `json:"format"`
+	Version  int                 `json:"version"`
+	Source   string              `json:"source,omitempty"`
+	Start    editdoc.Address     `json:"start"`
+	Rows     int                 `json:"rows"`
+	Cols     int                 `json:"cols"`
+	Cells    []editClipboardCell `json:"cells"`
+	Proof    string              `json:"proof,omitempty"`
 }
 
 type editBatchPreview struct {
+	Structure bool             `json:"structure,omitempty"`
 	Changes   []editdoc.Change `json:"changes,omitempty"`
 	Last      editdoc.Address  `json:"last"`
 	LastValue string           `json:"lastValue,omitempty"`
@@ -55,6 +57,7 @@ func editAddress(sheet, ref string) (editdoc.Address, error) {
 
 func (a *App) editClipboardProof(clip editClipboard) string {
 	clip.Proof = ""
+	clip.Portable = nil // Independently authenticated and unnecessary for a same-book paste.
 	data, _ := json.Marshal(clip)
 	return a.editTicket("clipboard-v2", string(data))
 }
@@ -77,11 +80,31 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 	first.Row, last.Row = min(first.Row, last.Row), max(first.Row, last.Row)
 	first.Col, last.Col = min(first.Col, last.Col), max(first.Col, last.Col)
 	rows, cols := last.Row-first.Row+1, last.Col-first.Col+1
-	if rows > formats.EditBatchCells/cols {
+	if (len(req.VisibleRows) == 0 && rows > formats.EditBatchCells/cols) || cols > formats.EditBatchCells {
 		return editClipboard{}, errEditRequestCapacity
 	}
+	rowNumbers := req.VisibleRows
+	if len(rowNumbers) == 0 {
+		rowNumbers = make([]int, rows)
+		for i := range rowNumbers {
+			rowNumbers[i] = first.Row + i
+		}
+	} else {
+		if len(rowNumbers) > formats.EditBatchCells/cols {
+			return editClipboard{}, errEditRequestCapacity
+		}
+		seen := map[int]bool{}
+		for _, row := range rowNumbers {
+			if row < 1 || row > formats.ExcelRows || seen[row] {
+				return editClipboard{}, editfile.ErrTarget
+			}
+			seen[row] = true
+		}
+		rows = len(rowNumbers)
+		first.Row = rowNumbers[0]
+	}
 	addresses := make([]editdoc.Address, 0, rows*cols)
-	for row := first.Row; row <= last.Row; row++ {
+	for _, row := range rowNumbers {
 		for col := first.Col; col <= last.Col; col++ {
 			addresses = append(addresses, editdoc.Address{Sheet: first.Sheet, Row: row, Col: col})
 		}
@@ -101,11 +124,15 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 	if err != nil {
 		return editClipboard{}, err
 	}
+	var portableValues []editdoc.Value
 	for _, addr := range addresses {
 		source := sources[addr]
 		value := doc.ValueAt(addr, source.Value)
 		if derived, ok := calc.ArrayMembers[addr]; ok {
 			value = derived
+		}
+		if req.Mode == "grid" {
+			portableValues = append(portableValues, value)
 		}
 		item := editClipboardCell{Style: value.Style, NumberStyle: value.NumberStyle, BuiltinFormat: value.BuiltinFormat}
 		value.Style, value.NumberStyle, value.BuiltinFormat = "", "", 0
@@ -126,6 +153,17 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 		clip.Cells = append(clip.Cells, item)
 	}
 	if layout.XLSX != nil {
+		if req.Mode == "grid" {
+			r, err := layout.XLSX.PortableSelection(ctx, f, first, rowNumbers, cols, portableValues)
+			if err != nil {
+				return editClipboard{}, err
+			}
+			r.Origin = doc.OriginalBase().Source.Book
+			clip.Portable, err = a.signedRange(r)
+			if err != nil {
+				return editClipboard{}, err
+			}
+		}
 		clip.Source = doc.Base.Source.Stamp
 		clip.Proof = a.editClipboardProof(clip)
 	}
@@ -157,6 +195,9 @@ func (a *App) previewEditCells(ctx context.Context, doc *editdoc.Document, layou
 	if req.Revision != doc.Revision {
 		return editBatchPreview{}, checkpoint.ErrConflict
 	}
+	if req.Mode == "portable" {
+		return a.previewPortable(ctx, doc, layout, req)
+	}
 	if req.Mode == "rule" {
 		return a.previewEditRule(ctx, doc, layout, req.Rule)
 	}
@@ -186,6 +227,8 @@ func (a *App) previewEditCells(ctx context.Context, doc *editdoc.Document, layou
 				preview.LastValue = c.Value.Raw
 			}
 		}
+	} else if req.Mode == "auto-fill" {
+		preview, err = a.planAutoFill(ctx, doc, layout, first, req)
 	} else if req.Mode == "fill-down" || req.Mode == "fill-right" || req.Mode == "fill-entry" {
 		preview, err = a.planGridFill(ctx, doc, layout, first, req)
 	} else if fill {
