@@ -60,7 +60,7 @@ textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 }
 .edit-formula-popup[hidden], .edit-formula-popup [hidden] { display:none; }
 #editFormulaSuggestions { position:relative; max-height:min(12em,32vh); overflow:auto; overscroll-behavior:contain; }
-#editFormulaSuggestions [role=option] { padding:4px 12px; cursor:pointer; font-family:Consolas,monospace; }
+#editFormulaSuggestions [role=option] { padding:4px 12px; cursor:pointer; font-family:Consolas,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #editFormulaSuggestions [role=option]:hover { background:var(--reading-inset,#f2f5f7); }
 #editFormulaSuggestions [aria-selected=true] { background:var(--reading-active,#e5eff9); box-shadow:inset 3px 0 var(--reading-accent,#2e75b7); }
 .edit-formula-popup.hint-only { pointer-events:none; min-width:0; }
@@ -229,3 +229,5 @@ body.editing-copy #editCopyValue, body.editing-copy #editCopyTextHint, body.edit
 @container edit-panel (max-width:425px) { .edit-pivot-axis { grid-template-columns:minmax(0,1fr); gap:4px; } .edit-pivot-heading { padding:0; } }
 #editSheetAdd { display:none; }
 .editing-copy:has(#editGridKind:not([hidden])) #editSheetAdd { display:inline-flex; align-items:center; justify-content:center; }
+.paste-source-dialog {width:fit-content;max-width:calc(100vw - 2rem);}
+.paste-source-dialog .dialog-actions {flex-wrap:wrap;justify-content:flex-end;}

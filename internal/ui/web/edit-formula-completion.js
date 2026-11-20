@@ -12,6 +12,7 @@
       this.items = [];
       this.generation = 0;
       this.popup.addEventListener('pointerdown', event => event.preventDefault());
+      this.list.addEventListener('scroll',()=>this.renderSlice());
       this.list.addEventListener('click', event => {
         const option = event.target.closest('[role="option"]');
         if (option) this.choose(Number(option.dataset.index));
@@ -28,9 +29,7 @@
     }
 
     context(text,caret) {
-      const bracket=/([\p{L}_][\p{L}\p{N}_.]*)?\[(@?)([^\[\]]*)$/u.exec(text.slice(0,caret));
-      if(bracket && inputModel.context(text,bracket.index))return {table:bracket[1]||'',prefix:bracket[3],start:caret-bracket[3].length,end:caret};
-      return inputModel.context(text,caret);
+      return inputModel.columnContext(text,caret)||inputModel.context(text,caret);
     }
     async symbols() {
       const g=this.editor,d=g.owner.data.document,key=[d.id,d.binding,g.owner.data.book].join('|');
@@ -81,14 +80,9 @@
       this.field = field;
       this.items = matches;
       this.index = 0;
-      this.list.replaceChildren(...matches.map((item, i) => {
-        const option = document.createElement('div');
-        option.setAttribute('role','option');
-        option.id = 'editFormulaOption' + i;
-        option.dataset.index = String(i);
-        option.textContent = item.name;
-        return option;
-      }));
+      this.list.replaceChildren();
+      this.virtual=matches.length>80;
+      this.firstOption=-1;
       this.list.hidden = !matches.length;
       this.hint.hidden = !fn && !matches.length;
       if (fn && !matches.length) {
@@ -106,12 +100,52 @@
       this.popup.hidden = false;
       this.popup.classList.toggle('hint-only', !matches.length);
       this.list.scrollTop = 0;
+      this.rowHeight=0;
+      if(this.virtual){
+        const sample=this.makeOption(0);this.list.append(sample);
+        this.rowHeight=sample.getBoundingClientRect().height;
+        if(!this.rowHeight)this.virtual=false;
+      }
+      this.renderSlice();
       this.highlight();
       this.position();
     }
 
+    makeOption(i) {
+      const option=document.createElement('div');
+      option.setAttribute('role','option');
+      option.id='editFormulaOption'+i;
+      option.dataset.index=String(i);
+      option.textContent=this.items[i].name;
+      option.setAttribute('aria-posinset',i+1);
+      option.setAttribute('aria-setsize',this.items.length);
+      if(i===this.index)option.setAttribute('aria-selected','true');
+      return option;
+    }
+    renderSlice() {
+      if(this.list.hidden)return;
+      const first=this.virtual?Math.max(0,Math.floor(this.list.scrollTop/this.rowHeight)-3):0;
+      if(first===this.firstOption)return;
+      this.firstOption=first;
+      const end=this.virtual?Math.min(this.items.length,first+Math.ceil(this.list.clientHeight/this.rowHeight)+8):this.items.length;
+      const fragment=document.createDocumentFragment();
+      const space=n=>{if(n>0){const gap=document.createElement('div');gap.setAttribute('aria-hidden','true');gap.style.height=(n*this.rowHeight)+'px';fragment.append(gap);}};
+      space(first);
+      for(let i=first;i<end;i++)fragment.append(this.makeOption(i));
+      space(this.items.length-end);
+      this.list.replaceChildren(fragment);
+      const active = this.list.querySelector('[aria-selected="true"]');
+      if (active) this.field.setAttribute('aria-activedescendant', active.id);
+      else this.field.removeAttribute('aria-activedescendant');
+    }
     highlight() {
-      const option = this.list.children[this.index];
+      if(this.virtual){
+        const top=this.index*this.rowHeight,bottom=top+this.rowHeight;
+        if(top<this.list.scrollTop)this.list.scrollTop=top;
+        else if(bottom>this.list.scrollTop+this.list.clientHeight)this.list.scrollTop=bottom-this.list.clientHeight;
+        this.renderSlice();
+      }
+      const option = this.list.querySelector('[data-index="'+this.index+'"]');
       this.list.querySelector('[aria-selected="true"]')?.setAttribute('aria-selected','false');
       this.field.setAttribute('aria-expanded', String(!!option));
       if (!option) { this.field.removeAttribute('aria-activedescendant'); return; }
@@ -142,10 +176,12 @@
       if (!at) return;
       if(option.kind){
         const suffix=field.value.slice(cursor);
-        const end=cursor+(option.kind==='column' ? (/^[^\[\],()+*/]*\]/.exec(suffix)?.[0].length||0) :
-          (/^[\p{L}\p{N}_.]*/u.exec(suffix)[0].length));
+        const end=option.kind==='column' ? at.end : cursor+/^[\p{L}\p{N}_.]*/u.exec(suffix)[0].length;
         this.hide();
-        this.accept(field,at.start,end,option.kind==='column'?option.name.replace(/['#@\[\]]/g,"'$&")+']':option.name+(option.kind==='table'?'[':''));
+        const value = option.kind === 'column'
+          ? option.name.replace(/['#@\[\]]/g, "'$&") + ']'.repeat(at.closures)
+          : option.name + (option.kind === 'table' ? '[' : '');
+        this.accept(field, at.start, end, value, option.kind !== 'name');
         return;
       }
       const tail = field.value.slice(cursor).match(/^[A-Za-z0-9_.]*/)[0];

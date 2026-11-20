@@ -27,8 +27,9 @@ type Structure struct {
 	DateFilter  *PivotDateFilter  `json:"dateFilter,omitempty"`
 	DateGroup   *PivotDateGroup   `json:"dateGroup,omitempty"`
 
-	Paste      *PortableRange `json:"paste,omitempty"`
-	TargetRows []int          `json:"targetRows,omitempty"`
+	Paste            *PortableRange `json:"paste,omitempty"`
+	TargetRows       []int          `json:"targetRows,omitempty"`
+	PasteVisibleOnly bool           `json:"pasteVisibleOnly,omitempty"`
 
 	DestinationSheet string `json:"destinationSheet,omitempty"`
 	Destination      string `json:"destination,omitempty"`

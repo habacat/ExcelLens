@@ -310,3 +310,33 @@ func TestCheckpointVisitRequiresCompleteConsumptionAndRetainsDataOnConsumerFailu
 		t.Fatal("consumer failure damaged the checkpoint")
 	}
 }
+
+func TestReplayCurrentChecksDigestBeforeExposingLeaseOrTrimmingTail(t *testing.T) {
+	s, def, _ := fixture(t)
+	l := create(t, s, def)
+	m := advance(t, l, `{"next":1}`, 1, []byte("abc"), false)
+	l.Close()
+	path := filepath.Join(m.ID, m.dataName())
+	f, err := s.regular(path, os.O_RDWR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.WriteAt([]byte("x"), blockHeaderBytes); err == nil {
+		_, err = f.WriteAt([]byte("tail"), m.DataBytes)
+	}
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var candidate []byte
+	got, err := s.ReplayCurrent(t.Context(), m.ID, m.DefinitionHash, func(Manifest) (func(Block, io.Reader) error, error) {
+		return func(_ Block, r io.Reader) error { var e error; candidate, e = io.ReadAll(r); return e }, nil
+	})
+	if got != nil || !errors.Is(err, ErrCorrupt) || string(candidate) != "xbc" {
+		t.Fatal(got, err, string(candidate))
+	}
+	st, err := s.root.Stat(path)
+	if err != nil || st.Size() != m.DataBytes+4 {
+		t.Fatal(st, err)
+	}
+}

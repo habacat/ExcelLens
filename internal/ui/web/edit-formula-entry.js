@@ -10,10 +10,10 @@
       this.grid = editor;
       this.refs = [];
       this.sequence = 0;
-      this.completion = new window.ExcelLensWorksheetCompletion(editor, (field, from, to, value) => {
+      this.completion = new window.ExcelLensWorksheetCompletion(editor, (field, from, to, value, offerNext) => {
         this.record(field);
         this.replace(field, from, to, value);
-        this.changed(field);
+        this.changed(field, false, offerNext);
       });
       const region = editor.region;
       region.addEventListener('pointermove', e => this.move(e));
@@ -89,14 +89,14 @@
       (field === g.input ? g.formula : g.input).value = field.value;
       g.schedulePosition();
     }
-    changed(field, keepPick = false) {
+    changed(field, keepPick = false, offerNext = true) {
       if (!keepPick) { ++this.sequence; this.pick = null; }
       const draft = this.grid.draft;
       if (draft) draft.field = field;
       const hadRefs = this.refs.length;
       this.refs = this.enabled ? inspector.parseFormula(draft.text, draft.address.sheet) : [];
       if (hadRefs || this.refs.length) this.grid.view.paintReferences();
-      if (this.enabled && !this.grid.composing && !this.gesture) this.completion.update(field, draft.text);
+      if (offerNext && this.enabled && !this.grid.composing && !this.gesture) this.completion.update(field, draft.text);
       else this.completion.hide();
     }
     caret(field) {

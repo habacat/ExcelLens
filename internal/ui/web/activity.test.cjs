@@ -35,6 +35,15 @@ function page(compositor=false) {
     value:()=>elements.get('.activity-value').textContent};
 }
 
+test('waiting for a paste choice hides progress and excludes time spent in the dialog',()=>{
+  const p=page(), task=p.activity.begin('正在粘贴');
+  p.advance(600);assert.equal(p.host.hidden,false);
+  task.pause();p.advance(60000);assert.equal(p.host.hidden,true);
+  task.resume();p.advance(499);assert.equal(p.host.hidden,true);
+  p.advance(1);assert.equal(p.host.hidden,false);assert.match(p.value(),/^约 1[0-9]%$/);
+  task.end();task.resume();assert.equal(p.host.hidden,true);
+});
+
 test('activity waits 500 ms across work phases and clears its only timer on completion',()=>{
   const p=page(), quick=p.activity.begin('打开');
   p.advance(499);assert.equal(p.host.hidden,true);

@@ -271,7 +271,7 @@
       el('ValueLabel').textContent = `${cell.ref} 的内容`;
       el('Address').value = cell.ref;
       this.escaped = cell.value.raw.includes('\r');
-      this.initialText = model.encode(cell.value.raw, this.escaped);
+      this.initialText = model.encode(cell.value.kind==='formula' ? window.ExcelLensFormulaInput.display(cell.value.raw) : cell.value.raw, this.escaped);
       const kind = cell.value.kind;
       this.initialKind = ['number', 'boolean', 'formula'].includes(kind) ? kind : 'text';
       el('Value').value = this.initialText;
@@ -313,7 +313,7 @@
         await this.fetchCell(signal);
         if (draft && this.cell) {
           this.escaped = draft.escaped;
-          this.initialText = model.encode(this.cell.value.raw, this.escaped);
+          this.initialText = model.encode(this.cell.value.kind==='formula' ? window.ExcelLensFormulaInput.display(this.cell.value.raw) : this.cell.value.raw, this.escaped);
           el('Value').value = draft.raw; el('Kind').value = draft.kind; el('TextHint').hidden = !this.escaped;
           this.status('已刷新修订，当前输入已保留');
         }
@@ -356,11 +356,11 @@
         }
         try {
           if (this.grid.active && result.book !== this.context().book) {
-            const {sheet,ref} = this.context(), names = this.data.sheets.map(s => s.name);
+            const {sheet,ref} = this.context();
             const next = await this.post('state', {document:keyOf(result.document)}, signal);
             const op=request.operation.structure;
-            const active = op && ['copySheet','newSheet'].includes(op.kind) ? op.name :
-              next.sheets.some(s => s.name === sheet) ? sheet : next.sheets[Math.min(names.indexOf(sheet),next.sheets.length-1)]?.name;
+            const followWorkbook=op && ['copySheet','newSheet','deleteSheet'].includes(op.kind);
+            const active = !followWorkbook && next.sheets.some(s=>s.name===sheet) ? sheet : undefined;
             await this.bindGridBase(next, signal, active, this.tools.entryRefAfterResize(sheet,ref,request.operation,next));
             await this.grid.enter(next, signal);
           } else if (this.grid.active) {

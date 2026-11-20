@@ -44,14 +44,38 @@
     return {rows,width:w,left};
   }
 
-  async function pasteRange(ranges,target,rect,clip) {
+  async function visibleOnly(clip, activity){
+    const r = clip.range, rows = r.visibleSourceRows?.length, cols = r.visibleSourceCols?.length;
+    if (!rows && !cols) return false;
+    const dialog=document.getElementById('editPasteHiddenRows');
+    const size = (h,w) => rows && cols ? h+' 行 × '+w+' 列' : rows ? h+' 行' : w+' 列';
+    document.getElementById('editPasteVisible').textContent='仅粘贴可见的 '+size(rows,cols);
+    document.getElementById('editPasteAllRows').textContent='粘贴全部 '+size(r.rows,r.cols);
+    dialog.returnValue='cancel';
+    activity?.pause();
+    try {
+      dialog.showModal();
+      const value = await new Promise(resolve => dialog.addEventListener('close', () => resolve(dialog.returnValue), {once:true}));
+      return value==='visible'?true:value==='all'?false:null;
+    } finally {
+      activity?.resume();
+    }
+  }
+
+  async function pasteRange(ranges,target,rect,clip,activity) {
     const selection=clip.range;
-    const dest=await destination(ranges,rect,selection.rows,selection.cols);
+    const visible=await visibleOnly(clip,activity);
+    if(visible===null)return true;
+    ranges.current(target);
+    const height = visible && selection.visibleSourceRows?.length || selection.rows;
+    const widthToPaste = visible && selection.visibleSourceCols?.length || selection.cols;
+    const dest=await destination(ranges,rect,height,widthToPaste);
     ranges.current(target);
     const {rows,left,width}=dest;
     const cell=(r,c)=>ranges.owner.colName(c)+r;
     const range=cell(rows[0],left)+':'+cell(ranges.view.mappedRows()?rows[0]:rows.at(-1),left+width-1);
     const structure={kind:'pasteRange',sheet:target.sheet,range,paste:selection};
+    if(visible)structure.pasteVisibleOnly=true;
     if(ranges.view.mappedRows())structure.targetRows=rows;
     if(!selection.merges?.length){
       const preview=await ranges.owner.post('preview',{...target,mode:'portable',proof:clip.proof,operation:{structure}});

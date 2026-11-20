@@ -3,14 +3,17 @@ package editdoc
 // PortableRange contains only the copied rectangle. Source style indices have
 // meaning only inside their own workbook, so cells refer to this style table.
 type PortableRange struct {
-	Origin     string          `json:"origin,omitempty"`
-	Start      Address         `json:"start"`
-	Rows       int             `json:"rows"`
-	Cols       int             `json:"cols"`
-	Cells      []PortableCell  `json:"cells"`
-	Styles     []PortableStyle `json:"styles"`
-	Merges     []Area          `json:"merges,omitempty"`
-	SourceRows []int           `json:"sourceRows,omitempty"`
+	VisibleSourceRows []int           `json:"visibleSourceRows,omitempty"`
+	VisibleSourceCols []int           `json:"visibleSourceCols,omitempty"`
+	Origin            string          `json:"origin,omitempty"`
+	Start             Address         `json:"start"`
+	Rows              int             `json:"rows"`
+	Cols              int             `json:"cols"`
+	Cells             []PortableCell  `json:"cells"`
+	Styles            []PortableStyle `json:"styles"`
+	Merges            []Area          `json:"merges,omitempty"`
+	SourceRows        []int           `json:"sourceRows,omitempty"`
+	SourceCols        []int           `json:"sourceCols,omitempty"`
 }
 
 type PortableCell struct {

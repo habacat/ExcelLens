@@ -12,6 +12,10 @@ import (
 // Cell ownership or values changed. Keep optional shared-string counts and
 // the calculation chain from advertising references to the previous revision.
 func (p *xlsxPackage) writeValueStructure(ctx context.Context, dst io.Writer, updates map[string][]byte) (opc.Receipt, error) {
+	return p.writePatchedValueStructure(ctx, dst, updates, nil)
+}
+
+func (p *xlsxPackage) writePatchedValueStructure(ctx context.Context, dst io.Writer, updates map[string][]byte, splices map[string][]xmlPatch) (opc.Receipt, error) {
 	for _, part := range []string{"xl/workbook.xml", "xl/sharedStrings.xml", "[Content_Types].xml", "xl/_rels/workbook.xml.rels"} {
 		if p.files[part] == nil {
 			continue
@@ -58,6 +62,11 @@ func (p *xlsxPackage) writeValueStructure(ctx context.Context, dst io.Writer, up
 		}
 		next, ok := updates[f.Name]
 		if !ok {
+			if ps := splices[f.Name]; len(ps) > 0 {
+				return opc.Change{Write: func(src io.Reader, out io.Writer) error {
+					return writePartPatches(ctx, out, src, int64(f.UncompressedSize64), ps)
+				}}, nil
+			}
 			return opc.Change{}, nil
 		}
 		if next == nil {

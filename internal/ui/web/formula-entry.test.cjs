@@ -48,3 +48,20 @@ test('a delayed reference lookup cannot overwrite newer typing; repeated arrows 
   calls=0;entry.step('ArrowDown',false);entry.sequence++;release();await entry.pendingStep;
   assert.deepEqual(written,[2,3]);
 });
+
+test('formula input displays workbook prefixes only outside literal text and field names',()=>{
+  const s=`=_xlfn.LET(_xlpm.a,2,_xlfn.TEXTJOIN(",",TRUE,"_xlpm.a",Sales[_xlfn.LET(],_xlpm.a))`;
+  assert.equal(model.display(s),`=LET(a,2,TEXTJOIN(",",TRUE,"_xlpm.a",Sales[_xlfn.LET(],a))`);
+  assert.equal(model.display("='_xlfn.LET('!A1"),"='_xlfn.LET('!A1");
+});
+test('column completion keeps the outer table and existing closing brackets',()=>{
+  for(const [text,caret,table,prefix,closures] of [
+    ['=SUM(销售表[[#Data],[金',null,'销售表','金',2],
+    ['=SUM(销售表[[#Data],[金额]])','=SUM(销售表[[#Data],[金'.length,'销售表','金',1],
+    ["=SUM(T[费']用",null,'T','费]用',1],
+    ['=[@收',null,'','收',1]
+  ]){
+    const c=model.columnContext(text,caret??text.length);assert.equal(c.table,table);assert.equal(c.prefix,prefix);assert.equal(c.closures,closures);
+  }
+  assert.equal(model.columnContext('="销售表[金',7),null);
+});

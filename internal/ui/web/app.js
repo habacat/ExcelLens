@@ -4344,7 +4344,7 @@
         event.preventDefault();
         const address = $("nameBox").value;
         const navigate = () => navigateNameBox(address).then(()=>editCopy?.grid.active ? editCopy.grid.focus() : $('grid').focus({preventScroll:true}));
-        if (editCopy?.grid.active) editCopy.grid.act(navigate);
+        if (editCopy?.grid.active) editCopy.grid.navigate(navigate);
         else navigate().catch(err=>toast(err.message,'error'));
       } else if (event.key === "Escape") {
         $("nameBox").value = S.selected?.ref || "";
@@ -4609,7 +4609,7 @@
       context: () => ({book: S.book, fileName: S.fileName, source: S.source, sheet: S.sheet, ref: S.selected?.ref}),
       grid: {
         selected:()=>S.selected, ready:()=>S.indexReady && !S.sheetLoadingEpoch, filtered:()=>S.filtered, mappedRows:()=>S.filtered||!!S.rowVisibility?.hidden.length,
-        paintReferences:()=>paintRangeFrames(),
+        clipboardIdentity, paintReferences:()=>paintRangeFrames(),
         selectArea:a=>{
           selectCellByAddress(colName(a.col1)+a.row1,a.row1);
           extendRange({row:a.row1,col:a.col1,visual:a.row1},a.row2,a.col2,a.row2);

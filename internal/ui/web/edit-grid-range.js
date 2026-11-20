@@ -19,7 +19,7 @@
         if (action==='cut') editor.copyForCut();
         if (action==='copy') this.view.copy();
         if (action==='resize-table') this.owner.advanced('Table');
-        if (action==='paste') editor.act(()=>this.pasteClipboard(),true,'正在粘贴选区');
+        if (action==='paste') editor.act(activity=>this.pasteClipboard(activity),true,'正在粘贴选区');
         if (action==='clear') editor.act(()=>this.clear(),true,'正在清除选区');
         if (action==='down' || action==='right') editor.act(()=>this.fill('fill-'+action),true,'正在填充选区');
       });
@@ -44,8 +44,8 @@
     typedClipboard(raw,html) {
       return window.ExcelLensGridPaste.identify(raw,html,this.copied,this.owner.limits.requestBytes);
     }
-    async pasteClipboard() {
-      const target=this.target(), selection=this.rectangle(true);
+    async pasteClipboard(activity) {
+      const target=this.pasteTarget(), selection=this.rectangle(true);
       let raw='', html='';
       try {
         if (navigator.clipboard.read) {
@@ -62,15 +62,23 @@
       if (Object.keys(selection).some(edge=>selection[edge]!==now[edge])) throw Error('选区已变化，请重新粘贴');
       const typed=this.typedClipboard(raw,html);
       if (!raw && !typed) throw Error('剪贴板没有可粘贴的单元格或文字');
-      return this.paste(raw,typed);
+      return this.paste(raw,typed,activity);
     }
-    target() {
+    target(copyOnly=false) {
       if (!this.grid.active || !this.view.ready() || !this.grid.selected || this.grid.stale || this.owner.pending) throw Error('请先核对当前修订');
-      if (this.grid.shape?.readOnly) throw Error(this.grid.shape.readOnly);
+      if (!copyOnly && this.grid.shape?.readOnly) throw Error(this.grid.shape.readOnly);
       const {id,binding,revision} = this.owner.data.document;
       return {document:{id,binding}, revision, sheet:this.grid.selected.sheet};
     }
+    pasteTarget() {
+      const target=this.target();
+      Object.defineProperty(target,'selection',{value:this.view.clipboardIdentity()});
+      return target;
+    }
     current(target) {
+      if (target.selection && (target.selection !== this.view.clipboardIdentity() || this.grid.queue.some(task => task.navigate))) {
+        throw Error('选区或筛选已变化，请重新粘贴');
+      }
       const current = this.target();
       if (current.sheet !== target.sheet || current.document.id !== target.document.id ||
           current.document.binding !== target.document.binding || current.revision !== target.revision) throw Error('选区或修订已变化，请重新操作');
@@ -209,21 +217,20 @@
       if (this.owner.data.encoding || cut && this.view.filtered() || snapshot.rows*(snapshot.lastColumn-snapshot.firstColumn+1)>this.owner.limits.batchCells) return null;
       const first = model.target(snapshot.start,this.grid.shape), last = model.target(snapshot.end,this.grid.shape);
       if (!visibleRows && last.row-first.row+1 !== snapshot.rows) return null;
-      const target = this.target(), merged=!visibleRows && this.hasMerge(first.row,last.row,first.col,last.col);
+      const target = this.target(!cut), merged=!visibleRows && this.hasMerge(first.row,last.row,first.col,last.col);
       const source={marker:'excellens-copy-'+crypto.randomUUID(),cut,merged,first,last,sheet:target.sheet,
         start:snapshot.start,end:snapshot.end,id:target.document.id,binding:target.document.binding,revision:target.revision};
-      if (cut) return source;
       try {
         const clip = await this.owner.post('copy',{...target,ref:snapshot.start,end:snapshot.end,mode:'grid',visibleRows});
         return {...source,clip};
       } catch (error) {
         // The normal HTML/TSV copy still works for a large typed payload.
-        if (error.status === 413) return merged ? source : null;
+        if (error.status === 413) return merged || cut ? source : null;
         throw error;
       }
     }
-    async paste(raw,typed) {
-      const target = this.target();
+    async paste(raw,typed,activity) {
+      const target=this.pasteTarget();
       const rect=this.rectangle(true), {top,bottom,left,right}=rect;
       const {limits,data} = this.owner, textFile = !!data.encoding;
       const local=typed && typed.id===target.document.id;
@@ -231,7 +238,7 @@
         let portable=typed?.portable || typed?.clip?.portable;
         if(typed?.external)portable=await window.ExcelLensGridPaste.native(this.owner,target,raw);
         this.current(target);
-        if(portable)return window.ExcelLensGridPaste.pasteRange(this,target,rect,portable);
+        if(portable)return window.ExcelLensGridPaste.pasteRange(this,target,rect,portable,activity);
       }
       if (local && !textFile) {
         const ref = this.owner.colName(left)+top;

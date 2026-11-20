@@ -256,44 +256,39 @@ func Create(ctx context.Context, store *checkpoint.Store, base Base) (Entry, err
 }
 
 func Load(ctx context.Context, store *checkpoint.Store, key Key) (*Document, error) {
-	lease, err := store.AcquireCurrent(ctx, key.ID, key.Binding)
-	if err != nil {
-		return nil, err
-	}
-	m := lease.Snapshot()
-	entry, err := EntryFromManifest(m)
-	if err != nil {
-		_ = lease.Close()
-		return nil, err
-	}
-	d := &Document{Entry: entry, lease: lease, dataSize: m.DataBytes, value: make(map[Address]Value), templates: make(map[Address]string), rules: make(map[Area]Rule), receipts: make(map[string]receipt)}
-	d.origin = entry.Base
-	d.blocks = m.Blocks
-	err = lease.VisitCandidate(ctx, func(b checkpoint.Block, r io.Reader) error {
-		if m.CompactedAt != 0 && b.Sequence == 1 {
-			d.dataSize -= b.Bytes + 64
-			return d.restoreHistory(r, m.CompactedAt)
+	var d *Document
+	lease, err := store.ReplayCurrent(ctx, key.ID, key.Binding, func(m checkpoint.Manifest) (func(checkpoint.Block, io.Reader) error, error) {
+		entry, err := EntryFromManifest(m)
+		if err != nil {
+			return nil, err
 		}
-		if b.Records != 1 || b.Bytes > 2*int64(formats.EditRequestBytes) {
-			return checkpoint.ErrCorrupt
-		}
-		var tx transaction
-		decoder := json.NewDecoder(r)
-		decoder.DisallowUnknownFields()
-		if decoder.Decode(&tx) != nil || decoder.Decode(new(json.RawMessage)) != io.EOF || !d.validTransaction(tx) {
-			return checkpoint.ErrCorrupt
-		}
-		revision := b.Sequence + 1
-		if m.CompactedAt != 0 {
-			revision = m.CompactedAt + b.Sequence - 1
-		}
-		d.apply(tx, revision)
-		return nil
+		d = &Document{Entry: entry, origin: entry.Base, blocks: m.Blocks, dataSize: m.DataBytes, value: make(map[Address]Value), templates: make(map[Address]string), rules: make(map[Area]Rule), receipts: make(map[string]receipt)}
+		return func(b checkpoint.Block, r io.Reader) error {
+			if m.CompactedAt != 0 && b.Sequence == 1 {
+				d.dataSize -= b.Bytes + 64
+				return d.restoreHistory(r, m.CompactedAt)
+			}
+			if b.Records != 1 || b.Bytes > 2*int64(formats.EditRequestBytes) {
+				return checkpoint.ErrCorrupt
+			}
+			var tx transaction
+			decoder := json.NewDecoder(r)
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&tx) != nil || decoder.Decode(new(json.RawMessage)) != io.EOF || !d.validTransaction(tx) {
+				return checkpoint.ErrCorrupt
+			}
+			revision := b.Sequence + 1
+			if m.CompactedAt != 0 {
+				revision = m.CompactedAt + b.Sequence - 1
+			}
+			d.apply(tx, revision)
+			return nil
+		}, nil
 	})
 	if err != nil {
-		_ = d.Close()
 		return nil, err
 	}
+	d.lease = lease
 	d.refreshInfo()
 	return d, nil
 }

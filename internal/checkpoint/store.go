@@ -370,16 +370,28 @@ func (s *Store) Create(ctx context.Context, definition Definition, stage string,
 }
 
 func (s *Store) Acquire(ctx context.Context, id, binding string) (*Lease, error) {
-	return s.acquire(ctx, id, binding, true)
+	return s.acquire(ctx, id, binding, true, nil)
 }
 
 // AcquireCurrent refuses a damaged primary manifest before opening or trimming
 // its blocks. Confirmed document edits cannot be rolled back to a backup slot.
 func (s *Store) AcquireCurrent(ctx context.Context, id, binding string) (*Lease, error) {
-	return s.acquire(ctx, id, binding, false)
+	return s.acquire(ctx, id, binding, false, nil)
 }
 
-func (s *Store) acquire(ctx context.Context, id, binding string, allowBackup bool) (*Lease, error) {
+// ReplayFactory prepares a private candidate from a verified manifest.
+type ReplayFactory func(Manifest) (func(Block, io.Reader) error, error)
+
+// ReplayCurrent checks every block digest and its chain while decoding.
+// The caller may publish the candidate only after this returns its lease.
+func (s *Store) ReplayCurrent(ctx context.Context, id, binding string, prepare ReplayFactory) (*Lease, error) {
+	if prepare == nil {
+		return nil, ErrBinding
+	}
+	return s.acquire(ctx, id, binding, false, prepare)
+}
+
+func (s *Store) acquire(ctx context.Context, id, binding string, allowBackup bool, prepare ReplayFactory) (*Lease, error) {
 	if !validHash(binding) {
 		return nil, ErrBinding
 	}
@@ -422,7 +434,20 @@ func (s *Store) acquire(ctx context.Context, id, binding string, allowBackup boo
 	s.active.Add(1)
 	lease := newLease(s, lock, data, m)
 	lease.backup = backup
-	if err := lease.verify(ctx); err != nil {
+	if prepare != nil {
+		var read func(Block, io.Reader) error
+		read, err = prepare(cloneManifest(m))
+		if err == nil {
+			if read == nil {
+				err = ErrBinding
+			} else {
+				err = lease.VisitCandidate(ctx, read)
+			}
+		}
+	} else {
+		err = lease.verify(ctx)
+	}
+	if err != nil {
 		_ = lease.Close()
 		return nil, err
 	}

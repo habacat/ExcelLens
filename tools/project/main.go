@@ -255,7 +255,7 @@ func audit(files []string) error {
 	}
 	for _, name := range files {
 		if filepath.Ext(name) == ".md" {
-			if err := checkLinks(name); err != nil {
+			if err := checkLinks(name, nil); err != nil {
 				return err
 			}
 		}
@@ -280,7 +280,7 @@ func audit(files []string) error {
 	return checkReleaseFiles()
 }
 
-func checkLinks(name string) error {
+func checkLinks(name string, manifest map[string]bool) error {
 	data, err := os.ReadFile(name)
 	if err != nil {
 		return err
@@ -291,7 +291,11 @@ func checkLinks(name string) error {
 			continue
 		}
 		link, _, _ = strings.Cut(link, "#")
-		if _, err := os.Stat(filepath.Join(filepath.Dir(name), filepath.FromSlash(link))); err != nil {
+		target := filepath.Join(filepath.Dir(name), filepath.FromSlash(link))
+		if manifest != nil && !manifest[filepath.ToSlash(target)] {
+			return fmt.Errorf("%s: local link %q is missing from the release package", name, link)
+		}
+		if _, err := os.Stat(target); err != nil {
 			return fmt.Errorf("%s: broken local link %q", name, link)
 		}
 	}
@@ -318,8 +322,17 @@ func checkReleaseFiles() error {
 			return fmt.Errorf("release file missing or not regular: %s", name)
 		}
 	}
-	if !seen["docs/releases/"+buildinfo.Version+".md"] {
+	releaseNotes := "docs/releases/" + buildinfo.Version + ".md"
+	if !seen[releaseNotes] {
 		return errors.New("release manifest must include the current verification report")
+	}
+	for _, template := range files {
+		name := strings.ReplaceAll(template, "{version}", buildinfo.Version)
+		if name == releaseNotes || strings.HasPrefix(name, "docs/user/") && strings.HasSuffix(name, ".md") {
+			if err := checkLinks(name, seen); err != nil {
+				return err
+			}
+		}
 	}
 	var toolchain struct {
 		Version string `json:"version"`

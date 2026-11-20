@@ -549,6 +549,11 @@
     </div>
   </dialog>
 
+  <dialog id="editPasteHiddenRows" class="float-dialog workbook-tool-dialog paste-source-dialog" aria-labelledby="editPasteHiddenTitle">
+    <form method="dialog" class="dialog-head"><div class="dialog-title" id="editPasteHiddenTitle">复制区域含隐藏单元格</div><button class="dialog-close" value="cancel" aria-label="取消粘贴">×</button></form>
+    <form method="dialog" class="dialog-body"><div class="dialog-actions"><button class="mini-button" id="editPasteAllRows" value="all">粘贴全部行</button><button class="primary-button compact" id="editPasteVisible" value="visible" autofocus>仅粘贴可见行</button></div></form>
+  </dialog>
+
   <dialog id="filterDialog" class="float-dialog workbook-tool-dialog filter-dialog" aria-labelledby="filterDialogTitle">
     <form method="dialog" class="dialog-head">
       <div id="filterDialogTitle" class="dialog-title">筛选条件</div>
@@ -891,7 +896,7 @@
     </footer>
   </dialog>
   <div id="editFormulaPopup" class="edit-formula-popup" hidden>
-    <div id="editFormulaSuggestions" role="listbox" aria-label="函数候选" hidden></div>
+    <div id="editFormulaSuggestions" role="listbox" aria-label="公式候选" hidden></div>
     <div id="editFormulaHint" role="status" hidden></div>
   </div>
 

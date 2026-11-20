@@ -71,7 +71,11 @@ func (a *sheetCollectionEdit) appTitles(ctx context.Context, raw []byte) ([]byte
 		}
 		change := 0
 		if slices.Equal(names, sheetNames) {
-			cell := items[a.index]
+			pos := a.index
+			if a.op.Kind != "deleteSheet" {
+				pos = a.position - 1
+			}
+			cell := items[pos]
 			if a.op.Kind == "deleteSheet" {
 				ps = append(ps, xmlPatch{cell.open, cell.end, ""})
 				change--

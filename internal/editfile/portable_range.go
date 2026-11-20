@@ -2,9 +2,7 @@ package editfile
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
-	"encoding/xml"
 	"errors"
 	"io"
 	"maps"
@@ -17,7 +15,7 @@ import (
 	"excellens/internal/workbook"
 )
 
-func (p *xlsxPackage) portable(ctx context.Context, sheet XLSXSheet, first editdoc.Address, rows []int, cols int, values []editdoc.Value, data []byte) (*editdoc.PortableRange, error) {
+func (p *xlsxPackage) clipStyleCatalog(ctx context.Context) (*clipStyleBook, error) {
 	var raw []byte
 	var err error
 	if p.files[entryStylePart] != nil {
@@ -26,17 +24,7 @@ func (p *xlsxPackage) portable(ctx context.Context, sheet XLSXSheet, first editd
 			return nil, err
 		}
 	}
-	if data == nil {
-		data, err = p.readPart(ctx, sheet.Part)
-		if err != nil {
-			return nil, err
-		}
-	}
-	owners, err := sheetOwners(ctx, data, sheet.Name)
-	if err != nil {
-		return nil, err
-	}
-	return clipFromCells(ctx, first, rows, cols, values, raw, owners.merges)
+	return readClipStyleBook(ctx, raw)
 }
 
 // Reader copy uses its existing row projection and merge index. Only the
@@ -61,9 +49,13 @@ func ReaderClipboardRange(ctx context.Context, file *workbook.EditSourceFile, fi
 	for _, m := range sourceMerges {
 		merges = append(merges, cellRect{m.Row, m.Col, m.EndRow, m.EndCol})
 	}
-	return clipFromCells(ctx, first, rows, cols, values, raw, merges)
+	book, err := readClipStyleBook(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	return clipFromCells(ctx, first, rows, cols, values, book, merges)
 }
-func clipFromCells(ctx context.Context, first editdoc.Address, rows []int, cols int, values []editdoc.Value, raw []byte, merges []cellRect) (*editdoc.PortableRange, error) {
+func clipFromCells(ctx context.Context, first editdoc.Address, rows []int, cols int, values []editdoc.Value, book *clipStyleBook, merges []cellRect) (*editdoc.PortableRange, error) {
 	if len(rows) == 0 || cols < 1 || len(rows) > formats.EditBatchCells/cols || len(values) != len(rows)*cols {
 		return nil, ErrTarget
 	}
@@ -75,21 +67,30 @@ func clipFromCells(ctx context.Context, first editdoc.Address, rows []int, cols 
 			clip.SourceRows = rows
 		}
 	}
-	book, err := readClipStyleBook(ctx, raw)
-	if err != nil {
-		return nil, err
+	type styleKey struct {
+		style, number string
+		builtin       int
 	}
+	slots := map[styleKey]int{}
 	ids := map[editdoc.PortableStyle]int{}
 	for i, v := range values {
-		style, err := book.style(v)
-		if err != nil {
+		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		idx, ok := ids[style]
+		key := styleKey{v.Style, v.NumberStyle, v.BuiltinFormat}
+		idx, ok := slots[key]
 		if !ok {
-			idx = len(clip.Styles)
-			ids[style] = idx
-			clip.Styles = append(clip.Styles, style)
+			style, err := book.style(v)
+			if err != nil {
+				return nil, err
+			}
+			idx, ok = ids[style]
+			if !ok {
+				idx = len(clip.Styles)
+				ids[style] = idx
+				clip.Styles = append(clip.Styles, style)
+			}
+			slots[key] = idx
 		}
 		v.Style, v.NumberStyle, v.BuiltinFormat = "", "", 0
 		if v.Kind == "missing" {
@@ -123,98 +124,71 @@ func clipFromCells(ctx context.Context, first editdoc.Address, rows []int, cols 
 	return clip, nil
 }
 
-func (l XLSXLayout) PortableSelection(ctx context.Context, f *workbook.EditSourceFile, first editdoc.Address, rows []int, cols int, values []editdoc.Value) (*editdoc.PortableRange, error) {
-	p, err := openXLSXPackage(f, f.Size())
-	if err != nil {
-		return nil, err
+func (l Layout) PortableSelection(ctx context.Context, f *workbook.EditSourceFile, first editdoc.Address, rows []int, cols int, values []editdoc.Value) (*editdoc.PortableRange, error) {
+	c := l.cache
+	var styles *clipStyleBook
+	var merges []cellRect
+	var cached bool
+	if c != nil {
+		c.mu.Lock()
+		if c.key == l.cacheKey {
+			styles = c.copyStyles
+			merges, cached = c.copyMerges[first.Sheet]
+		}
+		c.mu.Unlock()
 	}
-	for _, sheet := range l.Sheets {
-		if sheet.Name == first.Sheet {
-			return p.portable(ctx, sheet, first, rows, cols, values, nil)
+	if !cached || styles == nil {
+		p, err := openXLSXPackage(f, f.Size())
+		if err != nil {
+			return nil, err
+		}
+		if styles == nil {
+			styles, err = p.clipStyleCatalog(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if !cached {
+			i := slices.IndexFunc(l.XLSX.Sheets, func(s XLSXSheet) bool { return s.Name == first.Sheet })
+			if i < 0 {
+				return nil, ErrTarget
+			}
+			part := l.XLSX.Sheets[i].Part
+			// Merges follow sheetData. The existing owner scan also handles prefixes
+			// and bounds; keep only the coordinates in the revision-scoped cache.
+			raw, err := p.readPart(ctx, part)
+			if err != nil {
+				return nil, err
+			}
+			metadata, err := sheetOwners(ctx, raw, first.Sheet)
+			if err != nil {
+				return nil, err
+			}
+			merges = metadata.merges
+		}
+		if err := f.Check(); err != nil {
+			return nil, err
+		}
+		if c != nil {
+			c.mu.Lock()
+			if c.key == l.cacheKey {
+				if len(styles.raw) < 512<<10 && len(styles.xfs) <= 2048 {
+					c.copyStyles = styles
+				}
+				if !cached && len(merges) <= 4096 {
+					if len(c.copyMerges) >= 8 {
+						clear(c.copyMerges)
+					}
+					if c.copyMerges == nil {
+						c.copyMerges = map[string][]cellRect{}
+					}
+					c.copyMerges[first.Sheet] = merges
+				}
+			}
+			c.mu.Unlock()
 		}
 	}
-	return nil, ErrTarget
-}
-
-// Excel's HTML and its XML Spreadsheet clipboard can both omit a formula.
-// The embedded OOXML has the original coordinates and a workbook oleSize
-// identifying the copied rectangle. Only that rectangle leaves this reader.
-func NativeClipboardRange(ctx context.Context, ole []byte, sourceSheet string) (*editdoc.PortableRange, error) {
-	stream, err := workbook.EmbeddedWorkbook(bytes.NewReader(ole), int64(len(ole)))
-	if err != nil {
-		return nil, err
-	}
-	p, err := openXLSXPackage(stream, stream.Size())
-	if err != nil {
-		return nil, err
-	}
-	raw, err := p.readPart(ctx, workbookPart)
-	if err != nil {
-		return nil, err
-	}
-	var info struct {
-		Size struct {
-			Ref string `xml:"ref,attr"`
-		} `xml:"oleSize"`
-		View []struct {
-			Active int `xml:"activeTab,attr"`
-		} `xml:"bookViews>workbookView"`
-	}
-	if err = xml.Unmarshal(raw, &info); err != nil {
-		return nil, err
-	}
-	area, ok := parseRect(info.Size.Ref)
-	if !ok {
-		return nil, errors.New("Excel 剪贴板缺少复制范围")
-	}
-	raw, err = removeElements(ctx, raw, func(el xml.StartElement) bool { return el.Name == (xml.Name{Space: mainNS, Local: "oleSize"}) })
-	if err != nil {
-		return nil, err
-	}
-	p.revisedParts = map[string][]byte{workbookPart: raw}
-	p.layout.Native, p.layout.Structured = true, true
-	if err = p.loadWorkbook(ctx); err != nil {
-		return nil, err
-	}
-	active := 0
-	if len(info.View) > 0 {
-		active = info.View[0].Active
-	}
-	if sourceSheet != "" {
-		active = slices.IndexFunc(p.layout.Sheets, func(s XLSXSheet) bool { return s.Name == sourceSheet })
-	}
-	if active < 0 || active >= len(p.layout.Sheets) {
-		return nil, ErrTarget
-	}
-	sheet := p.layout.Sheets[active]
-	addrs, err := area.addresses(sheet.Name)
-	if err != nil {
-		return nil, err
-	}
-	data, err := p.readPart(ctx, sheet.Part)
-	if err != nil {
-		return nil, err
-	}
-	data, err = p.expandStructureGroups(ctx, data, sheet.Name, axisEdit{Structure: editdoc.Structure{Sheet: sheet.Name}})
-	if err != nil {
-		return nil, err
-	}
-	targets, err := newSheetTargets(sheet, addrs)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = p.scanSheet(ctx, data, sheet, targets, nil, nil, nil); err != nil {
-		return nil, err
-	}
-	var rows []int
-	var values []editdoc.Value
-	for _, row := range targets.rows {
-		rows = append(rows, row.row)
-		for _, c := range row.cells {
-			values = append(values, c.original.value)
-		}
-	}
-	return p.portable(ctx, sheet, addrs[0], rows, area.lastCol-area.firstCol+1, values, data)
+	return clipFromCells(ctx, first, rows, cols, values, styles, merges)
 }
 
 type portablePaste struct {
@@ -236,6 +210,13 @@ func (p *xlsxPackage) planPortable(ctx context.Context, op editdoc.Structure) (p
 	if !ok || clip == nil || clip.Rows < 1 || clip.Cols < 1 || clip.Rows > formats.EditBatchCells/clip.Cols || len(clip.Cells) != clip.Rows*clip.Cols || len(clip.Styles) == 0 {
 		return empty, ErrTarget
 	}
+	if op.PasteVisibleOnly {
+		var err error
+		clip, err = visibleClipboardRange(clip)
+		if err != nil {
+			return empty, err
+		}
+	}
 	rows := op.TargetRows
 	if len(rows) == 0 {
 		count := target.lastRow - target.firstRow + 1
@@ -248,7 +229,7 @@ func (p *xlsxPackage) planPortable(ctx context.Context, op editdoc.Structure) (p
 		}
 	}
 	width := target.lastCol - target.firstCol + 1
-	if len(rows) > formats.EditBatchCells/width || len(rows)%clip.Rows != 0 || width%clip.Cols != 0 || len(clip.SourceRows) != 0 && len(clip.SourceRows) != clip.Rows {
+	if len(rows) > formats.EditBatchCells/width || len(rows)%clip.Rows != 0 || width%clip.Cols != 0 || len(clip.SourceRows) != 0 && len(clip.SourceRows) != clip.Rows || len(clip.SourceCols) != 0 && len(clip.SourceCols) != clip.Cols {
 		return empty, ErrTarget
 	}
 	sheet, err := p.rangeSheet(ctx, op.Sheet)
@@ -320,7 +301,11 @@ func (p *xlsxPackage) planPortable(ctx context.Context, op editdoc.Structure) (p
 			}
 			addr := editdoc.Address{Sheet: op.Sheet, Row: row, Col: target.firstCol + j}
 			if v.Kind == "formula" {
-				v.Raw, err = copyRangeFormula(v.Raw, addr.Row-sourceRow, addr.Col-clip.Start.Col-col)
+				sourceCol := clip.Start.Col + col
+				if len(clip.SourceCols) > 0 {
+					sourceCol = clip.SourceCols[col]
+				}
+				v.Raw, err = copyRangeFormula(v.Raw, addr.Row-sourceRow, addr.Col-sourceCol)
 				if err != nil {
 					return empty, err
 				}

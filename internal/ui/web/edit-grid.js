@@ -3,7 +3,7 @@
   const el = id => document.getElementById('editGrid' + id);
   const model = window.ExcelLensEditModel;
   const keyOf = ({id, binding}) => ({id, binding});
-  const textOf = cell => (cell?.hasFormula ? cell.formula : cell?.raw) ?? '';
+  const textOf = cell => (cell?.hasFormula ? window.ExcelLensFormulaInput.display(cell.formula) : cell?.raw) ?? '';
   const kindOf = cell => cell?.hasFormula ? 'formula' : ({s:'text', inlineStr:'text', str:'text', text:'text', b:'boolean', d:'date', e:'error'}[cell?.type] || (cell?.raw ? 'number' : 'blank'));
 
   class SheetEditor {
@@ -76,7 +76,7 @@
           return;
         }
         if (this.view.dragged()) { this.focus(); return; }
-        if (this.view.ready()) this.act(() => {
+        if (this.view.ready()) this.navigate(() => {
           this.view.selectPoint(node,e);
           if (e.detail > 1) this.begin(false, this.input);
           this.focus();
@@ -310,7 +310,7 @@
           }
           const unchanged = !replace && d.text === d.initial;
           d.kind = source.value.kind;
-          const actual = source.value.raw;
+          const actual = source.value.kind==='formula' ? window.ExcelLensFormulaInput.display(source.value.raw) : source.value.raw;
           d.escaped = actual.includes('\r');
           d.initial = model.encode(actual, d.escaped);
           if (unchanged && d.text !== d.initial) {
@@ -367,6 +367,15 @@
       this.cancelDraft(); return true;
     }
 
+    navigate(next) {
+      if (!this.moving) return this.act(next);
+      // Keep explicit cell/address navigation in input order while a long
+      // operation is running. A paste still preparing must relinquish its target.
+      const documentId = this.owner.data.document.id, sheet = this.owner.context().sheet;
+      this.queue.push({navigate: () => {
+        if (this.active && this.owner.data.document.id === documentId && this.owner.context().sheet === sheet) return next();
+      }});
+    }
     async act(next, confirmDraft = true, label = '') {
       if (this.moving || this.composing) return false;
       this.moving = true; this.controls();
@@ -374,7 +383,7 @@
       let ok = false;
       try {
         if (confirmDraft && !await this.finish()) return false;
-        if (next && await next() === false) return false;
+        if (next && await next(activity) === false) return false;
         ok = true; return true;
       } catch (error) {
         if (error.status === 409) this.stale = true;
@@ -383,8 +392,12 @@
       finally {
         if (activity) activity.end();
         this.moving = false; this.controls();
-        if (!ok) this.queue.length = 0;
-        if (ok && this.queue.length) this.drain();
+        if (!ok) {
+          const navigation = this.queue.findLast(task => task.navigate);
+          this.queue.length = 0;
+          if (navigation) this.queue.push(navigation);
+        }
+        if (this.queue.length) this.drain();
       }
     }
     async reload() {
@@ -443,8 +456,8 @@
     }
     pasteText(raw,typed) {
       if (!this.selected || !raw && !typed) return;
-      return this.act(async () => {
-        const ok = await this.ranges.paste(raw,typed);
+      return this.act(async activity => {
+        const ok = await this.ranges.paste(raw,typed,activity);
         this.focus(); return ok;
       },true,'正在粘贴选区');
     }
@@ -452,7 +465,8 @@
     drain() {
       while (this.active && !this.moving && this.queue.length) {
         const task = this.queue.shift();
-        if ('paste' in task) this.pasteText(task.paste,task.typed);
+        if (task.navigate) this.act(task.navigate);
+        else if ('paste' in task) this.pasteText(task.paste,task.typed);
         else if ('text' in task) {
           if (!this.draft && !this.begin(true, this.input)) { this.queue.length = 0; return; }
           this.draft.text += task.text; this.input.value = this.formula.value = this.draft.text;

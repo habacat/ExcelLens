@@ -28,6 +28,19 @@
         this.refresh();
       }
       const task = {
+        pause: () => {
+          if (!this.tasks.has(state) || state.pausedAt !== undefined) return;
+          state.pausedAt = this.clock.now();
+          this.refresh();
+        },
+        resume: () => {
+          if (!this.tasks.has(state) || state.pausedAt === undefined) return;
+          const now = this.clock.now();
+          state.start = now;
+          state.phaseStart += now - state.pausedAt;
+          delete state.pausedAt;
+          this.refresh();
+        },
         stage: (name, from = 0, to = 100) => {
           Object.assign(state, {label:name, from, to, phaseStart:this.clock.now(), value:null, detail:'', cancel:null});
           if (this.visible === state) this.refresh();
@@ -50,7 +63,7 @@
           if (this.visible === state) this.refresh();
         },
         paintIfDue: () => {
-          if (!this.tasks.has(state) || this.clock.now() - start < delay || this.timers.document?.visibilityState !== 'visible') return;
+          if (!this.tasks.has(state) || state.pausedAt !== undefined || this.clock.now() - state.start < delay || this.timers.document?.visibilityState !== 'visible') return;
           this.refresh();
           // A synchronous layout can cross the deadline and finish in the
           // same event-loop turn. Give the compositor a frame before teardown.
@@ -82,6 +95,7 @@
       const now = this.clock.now();
       let chosen = null, preparing = null, next = Infinity;
       for (const task of this.tasks) {
+        if (task.pausedAt !== undefined) continue;
         const remaining = task.start + delay - now;
         if (remaining > 0) {
           next = Math.min(next, remaining);

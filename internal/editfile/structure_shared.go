@@ -23,6 +23,9 @@ type structureFormulaMember struct {
 // Resolve each shared member in the old coordinates. Insertion between the
 // master and a follower can change a relative offset outside the edited sheet.
 func (p *xlsxPackage) expandStructureGroups(ctx context.Context, data []byte, sheet string, a axisEdit) ([]byte, error) {
+	return p.expandMappedGroups(ctx, data, sheet, a, nil)
+}
+func (p *xlsxPackage) expandMappedGroups(ctx context.Context, data []byte, sheet string, a axisEdit, sourceRow func(int) int) ([]byte, error) {
 	if a.action == "rename" || !bytes.Contains(data, []byte("shared")) {
 		return data, nil
 	}
@@ -41,6 +44,9 @@ func (p *xlsxPackage) expandStructureGroups(ctx context.Context, data []byte, sh
 				col, row, err := workbook.ParseCellRef(attribute(t, "", "r"))
 				if err != nil {
 					return err
+				}
+				if sourceRow != nil {
+					row = sourceRow(row)
 				}
 				cell = editdoc.Address{Sheet: sheet, Row: row, Col: col}
 			case xml.Name{Space: mainNS, Local: "f"}:

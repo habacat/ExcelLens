@@ -52,7 +52,10 @@ func officeWalk(ctx context.Context, f *zip.File, visit func(xmlEvent) error) er
 		return err
 	}
 	defer raw.Close()
-	r := bufio.NewReaderSize(raw, 64<<10)
+	return walkXMLBuffered(ctx, bufio.NewReaderSize(raw, 64<<10), visit)
+}
+
+func walkXMLBuffered(ctx context.Context, r *bufio.Reader, visit func(xmlEvent) error) error {
 	skip := 0
 	if first, _ := r.Peek(3); bytes.Equal(first, []byte{0xef, 0xbb, 0xbf}) {
 		skip, _ = r.Discard(3)

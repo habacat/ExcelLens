@@ -2,6 +2,11 @@
 
 package server
 
-import "context"
+import (
+	"context"
+	"excellens/internal/editfile"
+)
 
-func nativeClipboard(context.Context, string) ([]byte, string, error) { return nil, "", nil }
+func nativeClipboard(context.Context, string) ([]byte, editfile.NativeSelection, error) {
+	return nil, editfile.NativeSelection{}, nil
+}

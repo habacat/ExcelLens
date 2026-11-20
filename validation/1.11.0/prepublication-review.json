@@ -1,0 +1,102 @@
+{
+  "version": "1.11.0",
+  "result": "PASS",
+  "scope": "Three reviews ahead of publication",
+  "excel": {
+    "version": "16.0",
+    "build": "20326.0"
+  },
+  "correctness": {
+    "worksheetOperations": 5,
+    "worksheetWindowStates": 15,
+    "filteredAndDateCases": 5,
+    "mutationUndoRedoStates": 15,
+    "cellsComparedOnSave": 720,
+    "cellsComparedAfterExcelReopen": 720,
+    "hiddenSelectionOracleShapes": 10,
+    "reportDerivedHiddenSelections": {
+      "cases": 4,
+      "states": 12,
+      "cellsOnSave": 936,
+      "cellsAfterExcelReopen": 936
+    },
+    "octoberRecalculation": {
+      "formulaAddresses": 16602,
+      "cellsCompared": 66408,
+      "restartedBeforeRedo": true,
+      "sourceUnchanged": true,
+      "toleranceULP": 8,
+      "absoluteTolerance": 1e-12,
+      "outsideTolerance": 0
+    }
+  },
+  "performance": {
+    "historyReopen": {
+      "transactions": 2000,
+      "samplesPerBuild": 24,
+      "beforeMedianMs": 107.035,
+      "afterMedianMs": 83.149
+    },
+    "warmCopy": {
+      "pairedRunMediansMs": {
+        "ledger": {
+          "before": [
+            51.412,
+            51.169
+          ],
+          "after": [
+            20.808,
+            15.111
+          ]
+        },
+        "expenseReimbursements": {
+          "before": [
+            28.492,
+            28.765
+          ],
+          "after": [
+            26.69,
+            26.516
+          ]
+        }
+      },
+      "range": "B2:D5"
+    },
+    "viewHeaderRead": {
+      "worksheetParts": 18,
+      "decompressedXMLBytes": 4497799,
+      "inspectedBytes": 67685
+    },
+    "compactionRecovery": {
+      "result": "PASS",
+      "consecutiveCommits": 4101,
+      "reopens": 2,
+      "retryRestoredRevision": 4102,
+      "elapsedMs": 42859
+    }
+  },
+  "interaction": {
+    "editingScenarios": [
+      "LET in formula bar and F2; Enter without changes",
+      "600 names remain keyboard accessible; 10 mounted",
+      "nested structured reference input",
+      "cross-tab cut preserves source and typed paste",
+      "late paste cannot edit prior selection"
+    ],
+    "nativeClipboardScenarios": [
+      "Excel visible rows and columns pasted directly",
+      "ambiguous cancel revision 3",
+      "ambiguous visible revision 4",
+      "ambiguous all revision 6"
+    ],
+    "downloadedWorkbooksCheckedInExcel": 3,
+    "cellsOnDownload": 234,
+    "cellsAfterExcelReopen": 234,
+    "narrowWidthCSSPixels": 390,
+    "unhandledBrowserErrors": 0
+  },
+  "coverageLimits": [
+    "Automated Windows Excel and browser interop. WPS and manual desktop acceptance were not run.",
+    "If Excel provides insufficient evidence about hidden cells, paste offers the two ranges with their dimensions."
+  ]
+}

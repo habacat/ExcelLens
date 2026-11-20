@@ -154,7 +154,7 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 	}
 	if layout.XLSX != nil {
 		if req.Mode == "grid" {
-			r, err := layout.XLSX.PortableSelection(ctx, f, first, rowNumbers, cols, portableValues)
+			r, err := layout.PortableSelection(ctx, f, first, rowNumbers, cols, portableValues)
 			if err != nil {
 				return editClipboard{}, err
 			}

@@ -38,11 +38,11 @@ func (a *App) nativePaste(ctx context.Context, d *editdoc.Document, req editRequ
 	if err != nil || len(h) != 32 {
 		return nil, editdoc.ErrInvalid
 	}
-	data, sheet, err := nativeClipboard(ctx, req.Proof)
+	data, selection, err := nativeClipboard(ctx, req.Proof)
 	if err != nil || data == nil {
 		return nil, err
 	}
-	r, err := editfile.NativeClipboardRange(ctx, data, sheet)
+	r, err := editfile.NativeClipboardRange(ctx, data, selection)
 	if err != nil {
 		return nil, errors.New("不能读取 Excel 复制区域，可用 Ctrl+Shift+V 粘贴文字。" + err.Error())
 	}

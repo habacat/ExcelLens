@@ -116,5 +116,66 @@
     return {from, until, value:value.replace(/(\$?)([A-Za-z]+)(\$?)(\d+)/g, cycle)};
   }
 
-  window.ExcelLensFormulaInput = {context, close, reference, absolute};
+
+  // Leave quoted text, sheet names and structured field captions intact.
+  function display(text) {
+    if(!text || !/_(?:xlfn|xlpm)\./i.test(text))return text;
+    const hasLet=/_xlfn\.(?:LET|LAMBDA)\s*\(/i.test(text);
+    let out='',quote='',brackets=0;
+    const token=/_(xlfn\.(?:_xlws\.)?|xlpm\.)([\p{L}_][\p{L}\p{N}_.]*)/iuy;
+    for(let i=0;i<text.length;){
+      const c=text[i];
+      if(quote){out+=c;i++;if(c===quote){if(text[i]===quote){out+=text[i++];}else quote='';}continue;}
+      if(brackets){out+=c;i++;if(c==="'"&&i<text.length)out+=text[i++];else if(c==='[')brackets++;else if(c===']')brackets--;continue;}
+      if(c==='"'||c==="'")quote=c;
+      else if(c==='[')brackets++;
+      else if(c==='_' && (i===0||!/[\p{L}\p{N}_.]/u.test(text[i-1]))){
+        token.lastIndex=i;const m=token.exec(text);
+        if(m){
+          const local=m[1].toLowerCase()==='xlpm.';
+          // SINGLE and ANCHORARRAY encode operators. Leave these intact
+          // until a full reference expression can be rendered losslessly.
+          if(local?hasLet:(/^\s*\(/.test(text.slice(token.lastIndex)) && !/^(SINGLE|ANCHORARRAY)$/i.test(m[2]))){
+            out+=m[2];i=token.lastIndex;continue;
+          }
+        }
+      }
+      out+=c;i++;
+    }
+    return out;
+  }
+
+  // Track nested structured selectors independently of quoted sheet names.
+  // A closing bracket can itself be part of an escaped column caption.
+  function columnContext(text,caret){
+    if(!text.trimStart().startsWith('='))return null;
+    const stack=[];let quote='',table='';
+    for(let i=0;i<caret;i++){
+      const c=text[i];
+      if(quote){if(c===quote){if(text[i+1]===quote)i++;else quote='';}continue;}
+      if(stack.length && c==="'"){i++;continue;}
+      if(!stack.length&&(c==='"'||c==="'")){quote=c;continue;}
+      if(c==='['){
+        if(!stack.length)table=/[\p{L}_][\p{L}\p{N}_.]*$/u.exec(text.slice(0,i))?.[0]||'';
+        stack.push(i+1);
+      }else if(c===']'&&stack.length)stack.pop();
+    }
+    if(!stack.length)return null;
+    let start=stack.at(-1);if(text[start]==='@')start++;
+    const raw=text.slice(start,caret);
+    if(raw.startsWith('#') || raw.includes('],'))return null;
+    let end=caret;
+    while(end<text.length){
+      const c=text[end];
+      if(c==="'" && /['#@\[\]]/.test(text[end+1]||' ')){end+=2;continue;}
+      if(c===']'){end++;break;}
+      if(c==='['||c===')')break;
+      end++;
+    }
+    const tail=text.slice(end);
+    const alreadyClosed=/^\]*/.exec(tail)[0].length;
+    const closures=/^[,:]/.test(tail)?1:Math.max(1,stack.length-alreadyClosed);
+    return {table,start,end,closures,prefix:raw.replace(/'(['#@\[\]])/g,'$1')};
+  }
+  window.ExcelLensFormulaInput = {context,close,reference,absolute,display,columnContext};
 })();

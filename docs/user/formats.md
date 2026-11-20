@@ -129,4 +129,4 @@ XLSX/XLSM普通及x14规则、BIFF8 DVal/Dv/CONTINUE按需读取，提供当前�
 .\upgrade-build.ps1
 ```
 
-构建脚本从 `go.mod` 读取工具链版本，运行统一项目检查、vendor 离线依赖校验、Go/Node 回归、`go vet`、PE 编译信息验证、`upx --best --lzma` 压缩和 `upx -t`。UPX 须安装并在 PATH 中；`build.ps1 -UpxExe 'D:\Tools\upx.exe'` 或 `upgrade-build.ps1 -UpxExe ...` 可指定路径。SHA256SUMS 和 ZIP 使用压缩后的 EXE，所有检查通过才替换 `release`；用户持久化数据不属于清理范围。依赖许可随发行包提供；当前验证与边界见 [当前版本说明](../releases/1.9.0.md)。
+构建脚本从 `go.mod` 读取工具链版本，运行统一项目检查、vendor 离线依赖校验、Go/Node 回归、`go vet`、PE 编译信息验证、`upx --best --lzma` 压缩和 `upx -t`。UPX 须安装并在 PATH 中；`build.ps1 -UpxExe 'D:\Tools\upx.exe'` 或 `upgrade-build.ps1 -UpxExe ...` 可指定路径。SHA256SUMS 和 ZIP 使用压缩后的 EXE，所有检查通过才替换 `release`；用户持久化数据不属于清理范围。依赖许可随发行包提供；当前验证与边界见 [当前版本入口](../../README.md)。

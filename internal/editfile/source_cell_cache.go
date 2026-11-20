@@ -11,12 +11,14 @@ import (
 // SourceCellCache holds only original cells from one digest-verified editor
 // base. Draft values, formula results and structural revisions never share it.
 type SourceCellCache struct {
-	mu      sync.Mutex
-	key     string
-	cells   map[editdoc.Address]SourceCell
-	names   map[nameKey]nameTarget
-	bytes   int
-	formats *entryFormatTable
+	mu         sync.Mutex
+	key        string
+	cells      map[editdoc.Address]SourceCell
+	names      map[nameKey]nameTarget
+	bytes      int
+	formats    *entryFormatTable
+	copyStyles *clipStyleBook
+	copyMerges map[string][]cellRect
 }
 
 func (l Layout) WithSourceCells(cache *SourceCellCache, binding string, index *CalculationBook) Layout {
@@ -33,7 +35,7 @@ func (c *SourceCellCache) read(ctx context.Context, f *workbook.EditSourceFile, 
 	c.mu.Lock()
 	if c.key != l.cacheKey {
 		c.key, c.cells, c.names, c.bytes = l.cacheKey, make(map[editdoc.Address]SourceCell), nil, 0
-		c.formats = nil
+		c.formats, c.copyStyles, c.copyMerges = nil, nil, nil
 	}
 	for _, a := range addresses {
 		if _, duplicate := result[a]; duplicate {

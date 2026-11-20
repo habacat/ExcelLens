@@ -27,9 +27,14 @@ type sheetCollectionEdit struct {
 	index                  int
 	oldPart, newPart, rid  string
 	updates                map[string][]byte
+	viewPatches            map[string][]xmlPatch
 	parts                  map[string]string
 	tableNames, pivotNames map[string]string
 	newTitles              []string
+	position               int
+	activeViews            []int
+	addView                bool
+	copyState              string
 }
 
 func (p *xlsxPackage) editSheetCollection(ctx context.Context, dst io.Writer, op editdoc.Structure) (opc.Receipt, error) {
@@ -85,6 +90,12 @@ func (p *xlsxPackage) editSheetCollection(ctx context.Context, dst io.Writer, op
 	if err != nil {
 		return opc.Receipt{}, err
 	}
+	if err = a.prepareViews(ctx, book); err != nil {
+		return opc.Receipt{}, err
+	}
+	if err = a.selectViews(ctx); err != nil {
+		return opc.Receipt{}, err
+	}
 	a.updates[workbookPart], err = a.workbook(ctx, book)
 	if err != nil {
 		return opc.Receipt{}, err
@@ -138,9 +149,9 @@ func (p *xlsxPackage) editSheetCollection(ctx context.Context, dst io.Writer, op
 		}
 	}
 	if op.Kind == "deleteSheet" {
-		return p.writeSheetDeletion(ctx, dst, a.updates)
+		return p.writeSheetDeletion(ctx, dst, a.updates, a.viewPatches)
 	}
-	return p.writeValueStructure(ctx, dst, a.updates)
+	return p.writePatchedValueStructure(ctx, dst, a.updates, a.viewPatches)
 }
 
 func appendXML(ctx context.Context, raw []byte, parent, child string) ([]byte, error) {
@@ -232,7 +243,7 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 	var ps []xmlPatch
 	var start xmlEvent
 	var text strings.Builder
-	var sheetIndex, maxID, visible int
+	var sheetIndex, maxID, visible, viewIndex int
 	var copies []string
 	localNames := map[string]bool{}
 	if a.op.Kind == "copySheet" {
@@ -259,6 +270,7 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 		maxID = max(maxID, v)
 	}
 	var scope int
+	var views xmlEvent
 	err := walkXML(ctx, raw, func(e xmlEvent) error {
 		switch t := e.token.(type) {
 		case xml.StartElement:
@@ -275,21 +287,38 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 				if sheetIndex == a.index {
 					ridOld = attribute(t, relationNS, "id")
 				}
+			case "bookViews":
+				if e.parent() == "workbook" && t.Name.Space == mainNS {
+					views = e
+				}
+			case "sheets":
+				if a.addView && views.to == 0 {
+					node := fmt.Sprintf(`<bookViews xmlns="%s"><workbookView activeTab="%d"/></bookViews>`, mainNS, a.activeViews[0])
+					ps = append(ps, xmlPatch{e.from, e.from, node})
+				}
 			case "workbookView":
-				for _, key := range []string{"activeTab", "firstSheet"} {
-					s := attribute(t, "", key)
-					if s == "" {
-						continue
+				if viewIndex >= len(a.activeViews) {
+					return ErrXLSX
+				}
+				desired := strconv.Itoa(a.activeViews[viewIndex])
+				viewIndex++
+				if attribute(t, "", "activeTab") != desired {
+					ap, err := setXMLAttribute(raw, e.from, e.to, "activeTab", desired)
+					if err != nil {
+						return err
 					}
+					ps = append(ps, ap...)
+				}
+				if s := attribute(t, "", "firstSheet"); s != "" {
 					v, _ := strconv.Atoi(s)
 					if drop && v > a.index {
 						v--
 					} else if drop && v == a.index {
 						v = min(v, len(a.p.layout.Sheets)-2)
-					} else if !drop && v > a.index {
+					} else if !drop && v >= a.position {
 						v++
 					}
-					ap, err := setXMLAttribute(raw, e.from, e.to, key, strconv.Itoa(max(0, v)))
+					ap, err := setXMLAttribute(raw, e.from, e.to, "firstSheet", strconv.Itoa(max(0, v)))
 					if err != nil {
 						return err
 					}
@@ -308,14 +337,25 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 				text.Write(t)
 			}
 		case xml.EndElement:
+			if a.addView && e.parent() == "workbook" && t.Name == (xml.Name{Space: mainNS, Local: "bookViews"}) {
+				child := fmt.Sprintf(`<workbookView xmlns="%s" activeTab="%d"/>`, mainNS, a.activeViews[0])
+				if e.from == e.to {
+					ps = append(ps, xmlPatch{views.to - 2, views.to, ">" + child + closingTag(raw[views.from:views.to])})
+				} else {
+					ps = append(ps, xmlPatch{e.from, e.from, child})
+				}
+			}
 			if e.local() == "sheet" {
-				if sheetIndex == a.index {
-					if drop {
-						ps = append(ps, xmlPatch{start.from, e.to, ""})
-					} else {
-						node := fmt.Sprintf("<sheet xmlns=\"%s\" xmlns:r=\"%s\" name=\"%s\" sheetId=\"%d\" r:id=\"%s\"/>", mainNS, relationNS, escapedXML(a.op.Name), maxID+1, a.rid)
-						ps = append(ps, xmlPatch{e.to, e.to, node})
+				if drop && sheetIndex == a.index {
+					ps = append(ps, xmlPatch{start.from, e.to, ""})
+				}
+				if !drop && sheetIndex+1 == a.position {
+					state := ""
+					if a.copyState == "hidden" || a.copyState == "veryHidden" {
+						state = " state=\"" + a.copyState + "\""
 					}
+					node := fmt.Sprintf(`<sheet xmlns="%s" xmlns:r="%s" name="%s" sheetId="%d" r:id="%s"%s/>`, mainNS, relationNS, escapedXML(a.op.Name), maxID+1, a.rid, state)
+					ps = append(ps, xmlPatch{e.to, e.to, node})
 				}
 				sheetIndex++
 			}
@@ -324,7 +364,7 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 					ps = append(ps, xmlPatch{start.from, e.to, ""})
 					return nil
 				}
-				if scope > a.index {
+				if drop && scope > a.index || !drop && scope >= a.position {
 					n := scope + 1
 					if drop {
 						n = scope - 1
@@ -358,7 +398,7 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 					}
 
 					tag := raw[start.from:start.to]
-					ap, err := setXMLAttribute(tag, 0, len(tag), "localSheetId", strconv.Itoa(a.index+1))
+					ap, err := setXMLAttribute(tag, 0, len(tag), "localSheetId", strconv.Itoa(a.position))
 					if err != nil {
 						return err
 					}
