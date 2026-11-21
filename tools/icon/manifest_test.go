@@ -87,6 +87,17 @@ func TestIconTreeKeepsAllImagesAndEmbedsNeutralManifest(t *testing.T) {
 	if err := writeCOFF(object, resources, relocs); err != nil {
 		t.Fatal(err)
 	}
+	want, err := os.ReadFile(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tracked, err := os.ReadFile("../../cmd/excellens/rsrc_windows_amd64.syso")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(tracked, want) {
+		t.Fatal("tracked Windows resource differs from the current version, manifest or icon; run go run ./tools/icon and commit the regenerated resource")
+	}
 	file, err := pe.Open(object)
 	if err != nil {
 		t.Fatal(err)

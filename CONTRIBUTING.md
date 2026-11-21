@@ -46,7 +46,7 @@ Windows竞态检查出现初始化分配失败、错误87，或需要指定MinGW
 
 ## 发布
 
-1. 修改 `internal/buildinfo/version.go`，同步 README 当前标题，在 `docs/releases/<版本>.md` 记录变更及验证；历史报告保留原版本。
+1. 修改 `internal/buildinfo/version.go` 后执行 `go run ./tools/icon`，一并提交重建的 Windows 资源。同步 README 当前标题，在 `docs/releases/<版本>.md` 记录变更及验证；历史报告保留原版本。
 2. 执行 `build.ps1` 或 `upgrade-build.ps1`。构建脚本从唯一版本源、`go.mod` 和发布清单读取配置；先通过全部检查，再构建、检查 PE、UPX 压缩与校验、逐文件核对 ZIP。
 3. 候选核验使用 `build.ps1 -StageOnly`。完整检查结果写入 `validation/<版本>/private/candidate-check.json`，同版本正式发行的检查收据继续对应正式源码。PE、UPX 和 ZIP 核验通过后，完整候选包位于 `artifacts/<版本>-verified-*`。普通构建全部成功后才原子替换 `release/`。正在运行旧版时会保留已验证包，用户退出托盘后可继续发布。
 4. 不自动提交、推送或公开发布。源码交付需与指定 Git 提交一致；工作树未提交时不能宣称源码包等于 HEAD。

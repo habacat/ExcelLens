@@ -3,7 +3,7 @@
   "AGENTS.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
-  "validation/1.12.0/workflow-verification.json",
+  "validation/{version}/workflow-verification.json",
   "go.mod",
   "NOTICE.md",
   "LICENSE",
