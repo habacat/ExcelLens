@@ -60,7 +60,7 @@ if ($TaggedRelease) {
     $headCommit = (& git rev-parse --verify HEAD | Out-String).Trim()
     Assert-Succeeded 'Resolve build checkout'
     if ($headCommit -ne $taggedCommit) { throw "Build checkout must match $releaseTag." }
-    $pythonExe = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+    $pythonExe = (Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 }
 
 # Never silently use an older compiler or pull code dependencies over the network.
@@ -73,7 +73,7 @@ $env:GOFLAGS = '-mod=vendor'
 [Environment]::SetEnvironmentVariable('GOARCH', $null, 'Process')
 
 Write-Host '[1/8] Checking Go compiler, UPX and dependencies...'
-$upxCommand = Get-Command -Name $UpxExe -CommandType Application -ErrorAction Stop
+$upxCommand = Get-Command -Name $UpxExe -CommandType Application -ErrorAction Stop | Select-Object -First 1
 $UpxExe = $upxCommand.Source
 $upxVersionText = (& $UpxExe --version | Out-String).Trim()
 Assert-Succeeded 'upx --version'

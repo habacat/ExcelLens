@@ -3,4 +3,4 @@ package buildinfo
 
 // Version is the only maintained application version. Historical release
 // reports retain their original versions; scripts must read this constant.
-const Version = "1.12.1"
+const Version = "1.12.2"

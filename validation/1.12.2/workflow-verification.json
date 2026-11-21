@@ -1,0 +1,103 @@
+{
+  "version": "1.12.2",
+  "result": "PASS",
+  "scope": "Synthetic and public fixtures through the local application, with independent artifact checks",
+  "alignment": {
+    "indexedDataRowsPerWorkbook": 25000,
+    "expectedChanges": {
+      "addedRows": 1,
+      "removedRows": 1,
+      "relativeMoves": 1,
+      "changedExistingCells": 1
+    },
+    "bothCoordinatesChecked": true,
+    "formulaTypeCacheAndDuplicateKeyCases": "Go HTTP regression"
+  },
+  "replayRules": {
+    "2": {
+      "equal": 1,
+      "withinTolerance": 2,
+      "different": 1,
+      "exactNonzeroDeltas": [
+        "0.009",
+        "0.01",
+        "0.011"
+      ]
+    },
+    "1": {
+      "equal": 1,
+      "withinTolerance": 0,
+      "different": 3,
+      "exactNonzeroDeltas": [
+        "0.009",
+        "0.01",
+        "0.011"
+      ]
+    }
+  },
+  "ods": {
+    "independentSourceCells": 92,
+    "samples": [
+      "Gnumeric ODS without styles",
+      "Gnumeric OpenOffice groups",
+      "native Excel ODS"
+    ]
+  },
+  "printing": {
+    "range": {
+      "pages": 2,
+      "detailRows": 47
+    },
+    "book": {
+      "pages": 8,
+      "detailRows": 126
+    }
+  },
+  "notesAndWhatIf": {
+    "nativeExcelVersion": "16.0",
+    "oldNoteGeometryAndAuthorPreserved": true,
+    "reopenedGeneratedCopy": true,
+    "goalSeek": [
+      10.0,
+      30.0
+    ],
+    "twoInputPoints": [
+      [
+        1,
+        3,
+        3.0
+      ],
+      [
+        1,
+        4,
+        4.0
+      ],
+      [
+        2,
+        3,
+        6.0
+      ],
+      [
+        2,
+        4,
+        8.0
+      ]
+    ]
+  },
+  "clipboard": {
+    "tsvRows": 501,
+    "exportedRangeRows": 2101,
+    "clipboardReceiver": "isolated browser receiver"
+  },
+  "coverageLimits": [
+    "WPS and manual desktop operation not exercised",
+    "Headless checks use the application server and embedded UI through tools/uiprobe"
+  ],
+  "windowsResource": {
+    "checks": [
+      "previous resource rejected",
+      "current tracked resource matches a fresh generation byte for byte"
+    ],
+    "sha256": "2d5433452c02ef0ca80f41873638a7a8fb8a090b892e59aa93f165df900fb6b1"
+  }
+}

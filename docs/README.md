@@ -69,6 +69,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.12.2.md](releases/1.12.2.md) | 正式双包与多工具路径兼容 |
 | [releases/1.12.1.md](releases/1.12.1.md) | 1.12 核查工作流和资源一致性正式包 |
 | [releases/1.12.0.md](releases/1.12.0.md) | 主键版本比较、金额容差、ODS、分页与批注 |
 | [releases/1.8.19.md](releases/1.8.19.md) | 1.8.19的功能汇总、验证及构建结果 |
