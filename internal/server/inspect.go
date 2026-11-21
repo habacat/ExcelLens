@@ -144,3 +144,31 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 		"truncated": result.Truncated, "durationMs": time.Since(started).Milliseconds(),
 	})
 }
+
+func (a *App) registerInspectionRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/catalogue/start", a.handleCatalogueStart)
+	mux.HandleFunc("/api/catalogue/status", a.handleCatalogueStatus)
+	mux.HandleFunc("/api/catalogue/cancel", a.handleCatalogueCancel)
+	mux.HandleFunc("/api/catalogue/clear", a.handleCatalogueClear)
+	mux.HandleFunc("/api/catalogue/items", a.handleCatalogueItems)
+	mux.HandleFunc("/api/catalogue/detail", a.handleCatalogueDetail)
+	mux.HandleFunc("/api/catalogue/resolve", a.handleCatalogueResolve)
+	mux.HandleFunc("/api/data-rules/start", a.handleDataRuleStart)
+	mux.HandleFunc("/api/data-rules/status", a.handleDataRuleStatus)
+	mux.HandleFunc("/api/data-rules/cancel", a.handleDataRuleCancel)
+	mux.HandleFunc("/api/data-rules/clear", a.handleDataRuleClear)
+	mux.HandleFunc("/api/data-rules/items", a.handleDataRuleItems)
+	mux.HandleFunc("/api/data-rules/detail", a.handleDataRuleDetail)
+	mux.HandleFunc("/api/data-rules/resolve", a.handleDataRuleResolve)
+	mux.HandleFunc("/api/printing/start", a.handlePrintStart)
+	mux.HandleFunc("/api/printing/status", a.handlePrintStatus)
+	mux.HandleFunc("/api/printing/cancel", a.handlePrintCancel)
+	mux.HandleFunc("/api/printing/clear", a.handlePrintClear)
+	mux.HandleFunc("/api/printing/summary", a.handlePrintSummary)
+	mux.HandleFunc("/api/printing/page", a.handlePrintPage)
+	mux.HandleFunc("/api/calculator/evaluate", a.handleCalculatorEvaluate)
+	mux.HandleFunc("/api/calculator/formula", a.handleCalculatorFormula)
+	mux.HandleFunc("/api/calculator/functions", a.handleCalculatorFunctions)
+	mux.HandleFunc("/api/calculator/capture", a.handleCalculatorCapture)
+	mux.HandleFunc("/api/calculator/history", a.handleCalculatorHistory)
+}

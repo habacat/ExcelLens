@@ -33,7 +33,7 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 		return nil, err
 	}
 	defer f.Close()
-	calc, err := a.calculationFor(ctx, doc, layout, f)
+	calc, err := a.edits.calculationFor(ctx, doc, layout, f)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func (a *App) handleEditBase(w http.ResponseWriter, r *http.Request, req editReq
 		editError(w, err)
 		return
 	}
-	if sourceBookID(wb) != base.Source.Book || !a.installWorkbook(wb, "", expected, true) {
+	if sourceBookID(wb) != base.Source.Book || !a.installWorkbook(wb, expected, true) {
 		editError(w, checkpoint.ErrConflict)
 		return
 	}

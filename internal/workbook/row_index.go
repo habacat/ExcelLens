@@ -8,6 +8,7 @@ import (
 	"iter"
 	"os"
 	"runtime"
+	"sort"
 )
 
 // MaxResidentRowOffsets limits the heap used by a published worksheet index.
@@ -18,6 +19,8 @@ const diskRowOffsetBytes = 20
 // RowIndex provides the same read-only row positions for both storage modes.
 // A mapped prefix retains its owner so collection cannot unmap a live view.
 type RowIndex struct {
+	odsRuns  []odsRowSpan
+	odsCount int
 	resident []RowOffset
 	records  []byte
 	mapping  *mappedRowIndex
@@ -67,13 +70,28 @@ func indexRowsStart(dimension string) int { return 8 + 4 + len(dimension) + 4 + 
 func (idx *RowIndex) RowsMapped() bool { return idx.mapping != nil }
 
 func (idx *RowIndex) RowCount() int {
+	if idx.odsRuns != nil {
+		return idx.odsCount
+	}
 	if idx.RowsMapped() {
 		return len(idx.records) / diskRowOffsetBytes
 	}
 	return len(idx.resident)
 }
 
+func (idx *RowIndex) odsRunAt(i int) odsRowSpan {
+	at := sort.Search(len(idx.odsRuns), func(j int) bool { return idx.odsRuns[j].Position+idx.odsRuns[j].Count > i })
+	return idx.odsRuns[at]
+}
+
 func (idx *RowIndex) RowAt(i int) RowOffset {
+	if idx.odsRuns != nil {
+		if i < 0 || i >= idx.odsCount {
+			panic("row index out of range")
+		}
+		r := idx.odsRunAt(i)
+		return RowOffset{Number: r.First + i - r.Position, Start: r.Start, End: r.End}
+	}
 	if !idx.RowsMapped() {
 		return idx.resident[i]
 	}
@@ -101,6 +119,10 @@ func (idx *RowIndex) RowOffsets() iter.Seq2[int, RowOffset] {
 // worksheet metadata and shared formulas. Both storage modes share their data.
 func (idx SheetIndex) FirstRows(limit int) *SheetIndex {
 	count := max(0, min(limit, idx.RowCount()))
+	if idx.odsRuns != nil {
+		idx.odsCount = count
+		return &idx
+	}
 	if idx.RowsMapped() {
 		end := count * diskRowOffsetBytes
 		idx.records = idx.records[:end:end]

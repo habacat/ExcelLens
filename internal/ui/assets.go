@@ -33,20 +33,21 @@ func Index(token string) ([]byte, error) {
 			CellRuns int `json:"cellRuns"`
 			ViewRuns int `json:"viewRuns"`
 		} `json:"richText"`
-		Clipboard       formats.ClipboardLimits        `json:"clipboard"`
-		Printing        formats.PrintingLimits         `json:"printing"`
-		Record          formats.RecordCardLimits       `json:"record"`
-		CellExplanation formats.CellExplanationLimits  `json:"cellExplanation"`
-		Profile         formats.ProfileLimits          `json:"profile"`
-		Clustering      formats.ClusteringLimits       `json:"clustering"`
-		Composition     formats.CompositionLimits      `json:"composition"`
-		SelectionQuick  formats.SelectionQuickLimits   `json:"selectionQuick"`
-		ChartExport     formats.ChartExportLimits      `json:"chartExport"`
-		Transpose       formats.TransposeLimits        `json:"transpose"`
-		Snapshots       formats.SnapshotLimits         `json:"snapshots"`
-		Editing         formats.EditLimits             `json:"editing"`
-		RelationExports []formats.RelationExportOption `json:"relationExports"`
-		TaskRecovery    struct {
+		Clipboard            formats.ClipboardLimits        `json:"clipboard"`
+		ReconcileRecordBytes int                            `json:"reconcileRecordBytes"`
+		Printing             formats.PrintingLimits         `json:"printing"`
+		Record               formats.RecordCardLimits       `json:"record"`
+		CellExplanation      formats.CellExplanationLimits  `json:"cellExplanation"`
+		Profile              formats.ProfileLimits          `json:"profile"`
+		Clustering           formats.ClusteringLimits       `json:"clustering"`
+		Composition          formats.CompositionLimits      `json:"composition"`
+		SelectionQuick       formats.SelectionQuickLimits   `json:"selectionQuick"`
+		ChartExport          formats.ChartExportLimits      `json:"chartExport"`
+		Transpose            formats.TransposeLimits        `json:"transpose"`
+		Snapshots            formats.SnapshotLimits         `json:"snapshots"`
+		Editing              formats.EditLimits             `json:"editing"`
+		RelationExports      []formats.RelationExportOption `json:"relationExports"`
+		TaskRecovery         struct {
 			Tasks int `json:"tasks"`
 		} `json:"taskRecovery"`
 		Catalogue struct {
@@ -67,19 +68,20 @@ func Index(token string) ([]byte, error) {
 			CellRuns int `json:"cellRuns"`
 			ViewRuns int `json:"viewRuns"`
 		}{formats.MaxCellRichRuns, formats.RichViewRuns},
-		Clipboard:       formats.Clipboard(),
-		Printing:        formats.Printing(),
-		Record:          formats.RecordCard(),
-		CellExplanation: formats.CellExplanation(),
-		Profile:         formats.Profile(),
-		Clustering:      formats.Clustering(),
-		Composition:     formats.Composition(),
-		SelectionQuick:  formats.SelectionQuick(),
-		ChartExport:     formats.ChartExport(),
-		Transpose:       formats.Transpose(),
-		Snapshots:       formats.Snapshots(),
-		Editing:         formats.Editing(),
-		RelationExports: formats.RelationExports(),
+		Clipboard:            formats.Clipboard(),
+		ReconcileRecordBytes: formats.ReconcileRecordBytes,
+		Printing:             formats.Printing(),
+		Record:               formats.RecordCard(),
+		CellExplanation:      formats.CellExplanation(),
+		Profile:              formats.Profile(),
+		Clustering:           formats.Clustering(),
+		Composition:          formats.Composition(),
+		SelectionQuick:       formats.SelectionQuick(),
+		ChartExport:          formats.ChartExport(),
+		Transpose:            formats.Transpose(),
+		Snapshots:            formats.Snapshots(),
+		Editing:              formats.Editing(),
+		RelationExports:      formats.RelationExports(),
 		TaskRecovery: struct {
 			Tasks int `json:"tasks"`
 		}{formats.CheckpointTasks},

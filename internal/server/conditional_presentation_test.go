@@ -178,7 +178,7 @@ func TestConditionalFormattedXLSXPublishesProvenSnapshotAndRejectsMissingFormula
 			JobID string `json:"jobId"`
 		}](t, featureCall(t, a, "POST", "/api/export/start", fmt.Sprintf(`{"scope":"selection","sheet":"Data","start":%q,"end":%q,"format":"xlsx","mode":"values","styles":true}`, tc.start, tc.end)))
 		a.mu.RLock()
-		job := a.exportJobs[started.JobID]
+		job := a.exports[started.JobID]
 		a.mu.RUnlock()
 		if job == nil {
 			t.Fatal("missing export")

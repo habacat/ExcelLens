@@ -124,7 +124,7 @@ func TestCompositionAnalysisMixedFormatsTraceDetailsAndRetainAfterTaskClear(t *t
 	}
 	export := decodeResponse[struct{ JobID string }](t, reconcilePost(t, a, "/api/analysis/issues/export", map[string]any{"jobId": job.ID}))
 	a.mu.RLock()
-	exportJob := a.exportJobs[export.JobID]
+	exportJob := a.exports[export.JobID]
 	a.mu.RUnlock()
 	if exportJob == nil {
 		t.Fatal("issue export task missing")
@@ -252,7 +252,7 @@ func TestCompositionAnalysisIssueExportSurvivesClearedOwnersAndRemovedAttachment
 	}
 	release()
 	a.mu.RLock()
-	export := a.exportJobs[response.JobID]
+	export := a.exports[response.JobID]
 	a.mu.RUnlock()
 	select {
 	case <-export.done:

@@ -37,6 +37,9 @@ func (w *Workbook) BuildIndex(meta SheetMeta, progress func(done, total int64, s
 	case <-cancel:
 		return nil, errors.New("index cancelled")
 	}
+	if w.Format == "ods" {
+		return w.buildODSIndex(meta, progress, cancel)
+	}
 	if w.source != nil {
 		return w.buildExternalIndex(meta, progress, cancel)
 	}

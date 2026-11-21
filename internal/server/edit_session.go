@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"excellens/internal/checkpoint"
@@ -15,6 +17,46 @@ import (
 	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
+
+// Each tab has one verified layout and original-cell cache. Calculation
+// revisions are immutable after publication and shared across the process.
+type editController struct {
+	mu       sync.RWMutex
+	binding  string
+	checked  editfile.XLSXLayout
+	cells    *editfile.SourceCellCache
+	revision *atomic.Pointer[editCalculationCache]
+}
+
+func newEditController() editController {
+	return editController{revision: new(atomic.Pointer[editCalculationCache])}
+}
+
+func (e *editController) releaseBinding() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.checked, e.binding, e.cells = editfile.XLSXLayout{}, "", nil
+}
+
+func (e *editController) rememberLayout(binding string, checked editfile.XLSXLayout) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.checked, e.binding = checked, binding
+}
+
+func (e *editController) withSourceCells(layout editfile.Layout, doc *editdoc.Document) editfile.Layout {
+	var index *editfile.CalculationBook
+	if entry := e.revision.Load(); entry != nil && entry.stamp == doc.Base.Source.Stamp {
+		index = entry.book
+	}
+	e.mu.Lock()
+	if e.cells == nil {
+		e.cells = new(editfile.SourceCellCache)
+	}
+	cells := e.cells
+	e.mu.Unlock()
+	return layout.WithSourceCells(cells, doc.Binding+"/"+doc.Base.Source.Stamp, index)
+}
 
 func editDirectory(subdir string) (string, error) {
 	base, err := os.UserConfigDir()
@@ -40,13 +82,13 @@ func openEditOutputs() (*editfile.Outputs, error) {
 	return editfile.OpenOutputs(dir)
 }
 
-func (a *App) documentEditLayout(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile) (editfile.Layout, error) {
+func (e *editController) documentEditLayout(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile) (editfile.Layout, error) {
 	if layout.XLSX == nil {
 		return layout, nil
 	}
-	a.mu.RLock()
-	cached, key := a.checkedEditLayout, a.editLayoutBinding
-	a.mu.RUnlock()
+	e.mu.RLock()
+	cached, key := e.checked, e.binding
+	e.mu.RUnlock()
 	binding := doc.Binding + "/" + doc.Base.Source.Stamp
 	if key == binding && cached.GridEditing {
 		layout.XLSX = &cached
@@ -67,9 +109,7 @@ func (a *App) documentEditLayout(ctx context.Context, doc *editdoc.Document, lay
 	if err != nil {
 		return layout, err
 	}
-	a.mu.Lock()
-	a.checkedEditLayout, a.editLayoutBinding = updated, binding
-	a.mu.Unlock()
+	e.rememberLayout(binding, updated)
 	layout.XLSX = &updated
 	return layout, nil
 }
@@ -141,9 +181,7 @@ func (a *App) startEdit(ctx context.Context, store *checkpoint.Store, book strin
 	base := editdoc.Base{Source: checkpoint.Source{Path: path, Book: book, Fingerprint: wb.Fingerprint, Format: format, Source: format, Stamp: proof}, Name: workbookDisplayName(wb), Layout: data}
 	entry, err := retryCheckpointBusy(ctx, func() (editdoc.Entry, error) { return editdoc.Create(ctx, store, base) })
 	if err == nil && layout.XLSX != nil {
-		a.mu.Lock()
-		a.checkedEditLayout, a.editLayoutBinding = *layout.XLSX, entry.Binding+"/"+proof
-		a.mu.Unlock()
+		a.edits.rememberLayout(entry.Binding+"/"+proof, *layout.XLSX)
 	}
 	return entry.Key, err
 }

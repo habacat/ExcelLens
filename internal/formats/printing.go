@@ -3,6 +3,8 @@ package formats
 // Browser limits use the same source and physical-page contract as the server.
 // DOMPixels bounds actual CSS layout before any screen-zoom transform.
 type PrintingLimits struct {
+	OutputPages   int   `json:"outputPages"`
+	OutputBytes   int   `json:"outputBytes"`
 	Pages         int   `json:"pages"`
 	Rows          int   `json:"rows"`
 	Columns       int   `json:"columns"`
@@ -19,5 +21,5 @@ type PrintingLimits struct {
 }
 
 func Printing() PrintingLimits {
-	return PrintingLimits{PrintPaginationPages, PrintPreviewPageRows, PrintPreviewPageColumns, PrintPreviewPageCells, PrintPaginationAreas, PrintPaginationParts, PrintPreviewPageBytes, PrintPreviewRequestBytes, PrintNoticeCount, PrintPreviewDOMPixels, PrintGeometryUnitsPerPoint, PrintFirstPageMin, PrintFirstPageMax}
+	return PrintingLimits{250, 64 << 20, PrintPaginationPages, PrintPreviewPageRows, PrintPreviewPageColumns, PrintPreviewPageCells, PrintPaginationAreas, PrintPaginationParts, PrintPreviewPageBytes, PrintPreviewRequestBytes, PrintNoticeCount, PrintPreviewDOMPixels, PrintGeometryUnitsPerPoint, PrintFirstPageMin, PrintFirstPageMax}
 }

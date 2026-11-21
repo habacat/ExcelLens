@@ -86,7 +86,7 @@ func TestRelationTasksActualReverseMillionAndFullBIFFCompleteCSVAfterOwnerClear(
 			release := holdRelationSlots(t, a.exportSem)
 			response := decodeResponse[struct{ JobID string }](t, reconcilePost(t, a, "/api/relation/export", map[string]any{"jobId": root.ID, "mode": "left", "maximum": strconv.FormatInt(records+1, 10), "protectCSV": false}))
 			a.mu.RLock()
-			export := a.exportJobs[response.JobID]
+			export := a.exports[response.JobID]
 			a.mu.RUnlock()
 			clearRelation(t, a, root.ID)
 			if relationUsed(a) <= 0 || kind == "csv" && !workbook.QueryFilesInUse(queryDir) {

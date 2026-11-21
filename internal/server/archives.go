@@ -230,7 +230,7 @@ func (a *App) runArchiveOpen(ctx context.Context, view *archiveView, id int, job
 			wb.SetDisplayName(filepath.Base(member.Name))
 			decorateArchiveWorkbook(wb, view, member)
 			wb.ArchiveOrigin = &workbook.ArchiveOrigin{Path: view.rootPath, Name: view.rootName, Member: member.Name, MemberID: id, Chain: append([]archiveHop(nil), view.chain...), Partial: member.Incomplete}
-			a.replaceWorkbook(wb, path)
+			a.replaceWorkbook(wb)
 			result = map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": wb.DisplayName, "fileSize": fileSize, "sheets": wb.Sheets, "activeTab": wb.ActiveTab, "source": wb.SourceInfo, "archive": summarizeArchive(view)}
 		}
 		a.archiveMu.Unlock()
@@ -359,7 +359,7 @@ func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) error {
 	wb.SetDisplayName(item.Name)
 	decorateArchiveWorkbook(wb, view, m)
 	wb.ArchiveOrigin = &workbook.ArchiveOrigin{Path: item.ArchivePath, Name: item.ArchiveName, Member: m.Name, MemberID: id, Chain: append([]archiveHop(nil), view.chain...), Partial: m.Incomplete}
-	a.replaceWorkbook(wb, path)
+	a.replaceWorkbook(wb)
 	return nil
 }
 

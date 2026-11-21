@@ -189,7 +189,7 @@ func TestReconcileScaleRealSources(t *testing.T) {
 	measure("full-csv", func() <-chan struct{} {
 		started := decodeResponse[struct{ JobID string }](t, reconcilePost(t, a, "/api/reconcile/export", map[string]any{"jobId": job.ID, "protectCSV": false}))
 		a.mu.RLock()
-		exportJob = a.exportJobs[started.JobID]
+		exportJob = a.exports[started.JobID]
 		a.mu.RUnlock()
 		return exportJob.done
 	})

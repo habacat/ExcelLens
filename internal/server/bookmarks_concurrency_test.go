@@ -37,7 +37,7 @@ func TestBookmarksSerializeWritesAcrossBrowserApps(t *testing.T) {
 	first := &gatedBookmarkBody{Reader: strings.NewReader(`{"action":"save","sheet":"First","ref":"A1","note":"first tab"}`), entered: entered, release: release}
 	call := func(app *App, body io.Reader) *httptest.ResponseRecorder {
 		req := httptest.NewRequest("POST", "/api/bookmarks", body)
-		req.RemoteAddr = "127.0.0.1:1234"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		out := httptest.NewRecorder()
 		app.Handler().ServeHTTP(out, req)

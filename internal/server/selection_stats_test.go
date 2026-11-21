@@ -126,7 +126,7 @@ func TestSelectionStatsFilterFrozenHeaderAndSortedOrder(t *testing.T) {
 	for _, tc := range cases {
 		if tc.total < 0 {
 			req := httptest.NewRequest(http.MethodPost, "/api/selection/stats", strings.NewReader(tc.body))
-			req.RemoteAddr = "127.0.0.1:777"
+			req = localTestConnection(req)
 			req.Header.Set("X-ExcelLens-Token", a.token)
 			out := httptest.NewRecorder()
 			a.Handler().ServeHTTP(out, req)
@@ -162,7 +162,7 @@ func TestSelectionStatsRejectsInvalidWithoutReading(t *testing.T) {
 		`{"sheet":"First","filterId":"missing","ranges":[{"start":"A1","end":"A1","visualStart":1,"visualEnd":1}]}`,
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/api/selection/stats", strings.NewReader(body))
-		req.RemoteAddr = "127.0.0.1:777"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", a.token)
 		out := httptest.NewRecorder()
 		a.Handler().ServeHTTP(out, req)

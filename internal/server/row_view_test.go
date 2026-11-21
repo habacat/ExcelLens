@@ -81,7 +81,7 @@ func waitRowView(t *testing.T, a *App, job *rowViewTask, status string) string {
 func rowViewCall(t *testing.T, a *App, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", a.token)
 	out := httptest.NewRecorder()
 	a.Handler().ServeHTTP(out, req)

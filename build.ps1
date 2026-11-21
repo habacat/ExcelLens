@@ -5,7 +5,8 @@ param(
     [string]$GoExe = 'go',
     [string]$UpxExe = 'upx',
     [string]$DeliveryRoot = '',
-    [switch]$StageOnly
+    [switch]$StageOnly,
+    [switch]$TaggedRelease
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -19,6 +20,7 @@ $moduleSource = Get-Content -LiteralPath (Join-Path $Root 'go.mod') -Raw
 if ($moduleSource -notmatch '(?m)^go ([0-9.]+)\s*$') { throw 'Go toolchain version is missing.' }
 $RequiredGo = 'go' + $Matches[1]
 $ValidationDir = Join-Path $Root ('validation/' + $Version)
+$CheckReport = if ($StageOnly) { Join-Path $ValidationDir 'private/candidate-check.json' } else { Join-Path $ValidationDir 'check.json' }
 $PackageRoot = $Root
 if ($DeliveryRoot) {
     $destination = Get-Item -LiteralPath $DeliveryRoot -ErrorAction Stop
@@ -49,6 +51,16 @@ foreach ($releasePath in @($ReleaseDir, $StageDir, $BackupDir)) {
 function Assert-Succeeded {
     param([string]$Description)
     if ($LASTEXITCODE -ne 0) { throw "$Description failed (exit code $LASTEXITCODE)." }
+}
+
+if ($TaggedRelease) {
+    $releaseTag = 'v' + $Version
+    $taggedCommit = (& git rev-parse --verify ($releaseTag + '^{commit}') | Out-String).Trim()
+    Assert-Succeeded 'Resolve release tag'
+    $headCommit = (& git rev-parse --verify HEAD | Out-String).Trim()
+    Assert-Succeeded 'Resolve build checkout'
+    if ($headCommit -ne $taggedCommit) { throw "Build checkout must match $releaseTag." }
+    $pythonExe = (Get-Command python -CommandType Application -ErrorAction Stop).Source
 }
 
 # Never silently use an older compiler or pull code dependencies over the network.
@@ -95,7 +107,7 @@ if (!(Test-Path -LiteralPath (Join-Path $Root 'vendor/modules.txt'))) {
 Assert-Succeeded 'offline vendored dependency validation'
 
 Write-Host '[2/8] Running the shared project quality gate...'
-& $GoExe run ./tools/project check -report (Join-Path $ValidationDir 'check.json')
+& $GoExe run ./tools/project check -report $CheckReport
 Assert-Succeeded 'project check'
 
 Write-Host '[3/8] Go, Node, package boundaries, metadata and documentation checks passed.'
@@ -107,6 +119,16 @@ Assert-Succeeded 'icon and manifest resource generation'
 New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 try {
     Write-Host '[5/8] Building and inspecting new Windows x64 executable...'
+    if ($TaggedRelease) {
+        # The icon generator has run. Include its tracked Windows resource,
+        # embedded assets and untracked inputs in the build provenance check.
+        $inputs = @('cmd','internal','vendor','tools','go.mod','go.sum','build.ps1')
+        & git diff --quiet $taggedCommit -- @inputs
+        Assert-Succeeded "Check tracked build inputs against $releaseTag"
+        $extras = @(& git ls-files --others --exclude-standard -- @inputs)
+        Assert-Succeeded 'Check for untracked build inputs'
+        if ($extras.Count) { throw "Build inputs include files outside $releaseTag." }
+    }
     $env:GOOS = 'windows'
     $env:GOARCH = 'amd64'
     $env:CGO_ENABLED = '0'
@@ -186,6 +208,10 @@ try {
     } finally { $package.Dispose() }
 
     Write-Host '[8/8] Finalizing the verified package...'
+    if ($TaggedRelease) {
+        & $pythonExe (Join-Path $Root 'tools/qa/verify_release.py') $Version --finalize --ref $taggedCommit --dir $StageDir
+        Assert-Succeeded 'Verify tagged source, Windows archive and checksums before delivery'
+    }
     # Do not replace an executable that is still running.
     $running = @(Get-Process -Name 'ExcelLens' -ErrorAction SilentlyContinue).Count -gt 0
     if ($StageOnly -or $running) {

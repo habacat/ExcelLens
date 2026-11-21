@@ -82,7 +82,7 @@ func TestImageEndpointAuthAndBytes(t *testing.T) {
 		t.Fatalf("unsafe media src %s", src)
 	}
 	raw := httptest.NewRequest("GET", src, nil)
-	raw.RemoteAddr = "127.0.0.1:6000"
+	raw = localTestConnection(raw)
 	content := httptest.NewRecorder()
 	a.Handler().ServeHTTP(content, raw)
 	if content.Code != 200 || content.Header().Get("Content-Type") != "image/png" || !strings.HasPrefix(content.Body.String(), "\x89PNG") {
@@ -101,7 +101,7 @@ func TestImageEndpointAuthAndBytes(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", c.uri, nil)
-			req.RemoteAddr = "127.0.0.1:6000"
+			req = localTestConnection(req)
 			r := httptest.NewRecorder()
 			a.Handler().ServeHTTP(r, req)
 			if r.Code != c.status {
@@ -110,14 +110,14 @@ func TestImageEndpointAuthAndBytes(t *testing.T) {
 		})
 	}
 	download := httptest.NewRequest("GET", src+"&download=1", nil)
-	download.RemoteAddr = "127.0.0.1:6000"
+	download = localTestConnection(download)
 	exported := httptest.NewRecorder()
 	a.Handler().ServeHTTP(exported, download)
 	if exported.Code != 200 || exported.Header().Get("Content-Type") != "application/octet-stream" || !strings.Contains(exported.Header().Get("Content-Disposition"), "attachment") {
 		t.Fatalf("download failed: %d %+v", exported.Code, exported.Header())
 	}
 	unauth := httptest.NewRequest(http.MethodGet, "/api/images?sheet="+url.QueryEscape("First"), nil)
-	unauth.RemoteAddr = "127.0.0.1:6000"
+	unauth = localTestConnection(unauth)
 	denied := httptest.NewRecorder()
 	a.Handler().ServeHTTP(denied, unauth)
 	if denied.Code != http.StatusForbidden {

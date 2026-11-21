@@ -63,7 +63,7 @@ func TestColumnRangeInvalidRejectedAtomically(t *testing.T) {
 		`{"sheet":"First","kind":"visibility","mode":"range","index":5,"hidden":true}`,
 	} {
 		req := httptest.NewRequest(http.MethodPost, "/api/layout", strings.NewReader(body))
-		req.RemoteAddr = "127.0.0.1:2222"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		out := httptest.NewRecorder()
 		app.Handler().ServeHTTP(out, req)

@@ -26,7 +26,7 @@ func editHTTP(t *testing.T, app *App, path string, req editRequest, status int) 
 		t.Fatal(err)
 	}
 	r := httptest.NewRequest(http.MethodPost, "/api/edits/"+path, bytes.NewReader(data))
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	r.Header.Set("X-ExcelLens-Token", app.token)
 	w := httptest.NewRecorder()
 	app.Handler().ServeHTTP(w, r)
@@ -116,7 +116,7 @@ func TestEditCopyLifecycleAndIndependentPublishedRevision(t *testing.T) {
 		t.Fatal(retry)
 	}
 	r := httptest.NewRequest("GET", retry.DownloadURL, nil)
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	w := httptest.NewRecorder()
 	b.Handler().ServeHTTP(w, r)
 	parser := csv.NewReader(w.Body)
@@ -126,7 +126,7 @@ func TestEditCopyLifecycleAndIndependentPublishedRevision(t *testing.T) {
 		t.Fatal(w.Code, rows, err)
 	}
 	r = httptest.NewRequest("GET", output.DownloadURL, nil)
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	w = httptest.NewRecorder()
 	b.Handler().ServeHTTP(w, r)
 	if w.Code != 403 {

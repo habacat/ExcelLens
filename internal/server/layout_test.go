@@ -49,7 +49,7 @@ func TestSheetLayoutPersistsAndIsolated(t *testing.T) {
 		t.Fatal("reset row did not delete override")
 	}
 	req := httptest.NewRequest("POST", "/api/layout", strings.NewReader(`{"sheet":"First","kind":"col","index":16385,"size":12}`))
-	req.RemoteAddr = "127.0.0.1:2222"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	out := httptest.NewRecorder()
 	app.Handler().ServeHTTP(out, req)
@@ -205,7 +205,7 @@ func TestColumnVisibilityRejectsBadCommands(t *testing.T) {
 		`{"sheet":"First","kind":"visibility","mode":""}`,
 	} {
 		req := httptest.NewRequest("POST", "/api/layout", strings.NewReader(body))
-		req.RemoteAddr = "127.0.0.1:2222"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		resp := httptest.NewRecorder()
 		app.Handler().ServeHTTP(resp, req)

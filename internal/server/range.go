@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -98,12 +99,12 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		col1, col2 = col2, col1
 	}
 	colCount := col2 - col1 + 1
-	if colCount > clipboardMaxCols {
+	format := r.URL.Query().Get("format")
+	if format != "tsv" && colCount > clipboardMaxCols {
 		writeError(w, http.StatusBadRequest, "一次最多复制50列；请缩小选区")
 		return
 	}
-	format := r.URL.Query().Get("format")
-	if format != "" && format != "json" {
+	if format != "" && format != "json" && format != "tsv" {
 		writeError(w, http.StatusBadRequest, "复制格式不受支持")
 		return
 	}
@@ -147,6 +148,14 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if format == "tsv" {
+		release, err := a.acquireQuerySlot(r.Context())
+		if err != nil {
+			writeError(w, http.StatusRequestTimeout, "复制已取消")
+			return
+		}
+		defer release()
+	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if a.currentWorkbook() != wb {
@@ -179,6 +188,20 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer visible.close()
+	}
+	if format == "tsv" {
+		view, err := newSelectionRowView(idx, filtered, through, visible)
+		if err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+		plan, err := view.plan(row1, row2, visual1, visual2)
+		if err != nil {
+			writeError(w, 400, err.Error())
+			return
+		}
+		writeClipboardTSV(w, r, wb, plan, col1, col2)
+		return
 	}
 	numbers, _, err := selectClipboardRows(idx, filtered, row1, row2, visual1, visual2, through, visible)
 	if err != nil {
@@ -297,4 +320,52 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte(out.String()))
+}
+
+// Buffer only the finished text so a budget or source error can never publish
+// a partial selection. Rows arrive in the same visual order used by export.
+func writeClipboardTSV(w http.ResponseWriter, r *http.Request, wb *workbook.Workbook, plan selectionRowPlan, first, last int) {
+	columns := last - first + 1
+	if plan.Len() > formats.ClipboardTSVRows || columns > formats.ClipboardTSVCols || plan.Len() > formats.ClipboardTSVCells/columns {
+		writeError(w, http.StatusRequestEntityTooLarge, "选区超过纯文本复制容量")
+		return
+	}
+	var out strings.Builder
+	rows := 0
+	err := wb.VisitRowsByReferencesWithOptionsContext(r.Context(), plan.Index(), plan.Rows(), first, last, workbook.RowReadOptions{FormatValue: true}, func(row workbook.RowData) error {
+		if rows > 0 {
+			out.WriteByte('\n')
+		}
+		rows++
+		cells := make(map[int]string, len(row.Cells))
+		for _, cell := range row.Cells {
+			cells[cell.Col] = cell.Display
+		}
+		for col := first; col <= last; col++ {
+			if col > first {
+				out.WriteByte('\t')
+			}
+			value := cells[col]
+			size := len(value)
+			if strings.ContainsAny(value, "\t\r\n\"") {
+				size += 2 + strings.Count(value, "\"")
+			}
+			if size > formats.ClipboardTextBytes-out.Len() {
+				return errSelectionLimit
+			}
+			out.WriteString(escapedClipboardCell(value))
+		}
+		return nil
+	})
+	if errors.Is(err, errSelectionLimit) {
+		writeError(w, http.StatusRequestEntityTooLarge, "选区文字超过 4 MB")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-ExcelLens-Range", strconv.Itoa(rows*columns))
+	_, _ = io.WriteString(w, out.String())
 }

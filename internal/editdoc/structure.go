@@ -2,7 +2,14 @@ package editdoc
 
 // At and Before use one-based coordinates of the current revision. Before
 // identifies the original row or column before which a moved block is placed.
+type ReviewNote struct {
+	Sheet string `json:"sheet"`
+	Ref   string `json:"ref"`
+	Text  string `json:"text"`
+}
+
 type Structure struct {
+	Notes          []ReviewNote         `json:"notes,omitempty"`
 	Kind           string               `json:"kind"`
 	Sheet          string               `json:"sheet"`
 	Name           string               `json:"name,omitempty"`

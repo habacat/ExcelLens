@@ -264,3 +264,12 @@ func (a *App) handleTaskCheckpointDiscard(w http.ResponseWriter, r *http.Request
 	}
 	writeJSON(w, map[string]bool{"discarded": true})
 }
+
+func (a *App) registerTaskRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/recovery", a.handleRecovery)
+	mux.HandleFunc("/api/recovery/list", a.handleRecoveryList)
+	mux.HandleFunc("/api/tasks", a.handleTaskCheckpoints)
+	mux.HandleFunc("/api/tasks/open", a.handleTaskCheckpointOpen)
+	mux.HandleFunc("/api/tasks/resume", a.handleTaskCheckpointResume)
+	mux.HandleFunc("/api/tasks/discard", a.handleTaskCheckpointDiscard)
+}

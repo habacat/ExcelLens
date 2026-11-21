@@ -244,12 +244,11 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 	}()
 	// Slot acquisition precedes cacheMu.RLock. Rebuilt filter scopes explicitly
 	// borrow this slot; neither nested waits nor a cache-writer inversion occurs.
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		return
 	}
+	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	a.mu.Lock()

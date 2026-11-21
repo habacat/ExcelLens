@@ -37,7 +37,7 @@ func TestCSVUploadIndexSheetSearchExportAndRecent(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/open", &buf)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	response := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func TestCSVUploadIndexSheetSearchExportAndRecent(t *testing.T) {
 			t.Fatal(e)
 		}
 		app.mu.RLock()
-		exportJob := app.exportJobs[sent.JobID]
+		exportJob := app.exports[sent.JobID]
 		app.mu.RUnlock()
 		if exportJob == nil {
 			t.Fatalf("export %s not queued", fmt)
@@ -291,7 +291,7 @@ func TestOracleAtAndOfficeHTMLUploadStatsAndXLSXExport(t *testing.T) {
 				t.Fatal(err)
 			}
 			req := httptest.NewRequest(http.MethodPost, "/api/open", &body)
-			req.RemoteAddr = "127.0.0.1:12345"
+			req = localTestConnection(req)
 			req.Header.Set("X-ExcelLens-Token", app.token)
 			req.Header.Set("Content-Type", mw.FormDataContentType())
 			response := httptest.NewRecorder()
@@ -326,7 +326,7 @@ func TestOracleAtAndOfficeHTMLUploadStatsAndXLSXExport(t *testing.T) {
 				JobID string `json:"jobId"`
 			}](t, featureCall(t, app, "POST", "/api/export/start", string(encoded)))
 			app.mu.RLock()
-			job := app.exportJobs[started.JobID]
+			job := app.exports[started.JobID]
 			app.mu.RUnlock()
 			if job == nil {
 				t.Fatal("export was not queued")

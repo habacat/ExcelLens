@@ -252,7 +252,7 @@ func TestRelationFailedReplacementAndChangedSourceNeverPublishPartialExportOrDis
 	}
 	out := decodeResponse[struct{ JobID string }](t, reconcilePost(t, a, "/api/relation/export", map[string]any{"jobId": root.ID, "mode": "left", "maximum": "100"}))
 	a.mu.RLock()
-	export := a.exportJobs[out.JobID]
+	export := a.exports[out.JobID]
 	a.mu.RUnlock()
 	select {
 	case <-export.done:

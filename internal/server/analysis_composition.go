@@ -45,7 +45,7 @@ func (a *App) borrowCompositionAnalysisSource(wb *workbook.Workbook, source, id 
 // Acquire it before the cache read lock; lower-level readers borrow it.
 func (a *App) acquireAnalysisQuerySlot(ctx context.Context, source string, rebuildFilter bool) (func(), error) {
 	if rebuildFilter || strings.HasPrefix(source, "append:") {
-		return a.acquireQuerySlot(ctx)
+		return a.backgroundQuery(ctx)
 	}
 	return func() {}, nil
 }

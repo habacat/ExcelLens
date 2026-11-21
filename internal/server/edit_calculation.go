@@ -25,8 +25,8 @@ type editCalculationCache struct {
 	pivotItems            *editfile.PivotItemList
 }
 
-func (a *App) calculationFor(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile) (*editfile.Calculation, error) {
-	entry, err := a.calculationRevision(ctx, doc, layout, f, false)
+func (e *editController) calculationFor(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile) (*editfile.Calculation, error) {
+	entry, err := e.calculationRevision(ctx, doc, layout, f, false)
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +35,11 @@ func (a *App) calculationFor(ctx context.Context, doc *editdoc.Document, layout 
 
 // A reader keeps the source index and the projection that was calculated from it
 // together, even if another tab replaces the application's most recent revision.
-func (a *App) calculationRevision(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile, needIndex bool) (*editCalculationCache, error) {
+func (e *editController) calculationRevision(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, f *workbook.EditSourceFile, needIndex bool) (*editCalculationCache, error) {
 	if layout.XLSX == nil {
 		return &editCalculationCache{view: &editfile.Calculation{}}, nil
 	}
-	root := a.rootApp()
-	root.calculationMu.Lock()
-	entry := root.calculation
-	root.calculationMu.Unlock()
+	entry := e.revision.Load()
 	stamp := doc.Base.Source.Stamp
 	if entry != nil && entry.stamp == stamp && entry.document == doc.Key && entry.revision == doc.Revision {
 		return entry, nil
@@ -97,9 +94,7 @@ func (a *App) calculationRevision(ctx context.Context, doc *editdoc.Document, la
 		return nil, err
 	}
 	entry = &editCalculationCache{stamp: stamp, book: entry.book, indexErr: entry.indexErr, document: doc.Key, revision: doc.Revision, view: view, patches: patches}
-	root.calculationMu.Lock()
-	root.calculation = entry
-	root.calculationMu.Unlock()
+	e.revision.Store(entry)
 	return entry, nil
 }
 

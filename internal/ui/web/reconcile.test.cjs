@@ -8,6 +8,25 @@ function setup(){
   return {ctx,model:ctx.window.ExcelLensReconcileModel,prototype:ctx.window.ExcelLensReconcile.prototype,get};
 }
 const field=(column,rawName,extras={})=>({column,rawName,name:rawName,headerLoaded:true,headerHash:rawName,...extras});
+test('saved comparison rules rebind both sides by unique headers without guessing',()=>{
+  const {model}=setup(),digest='b'.repeat(64),oldStamp='a'.repeat(64);
+  const fields=[field(1,'编号',{uniqueHeader:true}),field(2,'金额',{uniqueHeader:true})];
+  const input={kind:'workbook',name:'基线.csv',stamp:oldStamp,fileSHA256:digest,fields};
+  const target={kind:'workbook',stamp:'c'.repeat(64),fields:[{...fields[1],column:1},{...fields[0],column:2}]};
+  const record={kind:'ExcelLens.Reconcile',version:1,ruleVersion:1,scope:'all-data-rows',exceptionGroupsSHA256:digest,inputs:[input,input],
+    query:{keys:[{left:1,right:1,mode:'text',trim:true}],fields:[{left:2,right:2,mode:'number'}]},
+    counts:{equal:1,different:1,leftOnly:0,rightOnly:0,duplicate:0,review:0,invalidKeys:0},
+    detail:{status:'different',sha256:digest,protectCSV:true}};
+  const mapped=model.rebindRecord(record,[input,target]);
+  assert.deepEqual(JSON.parse(JSON.stringify(mapped)),{keys:[{left:1,right:2,mode:'text',trim:true,ignoreCase:false}],fields:[{left:2,right:1,mode:'number',trim:false,ignoreCase:false}],includeEqual:false});
+  assert.throws(()=>model.rebindRecord(record,[target,{...target,fields:[...target.fields,{...fields[0],column:3}]}]),/唯一表头/);
+  assert.throws(()=>model.rebindRecord(record,[target,{...target,fields:[target.fields[0]]}]),/唯一表头/);
+  const withTolerance={...record,ruleVersion:2,counts:{...record.counts,withinTolerance:1},query:{...record.query,fields:[{...record.query.fields[0],tolerance:'0.010'}]}};
+  assert.equal(model.rebindRecord(withTolerance,[input,target]).fields[0].tolerance,'0.010');
+  assert.throws(()=>model.rebindRecord({...withTolerance,ruleVersion:1},[input,target]),/容差/);
+  assert.throws(()=>model.rebindRecord({...record,ruleVersion:3},[input,target]),/版本/);
+  assert.throws(()=>model.rebindRecord({...record,counts:{duplicate:-1}},[input,target]),/计数/);
+});
 test('automatic field suggestions require complete unique names on both sides',()=>{
   const {model}=setup(),left=[field(1,'编号'),field(2,'金额'),field(3,'金额'),field(4,'未读',{headerLoaded:false}),field(5,'截取',{truncated:true}),field(6,'备注')],right=[field(2,'编号'),field(3,'金额'),field(4,'未读'),field(5,'截取'),field(7,'备注')];
   const result=JSON.parse(JSON.stringify(model.suggest(left,right)));

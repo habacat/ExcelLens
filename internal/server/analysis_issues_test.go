@@ -60,7 +60,7 @@ func TestIssuesMaterializationAndCompleteCSVUseSameSnapshotAndRawText(t *testing
 	for _, protect := range []bool{false, true} {
 		started := decodeResponse[struct{ JobID string }](t, analysisRequest(t, a, "POST", "/api/analysis/issues/export", fmt.Sprintf(`{"jobId":%q,"protectCSV":%t}`, id, protect)))
 		a.mu.RLock()
-		job := a.exportJobs[started.JobID]
+		job := a.exports[started.JobID]
 		a.mu.RUnlock()
 		select {
 		case <-job.done:
@@ -116,7 +116,7 @@ func TestIssuesRejectModifiedSourceEvenWhenRevisionIsRestoredToSameNumber(t *tes
 	}
 	started := decodeResponse[struct{ JobID string }](t, analysisRequest(t, a, "POST", "/api/analysis/issues/export", fmt.Sprintf(`{"jobId":%q}`, id)))
 	a.mu.RLock()
-	job := a.exportJobs[started.JobID]
+	job := a.exports[started.JobID]
 	a.mu.RUnlock()
 	select {
 	case <-job.done:

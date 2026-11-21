@@ -52,7 +52,8 @@
         presenter.paint(node,cell,{style:item.style});if(!cell)presenter.o.applyStyle(node,{style:item.style});
         if(item.hiddenAnchor){node.replaceChildren();warnings.add('隐藏的合并起点保留原坐标，未把其值移到可见覆盖格');}
         const messages=[node._xlRichNotice,node._xlPresentationNotice].filter(Boolean);for(const message of messages)warnings.add(message);
-        if(item.cell?.cacheMissing)warnings.add('本页有公式缺少保存结果，预览保留空结果并可悬停核对');
+        if(item.cell?.cacheMissing){node.setAttribute('data-missing-cache','缺少缓存');warnings.add('本页有公式缺少保存结果');}
+        else if(item.cell?.hasFormula&&!item.cell.raw&&(!item.cell.type||item.cell.type==='n')){node.setAttribute('data-missing-cache','数值缓存为空');warnings.add('本页有公式的数值缓存为空');}
         node.title=item.ref+(item.hiddenAnchor?'（源合并起点隐藏）':'')+(item.cell?'\n'+String(item.cell.raw).slice(0,2048):'（空白源坐标）')+(item.cell?.cacheMissing?'\n源公式未保存计算结果':'')+(messages.length?'\n'+messages.join('；'):'');
         const numericOverflow=!item.hiddenAnchor&&presenter.fitNumber(node,cell,Math.min(box.width,box.innerWidth),6*scale);
         if(numericOverflow)warnings.add('数值宽度不足时显示#提示，悬停可核对完整显示值，源值不变');

@@ -200,12 +200,11 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 		inputs.close()
 		close(job.done)
 	}()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		return
 	}
+	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	a.mu.Lock()

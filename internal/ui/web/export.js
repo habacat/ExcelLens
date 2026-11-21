@@ -11,15 +11,29 @@
       this.sourceCapabilities=sourceCapabilities;
       this.job='';this.running=false;this.timer=0;this.busy=false;this.serial=0;this.failures=0;this.snapshot='';this.resultSource='';this.pending=null;
       for(const id of controls)$(id).addEventListener('change',()=>this.refresh());
+      $('exportViewReport').addEventListener('click',()=>this.openReport());
       $('exportStartBtn').addEventListener('click',()=>this.start());
       $('exportCancelBtn').addEventListener('click',()=>this.cancel());
       $('exportFolderBtn').addEventListener('click',()=>this.folder());
       $('exportRetryBtn').addEventListener('click',()=>{this.failures=0;this.poll();});
     }
+    async openReport(){
+      const job=this.job,serial=this.serial;
+      const popup=window.open('about:blank','_blank');
+      if(!popup){this.toast('请允许打开明细标签页','warning');return;}
+      popup.opener=null;
+      try{
+        const data=await this.api('/api/reconcile/report/open',{method:'POST',body:JSON.stringify({id:job})});
+        if(job!==this.job||serial!==this.serial){popup.close();return;}
+        popup.location.assign(data.url);
+      }catch(error){popup.close();this.toast(error.message,'error');}
+    }
     clearResult(){
+      $('exportViewReport').hidden=true;
       $('exportResult').hidden=true;$('exportDownload').removeAttribute('href');$('exportDownload').removeAttribute('download');$('exportFileDetails').textContent='';$('exportSnapshot').textContent='';
     }
     resetBook(){
+      this.copySelection=null;
       this.activity?.end();this.activity=null;
       if(this.job&&this.running)this.cancelOwned(this.job);
       ++this.serial;clearTimeout(this.timer);this.pending?.abort();this.pending=null;
@@ -29,13 +43,17 @@
       $('exportDialog').close();
     }
     range() {
+      if(this.copySelection){
+        const {start,end,visualStart,visualEnd}=this.copySelection;
+        return {start,end,visualStart,visualEnd};
+      }
       const model=window.ExcelLensMultiSelection,area=model.areas(this.s,true).at(-1);
       return area?model.points(area,this.colName):{start:'A1',end:'A1'};
     }
-    open(scope='') {
+    open(scope='',selection=null) {
       if(!this.s.opened || !this.s.sheet) {this.toast('请先打开工作簿','warning');return;}
       const hasRange=this.s.range && (this.s.range.row1!==this.s.range.row2||this.s.range.col1!==this.s.range.col2);
-      if(!this.running&&!this.busy)this.generated=null;
+      if(!this.running&&!this.busy){this.generated=null;this.copySelection=selection;}
       if(scope&&!this.running&&!this.busy) $('exportScope').value=scope;
       else if(!this.running) $('exportScope').value=hasRange?'selection':'sheet';
       this.refresh();this.openDialog('exportDialog');
@@ -89,6 +107,7 @@
     async start() {
       if(this.running ||this.busy)return;
       if(this.generated)return this.begin(this.generated.path,this.generated.payload,this.generated.label);
+      if($('exportScope').value==='selection'&&this.copySelection&&!this.copySelection.current()){this.toast('选区已变化，请重新选择导出范围','warning');return;}
       if($('exportScope').value==='selection'&&this.s.multiRanges?.length){this.toast('导出选区请保留一个连续区域','warning');return;}
       const range=this.range();const payload={
         scope:$('exportScope').value,sheet:this.s.sheet,workbookKey:this.s.workbookKey,...range,filterId:this.s.filtered?this.s.filterId:'',
@@ -114,7 +133,8 @@
       this.snapshot=label;this.failures=0;this.busy=true;this.clearResult();this.refresh();
       this.resultSource=[this.s.fileName,payload.sheet,label].filter(Boolean).join(' · ');
       try {
-        const started=await this.api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const upload=typeof FormData!=='undefined'&&payload instanceof FormData;
+        const started=await this.api(path,upload?{method:'POST',body:payload,signal:ctrl.signal}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         if(!current()){this.cancelOwned(started.jobId);return;}
         this.job=started.jobId;this.running=true;
         $('exportProgress').hidden=false;$('exportCancelBtn').hidden=false;
@@ -156,6 +176,7 @@
         if(data.status==='done') {
           this.running=false;$('exportCancelBtn').hidden=true;
           $('exportResult').hidden=false;
+          $('exportViewReport').hidden=!data.auditReport;
           $('exportDownload').href=data.downloadUrl;
           $('exportDownload').setAttribute('download',data.fileName||'ExcelLens-export');
           $('exportFileDetails').textContent=`${data.fileName} · ${this.formatBytes(data.size)}`;

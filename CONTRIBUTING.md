@@ -48,7 +48,7 @@ Windows竞态检查出现初始化分配失败、错误87，或需要指定MinGW
 
 1. 修改 `internal/buildinfo/version.go`，同步 README 当前标题，在 `docs/releases/<版本>.md` 记录变更及验证；历史报告保留原版本。
 2. 执行 `build.ps1` 或 `upgrade-build.ps1`。构建脚本从唯一版本源、`go.mod` 和发布清单读取配置；先通过全部检查，再构建、检查 PE、UPX 压缩与校验、逐文件核对 ZIP。
-3. 候选核验使用 `build.ps1 -StageOnly`：执行相同完整检查、PE/UPX和ZIP核验后，将完整包保留在 `artifacts/<版本>-verified-*`，不替换 `release/`。普通构建全部成功后才原子替换 `release/`；正在运行旧版时同样保留完整已验证包和收据，不强制终止用户进程，用户退出托盘后再运行发布步骤。
+3. 候选核验使用 `build.ps1 -StageOnly`。完整检查结果写入 `validation/<版本>/private/candidate-check.json`，同版本正式发行的检查收据继续对应正式源码。PE、UPX 和 ZIP 核验通过后，完整候选包位于 `artifacts/<版本>-verified-*`。普通构建全部成功后才原子替换 `release/`。正在运行旧版时会保留已验证包，用户退出托盘后可继续发布。
 4. 不自动提交、推送或公开发布。源码交付需与指定 Git 提交一致；工作树未提交时不能宣称源码包等于 HEAD。
 
 本地交付源码时，先为发行提交建标签，再从标签生成归档。以下命令从唯一版本源取当前版本，独立核对两个包。源码包内的每个文件都要匹配发行标签的 Git 对象，之后的收据提交可以继续追加到分支。
@@ -61,6 +61,6 @@ python tools/qa/verify_release.py $releaseVersion
 python tools/qa/verify_release.py $releaseVersion --source --ref $releaseTag
 ```
 
-同一份 Windows 和源码包用于本地及 GitHub 交付时，可在公开源码工作树运行 `build.ps1 -DeliveryRoot <本地同版本项目目录>`。完整检查通过后，脚本将该工作树的 Windows 包交付到目标目录的 `release/`。建立版本标签后，运行 `python tools/qa/verify_release.py <版本> --finalize --ref <标签> --dir <发行目录>`。它会核对包内资源、从标签生成源码 ZIP，并为两个 ZIP 写出 SHA-256 清单。
+本地与 GitHub 交付相同双包时，先在公开源码提交建立对应标签，再从该工作树运行 `build.ps1 -TaggedRelease -DeliveryRoot <本地同版本项目目录>`。脚本校验标签对应的构建输入，在同一暂存目录完成 Windows 包、标签源码包和 SHA-256 清单核验，再整体切换 `release/`。可加 `-StageOnly` 预备双包。仅需独立复验现有附件时使用 `tools/qa/verify_release.py`。
 
 用户指南、当前变更及验证分开放置；完整目录说明见 [文档索引](docs/README.md)。

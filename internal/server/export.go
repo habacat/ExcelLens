@@ -22,27 +22,28 @@ import (
 // Export jobs write to disk, in fixed-size row batches. The browser only sees
 // lightweight progress/status JSON and a native file download link.
 type ExportJob struct {
-	mu         sync.RWMutex
-	ID         string
-	Ticket     string
-	Status     string
-	Stage      string
-	Error      string
-	FileName   string
-	FilePath   string
-	Format     string
-	TaskID     string
-	Progress   float64
-	DoneRows   int64
-	TotalRows  int64
-	Size       int64
-	Started    time.Time
-	Finished   time.Time
-	ctx        context.Context
-	cancel     context.CancelFunc
-	done       chan struct{}
-	wb         *workbook.Workbook
-	checkpoint *taskCheckpointRun
+	mu          sync.RWMutex
+	ID          string
+	Ticket      string
+	Status      string
+	Stage       string
+	Error       string
+	FileName    string
+	FilePath    string
+	Format      string
+	TaskID      string
+	Progress    float64
+	DoneRows    int64
+	TotalRows   int64
+	Size        int64
+	Started     time.Time
+	Finished    time.Time
+	ctx         context.Context
+	cancel      context.CancelFunc
+	done        chan struct{}
+	wb          *workbook.Workbook
+	auditReport bool
+	checkpoint  *taskCheckpointRun
 }
 
 type exportRequest struct {
@@ -167,8 +168,30 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 	if a.wb != wb || a.maintenance {
 		return nil, errors.New("工作簿已切换或正在维护缓存")
 	}
+	return a.exports.startLocked(wb, format)
+}
+
+// The session mutex protects registration and workbook replacement together.
+type exportController map[string]*ExportJob
+
+func (jobs exportController) cancelAllLocked() []*ExportJob {
+	active := make([]*ExportJob, 0, len(jobs))
+	for _, job := range jobs {
+		job.cancel()
+		active = append(active, job)
+	}
+	return active
+}
+
+func waitExportJobs(jobs []*ExportJob) {
+	for _, job := range jobs {
+		<-job.done
+	}
+}
+
+func (jobs exportController) startLocked(wb *workbook.Workbook, format string) (*ExportJob, error) {
 	active := 0
-	for _, j := range a.exportJobs {
+	for _, j := range jobs {
 		select {
 		case <-j.done:
 		default:
@@ -180,14 +203,14 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	job := &ExportJob{ID: randomID(), Ticket: randomID() + randomID(), Status: "queued", Stage: "等待导出槽位", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), wb: wb, Format: format}
-	a.exportJobs[job.ID] = job
+	jobs[job.ID] = job
 	// Trim history in batches, keeping recent download tickets. A displayed
 	// terminal status can precede deferred cleanup: only done confirms exit.
 	// Files remain on disk until the user explicitly cleans them.
-	if len(a.exportJobs) > 26 {
-		for len(a.exportJobs) > 20 {
+	if len(jobs) > 26 {
+		for len(jobs) > 20 {
 			var oldest *ExportJob
-			for _, old := range a.exportJobs {
+			for _, old := range jobs {
 				select {
 				case <-old.done:
 					if oldest == nil || old.Started.Before(oldest.Started) || old.Started.Equal(oldest.Started) && old.ID < oldest.ID {
@@ -200,7 +223,7 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 				break
 			}
 			oldest.cancel()
-			delete(a.exportJobs, oldest.ID)
+			delete(jobs, oldest.ID)
 		}
 	}
 	return job, nil
@@ -373,7 +396,7 @@ func (a *App) handleExportStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.RLock()
-	job := a.exportJobs[r.URL.Query().Get("id")]
+	job := a.exports[r.URL.Query().Get("id")]
 	a.mu.RUnlock()
 	if job == nil {
 		writeError(w, 404, "导出任务不存在")
@@ -385,6 +408,7 @@ func (a *App) handleExportStatus(w http.ResponseWriter, r *http.Request) {
 		resp["taskId"], resp["recoverable"] = job.TaskID, true
 	}
 	if job.Status == "done" {
+		resp["auditReport"] = job.auditReport
 		resp["downloadUrl"] = "/api/export/download?id=" + url.QueryEscape(job.ID) + "&ticket=" + url.QueryEscape(job.Ticket)
 		if id := r.Header.Get("X-ExcelLens-Session"); id != "" {
 			resp["downloadUrl"] = resp["downloadUrl"].(string) + "&session=" + url.QueryEscape(id)
@@ -407,7 +431,7 @@ func (a *App) handleExportCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.RLock()
-	job := a.exportJobs[req.ID]
+	job := a.exports[req.ID]
 	a.mu.RUnlock()
 	if job == nil {
 		writeError(w, 404, "导出任务不存在")
@@ -428,7 +452,7 @@ func (a *App) handleExportDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.RLock()
-	job := a.exportJobs[id]
+	job := a.exports[id]
 	a.mu.RUnlock()
 	if job == nil {
 		http.NotFound(w, r)
@@ -471,4 +495,12 @@ func (a *App) handleExportFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	go func() { _ = cmd.Wait() }()
 	writeJSON(w, map[string]any{"opened": true, "path": dir})
+}
+
+func (a *App) registerExportRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/export/start", a.handleExportStart)
+	mux.HandleFunc("/api/export/status", a.handleExportStatus)
+	mux.HandleFunc("/api/export/cancel", a.handleExportCancel)
+	mux.HandleFunc("/api/export/download", a.handleExportDownload)
+	mux.HandleFunc("/api/export/folder", a.handleExportFolder)
 }

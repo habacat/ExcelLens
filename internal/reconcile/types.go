@@ -45,6 +45,7 @@ type Field struct {
 	HeaderHash   string `json:"headerHash,omitempty"`
 	HeaderLoaded bool   `json:"headerLoaded"`
 	Truncated    bool   `json:"truncated,omitempty"`
+	UniqueHeader bool   `json:"uniqueHeader,omitempty"`
 }
 
 type SourceInfo struct {
@@ -77,6 +78,7 @@ type Source struct {
 // Empty Mode preserves source type; text explicitly uses displayed text and
 // number explicitly parses a strict exact accounting amount/percentage.
 type Pair struct {
+	Tolerance  string `json:"tolerance,omitempty"`
 	Left       int    `json:"left"`
 	Right      int    `json:"right"`
 	Mode       string `json:"mode,omitempty"`
@@ -84,17 +86,28 @@ type Pair struct {
 	IgnoreCase bool   `json:"ignoreCase,omitempty"`
 }
 
+const CurrentRuleVersion = 2
+
 type Query struct {
+	RuleVersion  int    `json:"ruleVersion,omitempty"`
 	Keys         []Pair `json:"keys"`
 	Fields       []Pair `json:"fields"`
 	IncludeEqual bool   `json:"includeEqual,omitempty"`
 }
 
+func (q Query) Rules() int {
+	if q.RuleVersion == 0 {
+		return CurrentRuleVersion
+	}
+	return q.RuleVersion
+}
+
 type Comparison struct {
-	Pair   int    `json:"pair"`
-	Equal  bool   `json:"equal"`
-	Delta  string `json:"delta,omitempty"` // exact left minus right, never float64
-	Reason string `json:"reason,omitempty"`
+	WithinTolerance bool   `json:"withinTolerance,omitempty"`
+	Pair            int    `json:"pair"`
+	Equal           bool   `json:"equal"`
+	Delta           string `json:"delta,omitempty"` // exact left minus right, never float64
+	Reason          string `json:"reason,omitempty"`
 }
 
 type Group struct {
@@ -113,15 +126,16 @@ type Group struct {
 }
 
 type Counts struct {
-	Equal        int64 `json:"equal"`
-	Different    int64 `json:"different"`
-	LeftOnly     int64 `json:"leftOnly"`
-	RightOnly    int64 `json:"rightOnly"`
-	Duplicate    int64 `json:"duplicate"`
-	Review       int64 `json:"review"`
-	InvalidKeys  int64 `json:"invalidKeys"` // rows, not distinct valid keys
-	LeftRecords  int64 `json:"leftRecords"`
-	RightRecords int64 `json:"rightRecords"`
+	WithinTolerance int64 `json:"withinTolerance"`
+	Equal           int64 `json:"equal"`
+	Different       int64 `json:"different"`
+	LeftOnly        int64 `json:"leftOnly"`
+	RightOnly       int64 `json:"rightOnly"`
+	Duplicate       int64 `json:"duplicate"`
+	Review          int64 `json:"review"`
+	InvalidKeys     int64 `json:"invalidKeys"` // rows, not distinct valid keys
+	LeftRecords     int64 `json:"leftRecords"`
+	RightRecords    int64 `json:"rightRecords"`
 }
 
 type Result struct {

@@ -19,6 +19,7 @@ import (
 )
 
 type editRequest struct {
+	Trial       *whatIfSpec          `json:"trial,omitempty"`
 	Document    editdoc.Key          `json:"document"`
 	Book        string               `json:"book"`
 	Revision    uint64               `json:"revision,string"`
@@ -230,7 +231,7 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 	// Save can return an existing artifact, and commit can return a confirmed
 	// request receipt. Neither requires reading the original workbook again.
 	if err == nil && command != "save" && command != "commit" {
-		layout, err = a.documentEditLayout(ctx, doc, layout, nil)
+		layout, err = a.edits.documentEditLayout(ctx, doc, layout, nil)
 		if command == "state" && (errors.Is(err, os.ErrNotExist) || errors.Is(err, editfile.ErrBinding)) {
 			err = nil // Previously generated downloads are still available.
 		}
@@ -239,20 +240,15 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		editError(w, err)
 		return
 	}
-	root := a.rootApp()
-	root.calculationMu.Lock()
-	var index *editfile.CalculationBook
-	if entry := root.calculation; entry != nil && entry.stamp == doc.Base.Source.Stamp {
-		index = entry.book
-	}
-	root.calculationMu.Unlock()
-	layout = layout.WithSourceCells(&a.editSourceCells, doc.Binding+"/"+doc.Base.Source.Stamp, index)
+	layout = a.edits.withSourceCells(layout, doc)
 	var body any
 	switch command {
 	case "state":
 		body, err = a.editState(doc, layout)
 	case "read":
 		body, err = a.editRead(ctx, doc, layout, req)
+	case "what-if":
+		body, err = a.editWhatIf(ctx, doc, layout, req)
 	case "grid":
 		body, err = a.editGrid(ctx, doc, layout, req)
 	case "input-kinds":
@@ -308,4 +304,12 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, body)
+}
+
+func (a *App) registerEditRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/edits", a.handleEditList)
+	for _, path := range []string{"start", "state", "base", "grid", "input-kinds", "formula-symbols", "native-paste", "what-if", "list-areas", "read", "choices", "pivot-items", "pivot-layout", "copy", "preview", "commit", "save", "open"} {
+		mux.HandleFunc("/api/edits/"+path, a.handleEditCommand)
+	}
+	mux.HandleFunc("/api/edits/download", a.handleEditDownload)
 }

@@ -51,7 +51,7 @@ func TestTaskOpenFailureLeavesCurrentWorkbookAndResults(t *testing.T) {
 	a, m := taskOpenFixture(t)
 	current := a.currentWorkbook()
 	other := checkpointOpen(t, filterCheckpointCSV(t, 3)).currentWorkbook()
-	a.replaceWorkbook(other, "")
+	a.replaceWorkbook(other)
 	req := taskCheckpointRequest{ID: m.ID, Revision: m.Revision, Book: sourceBookID(other), WorkbookKey: other.Fingerprint}
 	stale := req
 	stale.Revision++
@@ -82,7 +82,7 @@ func TestTaskOpenRejectsLateCandidateAndCancelledRequest(t *testing.T) {
 	data, _ := json.Marshal(req)
 	r := httptest.NewRequest("POST", "/api/tasks/open", strings.NewReader(string(data)))
 	r.Header.Set("X-ExcelLens-Token", a.token)
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	ctx, cancel := context.WithCancel(r.Context())
 	cancel()
 	w := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestTaskOpenRejectsLateCandidateAndCancelledRequest(t *testing.T) {
 		defer close(done)
 		r := httptest.NewRequest("POST", "/api/tasks/open", strings.NewReader(string(data)))
 		r.Header.Set("X-ExcelLens-Token", a.token)
-		r.RemoteAddr = "127.0.0.1:12345"
+		r = localTestConnection(r)
 		a.Handler().ServeHTTP(w, r)
 	}()
 	deadline := time.Now().Add(5 * time.Second)
@@ -116,7 +116,7 @@ func TestTaskOpenRejectsLateCandidateAndCancelledRequest(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	other := &workbook.Workbook{Path: filepath.Join(t.TempDir(), "new.csv"), Fingerprint: "new-source"}
-	a.replaceWorkbook(other, "")
+	a.replaceWorkbook(other)
 	a.cacheMu.Unlock()
 	locked = false
 	select {

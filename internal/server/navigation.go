@@ -25,8 +25,8 @@ var errNavigationSourceChanged = errors.New("工作簿已切换或索引已变�
 func (a *App) columnOccupied(ctx context.Context, wb *workbook.Workbook, idx *workbook.SheetIndex, column int) ([]occupiedRun, error) {
 	key := wb.Fingerprint + "|" + idx.SheetPath + "|" + strconv.Itoa(column)
 	lookup := func() ([]occupiedRun, bool) {
-		a.navigationMu.Lock()
-		defer a.navigationMu.Unlock()
+		a.mu.RLock()
+		defer a.mu.RUnlock()
 		found, ok := a.navigationCache[key]
 		return found, ok
 	}
@@ -74,10 +74,10 @@ func (a *App) columnOccupied(ctx context.Context, wb *workbook.Workbook, idx *wo
 	if err != nil {
 		return nil, err
 	}
-	a.navigationMu.Lock()
-	defer a.navigationMu.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	bytes := cap(occupied) * 2 * (strconv.IntSize / 8)
-	if bytes <= navigationCacheBudget && a.currentWorkbook() == wb {
+	if bytes <= navigationCacheBudget && a.wb == wb {
 		used := 0
 		for _, runs := range a.navigationCache {
 			used += cap(runs) * 2 * (strconv.IntSize / 8)

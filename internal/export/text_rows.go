@@ -36,10 +36,10 @@ func jsonlRowWriter(enc *json.Encoder, s Selection, opts Options) func(int, int,
 	return func(original, output int, row workbook.RowData) error {
 		cells := make([]cellRecord, 0, len(row.Cells))
 		for _, c := range row.Cells {
-			if c.Raw == "" && !c.HasFormula {
+			if c.Raw == "" && !c.HasFormula && c.SourceType == "" {
 				continue
 			}
-			cells = append(cells, cellRecord{Ref: c.Ref, Value: textOf(c, opts.Mode), Raw: c.Raw, Formula: c.Formula, Style: c.Style, Type: c.Type, MissingCache: c.CacheMissing})
+			cells = append(cells, cellRecord{Ref: c.Ref, SourceType: c.SourceType, Currency: c.Currency, Value: textOf(c, opts.Mode), Raw: c.Raw, Formula: c.Formula, Style: c.Style, Type: c.Type, MissingCache: c.CacheMissing})
 		}
 		if len(cells) == 0 {
 			return nil

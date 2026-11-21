@@ -15,6 +15,8 @@ type wireRow struct {
 	PresentationNotice string     `json:"p,omitempty"`
 }
 type wireCell struct {
+	Currency    string                            `json:"cu,omitempty"`
+	SourceType  string                            `json:"st,omitempty"`
 	Col         int                               `json:"c"`
 	Raw         string                            `json:"v"`
 	Display     *string                           `json:"d,omitempty"`
@@ -44,7 +46,7 @@ func packViewportRows(rows []workbook.RowData) []wireRow {
 		suffix := strconv.Itoa(row.Number)
 		for j := range row.Cells {
 			cell := &row.Cells[j]
-			value := wireCell{Col: cell.Col, Raw: cell.Raw, Type: cell.Type, Style: cell.Style, Formula: cell.Formula, Color: cell.ValueColor, Hyperlink: cell.Hyperlink, RichText: cell.RichText, Conditional: cell.Conditional}
+			value := wireCell{SourceType: cell.SourceType, Currency: cell.Currency, Col: cell.Col, Raw: cell.Raw, Type: cell.Type, Style: cell.Style, Formula: cell.Formula, Color: cell.ValueColor, Hyperlink: cell.Hyperlink, RichText: cell.RichText, Conditional: cell.Conditional}
 			if cell.Display != cell.Raw {
 				value.Display = &cell.Display
 			}

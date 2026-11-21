@@ -53,7 +53,7 @@ func writeAnalysisWorkbook(t *testing.T, path string) {
 func analysisRequest(t *testing.T, app *App, method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
@@ -122,7 +122,7 @@ func TestAnalysisAPIFullWorkflowKeepsOriginalReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	unauth := httptest.NewRequest("GET", "/api/analysis/workspace", nil)
-	unauth.RemoteAddr = "127.0.0.1:12345"
+	unauth = localTestConnection(unauth)
 	reject := httptest.NewRecorder()
 	a.Handler().ServeHTTP(reject, unauth)
 	if reject.Code != http.StatusForbidden {

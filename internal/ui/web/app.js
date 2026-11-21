@@ -153,7 +153,7 @@
     ["blank", "为空"], ["notBlank", "非空"]
   ];
 
-  async function api(url, options = {}) {
+  async function api(url, options = {}, responseType = 'json') {
     const activity = window.ExcelLensActivity?.request(url, options);
     try {
       await window.ExcelLensSession?.ready;
@@ -161,6 +161,7 @@
       headers.set("X-ExcelLens-Token", TOKEN);
       window.ExcelLensSession?.apply(headers);
       const response = await fetch(url, { ...options, headers, cache: "no-store" });
+      if(response.ok&&responseType==='text')return response.text();
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {const error=new Error(data.error || `请求失败（HTTP ${response.status}）`);error.status=response.status;throw error;}
       if(data.compact===1 && Array.isArray(data.rows))data.rows=window.ExcelLensWire.unpack(data.rows);
@@ -635,7 +636,7 @@
       toast(error.message,'error');
     } finally {
       activity?.end();
-      if(launch){S.opening=false;$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
+      if(launch){S.opening=false;printingCenter?.controls();$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
     }
   }
 
@@ -678,6 +679,7 @@
     } finally {
       activity?.end();
       S.opening = false;
+      printingCenter?.controls();
       $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = false;
     }
   }
@@ -2660,13 +2662,29 @@
     const rowCount=S.rowVisibility?S.rowVisibility.selectionCount(area,S.filtered,frozenPanes.effective().rows):model.rowCount(area,S.filtered,frozenPanes.effective().rows);
     const colCount=col2-col1+1;
     if(rowCount<1)throw Error('选区没有可见行');
-    if(rowCount>limits.rows||colCount>limits.columns||rowCount*colCount>limits.cells)throw Error(`${purpose}最多${limits.rows}行、${limits.columns}列、${limits.cells}格，请缩小选区`);
+    if(limits&&(rowCount>limits.rows||colCount>limits.columns||rowCount*colCount>limits.cells))throw Error(`${purpose}最多${limits.rows}行、${limits.columns}列、${limits.cells}格，请缩小选区`);
     const sheet=S.sheet,identity=clipboardIdentity(),selected={...S.selected},viewId=S.rowView?.id||'',filterId=S.filtered?S.filterId:'',excluded=frozenPanes.effective().rows,book=S.book,workbookKey=S.workbookKey,styled=S.showStyles,styles=S.styles,fontOverride=S.fontOverride;
     const current=()=>identity===clipboardIdentity();
     const sourceIdentity=selectionSourceIdentity(),sourceCurrent=()=>sourceIdentity===selectionSourceIdentity();
     const mergeAt=withMerges && mergedCells.root ? (row,col)=>mergedCells.copyAnchor(row,col,visibility) : undefined;
+    const rangeParams=()=>{
+      const params=new URLSearchParams({sheet,start:points.start,end:points.end,book,workbookKey});
+      if(viewId)params.set('viewId',viewId);
+      if(filterId){
+        params.set('filterId',filterId);
+        params.set('visualStart',String(points.visualStart));
+        params.set('visualEnd',String(points.visualEnd));
+      }
+      if(viewId||filterId)params.set('excludeThroughRow',String(excluded));
+      return params;
+    };
     return {book,workbookKey,sheet,styled,styles,fontOverride,current,sourceCurrent,mergeAt,rows:rowCount,firstColumn:col1,lastColumn:col2,...points,maxRow:sourceRowLimit(),headerRow:S.autoFilter?.row||S.sortHeaderBySheet.get(sheet)||S.source?.tableHeader?.row||1,
       label:`${sheet} · ${points.start}:${points.end} · ${rowCount}行 × ${colCount}列`,
+      readTSV:()=>{
+        const params=rangeParams();
+        params.set('format','tsv');
+        return api(`/api/range?${params}`,{},'text');
+      },
       read:async({headerRow=0,richText=true,conditional=styled,force=false,portable=false}={},signal)=>{
         if(!current())throw Error('来源或选区已变化，请重新选择');
         // A lone cell already holds the current edit projection.
@@ -2674,16 +2692,10 @@
           const cell={...selected};if(!richText)delete cell.richText;if(!conditional)delete cell.conditional;
           return {book,workbookKey,sheet,startCol:col1,endCol:col2,rows:[{row:selected.row,cells:[cell]}]};
         }
-        const params=new URLSearchParams({sheet,start:points.start,end:points.end,format:'json',book,workbookKey,richText:richText?'1':'0',conditional:conditional?'1':'0'});
+        const params=rangeParams();
+        params.set('format','json');params.set('richText',richText?'1':'0');params.set('conditional',conditional?'1':'0');
         if(portable)params.set('portable','1');
         if(headerRow)params.set('headerRow',String(headerRow));
-        if(viewId)params.set('viewId',viewId);
-        if(filterId){
-          params.set('filterId',filterId);
-          params.set('visualStart',String(points.visualStart));
-          params.set('visualEnd',String(points.visualEnd));
-          params.set('excludeThroughRow',String(excluded));
-        }
         const payload=await api(`/api/range?${params}`,{signal});
         if(!current())throw Object.assign(Error('复制已取消，来源或选区已变化'),{name:'AbortError'});
         if (editCopy?.grid.active) {
@@ -2698,35 +2710,54 @@
     const ranges=editCopy?.grid.active ? editCopy.grid.ranges : null;
     const epoch=ranges ? (ranges.copyEpoch=(ranges.copyEpoch||0)+1) : 0;
     try{
-      const snapshot=captureClipboardSelection({withMerges:!plain});
-      const [payload,initial]=await Promise.all([
-        snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled,portable:!plain&&!ranges}),
-        !plain && editCopy?.grid.active && !ranges.view.mappedRows() ? editCopy.grid.ranges.copySnapshot(snapshot,cut) : null
-      ]);
-      const typed=!plain && ranges && ranges.view.mappedRows() && snapshot.current() ? await ranges.copySnapshot(snapshot,cut,payload.rows.map(r=>r.row)) : initial;
-      if(!snapshot.current() || ranges && ranges.copyEpoch!==epoch)return;
-      if(cut && !typed)throw Error('剪切需要一个连续、完整可见且未超出编辑容量的工作表区域');
-      const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard,snapshot.mergeAt);
-      if (typed) {
-        typed.text=content.text.replaceAll('\r\n','\n');
-        content.html=content.html.replace('<table ','<table id="'+typed.marker+'"'+window.ExcelLensGridPaste.markup(typed)+' ');
-      }
-      if(!typed && payload.portable) content.html=content.html.replace('<table ','<table'+window.ExcelLensGridPaste.markup({clip:{portable:payload.portable}})+' ');
-      if(payload.portableNotice)content.notices.push(payload.portableNotice);
-      const copied=plain ? await copyText(content.text) : await writeClipboardPayload(content,cut);
-      if (cut && !snapshot.current()) return false;
-      if (copied && snapshot.current() && editCopy?.grid.active && ranges) {
-        if (ranges.copyEpoch!==epoch) {
-          if (cut && typed && !ranges.copied) ranges.copied={...typed,inactive:true};
-          return false;
-        }
-        const repaintCut=typed?.cut || ranges.copied?.cut && !ranges.copied.inactive;
-        ranges.copied=typed;
-        if (repaintCut) editCopy.grid.view.redraw();
-      }
-      if(!plain&&content.notices.length)toast(content.notices.join('；'),'warning');
-      return copied;
+      const progressive=!ranges&&!cut;
+      const snapshot=captureClipboardSelection({withMerges:!plain,limits:progressive?null:fileFormats.clipboard});
+      if(!progressive)return await copyGridPayload(snapshot,plain,cut,ranges,epoch);
+      return await window.ExcelLensClipboard.copyByBudget(snapshot,fileFormats.clipboard,plain,
+        ()=>copyGridPayload(snapshot,false,false,null,0),
+        async()=>{
+          const text=await snapshot.readTSV();
+          return snapshot.current()&&copyText(text,'已复制为纯文本');
+        },
+        ()=>{
+          if(exportCenter.running||exportCenter.busy){toast('导出中心正在处理任务，请在完成后导出选区','warning');return;}
+          exportCenter.open('selection',snapshot);
+          toast('选区超过复制容量，可导出为文件','warning');
+        });
     }catch(err){if(err.name!=='AbortError')toast(err.message,'error');}finally{activity?.end();}
+  }
+
+  async function copyGridPayload(snapshot,plain,cut,ranges,epoch) {
+    const [payload,initial]=await Promise.all([
+      snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled,portable:!plain&&!ranges}),
+      !plain && editCopy?.grid.active && !ranges.view.mappedRows() ? editCopy.grid.ranges.copySnapshot(snapshot,cut) : null
+    ]);
+    const typed=!plain && ranges && ranges.view.mappedRows() && snapshot.current() ? await ranges.copySnapshot(snapshot,cut,payload.rows.map(r=>r.row)) : initial;
+    if(!snapshot.current() || ranges && ranges.copyEpoch!==epoch)return;
+    if(cut && !typed)throw Error('剪切需要一个连续、完整可见且未超出编辑容量的工作表区域');
+    const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard,snapshot.mergeAt);
+    if (typed) {
+      typed.text=content.text.replaceAll('\r\n','\n');
+      content.html=content.html.replace('<table ','<table id="'+typed.marker+'"'+window.ExcelLensGridPaste.markup(typed)+' ');
+    }
+    if(!typed && payload.portable) content.html=content.html.replace('<table ','<table'+window.ExcelLensGridPaste.markup({clip:{portable:payload.portable}})+' ');
+    if((typed||payload.portable)&&window.ExcelLensClipboard.utf8Length(content.html)>fileFormats.clipboard.htmlBytes){
+      throw Object.assign(Error('复制内容超过本次容量'),{status:413});
+    }
+    if(payload.portableNotice)content.notices.push(payload.portableNotice);
+    const copied=plain ? await copyText(content.text) : await writeClipboardPayload(content,cut);
+    if (cut && !snapshot.current()) return false;
+    if (copied && snapshot.current() && editCopy?.grid.active && ranges) {
+      if (ranges.copyEpoch!==epoch) {
+        if (cut && typed && !ranges.copied) ranges.copied={...typed,inactive:true};
+        return false;
+      }
+      const repaintCut=typed?.cut || ranges.copied?.cut && !ranges.copied.inactive;
+      ranges.copied=typed;
+      if (repaintCut) editCopy.grid.view.redraw();
+    }
+    if(!plain&&content.notices.length)toast(content.notices.join('；'),'warning');
+    return copied;
   }
 
   function openDialog(id) {
@@ -3831,7 +3862,7 @@
     return cellExplanation?.open();
   }
 
-  async function copyText(value) {
+  async function copyText(value, successMessage='已复制') {
     const text = String(value ?? "");
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
@@ -3846,7 +3877,7 @@
           if(!document.execCommand("copy"))throw new Error('浏览器未能写入剪贴板');
         } finally { helper.remove(); }
       }
-      toast("已复制",'success');
+      toast(successMessage,'success');
       return true;
     } catch (error) { toast(`复制失败：${error.message}`,'error'); return false; }
   }
@@ -4799,8 +4830,9 @@
   transposeCenter=new window.ExcelLensTranspose({capture:captureClipboardSelection,copy:copyText,toast,navigate:navigateToCell,colName,fontStack,limits:fileFormats.transpose,richLimits:fileFormats.richText});
   window.ExcelLensExportIssues=(jobId,protectCSV)=>exportCenter.startGenerated('/api/analysis/issues/export',{jobId,protectCSV},'异常核对清单（完整）');
   window.ExcelLensExportClusters=(jobId,protectCSV)=>exportCenter.startGenerated('/api/analysis/clusters/export',{jobId,protectCSV},'疑似重复候选（完整计数、有限位置样例）');
-  window.ExcelLensExportReconcile=(jobId,protectCSV,label)=>exportCenter.startGenerated('/api/reconcile/export',{jobId,protectCSV},label);
-  if(window.ExcelLensReconcile)reconcileCenter=new window.ExcelLensReconcile({state:S,api,toast,colName,navigate:navigateToCell,canRun:canOpenWorkbook});
+  window.ExcelLensAuditExport=(path,payload,label)=>exportCenter.startGenerated(path,payload,label);
+  window.ExcelLensExportReconcile=(jobId,protectCSV,label,options={})=>exportCenter.startGenerated('/api/reconcile/export',{jobId,protectCSV,...options},label);
+  if(window.ExcelLensReconcile)reconcileCenter=new window.ExcelLensReconcile({state:S,api,toast,colName,navigate:navigateToCell,canRun:canOpenWorkbook,recordBytes:fileFormats.reconcileRecordBytes});
   if(window.ExcelLensRelations){relationsCenter=new window.ExcelLensRelations({api,toast,formats:fileFormats,fieldLimits:JSON.parse($('fileFormats').textContent).composition,navigate:navigateToCell,canRun:canOpenWorkbook,context:()=>({bookKey:S.workbookKey,book:S.book,opened:S.opened,source:'wb:'+S.sheet}),onExport:(payload,name)=>exportCenter.startGenerated('/api/relation/export',payload,name)});window.ExcelLensRelationsUI=relationsCenter;}
   if(window.ExcelLensNamedViews)namedViews=new window.ExcelLensNamedViews({state:S,api,toast,capture:captureNamedView,apply:applyNamedView,supportsRowVisibility:()=>!!rowViews,canApply:()=>{if(S.filterJob||S.opening||S.sheetLoadingEpoch||rowViews?.busy){toast('请先完成当前加载、筛选或行显隐更新','warning');return false;}return true;}});
 	if(window.ExcelLensCatalogue)catalogueCenter=new window.ExcelLensCatalogue({state:S,api,toast,limits:fileFormats.catalogue,supported:()=>!!fileFormats.source(S.source?.format).catalogueMetadata,navigate:navigateCatalogueArea,canNavigate:()=>!!S.opened&&!S.opening&&!S.sheetLoadingEpoch&&!S.filterJob&&!rowViews?.busy});
@@ -4810,7 +4842,14 @@
   profileCenter = new window.ExcelLensProfileCenter({state:S,api,toast,openDialog,navigateToCell,colName,limits:fileFormats.profile,source:()=>fileFormats.source(S.source?.format),canRead:()=>!S.filterJob&&!rowViews?.busy,excludeThroughRow:()=>frozenPanes.effective().rows});
 	selectionQuick=new window.ExcelLensSelectionQuick({state:S,api,toast,colName,limits:fileFormats.selectionQuick,pinnedThroughRow:()=>frozenPanes.effective().rows,canRead:()=>!S.filterJob&&!rowViews?.busy,navigate:(sheet,ref,guard)=>navigateToCell(sheet,ref,false,guard)});
 	cellExplanation=new window.ExcelLensCellExplanation({state:S,api,toast,colName,parseRef,limits:fileFormats.cellExplanation,source:()=>fileFormats.source(S.source?.format),pinnedThroughRow:()=>frozenPanes.effective().rows,canRead:()=>!S.filterJob&&!rowViews?.busy,notice:cell=>[...document.querySelectorAll('.grid-region .grid-cell.rich-text-notice,.grid-region .grid-cell.cell-presentation-notice')].filter(node=>node.dataset.ref===cell.ref).map(node=>node._xlRichNotice||node._xlPresentationNotice).filter(Boolean).join('；')||window.ExcelLensRichText.inspect(cell,fileFormats.richText)?.notice||''});
-  bookmarkCenter = new window.ExcelLensBookmarks({state:S,api,toast,openDialog,navigateToCell,onChange:()=>{
+  bookmarkCenter = new window.ExcelLensBookmarks({state:S,api,toast,openDialog,navigateToCell,canNotes:()=>fileFormats.source(S.source?.format).noteMetadata,applyNotes:async(book,notes)=>{
+    if(!editCopy||editCopy.pending||editCopy.abort||editCopy.grid.blocked)throw Error('请先完成当前编辑操作');
+    if(!editCopy.grid.active)await editCopy.show();
+    if(!editCopy.grid.active||S.book!==book||editCopy.data.book!==book)throw Error('编辑来源已变化，请重新选择标记');
+    const ok=await editCopy.commit('structure',[],{direct:true,structure:{kind:'reviewNotes',sheet:notes[0].sheet,notes}});
+    if(!ok)throw Error(document.getElementById('editCopyStatus')?.textContent||'批注写入失败');
+    toast('批注已写入当前修订，可撤销或生成副本','success');
+  },onChange:()=>{
     ++S.decorVersion; renderGridFromCurrentWindow(); frozenPanes.schedule(true);
   }});
   // Contains counters only, never spreadsheet content. Used by automated QA.

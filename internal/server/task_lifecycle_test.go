@@ -170,7 +170,7 @@ func TestExportHistoryRetainsExitingWorkersAndNewestDownloads(t *testing.T) {
 		job := &ExportJob{ID: randomID(), Status: "done", Started: stamp.Add(time.Duration(i+1) * time.Second), ctx: ctx, cancel: cancel, done: make(chan struct{})}
 		close(job.done)
 		defer cancel()
-		a.exportJobs[job.ID] = job
+		a.exports[job.ID] = job
 		completed = append(completed, job)
 	}
 	newest, err := a.newExportJob(nil, "csv")
@@ -178,11 +178,11 @@ func TestExportHistoryRetainsExitingWorkersAndNewestDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(newest.done)
-	if len(a.exportJobs) != 20 || a.exportJobs[pending.ID] != pending || a.exportJobs[newest.ID] != newest {
-		t.Fatal("history lost a live worker or exceeded its pruning target", len(a.exportJobs))
+	if len(a.exports) != 20 || a.exports[pending.ID] != pending || a.exports[newest.ID] != newest {
+		t.Fatal("history lost a live worker or exceeded its pruning target", len(a.exports))
 	}
 	for i, job := range completed {
-		if retained := a.exportJobs[job.ID] != nil; retained != (i >= 7) {
+		if retained := a.exports[job.ID] != nil; retained != (i >= 7) {
 			t.Errorf("history did not discard the oldest exited download: index=%d retained=%v", i, retained)
 		}
 	}

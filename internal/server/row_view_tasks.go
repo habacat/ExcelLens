@@ -230,13 +230,12 @@ func (a *App) runRowView(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wo
 			job.mu.Unlock()
 		}
 	}()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		err = job.ctx.Err()
 		return
 	}
+	defer releaseScan()
 	job.mu.Lock()
 	job.Status = "running"
 	job.Total = idx.RowCount()

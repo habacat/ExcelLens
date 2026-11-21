@@ -62,12 +62,11 @@ func runSourceMetadataTask[T any](a *App, job *sourceMetadataTask[T], unpin func
 		close(job.done)
 		prune()
 	}()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		return
 	}
+	defer releaseScan()
 	a.mu.Lock()
 	if job.ctx.Err() != nil || !current() || job.discarded {
 		a.mu.Unlock()

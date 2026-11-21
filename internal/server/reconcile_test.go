@@ -47,7 +47,7 @@ func attachReconcileCSV(t *testing.T, a *App, name, data string) string {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest("POST", "/api/open", &body)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", a.token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	out := httptest.NewRecorder()
@@ -82,7 +82,7 @@ func startReconcile(t *testing.T, a *App, left, right reconcileSourceRef, query 
 func awaitReconcileExport(t *testing.T, a *App, id string) *ExportJob {
 	t.Helper()
 	a.mu.RLock()
-	job := a.exportJobs[id]
+	job := a.exports[id]
 	a.mu.RUnlock()
 	if job == nil {
 		t.Fatal("export missing")

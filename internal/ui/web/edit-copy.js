@@ -33,6 +33,9 @@
       el('Undo').addEventListener('click', () => this.commit('undo'));
       el('Redo').addEventListener('click', () => this.commit('redo'));
       this.tools = new window.ExcelLensEditTools(this);
+      el('TrialMode').addEventListener('change',()=>this.trialMode());
+      el('Trial').addEventListener('input',()=>{el('TrialOutput').replaceChildren();el('TrialStatus').textContent='';});
+      el('TrialRun').addEventListener('click',()=>this.whatIf());
       el('Copy').addEventListener('click', () => this.copy());
       el('BatchText').addEventListener('input', () => { this.pasteRaw = null; this.clearPreview(); });
       el('BatchText').addEventListener('paste', event => {
@@ -103,6 +106,35 @@
       if (this.grid.active) { this.grid.selection(); this.grid.focus(); }
     }
 
+    trialMode(){
+      const table=el('TrialMode').value==='table';
+      for(const label of el('Trial').querySelectorAll('[data-seek]'))label.hidden=table;
+      for(const label of el('Trial').querySelectorAll('[data-trials]'))label.hidden=!table;
+    }
+    async whatIf(){
+      if(this.pending||this.dirty||this.abort){this.status('请先确认或放弃当前输入');return;}
+      const doc=this.data.document,mode=el('TrialMode').value;
+      const address=value=>{
+        const parts=value.trim().match(/^(?:(.+)!)?\$?([A-Za-z]+)\$?([1-9]\d*)$/);
+        if(!parts)throw Error('请输入有效的单元格地址');
+        const sheetName=parts[1]||el('Sheet').value;
+        const sheet=sheetName.startsWith("'")&&sheetName.endsWith("'")?sheetName.slice(1,-1).replaceAll("''","'"):sheetName;
+        return {sheet,col:window.ExcelLensAddress.columnNumber(parts[2].toUpperCase()),row:Number(parts[3])};
+      };
+      const read=id=>el('Trial'+id).value.trim(),list=id=>read(id).split(/[，,;；\s]+/).filter(Boolean);
+      await this.run('正在试算…',async signal=>{
+        el('TrialOutput').replaceChildren();el('TrialStatus').textContent='';
+        const trial={mode,input:address(read('Input')),target:address(read('Target'))};
+        if(mode==='seek')Object.assign(trial,{goal:read('Goal'),lower:read('Lower'),upper:read('Upper'),tolerance:read('Tolerance')});
+        else{trial.values=list('Values');trial.secondValues=list('SecondValues');if(read('Second'))trial.second=address(read('Second'));}
+        const data=await this.post('what-if',{document:keyOf(doc),revision:doc.revision,book:this.data.book,trial},signal);
+        el('TrialStatus').textContent=data.status+' · '+data.iterations+' 次计算'+(data.residual!==undefined?' · 残差 '+data.residual:'')+' · 修订 '+doc.revision;
+        const table=document.createElement('table');const tr=table.insertRow();
+        for(const name of (trial.second?['输入','第二输入','目标结果']:['输入','目标结果'])){const th=document.createElement('th');th.textContent=name;tr.append(th);}
+        for(const point of data.points){const row=table.insertRow();for(const value of (trial.second?[point.input,point.second,point.error||point.result]:[point.input,point.error||point.result]))row.insertCell().textContent=value;}
+        el('TrialOutput').replaceChildren(table);this.status('');
+      });
+    }
     async show() {
       const {book, sheet, ref} = this.context();
       if (!book || this.abort || this.grid.active || el('Dialog').open) return;
@@ -181,6 +213,7 @@
     async activate(data, preferredSheet, preferredRef, signal, read = true) {
       if (this.data?.document.id !== data.document.id) this.tools.selected = 'Copy';
       this.data = data; this.cell = null; this.pending = null; this.invalidated = false;
+      el('Trial').hidden=!!data.encoding;el('TrialOutput').replaceChildren();el('TrialStatus').textContent='';
       this.clearPreview(); this.pasteRaw = null; el('BatchText').value = '';
       el('CopyEnd').value = ''; el('PasteMode').value = 'plain';
       for (const option of el('PasteMode').options) if (['formulas', 'styles'].includes(option.value)) option.disabled = !!data.encoding;

@@ -179,7 +179,7 @@
     }
   }
   const types=new Map([['s','文本'],['str','文本'],['inlineStr','文本'],['text','文本'],['string','文本'],['b','布尔'],['e','错误'],['d','日期'],['n','数值']]);
-  const sourceType=cell=>cell.cacheMissing?'公式无保存结果':cell.presentationOnly?'源为空白':cell.raw===''&&!cell.hasFormula?'空白':types.get(cell.type)||(cell.type?'源类型 '+cell.type:'数值');
+  const sourceType=cell=>cell.cacheMissing?'公式无保存结果':cell.presentationOnly?'源为空白':cell.sourceType?'ODS · '+cell.sourceType+(cell.currency?' '+cell.currency:''):cell.raw===''&&!cell.hasFormula?'空白':types.get(cell.type)||(cell.type?'源类型 '+cell.type:'数值');
   const formula=cell=>cell.hasFormula&&typeof cell.formula==='string'&&cell.formula.startsWith('=')&&cell.formula.length>1?cell.formula:null;
   window.ExcelLensCellView={value,occupied,isText,Presenter,selectionFill,sourceType,formula};
 })();

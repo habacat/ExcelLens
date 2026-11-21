@@ -37,3 +37,9 @@ func sourceHeaderIdentities(info reconcile.SourceInfo) []sourceview.HeaderIdenti
 	}
 	return out
 }
+
+func markReconcileHeaders(info reconcile.SourceInfo) {
+	for i, field := range sourceHeaderIdentities(info) {
+		info.Fields[i].UniqueHeader = field.Complete && field.Unique
+	}
+}

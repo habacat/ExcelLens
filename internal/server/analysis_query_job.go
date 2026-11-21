@@ -218,14 +218,13 @@ func (a *App) runAnalysisQuery(job *analysisTask, q analysis.Query) {
 			return
 		}
 		if wb.GetCachedIndex(meta.Path) == nil {
-			select {
-			case a.indexSem <- struct{}{}:
-			case <-job.ctx.Done():
+			releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
+			if admissionErr != nil {
 				a.finishAnalysis(job, analysis.Result{}, job.ctx.Err())
 				return
 			}
 			_, err := wb.BuildIndex(meta, nil, job.ctx.Done())
-			<-a.indexSem
+			releaseIndex()
 			if err != nil {
 				a.finishAnalysis(job, analysis.Result{}, err)
 				return
@@ -342,6 +341,12 @@ func (a *App) getAnalysisJob(id string) *analysisTask {
 
 func (a *App) clearAnalysisTasks() {
 	a.analysisMu.Lock()
+	wait := a.detachAnalysisTasksLocked()
+	a.analysisMu.Unlock()
+	wait()
+}
+
+func (a *App) detachAnalysisTasksLocked() func() {
 	jobs := a.analysisJobs
 	a.analysisJobs = make(map[string]*analysisTask)
 	trees := a.analysisTreeJobs
@@ -356,18 +361,19 @@ func (a *App) clearAnalysisTasks() {
 	for _, job := range trees {
 		job.cancel()
 	}
-	a.analysisMu.Unlock()
-	for _, source := range sources {
-		source.close()
-	}
-	for _, job := range jobs {
-		if job.done != nil {
+	return func() {
+		for _, source := range sources {
+			source.close()
+		}
+		for _, job := range jobs {
+			if job.done != nil {
+				<-job.done
+			}
+			job.closeSourceRows()
+		}
+		for _, job := range trees {
 			<-job.done
 		}
-		job.closeSourceRows()
-	}
-	for _, job := range trees {
-		<-job.done
 	}
 }
 func (a *App) handleAnalysisQueryStatus(w http.ResponseWriter, r *http.Request) {

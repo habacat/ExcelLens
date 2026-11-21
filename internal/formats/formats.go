@@ -38,6 +38,14 @@ const (
 	ClipboardRows      = 250
 	ClipboardColumns   = 50
 	ClipboardCells     = 5000
+	ODSContentBytes    = 512 << 20
+	ODSLayoutBytes     = 16 << 20
+	ODSRowTemplates    = 1_000_000
+	ODSSheets          = 4096
+	ODSMerges          = 100_000
+	ClipboardTSVRows   = 2000
+	ClipboardTSVCols   = 200
+	ClipboardTSVCells  = 50000
 	// Read-only name/table directory: metadata and references, never cell arrays.
 	CatalogueEntries           = 8192
 	CatalogueBytes             = 16 << 20
@@ -196,10 +204,17 @@ type ClipboardLimits struct {
 	Cells     int `json:"cells"`
 	TextBytes int `json:"textBytes"`
 	HTMLBytes int `json:"htmlBytes"`
+	TSVRows   int `json:"tsvRows"`
+	TSVCols   int `json:"tsvColumns"`
+	TSVCells  int `json:"tsvCells"`
 }
 
 func Clipboard() ClipboardLimits {
-	return ClipboardLimits{ClipboardRows, ClipboardColumns, ClipboardCells, ClipboardTextBytes, ClipboardHTMLBytes}
+	return ClipboardLimits{
+		Rows: ClipboardRows, Columns: ClipboardColumns, Cells: ClipboardCells,
+		TextBytes: ClipboardTextBytes, HTMLBytes: ClipboardHTMLBytes,
+		TSVRows: ClipboardTSVRows, TSVCols: ClipboardTSVCols, TSVCells: ClipboardTSVCells,
+	}
 }
 
 // Source describes the read-only subset supplied by an adapter. HTML XLS has
@@ -213,6 +228,7 @@ type Source struct {
 	ConditionalMetadata bool   `json:"conditionalMetadata"`
 	CatalogueMetadata   bool   `json:"catalogueMetadata"`
 	DataRuleMetadata    bool   `json:"dataRuleMetadata"`
+	NoteMetadata        bool   `json:"noteMetadata"`
 	PrintMetadata       bool   `json:"printMetadata"`
 	TextClustering      bool   `json:"textClustering"`
 }
@@ -224,9 +240,10 @@ type entry struct {
 }
 
 var registry = []entry{
-	{Source{ID: "xlsx", MaxRows: ExcelRows, MaxColumns: ExcelColumns, Styled: true, ConditionalMetadata: true, CatalogueMetadata: true, DataRuleMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xlsx", ".xlsm"}, false},
+	{Source{ID: "xlsx", MaxRows: ExcelRows, MaxColumns: ExcelColumns, Styled: true, ConditionalMetadata: true, CatalogueMetadata: true, DataRuleMetadata: true, NoteMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xlsx", ".xlsm"}, false},
 	{Source{ID: "xls", MaxRows: BIFFRows, MaxColumns: BIFFColumns, Styled: true, CatalogueMetadata: true, DataRuleMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xls"}, false},
 	{Source{ID: "xls-html", MaxRows: ExternalRows, MaxColumns: ExcelColumns, Styled: true, TextAmounts: true, TextClustering: true}, nil, false},
+	{Source{ID: "ods", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextClustering: true}, []string{".ods"}, false},
 	{Source{ID: "csv", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true, TextClustering: true}, []string{".csv"}, false},
 	{Source{ID: "tsv", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true, TextClustering: true}, []string{".tsv"}, false},
 	{Source{ID: "txt", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true, TextClustering: true}, []string{".txt"}, false},

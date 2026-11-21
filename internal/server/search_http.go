@@ -154,18 +154,15 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 		_ = saveSearchCache(wb, job) // Search completion also persists its on-disk index.
 		close(job.done)
 	}()
-	if a.querySem != nil {
-		select {
-		case a.querySem <- struct{}{}:
-			defer func() { <-a.querySem }()
-		case <-job.ctx.Done():
-			job.mu.Lock()
-			job.Status = "cancelled"
-			job.Stage = "已取消"
-			job.mu.Unlock()
-			return
-		}
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
+		job.mu.Lock()
+		job.Status = "cancelled"
+		job.Stage = "已取消"
+		job.mu.Unlock()
+		return
 	}
+	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if job.checkpoint != nil {
@@ -269,9 +266,8 @@ func (a *App) runWorkbookSearch(wb *workbook.Workbook, job *SearchJob) {
 				var err error
 				if idx == nil {
 					report("建立索引", 0)
-					select {
-					case a.indexSem <- struct{}{}:
-					case <-ctx.Done():
+					releaseIndex, admissionErr := a.backgroundIndex(ctx)
+					if admissionErr != nil {
 						return
 					}
 					// Another worker or interactive request may have just finished.
@@ -283,7 +279,7 @@ func (a *App) runWorkbookSearch(wb *workbook.Workbook, job *SearchJob) {
 							}
 						}, ctx.Done())
 					}
-					<-a.indexSem
+					releaseIndex()
 				}
 				if err != nil {
 					select {
@@ -449,4 +445,28 @@ func (a *App) handleSearchCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	job.cancel()
 	writeJSON(w, map[string]any{"cancelled": true})
+}
+
+func (a *App) registerQueryRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/index/start", a.handleIndexStart)
+	mux.HandleFunc("/api/index/status", a.handleIndexStatus)
+	mux.HandleFunc("/api/index/cancel", a.handleIndexCancel)
+	mux.HandleFunc("/api/filter/start", a.handleFilterStart)
+	mux.HandleFunc("/api/filter/distinct", a.handleFilterDistinct)
+	mux.HandleFunc("/api/filter/status", a.handleFilterStatus)
+	mux.HandleFunc("/api/filter/cancel", a.handleFilterCancel)
+	mux.HandleFunc("/api/filter/clear", a.handleFilterClear)
+	mux.HandleFunc("/api/filter/locate", a.handleFilterLocate)
+	mux.HandleFunc("/api/row-view/start", a.handleRowViewStart)
+	mux.HandleFunc("/api/row-view/status", a.handleRowViewStatus)
+	mux.HandleFunc("/api/row-view/cancel", a.handleRowViewCancel)
+	mux.HandleFunc("/api/row-view/clear", a.handleRowViewClear)
+	mux.HandleFunc("/api/row-view/groups", a.handleRowViewGroups)
+	mux.HandleFunc("/api/row-view/locate", a.handleFilterLocate)
+	mux.HandleFunc("/api/row-view", a.handleRowView)
+	mux.HandleFunc("/api/search/start", a.handleSearchStart)
+	mux.HandleFunc("/api/search/validate", a.handleSearchValidate)
+	mux.HandleFunc("/api/search/history", a.handleSearchHistory)
+	mux.HandleFunc("/api/search/status", a.handleSearchStatus)
+	mux.HandleFunc("/api/search/cancel", a.handleSearchCancel)
 }

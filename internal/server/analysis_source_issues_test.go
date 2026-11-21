@@ -56,7 +56,7 @@ func TestAnalysisSourceIssuesExportRetainsScopeAfterAllAnalysisOwnersAreCleared(
 	a.clearAnalysisTasks()
 	release()
 	a.mu.RLock()
-	export := a.exportJobs[started.JobID]
+	export := a.exports[started.JobID]
 	a.mu.RUnlock()
 	select {
 	case <-export.done:

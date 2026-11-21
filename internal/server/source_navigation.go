@@ -28,7 +28,7 @@ func (a *App) sourceNavigation(book *workbook.Workbook, kind, source, sheet stri
 	if err != nil {
 		return nil, err
 	}
-	session.app.replaceWorkbook(book, "")
+	session.app.replaceWorkbook(book)
 	params.Set("session", id)
 	return map[string]any{"sameBook": false, "url": "/?" + params.Encode()}, nil
 }

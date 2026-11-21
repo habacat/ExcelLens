@@ -127,21 +127,6 @@ func (v *sheetRowView) payload() map[string]any {
 	}
 }
 
-func (a *App) clearRowViewsLocked() []*rowViewTask {
-	jobs := make([]*rowViewTask, 0, len(a.rowViewJobs))
-	for _, job := range a.rowViewJobs {
-		job.cancel()
-		jobs = append(jobs, job)
-	}
-	for _, v := range a.rowViews {
-		v.close()
-	}
-	a.rowViews = make(map[string]*sheetRowView)
-	a.rowViewJobs = make(map[string]*rowViewTask)
-	a.rowViewLatest = make(map[string]string)
-	return jobs
-}
-
 func pruneRowViewsLocked(views map[string]*sheetRowView, keep int) {
 	for len(views) > keep {
 		oldest := ""
@@ -152,11 +137,5 @@ func pruneRowViewsLocked(views map[string]*sheetRowView, keep int) {
 		}
 		views[oldest].close()
 		delete(views, oldest)
-	}
-}
-
-func waitRowViewTasks(jobs []*rowViewTask) {
-	for _, job := range jobs {
-		<-job.done
 	}
 }

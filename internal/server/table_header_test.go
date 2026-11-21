@@ -53,7 +53,7 @@ func TestTXTTableHeaderStatusManualHeaderAndFilterCoordinates(t *testing.T) {
 	}
 	for _, row := range []string{"0", "-1", "4"} {
 		req := httptest.NewRequest("GET", "/api/table/header?sheet=%E6%95%B0%E6%8D%AE&row="+row, nil)
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", a.token)
 		res := httptest.NewRecorder()
 		a.Handler().ServeHTTP(res, req)

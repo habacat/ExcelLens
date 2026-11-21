@@ -79,7 +79,7 @@ func TestRelationZIPInvalidFormatAndQueuedCancellationDoNotPublishFiles(t *testi
 		t.Fatal(response.Code, response.Body.String())
 	}
 	a.mu.RLock()
-	job := a.exportJobs[start.JobID]
+	job := a.exports[start.JobID]
 	a.mu.RUnlock()
 	<-job.done
 	if job.Status != "cancelled" || job.FilePath != "" {

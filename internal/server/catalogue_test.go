@@ -374,7 +374,7 @@ func TestCatalogueHTTPOpenResponseProvidesPathIdentityBeforeAnyIndex(t *testing.
 	r := httptest.NewRequest("POST", "/api/open", &body)
 	r.Header.Set("Content-Type", form.FormDataContentType())
 	r.Header.Set("X-ExcelLens-Token", a.token)
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	response := httptest.NewRecorder()
 	a.Handler().ServeHTTP(response, r)
 	opened := decodeResponse[struct{ WorkbookKey, Book string }](t, response)

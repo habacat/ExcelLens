@@ -90,6 +90,7 @@ type StyleInfo struct {
 }
 
 type SheetIndex struct {
+	odsLayout *SourceLayout
 	RowIndex
 	SourceFormat   string // supplied by its owning adapter, not encoded in the index
 	SheetPath      string
@@ -130,6 +131,8 @@ type SourceRowReference struct {
 }
 
 type CellData struct {
+	Currency   string `json:"currency,omitempty"`
+	SourceType string `json:"sourceType,omitempty"`
 	ShortDate  string `json:"shortDate,omitempty"`
 	Ref        string `json:"ref"`
 	Col        int    `json:"col"`

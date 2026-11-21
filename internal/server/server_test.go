@@ -30,7 +30,7 @@ func TestInitialPageClearlyExplainsHowToStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	res := httptest.NewRecorder()
 	app.Handler().ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -70,7 +70,7 @@ func TestGridAssetsExposeNativeSpreadsheetInteractions(t *testing.T) {
 		},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		res := httptest.NewRecorder()
 		app.Handler().ServeHTTP(res, req)
 		if res.Code != http.StatusOK {
@@ -106,7 +106,7 @@ func TestCellEndpointReturnsExactFormulaAndBlankCell(t *testing.T) {
 	}
 	call := func(ref string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/cell?sheet=First&ref="+ref, nil)
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		res := httptest.NewRecorder()
 		app.Handler().ServeHTTP(res, req)
@@ -156,7 +156,7 @@ func TestAPITokenIsRequired(t *testing.T) {
 	handler := app.Handler()
 	request := func(token string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		if token != "" {
 			req.Header.Set("X-ExcelLens-Token", token)
 		}
@@ -178,6 +178,7 @@ func TestNonLoopbackRemoteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = localTestConnection(req)
 	req.RemoteAddr = "192.0.2.1:12345"
 	res := httptest.NewRecorder()
 	app.Handler().ServeHTTP(res, req)
@@ -201,7 +202,7 @@ func TestWorkbookWideSearchFindsFormulaOnMultipleSheets(t *testing.T) {
 	handler := app.Handler()
 	call := func(method, target, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, target, strings.NewReader(body))
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		if body != "" {
 			req.Header.Set("Content-Type", "application/json")
@@ -269,7 +270,7 @@ func TestWorkbookWideReferenceSearchUsesTargetSheetContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := httptest.NewRequest(http.MethodPost, "/api/search/start", strings.NewReader(`{"sheet":"First","query":"'First'!A1","mode":"reference","scope":"all"}`))
-	request.RemoteAddr = "127.0.0.1:12345"
+	request = localTestConnection(request)
 	request.Header.Set("X-ExcelLens-Token", app.token)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -294,7 +295,7 @@ func TestWorkbookWideReferenceSearchUsesTargetSheetContext(t *testing.T) {
 	}
 	for time.Now().Before(deadline) {
 		req := httptest.NewRequest(http.MethodGet, "/api/search/status?id="+start.JobID, nil)
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		res := httptest.NewRecorder()
 		app.Handler().ServeHTTP(res, req)
@@ -377,7 +378,7 @@ func TestStartupFileErrorIsVisibleToUser(t *testing.T) {
 	}
 	_ = app.OpenPath(filepath.Join(t.TempDir(), "missing.xlsx"))
 	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	res := httptest.NewRecorder()
 	app.Handler().ServeHTTP(res, req)

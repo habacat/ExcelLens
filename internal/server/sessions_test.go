@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,12 +11,15 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
+
+	"excellens/internal/workbook"
 )
 
 func sessionCall(t *testing.T, a *App, session, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", a.token)
 	if session != "" {
 		req.Header.Set("X-ExcelLens-Session", session)
@@ -237,4 +241,42 @@ func TestInvalidBrowserSessionDoesNotReachAnotherWorkbook(t *testing.T) {
 			t.Fatalf("invalid session %q response %d", sid, response.Code)
 		}
 	}
+}
+
+// A previous workbook can take time to release its metadata worker. Anything
+// registered after the new binding becomes visible belongs to the new source.
+func TestSwitchRetiresOnlyPreviousWorkbookJobs(t *testing.T) {
+	isolateTestStorage(t)
+	path := filepath.Join(t.TempDir(), "new.csv")
+	if err := os.WriteFile(path, []byte("ID,金额\n001,12\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	next, err := workbook.OpenWorkbook(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	synctest.Test(t, func(t *testing.T) {
+		a, err := New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer a.Close()
+		ctx, cancel := context.WithCancel(t.Context())
+		job := &catalogueTask{ctx: ctx, cancel: cancel, done: make(chan struct{})}
+		a.catalogueJobs["old"] = job
+		finish := sync.OnceFunc(func() { close(job.done) })
+		defer finish()
+		switched := make(chan struct{})
+		go func() { a.replaceWorkbook(next); close(switched) }()
+		synctest.Wait()
+		if a.currentWorkbook() != next || ctx.Err() == nil {
+			t.Fatal("new binding was not installed while the old worker drained")
+		}
+		id := attachReconcileCSV(t, a, "right.csv", "ID,金额\n001,11\n")
+		finish()
+		<-switched
+		if a.resolveReconcileBook(id) == nil {
+			t.Fatal("old workbook retirement released the new workbook's attachment")
+		}
+	})
 }

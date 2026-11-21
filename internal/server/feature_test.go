@@ -15,7 +15,7 @@ import (
 func featureCall(t *testing.T, a *App, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", a.token)
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
@@ -90,7 +90,7 @@ func TestFreezeSettingsPersistAcrossAppReopen(t *testing.T) {
 		t.Fatalf("freeze settings leaked across sheets: %+v", untouched)
 	}
 	req := httptest.NewRequest("POST", "/api/view", strings.NewReader(`{"sheet":"First","rows":31,"cols":0}`))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", b.token)
 	res := httptest.NewRecorder()
 	b.Handler().ServeHTTP(res, req)

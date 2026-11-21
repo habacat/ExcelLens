@@ -50,7 +50,7 @@ func TestSelectionExportMatchesFilteredCopyAndFrozenOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 		a.mu.RLock()
-		job := a.exportJobs[started.JobID]
+		job := a.exports[started.JobID]
 		a.mu.RUnlock()
 		if job == nil {
 			t.Fatal(response.Body.String())
@@ -73,7 +73,7 @@ func TestSelectionExportMatchesFilteredCopyAndFrozenOrder(t *testing.T) {
 		}
 	}
 	invalid := httptest.NewRequest("POST", "/api/export/start", strings.NewReader(`{"scope":"selection","sheet":"Data","start":"A4","end":"B2","filterId":"f","format":"csv","mode":"values"}`))
-	invalid.RemoteAddr = "127.0.0.1:1234"
+	invalid = localTestConnection(invalid)
 	invalid.Header.Set("X-ExcelLens-Token", a.token)
 	out := httptest.NewRecorder()
 	a.Handler().ServeHTTP(out, invalid)

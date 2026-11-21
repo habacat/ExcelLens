@@ -14,6 +14,51 @@ import (
 func text(raw string) Value   { return Value{Raw: raw, Display: raw, Type: "s", Exists: true} }
 func number(raw string) Value { return Value{Raw: raw, Display: raw, Type: "n", Exists: true} }
 
+func TestAmountToleranceKeepsExactDifferencesAndLegacyBooleanRules(t *testing.T) {
+	left := fixtureSource([]Value{text("a"), number("9007199254740993")},
+		[]Value{text("b"), number("9007199254740993.009")}, []Value{text("c"), number("9007199254740993.01")},
+		[]Value{text("d"), number("9007199254740992.989")})
+	right := fixtureSource([]Value{text("a"), number("9007199254740993")}, []Value{text("b"), number("9007199254740993")},
+		[]Value{text("c"), number("9007199254740993")}, []Value{text("d"), number("9007199254740993")})
+	q := Query{Keys: []Pair{{Left: 1, Right: 1}}, Fields: []Pair{{Left: 2, Right: 2, Mode: "number", Tolerance: "0.01"}}, IncludeEqual: true}
+	result, err := Run(t.Context(), t.TempDir(), q, left, right, Sinks{}, nil)
+	if err != nil || result.Counts.Equal != 1 || result.Counts.WithinTolerance != 2 || result.Counts.Different != 1 {
+		t.Fatal(result.Counts, err)
+	}
+	for i, want := range []string{"0", "0.009", "0.01", "-0.011"} {
+		c := result.Samples[i].Comparisons[0]
+		if c.Delta != want || c.WithinTolerance != (i == 1 || i == 2) || c.Equal != (i == 0) {
+			t.Fatal(c)
+		}
+	}
+	q.RuleVersion = 1
+	if Validate(q, left, right) == nil {
+		t.Fatal("legacy rules silently accepted a tolerance")
+	}
+	q.RuleVersion = 0
+	for _, invalid := range []string{"-0.01", "1e2", "1/2", "."} {
+		q.Fields[0].Tolerance = invalid
+		if Validate(q, left, right) == nil {
+			t.Fatal(invalid)
+		}
+	}
+	q.Keys[0].Tolerance = "0.01"
+	q.Fields = nil
+	if Validate(q, left, right) == nil {
+		t.Fatal("key accepted an amount tolerance")
+	}
+	q.Keys[0].Tolerance = ""
+	boolValue := func(raw string) Value { return Value{Raw: raw, Type: "b", Exists: true} }
+	left, right = fixtureSource([]Value{boolValue("TRUE")}), fixtureSource([]Value{boolValue("true")})
+	for _, rules := range []int{1, 2} {
+		q.RuleVersion = rules
+		r, err := Run(t.Context(), t.TempDir(), q, left, right, Sinks{}, nil)
+		if err != nil || rules == 1 && r.Counts.InvalidKeys != 2 || rules == 2 && (r.Counts.Equal != 1 || r.Samples[0].Left.Values[1].Raw != "TRUE") {
+			t.Fatal(r.Counts, err)
+		}
+	}
+}
+
 func fixtureSource(rows ...[]Value) Source {
 	columns := 2
 	for _, row := range rows {

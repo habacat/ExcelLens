@@ -147,13 +147,12 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 	defer close(job.done)
 	defer job.release()
 	defer job.SourceRows.close()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		job.fail(job.ctx.Err())
 		return
 	}
+	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	wb, q := job.Workbook, job.Query
@@ -351,7 +350,7 @@ func (a *App) cancelRecipeCaptures() {
 		job.cancel()
 	}
 }
-func (a *App) clearRecipeCaptures() {
+func (a *App) detachRecipeCaptures() func() {
 	a.recipeMu.Lock()
 	jobs := a.recipeCaptures
 	a.recipeCaptures = make(map[string]*recipeCaptureTask)
@@ -359,7 +358,9 @@ func (a *App) clearRecipeCaptures() {
 		job.cancel()
 	}
 	a.recipeMu.Unlock()
-	for _, job := range jobs {
-		<-job.done
+	return func() {
+		for _, job := range jobs {
+			<-job.done
+		}
 	}
 }

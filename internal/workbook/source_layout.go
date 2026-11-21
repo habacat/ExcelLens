@@ -188,6 +188,9 @@ func (w *Workbook) SourceLayoutContext(ctx context.Context, meta SheetMeta, idx 
 	if w.Path == "" && idx == nil {
 		return SourceLayout{}, nil
 	}
+	if w.Format == "ods" && idx != nil && idx.odsLayout != nil {
+		return *idx.odsLayout, nil
+	}
 	if w.Format == "xls" && w.source == nil {
 		return SourceLayout{}, nil
 	}

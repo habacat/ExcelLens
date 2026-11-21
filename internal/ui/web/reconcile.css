@@ -13,7 +13,7 @@
 .reconcile-mapping-title{padding:12px 0 6px}.reconcile-mapping-title button{margin-left:auto}
 .reconcile-mappings{display:flex;flex-direction:column;gap:5px}.reconcile-mapping{display:grid;grid-template-columns:minmax(110px,1fr) minmax(110px,1fr) 148px auto auto 28px;gap:7px;align-items:center}
 .reconcile-mapping input.field-control{min-width:0;width:100%}.reconcile-mapping label{display:flex;gap:4px;align-items:center;white-space:nowrap;font-size:11px}.reconcile-mapping input[type=checkbox]{width:12px;height:12px}
-.reconcile-mapping button{border:1px solid var(--reading-line,#dfe4e9);background:transparent;color:inherit;min-height:29px;border-radius:4px}
+.reconcile-mapping button{grid-column:-2;border:1px solid var(--reading-line,#dfe4e9);background:transparent;color:inherit;min-height:29px;border-radius:4px}
 .reconcile-run-tools{padding:13px 0}.reconcile-run-tools>label,.reconcile-result-heading>label{display:flex;gap:5px;align-items:center;font-size:11px}
 .reconcile-progress{border-left:3px solid var(--reading-accent,#2563a6);padding:8px 10px;background:var(--reading-active,#eaf3fc);margin:2px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .reconcile-progress.is-error{border-left-color:#ad553a}
@@ -32,3 +32,7 @@
 .reconcile-empty{padding:20px!important;text-align:center;color:var(--reading-muted,#65758a)}
 @media(max-width:800px){.reconcile-dialog{width:98vw}.reconcile-body{padding:10px}.reconcile-sources{gap:8px}.reconcile-source{padding:9px}.reconcile-mapping{grid-template-columns:minmax(95px,1fr) minmax(95px,1fr) 130px 28px}.reconcile-mapping label{grid-row:2}.reconcile-mapping button{grid-column:4;grid-row:1}.reconcile-mapping select{grid-column:3}.reconcile-mapping-title{gap:6px}}
 @media(max-width:550px){.reconcile-sources{grid-template-columns:1fr}.reconcile-mapping{grid-template-columns:minmax(70px,1fr) minmax(70px,1fr) 28px}.reconcile-mapping select{grid-column:1/3;grid-row:2}.reconcile-mapping label{grid-row:3}.reconcile-mapping button{grid-column:3}.reconcile-result-heading .status-spacer{display:none}.reconcile-table{min-width:650px}}
+
+.reconcile-mapping label[hidden]{display:none}
+.reconcile-mapping .reconcile-threshold{grid-column:span 2}
+.reconcile-threshold input{min-width:0;width:7em}

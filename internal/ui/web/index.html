@@ -520,13 +520,15 @@
         <section class="reconcile-source"><div class="reconcile-source-heading"><strong>左侧来源</strong><button id="reconcileLeftRemove" type="button" class="mini-button" hidden>移除文件</button></div><label>文件<select id="reconcileLeftBook" class="field-control"></select></label><label>工作表<select id="reconcileLeftSheet" class="field-control"></select></label><div class="reconcile-source-bottom"><label>表头行<input id="reconcileLeftHeader" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" class="field-control"></label><span id="reconcileLeftInfo" class="reconcile-muted" role="status">选择来源后读取字段</span></div></section>
         <section class="reconcile-source"><div class="reconcile-source-heading"><strong>右侧来源</strong><button id="reconcileRightRemove" type="button" class="mini-button" hidden>移除文件</button></div><label>文件<select id="reconcileRightBook" class="field-control"></select></label><label>工作表<select id="reconcileRightSheet" class="field-control"></select></label><div class="reconcile-source-bottom"><label>表头行<input id="reconcileRightHeader" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" class="field-control"></label><span id="reconcileRightInfo" class="reconcile-muted" role="status">选择来源后读取字段</span></div></section>
       </div>
-      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><span class="reconcile-muted">表头填0表示无表头；编辑表读取已保存内容。</span></div>
+      <details class="reconcile-batches"><summary>跨批次异常跟踪</summary><div class="reconcile-fields-actions"><label>基线核查包 <input id="batchBaseline" type="file" accept=".zip"></label><label>当期核查包 <input id="batchCurrent" type="file" accept=".zip"></label><button id="batchCompare" class="mini-button" type="button">比较异常明细</button></div></details>
+      <div class="reconcile-fields-actions"><select id="versionScope" class="field-control" aria-label="版本比较范围"><option value="all">整本同名工作表</option><option value="pair">所选两张工作表</option><option value="keyed">所选两表按业务主键对齐</option></select><button id="versionCompare" type="button" class="mini-button">比较工作簿版本</button></div>
+      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><button id="reconcileImport" type="button" class="mini-button" disabled>载入核查记录</button><input id="reconcileRecordFile" type="file" accept=".json" hidden><span class="reconcile-muted">表头填0表示无表头；编辑表读取已保存内容。</span></div>
       <datalist id="reconcileLeftOptions"></datalist><datalist id="reconcileRightOptions"></datalist>
       <div class="reconcile-mapping-title"><strong>主键</strong><span class="reconcile-muted">最多4组；重复键单独列出</span><button id="reconcileAddKey" type="button" class="mini-button">添加主键</button></div><div id="reconcileKeys" class="reconcile-mappings"></div>
       <div class="reconcile-mapping-title"><strong>比较字段</strong><span class="reconcile-muted">最多8组；数值差额保持精确</span><button id="reconcileAddField" type="button" class="mini-button">添加字段</button></div><div id="reconcileFields" class="reconcile-mappings"></div>
       <div class="reconcile-run-tools"><label><input id="reconcileIncludeEqual" type="checkbox">包含一致记录</label><span class="status-spacer"></span><button id="reconcileCancel" type="button" class="mini-button" hidden>取消核对</button><button id="reconcileRun" type="button" class="primary-button compact" disabled>开始核对</button></div>
       <div id="reconcileProgress" class="reconcile-progress" role="status" hidden></div>
-      <section id="reconcileResults" hidden><div class="reconcile-result-heading"><strong>核对结果</strong><button id="reconcileClear" type="button" class="mini-button">清除结果</button><span class="status-spacer"></span><label><input id="reconcileProtectCSV" type="checkbox" checked>CSV文本保护</label><button id="reconcileExport" type="button" class="mini-button">导出完整CSV</button></div><p id="reconcileResultSource" class="reconcile-result-source"></p><div id="reconcileCounts" class="reconcile-counts"></div><div class="reconcile-sample-tools"><select id="reconcileResultFilter" class="field-control" aria-label="筛选核对样例"><option value="">全部样例</option><option value="different">差异</option><option value="left_only">仅左侧</option><option value="right_only">仅右侧</option><option value="duplicate">重复主键</option><option value="review">需核对</option><option value="invalid_key">无效主键</option><option value="equal">一致</option></select><span id="reconcileSampleNote" class="reconcile-muted"></span></div><div class="reconcile-result-scroll"><table id="reconcileTable" class="reconcile-table"></table></div></section>
+      <section id="reconcileResults" hidden><div class="reconcile-result-heading"><strong>核对结果</strong><button id="reconcileClear" type="button" class="mini-button">清除结果</button><span class="status-spacer"></span><label><input id="reconcileProtectCSV" type="checkbox" checked>CSV文本保护</label><button id="reconcileExport" type="button" class="mini-button">导出完整CSV</button><button id="reconcileBundle" type="button" class="mini-button">导出核查包</button></div><p id="reconcileResultSource" class="reconcile-result-source"></p><div id="reconcileCounts" class="reconcile-counts"></div><div class="reconcile-sample-tools"><select id="reconcileResultFilter" class="field-control" aria-label="筛选样例及核查包明细"><option value="">全部类型</option><option value="different">差异</option><option value="within_tolerance">容差内</option><option value="left_only">仅左侧</option><option value="right_only">仅右侧</option><option value="duplicate">重复主键</option><option value="review">需核对</option><option value="invalid_key">无效主键</option><option value="equal">一致</option></select><span id="reconcileSampleNote" class="reconcile-muted"></span></div><div class="reconcile-result-scroll"><table id="reconcileTable" class="reconcile-table"></table></div></section>
     </div>
   </dialog>
 
@@ -615,7 +617,7 @@
         <div class="export-intro">关闭此窗口后，导出任务继续运行。</div>
       <div class="export-field-grid">
         <label class="export-field"><span>导出范围</span><select id="exportScope" class="field-control"><option value="sheet">当前工作表</option><option value="selection">当前选区</option><option value="visible">当前可见行</option><option value="filtered">完整筛选结果</option><option value="all">整个工作簿</option></select></label>
-        <label class="export-field"><span>文件格式</span><select id="exportFormat" class="field-control"><option value="xlsx">Excel 工作簿（.xlsx）</option><option value="csv">CSV（Excel 兼容）</option><option value="tsv">制表符分隔（.tsv）</option><option value="jsonl">结构化数据（.jsonl）</option><option value="html">带格式 HTML（.html）</option><option value="zipcsv">全部 Sheet 分文件打包（.zip）</option></select></label>
+        <label class="export-field"><span>文件格式</span><select id="exportFormat" class="field-control"><option value="xlsx">Excel 工作簿（.xlsx）</option><option value="csv">CSV（Excel 兼容）</option><option value="tsv">制表符分隔（.tsv）</option><option value="jsonl">结构化数据（.jsonl）</option><option value="html">带格式 HTML（.html）</option><option value="zipcsv">CSV 打包文件（.zip）</option></select></label>
         <label class="export-field"><span>内容模式</span><select id="exportMode" class="field-control"><option value="values">原始缓存值（推荐）</option><option value="display">按屏幕显示值</option><option value="formula">保留公式文本</option></select></label>
         <div class="export-field"><span>当前选区</span><div id="exportRangeLabel" class="export-range-value">尚未选择</div></div>
       </div>
@@ -632,7 +634,7 @@
         <div class="progress-track"><div id="exportBar" class="progress-fill"></div></div>
         <div id="exportDetails" class="dialog-summary">正在准备数据...</div>
       </div>
-      <div id="exportResult" class="export-result" hidden><span class="export-success">✓ 文件已生成</span><a id="exportDownload" class="export-download" href="#">下载导出文件</a><span id="exportFileDetails"></span><span id="exportSnapshot" class="export-source"></span></div>
+      <div id="exportResult" class="export-result" hidden><span class="export-success">✓ 文件已生成</span><a id="exportDownload" class="export-download" href="#">下载导出文件</a><button id="exportViewReport" class="mini-button" type="button" hidden>查看差异明细</button><span id="exportFileDetails"></span><span id="exportSnapshot" class="export-source"></span></div>
         <div class="export-actions"><button id="exportFolderBtn" class="mini-button" type="button" title="打开本机导出文件夹">打开导出目录</button><span class="status-spacer"></span><button id="exportRetryBtn" class="mini-button" type="button" hidden>恢复查询</button><button id="exportCancelBtn" class="mini-button" type="button" hidden>取消任务</button><button id="exportStartBtn" class="primary-button compact" type="button">开始导出</button></div>
     </div>
   </dialog>
@@ -654,6 +656,8 @@
       <div id="bookmarkTarget" class="bookmark-target">请选择单元格</div>
       <div class="bookmark-entry"><select id="bookmarkTag" class="field-control"><option value="待复核">待复核</option><option value="异常">异常</option><option value="重要">重要</option><option value="已核实">已核实</option><option value="普通">普通</option></select><textarea id="bookmarkNote" rows="2" maxlength="800" placeholder="记录待核事项、证据线索或复核结论（仅保存在本机）"></textarea><button id="bookmarkSaveBtn" class="primary-button compact" type="button">添加标记</button></div>
       <div class="bookmark-tools"><input id="bookmarkSearch" class="field-control" placeholder="搜索工作表、地址、标记或备注"><button id="bookmarkExportBtn" type="button" class="mini-button">导出标记 CSV</button><button id="bookmarkRefreshBtn" type="button" class="mini-button">刷新</button></div>
+      <div id="bookmarkNoteActions" class="bookmark-tools" hidden><button id="bookmarkSourceNotes" type="button" class="mini-button">查看本表原批注</button><button id="bookmarkWriteNotes" class="mini-button" type="button">将所选标记写入编辑副本</button></div>
+      <section id="sourceNotesPanel" hidden><p id="sourceNotesStatus" role="status"></p><div id="sourceNotesList" class="bookmark-list"></div><button id="sourceNotesPrev" class="mini-button" type="button">上一页</button> <button id="sourceNotesNext" class="mini-button" type="button">下一页</button></section>
       <div id="bookmarkList" class="bookmark-list"></div>
       <div id="bookmarkCount" class="dialog-summary"></div>
     </div>
@@ -728,6 +732,12 @@
           <label for="editCopyAddress">单元格</label><input id="editCopyAddress" autocapitalize="characters" spellcheck="false" maxlength="16" required>
           <button id="editCopyRead" type="submit" class="mini-button">读取</button>
         </form>
+        <details id="editCopyTrial" class="edit-copy-trial"><summary>目标求解与敏感性试算</summary>
+          <div class="edit-trial-fields"><label>方式<select id="editCopyTrialMode"><option value="seek">目标求解</option><option value="table">敏感性试算</option></select></label>
+          <label>输入格<input id="editCopyTrialInput" placeholder="如 A1"></label><label>目标公式格<input id="editCopyTrialTarget" placeholder="如 结果!B2"></label>
+          <label data-seek>目标值<input id="editCopyTrialGoal" inputmode="decimal"></label><label data-seek>输入下界<input id="editCopyTrialLower" inputmode="decimal"></label><label data-seek>输入上界<input id="editCopyTrialUpper" inputmode="decimal"></label><label data-seek>允许残差<input id="editCopyTrialTolerance" value="0.000001" inputmode="decimal"></label>
+          <label data-trials hidden>输入值<textarea id="editCopyTrialValues" placeholder="每行一个数"></textarea></label><label data-trials hidden>第二输入格（可选）<input id="editCopyTrialSecond" placeholder="如 A2"></label><label data-trials hidden>第二组值<textarea id="editCopyTrialSecondValues" placeholder="每行一个数"></textarea></label></div>
+          <button id="editCopyTrialRun" class="mini-button" type="button">运行试算</button><p id="editCopyTrialStatus" role="status"></p><div id="editCopyTrialOutput" class="edit-trial-result"></div></details>
         <div id="editCopyCellPanel" hidden>
           <div class="edit-copy-line edit-copy-cell-head"><label id="editCopyValueLabel" for="editCopyValue">单元格内容</label><select id="editCopyKind" aria-label="单元格类型"><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option><option value="blank">空白</option></select><output id="editCopyCellState"></output></div>
           <textarea id="editCopyValue" rows="4" spellcheck="false" aria-describedby="editCopyTextHint"></textarea>
@@ -1115,6 +1125,7 @@
 	<script src="/assets/data-rules.js"></script>
 	<script src="/assets/printing-model.js"></script>
 	<script src="/assets/printing-render.js"></script>
+	<script src="/assets/printing-output.js"></script>
 	<script src="/assets/printing.js"></script>
 	<script src="/assets/record-card-model.js"></script>
 	<script src="/assets/record-card.js"></script>

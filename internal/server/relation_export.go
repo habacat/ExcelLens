@@ -80,13 +80,12 @@ func (a *App) handleRelationExport(w http.ResponseWriter, r *http.Request) {
 			job.fail(job.ctx.Err())
 			return
 		}
-		select {
-		case a.querySem <- struct{}{}:
-			defer func() { <-a.querySem }()
-		case <-job.ctx.Done():
+		releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+		if admissionErr != nil {
 			job.fail(job.ctx.Err())
 			return
 		}
+		defer releaseScan()
 		a.cacheMu.RLock()
 		defer a.cacheMu.RUnlock()
 		job.mu.Lock()

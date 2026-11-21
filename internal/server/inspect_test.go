@@ -36,7 +36,7 @@ func TestInspectEndpointAndTokenGuard(t *testing.T) {
 	check("constants", 1)
 	check("blanks", 14)
 	request := httptest.NewRequest(http.MethodPost, "/api/inspect", strings.NewReader(`{"sheet":"First","mode":"formulas","start":"A1","end":"D4"}`))
-	request.RemoteAddr = "127.0.0.1:12345"
+	request = localTestConnection(request)
 	res := httptest.NewRecorder()
 	a.Handler().ServeHTTP(res, request)
 	if res.Code != http.StatusForbidden {

@@ -227,14 +227,13 @@ func (a *App) buildTypedTableSource(ctx context.Context, wb *workbook.Workbook, 
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		select {
-		case a.indexSem <- struct{}{}:
-		case <-ctx.Done():
+		releaseIndex, admissionErr := a.backgroundIndex(ctx)
+		if admissionErr != nil {
 			return reconcile.Source{}, ctx.Err()
 		}
 		var err error
 		idx, err = wb.BuildIndex(meta, nil, ctx.Done())
-		<-a.indexSem
+		releaseIndex()
 		if err != nil {
 			return reconcile.Source{}, err
 		}
@@ -430,5 +429,6 @@ func (a *App) handleReconcileFields(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 409, err.Error())
 		return
 	}
+	markReconcileHeaders(source.Info)
 	writeJSON(w, source.Info)
 }

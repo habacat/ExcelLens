@@ -12,6 +12,7 @@
       queryTempBytes: config.queryTempBytes,
       richText: config.richText,
       clipboard: config.clipboard,
+      reconcileRecordBytes: config.reconcileRecordBytes,
 	  printing: config.printing,
 	  record: config.record,
 	  cellExplanation: config.cellExplanation,

@@ -48,12 +48,6 @@ func (a *App) handleAssets(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func (a *App) currentWorkbook() *workbook.Workbook {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return a.wb
-}
-
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -174,7 +168,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	defer releaseBook()
 	wb.SetDisplayName(filepath.Base(h.Filename))
-	a.replaceWorkbook(wb, tmpPath)
+	a.replaceWorkbook(wb)
 	a.recordRecent(wb)
 	writeJSON(w, map[string]any{
 		"opened":      true,
@@ -279,18 +273,11 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.maintenance = true
-	indexes := make([]*IndexJob, 0, len(a.indexJobs))
-	searches := make([]*SearchJob, 0, len(a.searchJobs))
-	for _, job := range a.indexJobs {
-		job.cancel()
-		indexes = append(indexes, job)
-	}
-	for _, job := range a.searchJobs {
-		job.cancel()
-		searches = append(searches, job)
-	}
+	done := a.cancelIndexSearchLocked()
 	a.mu.Unlock()
-	waitJobs(indexes, searches)
+	for _, task := range done {
+		<-task
+	}
 	a.cacheMu.Lock()
 	var clearErr error
 	conflict := false

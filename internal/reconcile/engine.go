@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -56,7 +57,7 @@ func checkedKey(record Record, query Query, right bool) (string, string, error) 
 	if bytes > MaxRecordBytes {
 		return "", "", fmt.Errorf("源行%d所选核对字段超过8MiB限制，请减少比较字段", record.Number)
 	}
-	key, reason := recordKey(record, query.Keys, right)
+	key, reason := recordKey(record, query.Keys, right, query.Rules())
 	if reason != "" {
 		key = invalidRecordKey(record.Position, right)
 	}
@@ -183,6 +184,10 @@ func Run(ctx context.Context, dir string, query Query, left, right Source, sinks
 	if err := Validate(query, left, right); err != nil {
 		return Result{}, err
 	}
+	tolerances := make([]*big.Rat, len(query.Fields))
+	for i, pair := range query.Fields {
+		tolerances[i], _ = pair.AmountTolerance()
+	} // checked by Validate above
 	result := Result{Left: left.Info, Right: right.Info, Query: query, Samples: []Group{}}
 	nextLeft, stopLeft := iter.Pull2(sortedRecords(ctx, dir, left, query, false, progress))
 	defer stopLeft()
@@ -310,15 +315,21 @@ func Run(ctx context.Context, dir string, query Query, left, right Source, sinks
 		default:
 			group.Status = "equal"
 			for i, pair := range query.Fields {
-				comparison := compareValues(group.Left.Values[pair.Left], group.Right.Values[pair.Right], pair, i)
+				comparison := compareValues(group.Left.Values[pair.Left], group.Right.Values[pair.Right], pair, i, query.Rules(), tolerances[i])
 				group.Comparisons = append(group.Comparisons, comparison)
 				if comparison.Reason != "" {
 					group.Status = "review"
-				} else if !comparison.Equal && group.Status == "equal" {
+				} else if comparison.WithinTolerance {
+					if group.Status == "equal" {
+						group.Status = "within_tolerance"
+					}
+				} else if !comparison.Equal && group.Status != "review" {
 					group.Status = "different"
 				}
 			}
 			switch group.Status {
+			case "within_tolerance":
+				result.Counts.WithinTolerance++
 			case "equal":
 				result.Counts.Equal++
 			case "different":

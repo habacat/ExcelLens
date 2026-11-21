@@ -41,6 +41,7 @@ type SourceInfo struct {
 }
 
 type externalSource struct {
+	ods               *odsBook
 	html              *htmlStyleMetadata
 	htmlDefaultName   bool
 	format            string
@@ -62,6 +63,8 @@ type externalSource struct {
 
 func OpenDataFile(path string) (*Workbook, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
+	case ".ods":
+		return openODS(path)
 	case ".csv", ".tsv", ".txt":
 		return openTextWorkbook(path)
 	case ".db", ".sqlite", ".sqlite3":

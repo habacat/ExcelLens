@@ -25,7 +25,7 @@ func checkpointCall(t *testing.T, a *App, path string, body any, code int) *http
 		t.Fatal(err)
 	}
 	r := httptest.NewRequest("POST", path, strings.NewReader(string(data)))
-	r.RemoteAddr = "127.0.0.1:12345"
+	r = localTestConnection(r)
 	r.Header.Set("X-ExcelLens-Token", a.token)
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, r)

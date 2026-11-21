@@ -10,7 +10,7 @@ import (
 func TestChartExportLocalBlobPreviewKeepsScriptAndObjectPolicy(t *testing.T) {
 	a := &App{}
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.RemoteAddr = "127.0.0.1:777"
+	request = localTestConnection(request)
 	out := httptest.NewRecorder()
 	a.securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })).ServeHTTP(out, request)
 	directives := make(map[string]string)

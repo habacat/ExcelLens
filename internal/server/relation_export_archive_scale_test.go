@@ -128,7 +128,7 @@ func TestRelationExportArchiveActualMillionCSVAndFullBIFF(t *testing.T) {
 			for _, format := range []string{"csv", "zipcsv"} {
 				response := decodeResponse[struct{ JobID string }](t, reconcilePost(t, a, "/api/relation/export", map[string]any{"jobId": root.ID, "mode": "left", "maximum": strconv.FormatInt(records+1, 10), "format": format, "protectCSV": false}))
 				a.mu.RLock()
-				jobs = append(jobs, a.exportJobs[response.JobID])
+				jobs = append(jobs, a.exports[response.JobID])
 				a.mu.RUnlock()
 			}
 			clearRelation(t, a, root.ID)

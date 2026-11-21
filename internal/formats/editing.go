@@ -3,6 +3,11 @@ package formats
 import "strings"
 
 const (
+	TrialPoints                     = 256
+	TrialDigits                     = 96
+	TrialIterations                 = 80
+	ReviewNotesPerEdit              = 500
+	ReviewNoteChars                 = 2048
 	EditSourceBytes           int64 = 512 << 20
 	EditStructureHistoryBytes int64 = 4 << 30
 	EditOutputBytes           int64 = 768 << 20

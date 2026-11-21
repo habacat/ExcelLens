@@ -5,16 +5,49 @@
   const $=id=>document.getElementById(id);
   const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
   class Bookmarks {
-    constructor({state,api,toast,openDialog,navigateToCell,onChange}){
-      this.s=state;this.api=api;this.toast=toast;this.openDialog=openDialog;this.navigate=navigateToCell;this.onChange=onChange;
+    constructor({state,api,toast,openDialog,navigateToCell,onChange,canNotes=()=>false,applyNotes}){
+      this.canNotes=canNotes;this.applyNotes=applyNotes;this.s=state;this.api=api;this.toast=toast;this.openDialog=openDialog;this.navigate=navigateToCell;this.onChange=onChange;
       this.items=[];this.keys=new Set();this.loadedBook='';this.request=0;this.pending=null;this.saving=false;this.targetBook='';
       $('bookmarkOpenBtn').addEventListener('click',()=>this.open());
       $('bookmarkSaveBtn').addEventListener('click',()=>this.save());
       $('bookmarkExportBtn').addEventListener('click',()=>this.exportCSV());
+      this.checked=new Set();this.noteSerial=0;
+      $('bookmarkSourceNotes').addEventListener('click',()=>this.readNotes());
+      $('bookmarkWriteNotes').addEventListener('click',()=>this.writeNotes());
+      $('sourceNotesPrev').addEventListener('click',()=>this.drawNotes(this.notePage-1));
+      $('sourceNotesNext').addEventListener('click',()=>this.drawNotes(this.notePage+1));
       $('bookmarkSearch').addEventListener('input',()=>this.render());
       $('bookmarkRefreshBtn').addEventListener('click',()=>this.load(true));
     }
+    async readNotes(){
+      const book=this.s.book,sheet=this.s.sheet,serial=++this.noteSerial;
+      this.noteController?.abort();const controller=this.noteController=new AbortController();
+      $('sourceNotesPanel').hidden=false;this.notes=[];this.drawNotes(0);$('sourceNotesStatus').textContent='正在读取批注…';
+      try{
+        const data=await this.api('/api/notes?'+new URLSearchParams({book,sheet}),{signal:controller.signal});
+        if(serial!==this.noteSerial||book!==this.s.book||sheet!==this.s.sheet)return;
+        this.notes=data.items;this.noteThreaded=data.threaded;this.noteSheet=sheet;this.drawNotes(0);
+      }catch(error){if(serial===this.noteSerial&&error.name!=='AbortError')$('sourceNotesStatus').textContent=error.message;}
+    }
+    drawNotes(page){
+      this.notePage=Math.max(0,page);const items=this.notes||[],list=$('sourceNotesList');list.replaceChildren();
+      const start=page*50;
+      for(const item of items.slice(start,start+50)){
+        const line=document.createElement('button');line.type='button';line.className='bookmark-visit';
+        const label=document.createElement('strong'),body=document.createElement('span');label.textContent=item.ref+' · '+item.author;body.className='bookmark-desc';body.style.whiteSpace='pre-wrap';body.textContent=item.text;line.append(label,body);
+        line.onclick=()=>{$('bookmarkDialog').close();this.navigate(this.noteSheet,item.ref);};list.append(line);
+      }
+      $('sourceNotesStatus').textContent=(items.length?(start+1)+'–'+Math.min(start+50,items.length)+' / '+items.length+' 条传统批注':'本表没有传统批注')+(this.noteThreaded?'，另含线程批注':'');
+      $('sourceNotesPrev').hidden=page<=0;$('sourceNotesNext').hidden=start+50>=items.length;
+    }
+    async writeNotes(){
+      const notes=this.items.filter(item=>this.checked.has(item.id)).map(item=>({sheet:item.sheet,ref:item.ref,text:item.note?item.tag+'\n'+item.note:item.tag}));
+      if(!notes.length){this.toast('请先勾选要写入的标记','warning');return;}
+      const book=this.s.book;$('bookmarkDialog').close();
+      try{await this.applyNotes(book,notes);}catch(error){this.toast(error.message,'error');}
+    }
     resetBook(){
+      this.checked.clear();this.noteSerial++;this.noteController?.abort();this.notes=[];$('sourceNotesPanel').hidden=true;
       ++this.request;this.pending?.abort();this.pending=null;this.saving=false;
       this.loadedBook='';this.targetBook='';this.items=[];this.keys.clear();
       $('bookmarkSaveBtn').disabled=false;
@@ -41,6 +74,7 @@
     }
     has(sheet,ref){return this.loadedBook===this.s.workbookKey&&this.keys.has(`${sheet}!${ref}`)}
     open() {
+      $('bookmarkNoteActions').hidden=!this.canNotes();$('sourceNotesPanel').hidden=true;this.noteThreaded=false;
       if(!this.s.sheet||!this.s.selected){this.toast('请先选中单元格','warning');return;}
       this.prepareCurrent();this.render();this.openDialog('bookmarkDialog');
       const book=this.s.workbookKey,target=`${this.s.sheet}!${this.s.selected.ref}`,note=$('bookmarkNote').value,tag=$('bookmarkTag').value;
@@ -101,6 +135,10 @@
         main.append(head,tag,desc);
         main.addEventListener('click',async()=>{$('bookmarkDialog').close();try{await this.navigate(b.sheet,b.ref)}catch(e){this.toast(e.message,'error')}});
         const del=document.createElement('button');del.type='button';del.className='bookmark-remove';del.textContent='×';del.title='删除此标记';del.addEventListener('click',()=>this.remove(b));
+        if(this.canNotes()){
+          const check=document.createElement('input');check.type='checkbox';check.checked=this.checked.has(b.id);check.setAttribute('aria-label','选中 '+b.sheet+'!'+b.ref+' 的标记');
+          check.onchange=()=>{if(check.checked)this.checked.add(b.id);else this.checked.delete(b.id);};row.prepend(check);
+        }
         row.append(main,del);frag.append(row);count++;
       }
       if(!count){const empty=document.createElement('div');empty.className='dialog-summary';empty.textContent='暂无匹配的标记';frag.append(empty)}

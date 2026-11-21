@@ -1,5 +1,33 @@
 # ExcelLens 上游算法功能与写入架构调研
 
+## 2026-11-21 发行后功能复核
+
+本轮对照 Gnumeric、Grist、LibreOffice Calc、Univer 和纯 Go 的 Excelize。下列链接固定到本次阅读的上游提交。下表记录调研时的 1.11.0 基线，已计入当时工作树中的核查包和跨批次计数比较。优先级按财务台账核查中的实际用途排列。
+
+| 优先级 | 工作场景与现有边界 | 建议的首个可验收交付 | 上游实现 |
+| --- | --- | --- | --- |
+| P1 | 复核两版工作簿。双表核对能按主键比较字段，比较快照能比较汇总指标。当前缺少按工作表和原坐标找出公式、类型、值及结构变化的入口。 | 选两本簿并确认工作表对应关系，列出增删格和变更格。样本应含“公式换成同值常量”“前导零文本换成数值”“缓存缺失”，分别显示计算式、缓存及两侧源格。行列插入时先标记结构变化。 | [Gnumeric 工作表差异算法](https://github.com/GNOME/gnumeric/blob/bf0f6b1c2354c8e10d5f74d086df42c68a960ea1/src/sheet-diff.c#L88) · [ssdiff 输出](https://github.com/GNOME/gnumeric/blob/bf0f6b1c2354c8e10d5f74d086df42c68a960ea1/doc/ssdiff.1#L33) |
+| P1 | 跟踪异常整改。现有核查包能比较分类计数和有效异常主键摘要，另存两侧源格和精确金额。两期各有十项异常时，仍需翻阅明细才能指出哪一项消失、哪一项新增、哪一项只改了金额。 | 按已确认的业务主键归并两次完整明细，列出新增、已消失及持续但值有变的异常。保留基线与当期坐标；重复主键按组列成员，无效主键单列。用“数量相同但主键互换”和“同一主键差额改变”验收。 | [Grist 单元格前后值](https://github.com/gristlabs/grist-core/blob/1fb37587f45e2414cbd88928f89fabffcea8a999/app/common/TabularDiff.ts#L9) · [增删行显示](https://github.com/gristlabs/grist-core/blob/1fb37587f45e2414cbd88928f89fabffcea8a999/app/client/models/DataTableModelWithDiff.ts#L83) |
+| P1 | 交付可打印底稿。当前分页预览已支持纸张、页边距、重复标题及页段定位，用户指南的交付边界止于预览。 | 从已确认的分页结果选择页段，输出可打印文件或 PDF。逐页核对重复标题、分页边界、负数、缺缓存及字体替代提示；先覆盖单表指定页段，再扩展整本。 | [Calc 页数计算及按页输出](https://github.com/LibreOffice/core/blob/a418b990c2ec17e9e3cb025edb533213c8595089/sc/source/ui/view/printfun.cxx#L2481) |
+| P2 | 与提供台账的人交换批注。当前本地标记可写复核备注、切换状态并导出 CSV；编辑副本可保留已有传统批注。缺口是操作工作簿内的批注并随副本交付。 | 先只读列出原批注的作者、原文和位置，再允许显式将选中的本地标记写为副本传统批注。已有批注、框位置以及撤销、生成、重开均需核对。 | [Excelize 批注读写](https://github.com/qax-os/excelize/blob/1615ceb458fe237626c63dd46dc7dd72ec852504/vml.go#L61) · [Univer 可撤销的备注命令](https://github.com/dream-num/univer/blob/4767b3b309467c283bbd52b725536ca73861e0fc/packages/sheets-note/src/commands/commands/note.command.ts#L151) |
+| P2，有样本时优先 | 直接打开 ODS 台账。历史调研已列过这个候选，当前格式注册表仍未包含 ODS。 | 在有真实样本需求时增加只读适配器。用重复行列、显式文本编号、日期和缺缓存公式核对源类型与坐标；超大重复区间须按需展开。 | [Gnumeric ODF 重复行与值类型读取](https://github.com/GNOME/gnumeric/blob/bf0f6b1c2354c8e10d5f74d086df42c68a960ea1/plugins/openoffice/openoffice-read.c#L3902) |
+| P3 | 复核模型的盈亏平衡点及敏感性。编辑副本支持依赖重算，现有入口尚未提供给定目标值反求一个输入，或批量试算一组输入。 | 先在显式试算中选择输入格和目标格，报告解、残差及迭代状态。用可解、无解、不支持公式及循环引用四组样本验收，再考虑双变量表。 | [Gnumeric 单变量求解](https://github.com/GNOME/gnumeric/blob/bf0f6b1c2354c8e10d5f74d086df42c68a960ea1/src/tools/goal-seek.c#L319) · [Calc 行列变量试算](https://github.com/LibreOffice/core/blob/a418b990c2ec17e9e3cb025edb533213c8595089/sc/source/ui/miscdlgs/tabopdlg.cxx#L52) |
+
+同一模板的两个版本适合从原坐标比较入手，不同批次的业务台账更适合先按字段身份和业务主键对齐。两项可共用输入摘要、分页差异明细和双侧来源导航。工作树已沿这两条路径实现版本比较和异常逐项跟踪。
+
+本地已能双向追踪公式的直接引用与从属关系，也有可撤销的编辑历史、复核标记和分析快照。本轮将这些能力计入现状。表中六项均已进入本地实现。版本比较与逐项跟踪复用来源、索引和导出服务，分页底稿复用纸张预览，批注和试算绑定编辑修订，ODS 使用公共只读适配器接口。[实施与验收记录](improvement-progress.md#接续入口)[公式追踪实现](../../internal/ui/web/tracing.js) · [复核标记](../../internal/server/bookmarks.go) · [分页预览](../user/printing.md) · [分析快照](../user/comparison-snapshots.md) · [双表核查](../user/reconciliation.md) · [格式注册表](../../internal/formats/formats.go)
+
+### 六项实现后的差距
+
+对照 daff 时列出的两项差距已在 1.12.0 实现，操作入口及适用边界见[双表核对](../user/reconciliation.md)。下表保留当时的基线和验收样例。
+
+| 优先级 | 当前工作流遇到的问题 | 建议验收样例 |
+| --- | --- | --- |
+| P1 | 在两版台账中间插入一行时，按原坐标比较会列出其后各行的变化。双表核对能按主键比值，版本报告还不能同时按业务行对齐和检查公式变化。[daff 的主键与行序选项](https://github.com/paulfitz/daff/blob/ad5a02efd58ea7a2a70bb888f65ab610d136db28/README.md#L72) | 允许为一对工作表显式选择业务主键。在其中一版插入一行、移动一条记录，并把另一条的公式改成同值常量。报告分别列出新增、移动、公式变化以及两侧源格。重复键显示待核。 |
+| P2 | 同一金额按不同舍入规则汇总，当前精确数值核对会把一分钱的尾差与更大的差额归在同一类。核查记录还没有按字段记录金额容差的选项。[daff 的数值容差定义](https://github.com/paulfitz/daff/blob/ad5a02efd58ea7a2a70bb888f65ab610d136db28/coopy/CompareFlags.hx#L208) | 默认继续精确比较。明确设置金额容差 0.01 后，分别核对差额 0、0.009、0.01、0.011。保留全部精确差额，对容差内的非零项单独标记，将阈值和边界规则随核查包保存并在重跑时核对。 |
+
+## 1.8.17 首轮调研基线
+
 调研基线为1.8.17、提交`df62426434286294ce40052653e65f101231f075`。目标是保留本机图形界面、多格式、源值可信及有界资源使用，借鉴上游算法和实用流程，采用适合本项目的实现。
 
 优先方向是复用数值解析、可落盘的查询结果与排序、双表对账、计算过程恢复，以及独立的编辑变更层。图形还原优先补富文本和条件格式。压缩索引和全面Canvas绘制需要分场景验证。源文件写入宜从编辑副本和另存开始，并建立格式能力、依赖失效及事务保存规则。

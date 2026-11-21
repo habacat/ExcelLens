@@ -104,7 +104,7 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 422, "任务原文件已移动或删除")
 		return
 	}
-	if !a.installWorkbook(wb, "", expected, true) {
+	if !a.installWorkbook(wb, expected, true) {
 		writeError(w, 409, "当前文件已切换，未替换当前视图")
 		return
 	}

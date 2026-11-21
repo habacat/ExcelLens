@@ -51,7 +51,7 @@ func (a *App) editRead(ctx context.Context, doc *editdoc.Document, layout editfi
 	current := doc.ValueAt(address, source.Value)
 	var formulaState string
 	var savedResult, calculatedResult *editdoc.Value
-	calc, err := a.calculationFor(ctx, doc, layout, f)
+	calc, err := a.edits.calculationFor(ctx, doc, layout, f)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil {
 			return editdoc.PreparedChanges{}, err
 		}
-		layout, err = a.documentEditLayout(ctx, doc, layout, f)
+		layout, err = a.edits.documentEditLayout(ctx, doc, layout, f)
 		if err != nil {
 			return editdoc.PreparedChanges{}, err
 		}
@@ -223,7 +223,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil || layout.XLSX == nil || len(plan.Changes) == 0 {
 			return plan, err
 		}
-		entry, err := a.calculationRevision(ctx, doc, layout, f, slices.ContainsFunc(plan.Changes, func(c editdoc.Change) bool { return c.Value.Kind == "formula" }))
+		entry, err := a.edits.calculationRevision(ctx, doc, layout, f, slices.ContainsFunc(plan.Changes, func(c editdoc.Change) bool { return c.Value.Kind == "formula" }))
 		if err != nil {
 			return plan, err
 		}
@@ -253,7 +253,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil {
 			return nil, err
 		}
-		layout, err = a.documentEditLayout(ctx, doc, layout, f)
+		layout, err = a.edits.documentEditLayout(ctx, doc, layout, f)
 		if err != nil {
 			return nil, err
 		}

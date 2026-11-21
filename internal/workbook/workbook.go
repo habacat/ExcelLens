@@ -165,7 +165,13 @@ func (w *Workbook) GetCachedIndex(sheetPath string) *SheetIndex {
 		return idx
 	}
 	xmlPath, idxPath := w.cachePaths(sheetPath)
-	loaded, err := loadIndex(idxPath, xmlPath, sheetPath)
+	var loaded *SheetIndex
+	var err error
+	if w.Format == "ods" {
+		loaded, err = loadODSIndex(idxPath, xmlPath, sheetPath)
+	} else {
+		loaded, err = loadIndex(idxPath, xmlPath, sheetPath)
+	}
 	if err != nil {
 		return nil
 	}
@@ -215,6 +221,9 @@ func (w *Workbook) CheckSourceUnchanged() error {
 func (w *Workbook) cachePaths(sheetPath string) (string, string) {
 	sum := sha1.Sum([]byte(sheetPath))
 	base := fmt.Sprintf("sheet-%x", sum[:8])
+	if w.Format == "ods" {
+		base += "-ods2"
+	}
 	if w.Format == "xls" {
 		base += fmt.Sprintf("-biff%d", biffRowReaderVersion)
 	}

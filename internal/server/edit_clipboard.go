@@ -120,7 +120,7 @@ func (a *App) copyEditCells(ctx context.Context, doc *editdoc.Document, layout e
 	}
 	clip := editClipboard{Format: editClipboardFormat, Version: 2, Start: first, Rows: rows, Cols: cols, Cells: make([]editClipboardCell, 0, len(addresses))}
 	size := 1024
-	calc, err := a.calculationFor(ctx, doc, layout, f)
+	calc, err := a.edits.calculationFor(ctx, doc, layout, f)
 	if err != nil {
 		return editClipboard{}, err
 	}

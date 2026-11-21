@@ -29,7 +29,7 @@ func (a *App) editPivotFields(ctx context.Context, doc *editdoc.Document, layout
 		return nil, err
 	}
 	defer file.Close()
-	entry, err := a.calculationRevision(ctx, doc, layout, file, true)
+	entry, err := a.edits.calculationRevision(ctx, doc, layout, file, true)
 	if err != nil {
 		return nil, err
 	}

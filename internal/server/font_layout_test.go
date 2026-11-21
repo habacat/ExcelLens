@@ -62,7 +62,7 @@ func TestFontOverrideHTTPPersistsIndependentlyPerSheet(t *testing.T) {
 	}
 	invalid := httptest.NewRecorder()
 	request := httptest.NewRequest("POST", "/api/layout", strings.NewReader(`{"sheet":"First","kind":"font","font":"not-a-platform-font"}`))
-	request.RemoteAddr = "127.0.0.1:2222"
+	request = localTestConnection(request)
 	request.Header.Set("X-ExcelLens-Token", app.token)
 	app.Handler().ServeHTTP(invalid, request)
 	if invalid.Code != http.StatusBadRequest {

@@ -45,14 +45,13 @@ func (a *App) prepareExportSelections(ctx context.Context, wb *workbook.Workbook
 			index = wb.GetCachedIndex(meta.Path)
 		}
 		if index == nil {
-			select {
-			case a.indexSem <- struct{}{}:
-			case <-ctx.Done():
+			releaseIndex, admissionErr := a.backgroundIndex(ctx)
+			if admissionErr != nil {
 				return nil, ctx.Err()
 			}
 			var err error
 			index, err = wb.BuildIndex(meta, nil, ctx.Done())
-			<-a.indexSem
+			releaseIndex()
 			if err != nil {
 				if ctx.Err() != nil {
 					return nil, ctx.Err()

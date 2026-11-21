@@ -86,7 +86,7 @@ func TestBookmarksRejectUnknownSheetOrExcessiveNotes(t *testing.T) {
 		`{"action":"save","sheet":"First","ref":"A1","note":"` + strings.Repeat("a", 801) + `"}`,
 	} {
 		req := httptest.NewRequest("POST", "/api/bookmarks", strings.NewReader(body))
-		req.RemoteAddr = "127.0.0.1:12345"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		response := httptest.NewRecorder()
 		app.Handler().ServeHTTP(response, req)

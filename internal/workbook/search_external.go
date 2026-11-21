@@ -42,17 +42,18 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 	lastReport := time.Now()
 	for i := state.Next; i < total; i++ {
 		off := idx.RowAt(i)
-		if i&63 == 0 {
+		if i&63 == 0 || idx.odsRuns != nil {
 			if err := ctx.Err(); err != nil {
 				return state, err
 			}
 		}
+		sameTemplate := idx.odsRuns != nil && len(buf) > 0 && off.End == offset && off.Start == offset-int64(len(buf))
 		if skip := off.Start - offset; skip > 0 {
 			if _, err = io.CopyN(io.Discard, br, skip); err != nil {
 				return state, err
 			}
 			offset += skip
-		} else if skip < 0 {
+		} else if skip < 0 && !sameTemplate {
 			return state, errors.New("索引交叠")
 		}
 		size := off.End - off.Start
@@ -62,15 +63,19 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 		if cap(buf) < int(size) {
 			buf = make([]byte, size)
 		}
-		rowBytes := buf[:int(size)]
-		if _, err = io.ReadFull(br, rowBytes); err != nil {
-			return state, err
+		buf = buf[:int(size)]
+		rowBytes := buf
+		if !sameTemplate {
+			if _, err = io.ReadFull(br, rowBytes); err != nil {
+				return state, err
+			}
+			offset += size
 		}
-		offset += size
 		row, err := w.decodeExternalRow(rowBytes, off.Number, 1, 16384, nil, true, true)
 		if err != nil {
 			return state, fmt.Errorf("第 %d 行：%w", off.Number, err)
 		}
+		hitsBefore := len(results)
 		for _, cell := range row.Cells {
 			matched := false
 			if mode == "value" {
@@ -100,6 +105,12 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 				}
 				return state, nil
 			}
+		}
+		if idx.odsRuns != nil && len(results) == hitsBefore {
+			// Simple search compares the stored values and formula text. Only
+			// the result coordinate changes inside a repeated ODS template.
+			run := idx.odsRunAt(i)
+			i = min(total, run.Position+run.Count) - 1
 		}
 		state.Next, state.Matches, state.Complete = i+1, results, i+1 == total
 		if err := saveSearchCheckpoint(state, save, state.Complete); err != nil {

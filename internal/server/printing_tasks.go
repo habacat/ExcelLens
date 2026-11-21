@@ -40,7 +40,10 @@ func (a *App) handlePrintStart(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w)
 		return
 	}
-	var req printStartRequest
+	var req struct {
+		printStartRequest
+		IndexIfNeeded bool `json:"indexIfNeeded,omitempty"`
+	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.PrintPreviewRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.Sheet == "" {
 		writeError(w, 400, "打印预览参数无效")
@@ -64,6 +67,19 @@ func (a *App) handlePrintStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
+	if idx == nil && req.IndexIfNeeded {
+		release, err := a.backgroundIndex(r.Context())
+		if err != nil {
+			writeError(w, 408, "准备工作表已取消")
+			return
+		}
+		idx, err = wb.BuildIndex(meta, nil, r.Context().Done())
+		release()
+		if err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+	}
 	if idx == nil {
 		writeError(w, 409, "请先打开并完成该工作表索引，再准备打印预览")
 		return

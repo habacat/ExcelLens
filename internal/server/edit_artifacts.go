@@ -60,7 +60,7 @@ func (a *App) editSave(ctx context.Context, doc *editdoc.Document, layout editfi
 		return editArtifact{}, err
 	}
 	defer f.Close()
-	layout, err = a.documentEditLayout(ctx, doc, layout, f)
+	layout, err = a.edits.documentEditLayout(ctx, doc, layout, f)
 	if err != nil {
 		return editArtifact{}, err
 	}
@@ -136,7 +136,7 @@ func (a *App) handleEditOpen(w http.ResponseWriter, r *http.Request, req editReq
 		editError(w, err)
 		return
 	}
-	if !a.installWorkbook(wb, "", expected, true) {
+	if !a.installWorkbook(wb, expected, true) {
 		editError(w, checkpoint.ErrConflict)
 		return
 	}

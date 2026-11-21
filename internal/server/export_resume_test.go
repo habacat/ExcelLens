@@ -42,7 +42,7 @@ func exportResumeJob(t *testing.T, a *App, m checkpoint.Manifest) *ExportJob {
 		t.Fatal(err)
 	}
 	a.mu.RLock()
-	job := a.exportJobs[response.JobID]
+	job := a.exports[response.JobID]
 	a.mu.RUnlock()
 	if job == nil || response.TaskID != m.ID || response.Operation != "export" {
 		t.Fatal("durable export was queued as the wrong operation", response)

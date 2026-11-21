@@ -67,7 +67,7 @@ func TestAnalysisSelectionMatchesQuickStatsAfterSortingAndFreezing(t *testing.T)
 			body = strings.ReplaceAll(body, `,"mode":"formulas"`, "")
 		}
 		r := httptest.NewRequest("POST", endpoint, strings.NewReader(body))
-		r.RemoteAddr = "127.0.0.1:1"
+		r = localTestConnection(r)
 		r.Header.Set("X-ExcelLens-Token", a.token)
 		w := httptest.NewRecorder()
 		a.Handler().ServeHTTP(w, r)

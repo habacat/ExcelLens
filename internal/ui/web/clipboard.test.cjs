@@ -1,6 +1,23 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ctx={window:{}};vm.runInNewContext(fs.readFileSync(__dirname+'/clipboard.js','utf8'),ctx);
 const clip=ctx.window.ExcelLensClipboard,plain=value=>JSON.parse(JSON.stringify(value));
+test('read-only copy chooses a bounded representation and exports only the current selection',async()=>{
+  const limits={rows:250,columns:50,cells:5000,tsvRows:2000,tsvColumns:200,tsvCells:50000};
+  async function tryCopy(rows,callbacks={},plain=false){
+    const calls=[],snapshot={rows,firstColumn:1,lastColumn:2,current:()=>true};
+    const step=name=>async()=>{calls.push(name);return callbacks[name]?.(snapshot);};
+    await clip.copyByBudget(snapshot,limits,plain,step('rich'),step('tsv'),step('export'));
+    return calls;
+  }
+  const over=()=>{throw Object.assign(Error('capacity'),{status:413});};
+  assert.deepEqual(await tryCopy(250),['rich']);
+  assert.deepEqual(await tryCopy(251),['tsv']);
+  assert.deepEqual(await tryCopy(2,{},true),['tsv']);
+  assert.deepEqual(await tryCopy(2,{rich:over,tsv:over}),['rich','tsv','export']);
+  assert.deepEqual(await tryCopy(2001),['export']);
+  assert.deepEqual(await tryCopy(251,{tsv:s=>{s.current=()=>false;over();}}),['tsv']);
+  await assert.rejects(()=>tryCopy(251,{tsv:()=>{throw Error('来源已变化');}}),/来源已变化/);
+});
 test('HTML keeps the merged grid while TSV keeps a placeholder for every covered position',()=>{
   const limits={rows:12,columns:8,cells:40,textBytes:20000,htmlBytes:20000};
   vm.runInNewContext(fs.readFileSync(__dirname+'/merges.js','utf8'),ctx);

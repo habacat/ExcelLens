@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"excellens/internal/analysis"
+	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
 
@@ -57,7 +58,22 @@ func exactNumber(v Value, explicit bool) (*big.Rat, bool) {
 	return number, ok
 }
 
-func normalize(v Value, pair Pair) (string, string, *big.Rat, string) {
+// AmountTolerance is a nonnegative decimal in the same units as the delta.
+func (p Pair) AmountTolerance() (*big.Rat, error) {
+	if p.Tolerance == "" {
+		return nil, nil
+	}
+	if p.Mode != "number" || len(p.Tolerance) > formats.ReconcileToleranceChars || strings.Trim(p.Tolerance, "0123456789.") != "" {
+		return nil, errors.New("容差限精确数值字段，须填写非负十进制数")
+	}
+	r, ok := analysis.Decimal(p.Tolerance)
+	if !ok {
+		return nil, errors.New("金额容差无效")
+	}
+	return r, nil
+}
+
+func normalize(v Value, pair Pair, rules int) (string, string, *big.Rat, string) {
 	if v.MissingCache {
 		return "", "", nil, "公式缺少缓存值"
 	}
@@ -86,6 +102,14 @@ func normalize(v Value, pair Pair) (string, string, *big.Rat, string) {
 		}
 	}
 	if kind == "boolean" {
+		if rules >= 2 {
+			switch strings.ToLower(text) {
+			case "true":
+				text = "1"
+			case "false":
+				text = "0"
+			}
+		}
 		if text != "0" && text != "1" {
 			return "", "", nil, "布尔源值无效"
 		}
@@ -101,7 +125,7 @@ func normalize(v Value, pair Pair) (string, string, *big.Rat, string) {
 	return kind, text, nil, ""
 }
 
-func recordKey(record Record, keys []Pair, right bool) (string, string) {
+func recordKey(record Record, keys []Pair, right bool, rules int) (string, string) {
 	var out strings.Builder
 	out.WriteByte(1)
 	var raw [10]byte
@@ -112,13 +136,13 @@ func recordKey(record Record, keys []Pair, right bool) (string, string) {
 		}
 		value := record.Values[col]
 		if value.MissingCache || value.Uncertain != "" {
-			_, _, _, reason := normalize(value, pair)
+			_, _, _, reason := normalize(value, pair, rules)
 			return "", reason
 		}
 		if !value.Exists || strings.TrimSpace(value.Raw) == "" {
 			return "", "主键为空"
 		}
-		kind, text, _, reason := normalize(value, pair)
+		kind, text, _, reason := normalize(value, pair, rules)
 		if reason != "" {
 			return "", reason
 		}
@@ -134,9 +158,9 @@ func recordKey(record Record, keys []Pair, right bool) (string, string) {
 	return out.String(), ""
 }
 
-func compareValues(left, right Value, pair Pair, position int) Comparison {
-	leftKind, a, an, ae := normalize(left, pair)
-	rightKind, b, bn, be := normalize(right, pair)
+func compareValues(left, right Value, pair Pair, position, rules int, tolerance *big.Rat) Comparison {
+	leftKind, a, an, ae := normalize(left, pair, rules)
+	rightKind, b, bn, be := normalize(right, pair, rules)
 	comparison := Comparison{Pair: position}
 	if ae != "" || be != "" {
 		var reasons []string
@@ -151,7 +175,9 @@ func compareValues(left, right Value, pair Pair, position int) Comparison {
 	}
 	comparison.Equal = leftKind == rightKind && a == b
 	if an != nil && bn != nil {
-		comparison.Delta = analysis.ExactDecimalString(new(big.Rat).Sub(an, bn))
+		delta := new(big.Rat).Sub(an, bn)
+		comparison.Delta = analysis.ExactDecimalString(delta)
+		comparison.WithinTolerance = tolerance != nil && delta.Sign() != 0 && delta.Abs(delta).Cmp(tolerance) <= 0
 	}
 	return comparison
 }
@@ -165,9 +191,20 @@ func Validate(query Query, left, right Source) error {
 			return errors.New("核对来源快照无效")
 		}
 	}
-	for _, pairs := range [][]Pair{query.Keys, query.Fields} {
+	if query.Rules() != 1 && query.Rules() != CurrentRuleVersion {
+		return errors.New("核查规则版本不受支持")
+	}
+	for section, pairs := range [][]Pair{query.Keys, query.Fields} {
 		seenLeft, seenRight := map[int]bool{}, map[int]bool{}
 		for _, pair := range pairs {
+			if pair.Tolerance != "" {
+				if section == 0 || query.Rules() == 1 {
+					return errors.New("主键和旧版规则不支持金额容差")
+				}
+				if _, err := pair.AmountTolerance(); err != nil {
+					return err
+				}
+			}
 			if pair.Mode != "" && pair.Mode != "text" && pair.Mode != "number" {
 				return errors.New("字段核对方式无效")
 			}

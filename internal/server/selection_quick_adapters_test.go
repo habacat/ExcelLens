@@ -93,7 +93,7 @@ func TestSelectionQuickSharedTextBudgetAndQueueCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	request := httptest.NewRequest("POST", "/api/selection/quick", bytes.NewReader(data)).WithContext(ctx)
-	request.RemoteAddr = "127.0.0.1:777"
+	request = localTestConnection(request)
 	request.Header.Set("X-ExcelLens-Token", a.token)
 	out := httptest.NewRecorder()
 	done := make(chan struct{})

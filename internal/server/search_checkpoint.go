@@ -324,13 +324,12 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 			if cursor.Index != "" {
 				return errors.New("搜索恢复所需索引已被清理，请重新运行")
 			}
-			select {
-			case a.indexSem <- struct{}{}:
-			case <-job.ctx.Done():
+			releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
+			if admissionErr != nil {
 				return job.ctx.Err()
 			}
 			idx, err = wb.BuildIndex(meta, nil, job.ctx.Done())
-			<-a.indexSem
+			releaseIndex()
 			if err != nil {
 				return err
 			}

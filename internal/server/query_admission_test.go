@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,62 @@ import (
 
 	"excellens/internal/sourceview"
 )
+
+func TestBackgroundWorkLeavesCapacityForAnotherTab(t *testing.T) {
+	for _, index := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			root, err := New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+			tab, err := root.sessionFor(randomID())
+			if err != nil {
+				t.Fatal(err)
+			}
+			start, other := root.backgroundQuery, tab.app.backgroundQuery
+			foreground := tab.app.querySem
+			if index {
+				start, other = root.backgroundIndex, tab.app.backgroundIndex
+				foreground = tab.app.indexSem
+			}
+			first, err := start(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			waiting := make(chan error, 1)
+			go func() {
+				release, err := other(ctx)
+				if err == nil {
+					release()
+				}
+				waiting <- err
+			}()
+			synctest.Wait()
+			select {
+			case <-waiting:
+				t.Fatal("a second background task took the interactive slot")
+			default:
+			}
+			interactive, err := acquireWorkSlot(t.Context(), foreground)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cancel()
+			if <-waiting != context.Canceled {
+				t.Fatal("queued scan did not cancel")
+			}
+			interactive()
+			first()
+			next, err := other(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			next()
+		})
+	}
+}
 
 func TestQueuedQueriesLeaveCacheMaintenanceAvailable(t *testing.T) {
 	check := func(t *testing.T, a *App, handler http.HandlerFunc, endpoint string, body any) {
@@ -71,6 +128,7 @@ func TestQueuedQueriesLeaveCacheMaintenanceAvailable(t *testing.T) {
 			WorkbookKey: rec.WorkbookKey, Book: rec.Book, Sheet: rec.Sheet, ViewID: rec.ViewID, Ref: "A2",
 		}},
 		{"cold navigation", "/api/navigate?sheet=First&ref=A1&direction=down", a.handleNavigate, nil},
+		{"lightweight TSV", "/api/range?sheet=First&start=A1&end=B2&format=tsv", a.handleRange, nil},
 		{"analysis restore", "/api/analysis/source/restore", a.handleAnalysisSourceRestore, map[string]any{
 			"workbookKey": rec.WorkbookKey, "book": rec.Book, "source": "wb:First",
 			"sourceScope": sourceview.Scope{Version: sourceview.ScopeVersion, Fingerprint: rec.WorkbookKey,

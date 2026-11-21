@@ -271,7 +271,7 @@ func (h stabilityHTTP) cycle(source *stabilitySource, cycle int) error {
 		return err
 	}
 	source.app.mu.RLock()
-	job := source.app.exportJobs[exported.JobID]
+	job := source.app.exports[exported.JobID]
 	source.app.mu.RUnlock()
 	select {
 	case <-job.done:
@@ -328,7 +328,7 @@ func stabilityQuiescent(root *App, sources []*stabilitySource) error {
 		for _, job := range a.searchJobs {
 			exits = append(exits, job.done)
 		}
-		for _, job := range a.exportJobs {
+		for _, job := range a.exports {
 			exits = append(exits, job.done)
 		}
 		a.mu.RUnlock()
@@ -451,7 +451,7 @@ func (h stabilityHTTP) lifecycle(root *App, sources []*stabilitySource) error {
 		return err
 	}
 	source.app.mu.RLock()
-	job := source.app.exportJobs[queued.JobID]
+	job := source.app.exports[queued.JobID]
 	source.app.mu.RUnlock()
 	if err := source.app.OpenPath(source.path); err != nil {
 		return err
@@ -499,8 +499,8 @@ func stabilitySnapshot(root *App, sources []*stabilitySource, start time.Time, c
 		a.mu.RLock()
 		sample.Filters = append(sample.Filters, len(a.filterJobs))
 		sample.Searches = append(sample.Searches, len(a.searchJobs))
-		sample.Exports = append(sample.Exports, len(a.exportJobs))
-		tooMany := len(a.filterJobs) > formats.QueryTaskHistory || len(a.searchJobs) > formats.QueryTaskHistory || len(a.exportJobs) > 26 || len(a.filterResults) != 0
+		sample.Exports = append(sample.Exports, len(a.exports))
+		tooMany := len(a.filterJobs) > formats.QueryTaskHistory || len(a.searchJobs) > formats.QueryTaskHistory || len(a.exports) > 26 || len(a.filterResults) != 0
 		a.mu.RUnlock()
 		a.analysisMu.Lock()
 		sample.Analyses = append(sample.Analyses, len(a.analysisJobs))

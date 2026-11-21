@@ -152,7 +152,7 @@ func (a *App) gridFillSources(ctx context.Context, doc *editdoc.Document, layout
 	if err != nil {
 		return nil, err
 	}
-	calc, err := a.calculationFor(ctx, doc, layout, f)
+	calc, err := a.edits.calculationFor(ctx, doc, layout, f)
 	if err != nil {
 		return nil, err
 	}

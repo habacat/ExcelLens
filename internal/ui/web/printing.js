@@ -13,6 +13,8 @@
       $('printSettingsForm').addEventListener('submit',event=>{event.preventDefault();this.refresh();});$('printSettingsForm').addEventListener('input',()=>this.changed());$('printSettingsForm').addEventListener('change',()=>this.changed());
       $('printPreviewPrev').addEventListener('click',()=>this.go(this.index-1));$('printPreviewNext').addEventListener('click',()=>this.go(this.index+1));
       $('printPreviewPage').addEventListener('change',()=>this.goInput());$('printPreviewPage').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();this.goInput();}});
+      $('printOutputMode').addEventListener('change',()=>this.controls());
+      $('printOutput').addEventListener('click',()=>this.exportPaper());
       $('printScreenZoom').addEventListener('change',()=>this.zoom());
       this.dialog.addEventListener('keydown',event=>{if(event.target.closest?.('input,textarea,select')||event.ctrlKey||event.altKey||event.metaKey)return;const page=event.key==='PageDown'?this.index+1:event.key==='PageUp'?this.index-1:event.key==='Home'?0:event.key==='End'?(this.summary?.summary.pages||1)-1:null;if(page!==null){event.preventDefault();this.go(page);}});
       document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key.toLowerCase()==='p'&&this.s.opened){event.preventDefault();this.open();}});
@@ -36,7 +38,7 @@
         <div class="print-pair"><label>缺省行高（磅）<input id="printRowHeight" class="field-control" placeholder="留空按源" inputmode="decimal"></label><label>缺省列宽（磅）<input id="printColumnWidth" class="field-control" placeholder="留空按源" inputmode="decimal"></label></div><label class="print-toggle"><input id="printIgnoreBreaks" type="checkbox">忽略源手工分页</label></details>
         <label class="print-toggle"><input id="printUseDefaults" type="checkbox" checked>补足缺失的页面设置</label><button id="printPreviewUpdate" class="tool-button" type="button">更新预览</button><p id="printPendingNote" class="print-pending" hidden>设置已更改，点击更新预览。</p></form></details>
         <section class="print-view"><div class="print-page-tools"><button id="printPreviewPrev" class="mini-button" type="button" aria-label="上一页">上一页</button><label class="print-page-number">第<input id="printPreviewPage" class="field-control" type="number" min="1" value="1" aria-label="预览页序">页<span id="printPreviewCount">/ 0</span></label><button id="printPreviewNext" class="mini-button" type="button" aria-label="下一页">下一页</button><label class="print-screen-zoom">屏幕缩放<select id="printScreenZoom" class="field-control"><option value="fit">适合页面</option><option value="width">适合宽度</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div><p id="printEffective" class="print-effective"></p><div id="printPreviewCanvas" class="print-canvas" tabindex="0" aria-label="纸张预览，PageUp和PageDown翻页"><div id="printPaperWrap" class="print-paper-wrap"></div><p id="printPreviewEmpty" class="print-empty">正在准备预览…</p></div><p id="printPageCaption" class="print-caption"></p></section></div>
-        <details id="printSourceDetails" class="print-source-details"><summary>页面详情</summary><ul id="printWarnings"></ul><div id="printRawSettings"></div></details><div class="print-footer"><p id="printPreviewStatus" role="status"></p><button id="printPreviewCancel" class="mini-button" type="button" hidden>取消</button></div>`;
+        <details id="printSourceDetails" class="print-source-details"><summary>页面详情</summary><ul id="printWarnings"></ul><div id="printRawSettings"></div></details><div class="print-footer"><select id="printOutputMode" class="field-control" aria-label="底稿页段"><option value="current">当前页</option><option value="range">指定页段</option><option value="sheet">本表全部页</option><option value="book">整本可见表</option></select><input id="printOutputRange" class="field-control" placeholder="1-3,5" aria-label="底稿页段范围" hidden><button id="printOutput" class="mini-button" type="button">导出打印底稿</button><p id="printPreviewStatus" role="status"></p><button id="printPreviewCancel" class="mini-button" type="button" hidden>取消</button></div>`;
       document.body.append(d);const names={left:'左',right:'右',top:'上',bottom:'下',header:'页眉',footer:'页脚'};
       for(const [key,label] of Object.entries(names)){const node=make('label','',label+'（mm）'),input=make('input','field-control');input.id='printMargin'+key[0].toUpperCase()+key.slice(1);input.inputMode='decimal';input.value=input.defaultValue=['header','footer'].includes(key)?'8':'20';node.append(input);$('printMargins').append(node);}return d;
     }
@@ -47,11 +49,15 @@
     release(id){if(id)this.api('/api/printing/clear',{method:'POST',body:JSON.stringify({id})}).catch(()=>{});}
     status(text,error=false){$('printPreviewStatus').textContent=text||'';$('printPreviewStatus').classList.toggle('is-error',error);$('printPreviewStatus').setAttribute('role',error?'alert':'status');}
     controls(){
-      const enabled=this.enabled(),pending=this.busy||this.loading,pages=this.summary?.summary.pages||0;
+      const enabled=this.enabled(),pending=this.busy||this.loading||!!this.outputController,pages=this.summary?.summary.pages||0;
       $('printPreviewOpenBtn').disabled=!enabled;if($('menuPrintPreview'))$('menuPrintPreview').disabled=!enabled;
       $('printPreviewUpdate').disabled=!enabled||this.busy;$('printPreviewCancel').hidden=!pending;
       $('printPreviewPrev').disabled=pending||!this.job||this.index===0;$('printPreviewNext').disabled=pending||!this.job||this.index+1>=pages;
       $('printPreviewPage').disabled=this.busy||!pages;$('printPreviewPage').max=String(pages);$('printPreviewCount').textContent='/ '+pages;
+      $('printOutput').disabled=pending||this.dirty||!this.job||!pages;
+      $('printOutputRange').hidden=$('printOutputMode').value!=='range';
+      $('printOutputMode').disabled=!!this.outputController;
+      $('printOutputRange').disabled=!!this.outputController;
       $('printPendingNote').hidden=!this.dirty;$('printScreenZoom').disabled=!this.rendered;
     }
     fields(){
@@ -63,7 +69,7 @@
       for(const key of ['left','right','top','bottom','header','footer'])out[key]=value('printMargin'+key[0].toUpperCase()+key.slice(1));return out;
     }
     changed(){this.stop(false);this.dirty=true;this.fields();this.controls();this.status('设置已更改，点击更新预览。');}
-    stop(clear=false){++this.epoch;++this.request;++this.pageRequest;this.jobs?.reset();this.controller?.abort();this.pageController?.abort();this.busy=this.loading=false;if(clear){this.release(this.job);this.job='';this.summary=this.page=this.rendered=null;$('printPaperWrap').replaceChildren();$('printPageCaption').textContent='';$('printEffective').textContent='';$('printWarnings').replaceChildren();$('printRawSettings').replaceChildren();$('printPreviewEmpty').hidden=false;$('printPreviewEmpty').textContent='点击更新预览，准备本表分页。';}this.controls();}
+    stop(clear=false){this.outputController?.abort();this.outputJobs?.reset();this.outputController=this.outputJobs=null;++this.epoch;++this.request;++this.pageRequest;this.jobs?.reset();this.controller?.abort();this.pageController?.abort();this.busy=this.loading=false;if(clear){this.release(this.job);this.job='';this.summary=this.page=this.rendered=null;$('printPaperWrap').replaceChildren();$('printPageCaption').textContent='';$('printEffective').textContent='';$('printWarnings').replaceChildren();$('printRawSettings').replaceChildren();$('printPreviewEmpty').hidden=false;$('printPreviewEmpty').textContent='点击更新预览，准备本表分页。';}this.controls();}
     close(){this.stop(true);if(this.dialog.open)this.dialog.close();}
     resetBook(){this.stop(true);this.bound='';this.dirty=false;$('printSettingsForm').reset();$('printScreenZoom').value='fit';this.fields();this.status('');if(this.dialog.open)this.dialog.close();this.controls();}
     cancel(){this.stop(false);this.status(this.job?'已取消更新，保留上一次预览。':'已取消，可重新准备预览。');}
@@ -96,6 +102,48 @@
       try{const page=await this.readPage(job,index,summary,binding,controller.signal);if(!current()||controller.signal.aborted)return;const rendered=this.renderer.build(summary,page);if(!current())return;this.page=page;this.index=index;this.rendered=rendered;this.commit();}
       catch(error){if(current()&&error.name!=='AbortError'){this.status('保留上一次预览。'+error.message,true);$('printPreviewPage').value=String(this.index+1);}}
       finally{if(current()){this.loading=false;this.controls();}}
+    }
+    async exportPaper(){
+      if(this.dirty||this.busy||this.loading||this.outputController||!this.summary)return;
+      const controller=new AbortController(),identity=this.identity(),binding=this.binding(),base=this.job;
+      const current=()=>this.outputController===controller&&!controller.signal.aborted&&this.dialog.open&&this.identity()===identity&&this.job===base;
+      const jobs=new window.ExcelLensAnalysisJobs({api:this.api,identity:()=>this.identity(),requestIdentity:()=>binding.workbookKey,sleep:ms=>new Promise(resolve=>setTimeout(resolve,ms)),endpoint:'/api/printing',label:'底稿分页',maxPolls:0,resultFromStatus:status=>status});
+      this.outputController=controller;this.outputJobs=jobs;this.controls();
+      try{
+        const mode=$('printOutputMode').value,model=window.ExcelLensPrintingOutput;
+        const sheets=mode==='book'?this.s.sheets.filter(s=>!s.state||s.state==='visible').map(s=>s.name):[binding.sheet];
+        const title=this.s.fileName+' · '+(mode==='book'?'可见工作表':binding.sheet);
+        const output=new model.Output(title,this.limits);
+        for(const sheet of sheets){
+          const source={...binding,sheet};
+          let id=base,summary=this.summary,temporary='';
+          try{
+            if(sheet!==binding.sheet){
+              const task=await jobs.execute({...source,indexIfNeeded:true,options:{usePreviewDefaults:$('printUseDefaults').checked}},{main:true});
+              id=temporary=task.job;if(!current())return;
+              summary=await this.api('/api/printing/summary?'+new URLSearchParams({id}),{signal:controller.signal});
+              window.ExcelLensPrintingModel.summary(summary,source,id,this.limits,this.source());
+            }
+            if(!current())return;
+            const total=summary.summary.pages;if(!total)continue;
+            const pages=mode==='current'?[this.index]:model.pageRange(mode==='range'?$('printOutputRange').value:'1-'+total,total,this.limits.outputPages-output.parts.length);
+            for(const index of pages){
+              this.status(sheet+' · 正在输出第 '+(index+1)+' 页');
+              const page=await this.readPage(id,index,summary,source,controller.signal);if(!current())return;
+              const rendered=this.renderer.build(summary,page);
+              const notes=[...(summary.summary.notices||[]),...(summary.sourceNotices||[])];
+              if(!summary.sourceComplete||summary.summary.approximate)notes.push('部分页面设置采用缺省或近似值。');
+              if(Object.values(summary.sourceProperties.headerFooter||{}).some(v=>v.type==='text'&&v.value))notes.push('源页眉页脚字段未绘制。');
+              output.add(rendered,sheet,index+1,notes);
+            }
+          }finally{if(temporary)await this.api('/api/printing/clear',{method:'POST',body:JSON.stringify({id:temporary})}).catch(()=>{});}
+        }
+        if(!current())return;
+        const url=URL.createObjectURL(output.file()),link=document.createElement('a');
+        link.href=url;link.download=title.replace(/[\\/:*?"<>|]/g,'_')+'_分页底稿.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+        this.status('已导出 '+output.parts.length+' 页，可打开底稿打印或另存为 PDF');
+      }catch(error){if(current())this.status(error.message,true);}
+      finally{if(this.outputController===controller){this.outputController=this.outputJobs=null;this.controls();}}
     }
     goInput(){const value=Number($('printPreviewPage').value),pages=this.summary?.summary.pages||0;if(!Number.isSafeInteger(value)||value<1||value>pages){this.status('页序请输入1到'+pages+'之间的整数',true);$('printPreviewPage').value=String(this.index+1);return;}return this.go(value-1);}
     commit(){

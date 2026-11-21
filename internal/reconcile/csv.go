@@ -50,6 +50,8 @@ func StatusLabel(status string) string {
 	switch status {
 	case "equal":
 		return "一致"
+	case "within_tolerance":
+		return "容差内"
 	case "different":
 		return "差异"
 	case "left_only":
@@ -131,6 +133,9 @@ func (writer *CSVWriter) Sinks() Sinks {
 				comparison := group.Comparisons[i]
 				delta, reason = comparison.Delta, comparison.Reason
 				status = "差异"
+				if comparison.WithinTolerance {
+					status = "容差内"
+				}
 				if comparison.Equal {
 					status = "一致"
 				}

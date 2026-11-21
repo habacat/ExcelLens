@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -23,6 +26,8 @@ type reconcileTask struct {
 	Sources              [2]reconcile.Source
 	Query                reconcile.Query
 	Result               reconcile.Result
+	Record               *reconcileRecord
+	RecordError          string
 	Status, Stage, Error string
 	Done, Total          int64
 	Created              time.Time
@@ -112,13 +117,12 @@ func (a *App) runReconcile(job *reconcileTask) {
 			job.closeSources()
 		}
 	}()
-	select {
-	case a.querySem <- struct{}{}:
-		defer func() { <-a.querySem }()
-	case <-job.ctx.Done():
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
 		job.finishError(job.ctx.Err())
 		return
 	}
+	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job.mu.Lock()
@@ -133,7 +137,20 @@ func (a *App) runReconcile(job *reconcileTask) {
 			return
 		}
 	}
-	result, err := reconcile.Run(job.ctx, filepath.Join(job.Workbook.CacheDir, "queries"), job.Query, sources[0], sources[1], reconcile.Sinks{}, func(stage string, done, total int64) {
+	job.mu.Lock()
+	job.Stage = "核验输入摘要"
+	job.mu.Unlock()
+	record, recordErr := captureReconcileRecord(job, sources)
+	// Compare classified, identifiable exception groups even if their totals
+	// match. Invalid keys have no stable cross-batch identity.
+	groups := sha256.New()
+	sinks := reconcile.Sinks{Group: func(g reconcile.Group) error {
+		if g.Status != "equal" && g.Status != "within_tolerance" && g.Status != "invalid_key" {
+			fmt.Fprintf(groups, "%s/%s/%d/%d\n", g.KeyID, g.Status, g.LeftCount, g.RightCount)
+		}
+		return nil
+	}}
+	result, err := reconcile.Run(job.ctx, filepath.Join(job.Workbook.CacheDir, "queries"), job.Query, sources[0], sources[1], sinks, func(stage string, done, total int64) {
 		job.mu.Lock()
 		job.Stage, job.Done, job.Total = stage, done, total
 		job.mu.Unlock()
@@ -149,6 +166,13 @@ func (a *App) runReconcile(job *reconcileTask) {
 		return
 	}
 	job.Result, job.Sources, job.Status, job.Stage = result, sources, "done", "核对完成"
+	if recordErr != nil {
+		job.RecordError = recordErr.Error()
+	} else {
+		record.Counts = result.Counts
+		record.ExceptionGroupsSHA256 = hex.EncodeToString(groups.Sum(nil))
+		job.Record = record
+	}
 	job.mu.Unlock()
 }
 
@@ -182,12 +206,14 @@ func (a *App) getReconcileTask(id string) *reconcileTask {
 }
 
 type reconcileSnapshot struct {
-	book    *workbook.Workbook
-	books   [2]*workbook.Workbook
-	sources [2]reconcile.Source
-	refs    [2]reconcileSourceRef
-	query   reconcile.Query
-	counts  reconcile.Counts
+	book        *workbook.Workbook
+	books       [2]*workbook.Workbook
+	sources     [2]reconcile.Source
+	refs        [2]reconcileSourceRef
+	query       reconcile.Query
+	counts      reconcile.Counts
+	record      *reconcileRecord
+	recordError string
 }
 
 // Caller holds the shared cache read lock. Retain source pins under the task
@@ -204,7 +230,7 @@ func (a *App) snapshotReconcile(id string) (reconcileSnapshot, func(), error) {
 	if job.Status != "done" {
 		return reconcileSnapshot{}, nil, errors.New("核对尚未完成")
 	}
-	snapshot := reconcileSnapshot{book: job.Workbook, books: job.Books, sources: job.Sources, refs: job.Refs, query: job.Query, counts: job.Result.Counts}
+	snapshot := reconcileSnapshot{book: job.Workbook, books: job.Books, sources: job.Sources, refs: job.Refs, query: job.Query, counts: job.Result.Counts, record: job.Record, recordError: job.RecordError}
 	return snapshot, a.pinWorkbooks(job.Books[0], job.Books[1]), nil
 }
 
@@ -222,6 +248,10 @@ func (a *App) handleReconcileStatus(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"jobId": job.ID, "status": job.Status, "stage": job.Stage, "error": job.Error, "done": job.Done, "total": job.Total, "elapsedMs": time.Since(job.Created).Milliseconds()}
 	if job.Status == "done" {
 		out["result"] = job.Result
+		out["recordError"] = job.RecordError
+		if job.Record != nil {
+			out["exceptionGroupsSHA256"] = job.Record.ExceptionGroupsSHA256
+		}
 	}
 	job.mu.RUnlock()
 	writeJSON(w, out)
@@ -284,7 +314,7 @@ func (a *App) cancelReconciliations() {
 	}
 }
 
-func (a *App) clearReconciliations() {
+func (a *App) detachReconciliations() func() {
 	a.reconcileMu.Lock()
 	jobs, books := a.reconcileJobs, a.reconcileBooks
 	for _, job := range jobs {
@@ -292,12 +322,14 @@ func (a *App) clearReconciliations() {
 	}
 	a.reconcileJobs, a.reconcileBooks = make(map[string]*reconcileTask), make(map[string]*reconcileAttachment)
 	a.reconcileMu.Unlock()
-	for _, job := range jobs {
-		<-job.done
-		job.closeSources()
-	}
-	for _, book := range books {
-		book.release()
+	return func() {
+		for _, job := range jobs {
+			<-job.done
+			job.closeSources()
+		}
+		for _, book := range books {
+			book.release()
+		}
 	}
 }
 
@@ -379,4 +411,36 @@ func (a *App) handleReconcileNavigate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, target)
+}
+
+func (a *App) registerComparisonRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/reconcile/batches", a.handleBatchComparison)
+	mux.HandleFunc("/api/reconcile/versions", a.handleVersionCompare)
+	mux.HandleFunc("/api/reconcile/report/open", a.handleOpenAuditReport)
+	mux.HandleFunc("/api/reconcile/sources", a.handleReconcileSources)
+	mux.HandleFunc("/api/reconcile/fields", a.handleReconcileFields)
+	mux.HandleFunc("/api/reconcile/start", a.handleReconcileStart)
+	mux.HandleFunc("/api/relation/limits", a.handleRelationLimits)
+	mux.HandleFunc("/api/relation/sources", a.handleReconcileSources)
+	mux.HandleFunc("/api/relation/start", a.handleRelationStart)
+	mux.HandleFunc("/api/relation/status", a.handleRelationStatus)
+	mux.HandleFunc("/api/relation/result", a.handleRelationResult)
+	mux.HandleFunc("/api/relation/cancel", a.handleRelationCancel)
+	mux.HandleFunc("/api/relation/clear", a.handleRelationClear)
+	mux.HandleFunc("/api/relation/export", a.handleRelationExport)
+	mux.HandleFunc("/api/relation/navigate", a.handleRelationNavigate)
+	mux.HandleFunc("/api/composition/sources", a.handleReconcileSources)
+	mux.HandleFunc("/api/composition/limits", a.handleCompositionLimits)
+	mux.HandleFunc("/api/composition/definitions", a.handleCompositionDefinitions)
+	mux.HandleFunc("/api/composition/start", a.handleCompositionStart)
+	mux.HandleFunc("/api/composition/status", a.handleCompositionStatus)
+	mux.HandleFunc("/api/composition/result", a.handleCompositionResult)
+	mux.HandleFunc("/api/composition/cancel", a.handleCompositionCancel)
+	mux.HandleFunc("/api/composition/clear", a.handleCompositionClear)
+	mux.HandleFunc("/api/reconcile/status", a.handleReconcileStatus)
+	mux.HandleFunc("/api/reconcile/cancel", a.handleReconcileCancel)
+	mux.HandleFunc("/api/reconcile/clear", a.handleReconcileClear)
+	mux.HandleFunc("/api/reconcile/export", a.handleReconcileExport)
+	mux.HandleFunc("/api/reconcile/source/remove", a.handleReconcileRemoveSource)
+	mux.HandleFunc("/api/reconcile/navigate", a.handleReconcileNavigate)
 }

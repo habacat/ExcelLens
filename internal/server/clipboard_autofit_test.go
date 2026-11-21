@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,48 @@ import (
 
 	"excellens/internal/workbook"
 )
+
+func TestLightweightClipboardReturnsWholeTSVOrBudgetError(t *testing.T) {
+	isolateTestStorage(t)
+	path := filepath.Join(t.TempDir(), "台账.csv")
+	source := "编号,说明\n001,\"有\t引号\"\"和\n换行\"\n" + strings.Repeat("002,"+strings.Repeat("文", 2500)+"\n", 600)
+	if err := os.WriteFile(path, []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	if err := a.OpenPath(path); err != nil {
+		t.Fatal(err)
+	}
+	wb := a.currentWorkbook()
+	sheet := wb.Sheets[0]
+	if _, err := wb.BuildIndex(sheet, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	get := func(end string) *httptest.ResponseRecorder {
+		target := "/api/range?format=tsv&sheet=" + url.QueryEscape(sheet.Name) + "&start=A2&end=" + end
+		out := httptest.NewRecorder()
+		a.handleRange(out, httptest.NewRequest("GET", target, nil))
+		return out
+	}
+	out := get("B2")
+	if out.Code != 200 || out.Body.String() != "001\t\"有\t引号\"\"和\n换行\"" {
+		t.Fatal("quoted text or identifier changed", out.Code, out.Body)
+	}
+	out = get("A502")
+	if out.Code != 200 || strings.Count(out.Body.String(), "\n") != 500 {
+		t.Fatal("lightweight selection lost rows", out.Code)
+	}
+	for _, end := range []string{"B602", "A3000", "GR300"} {
+		out = get(end)
+		if out.Code != 413 || strings.Contains(out.Body.String(), "001") {
+			t.Fatal("oversized TSV published a partial result", end, out.Code)
+		}
+	}
+}
 
 func TestAutofitSamplingIsStrictlyBoundedAndDistributed(t *testing.T) {
 	for _, size := range []int{0, 1, 10, 511, 512, 513, 777, 10000, 1048576} {
@@ -123,7 +166,7 @@ func TestClipboardJSONEndpointPreservesFilteredVisualOrder(t *testing.T) {
 	app.mu.Unlock()
 	call := func(query string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/range?"+query, nil)
-		req.RemoteAddr = "127.0.0.1:9999"
+		req = localTestConnection(req)
 		req.Header.Set("X-ExcelLens-Token", app.token)
 		response := httptest.NewRecorder()
 		app.Handler().ServeHTTP(response, req)
@@ -154,6 +197,10 @@ func TestClipboardJSONEndpointPreservesFilteredVisualOrder(t *testing.T) {
 	resp = call(args)
 	if resp.Code != http.StatusOK || strings.TrimSpace(resp.Body.String()) != "gamma\t4\nalpha\t2\nbeta\t3" {
 		t.Fatalf("clipboard TSV wrong %d: %q", resp.Code, resp.Body.String())
+	}
+	light := call(args + "&format=tsv")
+	if light.Code != http.StatusOK || light.Body.String() != resp.Body.String() {
+		t.Fatal("lightweight copy changed the filtered row order", light.Code)
 	}
 	if bad := call(args + "&format=xml"); bad.Code != http.StatusBadRequest {
 		t.Errorf("unsupported format status=%d", bad.Code)

@@ -29,7 +29,7 @@ func startRowExport(t *testing.T, a *App, req exportRequest) *ExportJob {
 		t.Fatal(err)
 	}
 	a.mu.RLock()
-	job := a.exportJobs[started.JobID]
+	job := a.exports[started.JobID]
 	a.mu.RUnlock()
 	if job == nil {
 		t.Fatal("missing export task")

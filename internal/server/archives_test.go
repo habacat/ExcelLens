@@ -39,7 +39,7 @@ func zipArchiveFixture(t *testing.T, entries map[string][]byte) []byte {
 
 func rawArchiveCall(app *App, method, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, req)
@@ -61,7 +61,7 @@ func uploadArchiveFixture(t *testing.T, app *App, name string, content []byte) m
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/open", &buffer)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	req.Header.Set("X-ExcelLens-Token", app.token)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	res := httptest.NewRecorder()
@@ -442,7 +442,7 @@ func TestArchiveRejectsUnauthorizedParametersAndStaticAssets(t *testing.T) {
 		t.Fatal("client-selected local path accepted")
 	}
 	req := httptest.NewRequest(http.MethodGet, "/assets/archives.js", nil)
-	req.RemoteAddr = "127.0.0.1:12345"
+	req = localTestConnection(req)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, req)
 	if response.Code != 200 || !strings.Contains(response.Body.String(), "ExcelLensArchives") {

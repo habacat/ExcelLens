@@ -239,6 +239,9 @@ var nativeColumnNames = func() [16385]string {
 }()
 
 func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selected map[int]struct{}, formatValue, includeFormula bool) (RowData, error) {
+	if w.source != nil && w.source.ods != nil {
+		return w.decodeODS(data, number, first, last, selected, formatValue, includeFormula)
+	}
 	res := RowData{Number: number}
 	rowSuffix := strconv.Itoa(number)
 	p := 0

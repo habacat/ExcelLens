@@ -251,7 +251,10 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 				}
 				continue
 			}
-			if value == "" && !c.HasFormula { // preserve intentionally styled blank cells
+			if s.Index.SourceFormat == "ods" && c.HasFormula && c.CacheMissing && opts.Mode == "values" {
+				return fmt.Errorf("%s!%s 缺少 ODS 公式缓存，无法导出数值。可用 JSONL 保留缺缓存状态", s.Sheet.Name, c.Ref)
+			}
+			if value == "" && !c.HasFormula && c.SourceType != "string" { // preserve intentionally styled blank cells
 				if style != "" {
 					if _, err := fmt.Fprintf(out, `<c r="%s"%s/>`, ref, style); err != nil {
 						return err
@@ -260,6 +263,12 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 				continue
 			}
 			if opts.Mode != "display" {
+				if c.Type == "d" {
+					if _, err := fmt.Fprintf(out, `<c r="%s"%s t="d"><v>%s</v></c>`, ref, style, xmlText(value)); err != nil {
+						return err
+					}
+					continue
+				}
 				if c.Type == "b" {
 					v := "0"
 					if strings.EqualFold(value, "TRUE") || value == "1" {

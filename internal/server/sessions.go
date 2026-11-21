@@ -73,11 +73,8 @@ func (a *App) sessionWithLaunch(id, launchPath string) (*browserSession, error) 
 	}
 	child.owner = a
 	child.cacheMu = a.cacheMu
-	child.indexSem = a.indexSem
-	child.querySem = a.querySem
-	child.exportSem = a.exportSem
-	child.analysisSem = a.analysisSem
-	child.inspectSem = a.inspectSem
+	child.workAdmission = a.workAdmission
+	child.edits.revision = a.edits.revision
 	routes := child.routes()
 	if launchPath != "" {
 		next := routes

@@ -102,6 +102,9 @@ func Validate(opts Options, selections []Selection) error {
 	}
 	var cells int64
 	for _, s := range selections {
+		if s.Index != nil && s.Index.SourceFormat == "ods" && opts.Format == "xlsx" && opts.Mode == "formula" {
+			return errors.New("OpenFormula 无法直接写为 Excel 公式，请导出缓存值或显示文字")
+		}
 		if s.Index == nil || s.FirstCol < 1 || s.LastCol > 16384 || s.LastCol < s.FirstCol || s.FirstRow < 1 || s.LastRow > workbook.MaxRowsForIndex(s.Index) || s.LastRow < s.FirstRow {
 			return errors.New("导出区域超出 Excel 允许范围")
 		}
@@ -412,6 +415,8 @@ func writeSeparatedRecord(out *bufio.Writer, fields []string, comma byte) error 
 }
 
 type cellRecord struct {
+	SourceType   string `json:"sourceType,omitempty"`
+	Currency     string `json:"currency,omitempty"`
 	Ref          string `json:"ref"`
 	Value        string `json:"value"`
 	Raw          string `json:"raw,omitempty"`

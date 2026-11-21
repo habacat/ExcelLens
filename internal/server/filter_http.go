@@ -105,14 +105,24 @@ func (a *App) handleFilterDistinct(w http.ResponseWriter, r *http.Request) {
 	}
 	const maxDistinct = 2500
 	key := fmt.Sprintf("%s|%s|%d|%d", wb.Fingerprint, meta.Path, col, header)
-	a.distinctMu.Lock()
+	a.mu.RLock()
 	cached, found := a.distinctCache[key]
-	a.distinctMu.Unlock()
+	a.mu.RUnlock()
 	if found {
 		writeJSON(w, map[string]any{"values": cached.Items, "truncated": cached.Truncated, "cached": true})
 		return
 	}
+	release, err := a.backgroundQuery(r.Context())
+	if err != nil {
+		return
+	}
+	defer release()
 	a.cacheMu.RLock()
+	if a.currentWorkbook() != wb {
+		a.cacheMu.RUnlock()
+		writeError(w, http.StatusConflict, "工作簿已切换，请重新读取筛选选项")
+		return
+	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		a.cacheMu.RUnlock()
@@ -129,14 +139,14 @@ func (a *App) handleFilterDistinct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Never let a previous workbook's scan contaminate the new workbook.
-	if a.currentWorkbook() == wb {
-		a.distinctMu.Lock()
+	a.mu.Lock()
+	if a.wb == wb {
 		if len(a.distinctCache) >= 64 {
 			a.distinctCache = make(map[string]DistinctCache)
 		}
 		a.distinctCache[key] = DistinctCache{Items: items, Truncated: truncated}
-		a.distinctMu.Unlock()
 	}
+	a.mu.Unlock()
 	writeJSON(w, map[string]any{"values": items, "truncated": truncated, "cached": false})
 }
 
@@ -235,18 +245,15 @@ func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wor
 		}
 		close(job.done)
 	}()
-	if a.querySem != nil {
-		select {
-		case a.querySem <- struct{}{}:
-			defer func() { <-a.querySem }()
-		case <-job.ctx.Done():
-			job.mu.Lock()
-			job.Status = "cancelled"
-			job.Stage = "已取消"
-			job.mu.Unlock()
-			return
-		}
+	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
+	if admissionErr != nil {
+		job.mu.Lock()
+		job.Status = "cancelled"
+		job.Stage = "已取消"
+		job.mu.Unlock()
+		return
 	}
+	defer releaseScan()
 	if job.checkpoint != nil {
 		a.runCheckpointFilter(wb, job)
 		return

@@ -17,6 +17,21 @@
     if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<1||end<start||end-start+1>limits.columns||!Array.isArray(payload.rows)||payload.rows.length>limits.rows||payload.rows.length*(end-start+1)>limits.cells)throw Error('复制区域超出安全上限');
     return {start,end,limits};
   }
+  const capacityError=message=>Object.assign(Error(message),{status:413});
+  async function copyByBudget(snapshot,limits,plain,richCopy,textCopy,openExport) {
+    const rows=snapshot.rows,columns=snapshot.lastColumn-snapshot.firstColumn+1,cells=rows*columns;
+    if(!plain&&rows<=limits.rows&&columns<=limits.columns&&cells<=limits.cells){
+      try{return await richCopy();}
+      catch(error){if(error.status!==413)throw error;}
+    }
+    if(!snapshot.current())return false;
+    if(rows<=limits.tsvRows&&columns<=limits.tsvColumns&&cells<=limits.tsvCells){
+      try{return await textCopy();}
+      catch(error){if(error.status!==413)throw error;}
+    }
+    if(snapshot.current())openExport();
+    return false;
+  }
   const escape = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   // Excel interprets a plain HTML break as the start of another worksheet row.
@@ -72,7 +87,7 @@
   function build(payload, styles=[], showStyles=true, fontOverride='',richLimits,copyLimits,mergeAt) {
     const {start,end,limits}=checkCopy(payload,copyLimits);copyLimits=limits;
     const plain=[],notices=new Set(),html=[];let sourceBytes=0,htmlBytes=0;
-    const append=(...parts)=>{for(const part of parts){htmlBytes+=utf8Length(part);if(copyLimits&&htmlBytes>copyLimits.htmlBytes)throw Error('复制HTML超过本次容量，请缩小选区或使用导出');html.push(part);}};
+    const append=(...parts)=>{for(const part of parts){htmlBytes+=utf8Length(part);if(copyLimits&&htmlBytes>copyLimits.htmlBytes)throw capacityError('复制HTML超过本次容量，请缩小选区或使用导出');html.push(part);}};
     append('<html><body><!--StartFragment--><table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse">');
     const coveredUntil=new Uint32Array(end-start+1);
     for(const [index,row] of payload.rows.entries()){
@@ -96,7 +111,7 @@
         const cell=cells.get(col)||{display:'',raw:'',style:0};
         sourceBytes+=utf8Length(cell.raw||'')+utf8Length(cell.display||'')+utf8Length(cell.formula||'');
         if(showStyles&&cell.conditional?.display!=null)sourceBytes+=utf8Length(cell.conditional.display);
-        if(copyLimits&&sourceBytes>copyLimits.textBytes)throw Error('复制文字超过本次容量，请缩小选区或使用导出');
+        if(copyLimits&&sourceBytes>copyLimits.textBytes)throw capacityError('复制文字超过本次容量，请缩小选区或使用导出');
         const value=window.ExcelLensConditional?.value(cell,false,showStyles)??String(cell.display??cell.raw??'');
         values.push(tsvCell(value));
         const base=window.ExcelLensConditional?.visual(cell,styles)||styles[Number(cell.style)||0]||{};
@@ -109,7 +124,7 @@
       append('</tr>');
     }
     append('</table><!--EndFragment--></body></html>');
-    const text=plain.join('\n');if(copyLimits&&utf8Length(text)>copyLimits.textBytes)throw Error('复制文字超过本次容量，请缩小选区或使用导出');
+    const text=plain.join('\n');if(copyLimits&&utf8Length(text)>copyLimits.textBytes)throw capacityError('复制文字超过本次容量，请缩小选区或使用导出');
     return {text,html:html.join(''),notices:[...notices]};
   }
   // Excel/WPS quote cells containing tabs, line breaks or double quotes.
@@ -175,5 +190,5 @@
     rows.forEach((row,i)=>row.forEach((value,j)=>changes.push({row:startRow+i,col:startCol+j,value})));
     return validateChanges(changes);
   }
-  window.ExcelLensClipboard={configure,copyLimits,checkCopy,build,styleOf,tsvCell,parse,pasteChanges,characterCount,utf8Length,validateChanges,batches};
+  window.ExcelLensClipboard={configure,copyLimits,checkCopy,copyByBudget,build,styleOf,tsvCell,parse,pasteChanges,characterCount,utf8Length,validateChanges,batches};
 })();

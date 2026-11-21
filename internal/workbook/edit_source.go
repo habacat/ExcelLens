@@ -34,6 +34,10 @@ type EditSourceFile struct {
 }
 
 func OpenEditSource(path string) (*EditSourceFile, error) {
+	return openSourceFile(path, formats.EditSourceBytes)
+}
+
+func openSourceFile(path string, maxBytes int64) (*EditSourceFile, error) {
 	expected, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -50,10 +54,10 @@ func OpenEditSource(path string) (*EditSourceFile, error) {
 		switch {
 		case !os.SameFile(expected, info):
 			err = errors.New("编辑源在打开时发生了变化")
-		case !info.Mode().IsRegular(), info.Size() == 0:
+		case !info.Mode().IsRegular(), maxBytes > 0 && info.Size() == 0:
 			err = errors.New("编辑源必须是非空的普通文件")
-		case info.Size() > formats.EditSourceBytes:
-			err = fmt.Errorf("编辑源超过 %d MB 上限", formats.EditSourceBytes>>20)
+		case maxBytes > 0 && info.Size() > maxBytes:
+			err = fmt.Errorf("编辑源超过 %d MB 上限", maxBytes>>20)
 		case !stable && os.PathSeparator == '\\':
 			err = errors.New("无法锁定源文件以读取固定版本。请关闭正在写入该文件的程序后重试")
 		}
@@ -67,6 +71,20 @@ func OpenEditSource(path string) (*EditSourceFile, error) {
 		src.stamp, src.stamped = fingerprintSourceStamp(f, info)
 	}
 	return src, nil
+}
+
+// SourceFileSHA256 binds the exact input bytes to the opened workbook.
+// Explicit comparisons can include read-only formats and files above edit limits.
+func (w *Workbook) SourceFileSHA256(ctx context.Context) (string, error) {
+	f, err := openSourceFile(w.Path, 0)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if err := w.CheckEditSource(ctx, f); err != nil {
+		return "", err
+	}
+	return f.SHA256(ctx)
 }
 
 func (f *EditSourceFile) Size() int64 { return f.info.Size() }

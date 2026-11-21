@@ -34,7 +34,7 @@ func TestExportRoundTripXLSXAndZIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.mu.RLock()
-	job := a.exportJobs[initiated.JobID]
+	job := a.exports[initiated.JobID]
 	a.mu.RUnlock()
 	if job == nil {
 		t.Fatal("missing job")
@@ -82,14 +82,14 @@ func TestExportRoundTripXLSXAndZIP(t *testing.T) {
 	}
 	// The ticket permits native browser downloads without exposing the app token.
 	download := httptest.NewRequest("GET", "/api/export/download?id="+initiated.JobID+"&ticket="+ticket, nil)
-	download.RemoteAddr = "127.0.0.1:11111"
+	download = localTestConnection(download)
 	response := httptest.NewRecorder()
 	a.Handler().ServeHTTP(response, download)
 	if response.Code != 200 || !strings.HasPrefix(response.Header().Get("Content-Disposition"), "attachment;") {
 		t.Fatalf("download failed: %d %s", response.Code, response.Body.String())
 	}
 	invalid := httptest.NewRequest("GET", "/api/export/download?id="+initiated.JobID+"&ticket=invalid", nil)
-	invalid.RemoteAddr = "127.0.0.1:11111"
+	invalid = localTestConnection(invalid)
 	blocked := httptest.NewRecorder()
 	a.Handler().ServeHTTP(blocked, invalid)
 	if blocked.Code != http.StatusForbidden {
@@ -101,7 +101,7 @@ func TestExportRoundTripXLSXAndZIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.mu.RLock()
-	job = a.exportJobs[initiated.JobID]
+	job = a.exports[initiated.JobID]
 	a.mu.RUnlock()
 	<-job.done
 	job.mu.RLock()
@@ -145,7 +145,7 @@ func TestExportSelectionPositionsAndProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.mu.RLock()
-	job := a.exportJobs[begun.JobID]
+	job := a.exports[begun.JobID]
 	a.mu.RUnlock()
 	<-job.done
 	job.mu.RLock()
@@ -162,7 +162,7 @@ func TestExportSelectionPositionsAndProfile(t *testing.T) {
 		t.Fatalf("bad CSV: %q", body)
 	}
 	invalid := httptest.NewRequest("POST", "/api/export/start", strings.NewReader(`{"scope":"selection","sheet":"First","start":"A1","end":"B1","format":"xlsx","mode":"formula"}`))
-	invalid.RemoteAddr = "127.0.0.1:11111"
+	invalid = localTestConnection(invalid)
 	invalid.Header.Set("X-ExcelLens-Token", a.token)
 	invalidResult := httptest.NewRecorder()
 	a.Handler().ServeHTTP(invalidResult, invalid)
