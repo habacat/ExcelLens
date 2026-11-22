@@ -61,6 +61,7 @@
       });
       el('Save').addEventListener('click', () => this.save());
       window.addEventListener('beforeunload', event => {
+        if (window.ExcelLensSession?.cacheCleared) return;
         if (this.grid.dirty || this.pending || el('Dialog').open && this.dirty) { event.preventDefault(); event.returnValue = ''; }
       });
     }

@@ -10,7 +10,7 @@ function bus(){
       close(){this.closed=true;}
     }
     const ctx={window:{location:{href:'http://localhost/'+(launch?'?session='+launch:'')},addEventListener:(name,fn)=>events[name]=fn},
-      crypto:{randomUUID:()=>String(++serial).padStart(24,'0')},BroadcastChannel:Channel,URL,history:{replaceState(){}},
+      document:{documentElement:{dataset:{cacheEpoch:'3'}}},crypto:{randomUUID:()=>String(++serial).padStart(24,'0')},BroadcastChannel:Channel,URL,history:{replaceState(){}},
       sessionStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)},
       setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)};
     vm.runInNewContext(source,ctx);return {session:ctx.window.ExcelLensSession,events,values};
@@ -23,6 +23,7 @@ test('native launch owns its workbook and a duplicated tab negotiates a differen
   const duplicate=b.page({stored:id});b.flush();await duplicate.session.ready;
   assert.equal(native.session.id,id);assert.notEqual(duplicate.session.id,id);
   const headers=new Headers();duplicate.session.apply(headers);assert.equal(headers.get('X-ExcelLens-Session'),duplicate.session.id);
+  assert.equal(headers.get('X-ExcelLens-Cache-Epoch'),'3');
 });
 test('simultaneous normal duplicates separate while a reload after pagehide preserves its session',async()=>{
   const b=bus(),id='stored-session-1234567890',a=b.page({stored:id}),c=b.page({stored:id});b.flush();await Promise.all([a.session.ready,c.session.ready]);

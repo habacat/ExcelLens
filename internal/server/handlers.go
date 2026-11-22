@@ -24,7 +24,9 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	b, err := ui.Index(a.token)
+	root := a.rootApp()
+	ribbon, _ := root.RibbonLayout() // keep the page usable if a preference is unreadable
+	b, err := ui.IndexWithLayout(a.token, ribbon, root.cacheEpoch.Load())
 	if err != nil {
 		http.Error(w, "界面资源不可用", http.StatusInternalServerError)
 		return

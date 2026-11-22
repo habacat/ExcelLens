@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -39,6 +40,7 @@ const (
 	nimAdd              = 0
 	nimDelete           = 2
 	mfString            = 0
+	mfChecked           = 8
 	mfSeparator         = 0x800
 	tpmRightButton      = 0x2
 	tpmNonotify         = 0x80
@@ -72,6 +74,9 @@ const (
 	menuInstallShell    = 1013
 	menuRemoveShell     = 1014
 	menuOpenLayouts     = 1015
+	menuRibbonLayout    = 1016
+	menuOpenProgram     = 1017
+	menuClearAllCaches  = 1018
 )
 
 // Options contains only user-initiated callbacks. Cleanup callbacks return
@@ -86,6 +91,10 @@ type Options struct {
 	OnOpenExports        func() error
 	OnOpenNotes          func() error
 	OnOpenLayouts        func() error
+	OnOpenProgram        func() error
+	RibbonLayout         func() (bool, error)
+	SetRibbonLayout      func(bool) error
+	OnClearAllCaches     func() (string, error)
 	OnClearCache         func() (string, error)
 	OnClearTemp          func() (string, error)
 	ContextMenuInstalled func() bool
@@ -311,6 +320,47 @@ func positionMenuOwner(hwnd uintptr, cursor point) {
 		swpNoSize|swpNoZOrder|swpNoActivate)
 }
 
+func appendTrayCommands(menu uintptr, options Options) bool {
+	appendMenu(menu, menuOpen, "打开 ExcelLens")
+	appendMenu(menu, menuChoose, "打开 Excel 文件...")
+	var ribbon bool
+	if options.RibbonLayout != nil {
+		var err error
+		ribbon, err = options.RibbonLayout()
+		flags := uintptr(mfString)
+		if ribbon {
+			flags |= mfChecked
+		}
+		if err != nil {
+			log.Printf("读取工具栏布局失败：%v", err)
+		}
+		pAppendMenu.Call(menu, flags, menuRibbonLayout, uintptr(unsafe.Pointer(utf16ptr("选项卡布局"))))
+	}
+	appendSeparator(menu)
+	appendMenu(menu, menuOpenProgram, "打开程序所在目录")
+	appendMenu(menu, menuOpenCache, "打开缓存目录")
+	appendMenu(menu, menuOpenTemp, "打开临时文件目录")
+	appendMenu(menu, menuOpenLog, "打开日志目录")
+	appendMenu(menu, menuOpenExports, "打开导出文件目录")
+	appendMenu(menu, menuOpenNotes, "打开审计标记目录")
+	appendMenu(menu, menuOpenLayouts, "打开行列尺寸设置目录")
+	appendMenu(menu, menuCopyURL, "复制本地访问地址")
+	appendSeparator(menu)
+	if options.ContextMenuInstalled != nil && options.ContextMenuInstalled() {
+		appendMenu(menu, menuRemoveShell, "移除 Windows 文件右键菜单")
+	} else {
+		appendMenu(menu, menuInstallShell, "添加到 Windows 文件右键菜单")
+	}
+	appendSeparator(menu)
+	appendMenu(menu, menuClearCache, "清理历史缓存（保留当前）...")
+	appendMenu(menu, menuClearAllCaches, "清除所有缓存（含当前）...")
+	appendMenu(menu, menuClearTemp, "清理临时文件（保留当前）...")
+	appendSeparator(menu)
+	appendMenu(menu, menuAbout, "关于 ExcelLens")
+	appendMenu(menu, menuQuit, "退出 ExcelLens")
+	return ribbon
+}
+
 func showMenu(hwnd uintptr) {
 	if activeTray == nil {
 		return
@@ -325,32 +375,11 @@ func showMenu(hwnd uintptr) {
 		return
 	}
 	defer pDestroyMenu.Call(menu)
-	appendMenu(menu, menuOpen, "打开 ExcelLens")
-	appendMenu(menu, menuChoose, "打开 Excel 文件...")
-	appendSeparator(menu)
-	appendMenu(menu, menuOpenCache, "打开缓存目录")
-	appendMenu(menu, menuOpenTemp, "打开临时文件目录")
-	appendMenu(menu, menuOpenLog, "打开日志目录")
-	appendMenu(menu, menuOpenExports, "打开导出文件目录")
-	appendMenu(menu, menuOpenNotes, "打开审计标记目录")
-	appendMenu(menu, menuOpenLayouts, "打开行列尺寸设置目录")
-	appendMenu(menu, menuCopyURL, "复制本地访问地址")
-	appendSeparator(menu)
-	if activeTray.options.ContextMenuInstalled != nil && activeTray.options.ContextMenuInstalled() {
-		appendMenu(menu, menuRemoveShell, "移除 Windows 文件右键菜单")
-	} else {
-		appendMenu(menu, menuInstallShell, "添加到 Windows 文件右键菜单")
-	}
-	appendSeparator(menu)
-	appendMenu(menu, menuClearCache, "清理历史缓存（保留当前）...")
-	appendMenu(menu, menuClearTemp, "清理临时文件（保留当前）...")
-	appendSeparator(menu)
-	appendMenu(menu, menuAbout, "关于 ExcelLens")
-	appendMenu(menu, menuQuit, "退出 ExcelLens")
+	options := activeTray.options
+	ribbon := appendTrayCommands(menu, options)
 	pSetForegroundWindow.Call(hwnd)
 	command, _, _ := pTrackPopupMenu.Call(menu, tpmRightButton|tpmNonotify|tpmReturnCmd,
 		uintptr(int64(cursor.X)), uintptr(int64(cursor.Y)), 0, hwnd, 0)
-	options := activeTray.options
 	switch command {
 	case menuOpen:
 		if options.OnOpen != nil {
@@ -365,6 +394,12 @@ func showMenu(hwnd uintptr) {
 		}
 	case menuOpenCache:
 		callAction(options.OnOpenCache)
+	case menuOpenProgram:
+		callAction(options.OnOpenProgram)
+	case menuRibbonLayout:
+		if options.SetRibbonLayout != nil {
+			alertErr(options.SetRibbonLayout(!ribbon))
+		}
 	case menuOpenTemp:
 		callAction(options.OnOpenTemp)
 	case menuOpenLog:
@@ -407,6 +442,8 @@ func showMenu(hwnd uintptr) {
 		cleanAction(hwnd, "清理未在使用的工作簿索引及搜索缓存？\n当前已打开的工作簿缓存会保留。", options.OnClearCache)
 	case menuClearTemp:
 		cleanAction(hwnd, "清理历史上传的 Excel 临时副本？\n当前打开的文件和原始工作簿会保留。", options.OnClearTemp)
+	case menuClearAllCaches:
+		cleanAction(hwnd, "清除所有工作簿缓存，包括当前正在使用的缓存？\n所有页面将返回首页，运行中的任务将取消。请先确认正在输入的编辑内容。原始文件、上传副本和已保存的编辑修订将保留。", options.OnClearAllCaches)
 	case menuAbout:
 		showAbout(hwnd)
 	case menuQuit:

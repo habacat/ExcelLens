@@ -24,6 +24,8 @@ func LogDir() string {
 // ClearUnusedCaches intentionally preserves the currently open workbook so a
 // tray action cannot invalidate mapped row indexes while a browser reads them.
 func (a *App) ClearUnusedCaches() (string, error) {
+	a.rootApp().cacheResetMu.RLock()
+	defer a.rootApp().cacheResetMu.RUnlock()
 	releaseArchiveMaintenance := archives.LockCacheMaintenance()
 	defer releaseArchiveMaintenance()
 	rootApp := a.rootApp()
@@ -77,6 +79,8 @@ func (a *App) ClearUnusedCaches() (string, error) {
 // never the original workbook and never the one currently open in the viewer.
 // No file is ever deleted implicitly on switching workbooks or quitting.
 func (a *App) ClearUnusedUploads() (string, error) {
+	a.rootApp().cacheResetMu.RLock()
+	defer a.rootApp().cacheResetMu.RUnlock()
 	rootApp := a.rootApp()
 	rootApp.cacheMu.Lock()
 	defer rootApp.cacheMu.Unlock()

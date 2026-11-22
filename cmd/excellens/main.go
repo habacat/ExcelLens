@@ -122,8 +122,12 @@ func main() {
 		return exec.Command("explorer.exe", path).Start()
 	}
 	options := tray.Options{
-		Address: url,
-		OnOpen:  openViewer,
+		Address:          url,
+		OnOpen:           openViewer,
+		OnOpenProgram:    func() error { return openProgramDirectory(openDirectory) },
+		RibbonLayout:     app.RibbonLayout,
+		SetRibbonLayout:  app.SetRibbonLayout,
+		OnClearAllCaches: app.ClearAllCaches,
 		OnChooseFile: func(path string) error {
 			id, err := app.PreparePathForLaunch(path)
 			if err != nil {
@@ -149,4 +153,12 @@ func main() {
 	}
 	app.Shutdown()
 	<-serveDone
+}
+
+func openProgramDirectory(open func(string) error) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	return open(filepath.Dir(exe))
 }

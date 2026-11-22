@@ -1,10 +1,15 @@
-// Tabbed command bar. Commands keep their original controls and handlers;
-// this module only arranges them: tabs, folding and overflow. No source reads.
+// Both layouts use the same controls, including their handlers and live state.
 (() => {
   'use strict';
   const TAB_KEY='ExcelLens.ribbonTab',COLLAPSE_KEY='ExcelLens.ribbonCollapsed';
   const read=key=>{try{return localStorage.getItem(key);}catch{return null;}};
   const write=(key,value)=>{try{localStorage.setItem(key,value);}catch{}};
+  const classicTop = [
+    ['archiveBtn',2], ['openBtn',0], ['historyBackBtn',4], ['historyForwardBtn',4],
+    ['searchOpenBtn',0], ['filterOpenBtn',0], ['textHeaderBtn',1], ['multiSortBtn',0],
+    ['freezeBtn',2], ['exportOpenBtn',0], ['editCopyOpen',1], ['copyMenuBtn',2],
+    ['analysisOpenBtn',0], ['profileOpenBtn',3], ['calculatorOpenBtn',3], ['clearFilterBtn',1]
+  ];
   class AdaptiveToolbar {
     static choose(items,width,gap){
       const shown=new Set(),ordered=items.map((item,index)=>({...item,index})).sort((a,b)=>a.priority-b.priority||a.index-b.index);
@@ -14,11 +19,28 @@
     }
     constructor(root){
       this.root=root;this.actions=root.querySelector('.app-actions');this.frame=0;
+      this.classic = root.querySelector('.classic-actions');
+      this.positions = [];
+      const remember = (node, group) => {
+        const marker = document.createComment(node.id || 'font');
+        node.before(marker);
+        this.positions.push({node, marker, group, menuItem:node.getAttribute('role') === 'menuitem'});
+      };
+      for (const [id, priority] of classicTop) {
+        const node = document.getElementById(id);
+        node.dataset.classicPriority = String(priority);
+        remember(node, this.classic);
+      }
+      const before = document.querySelector('.classic-before'), after = document.querySelector('.classic-after');
+      for (const id of ['catalogueOpenBtn','dataRulesOpenBtn','recordCardOpenBtn']) remember(document.getElementById(id), before);
+      remember(document.getElementById('fontSelect').closest('label'), after);
+      for (const id of ['copyFormulaBtn','copyValueBtn','tracePrecedentsBtn','traceDependentsBtn']) remember(document.getElementById(id), after);
       this.tabs=[...root.querySelectorAll('.ribbon-tabs [data-ribbon-tab]')];this.panels=[...root.querySelectorAll('[data-ribbon-panel]')];
       this.more=root.querySelector('#ribbonMoreBtn');this.moreMenu=document.getElementById('ribbonMoreMenu');this.collapse=root.querySelector('#ribbonCollapseBtn');
       this.schedule=()=>{if(!this.frame)this.frame=requestAnimationFrame(()=>{this.frame=0;this.fit();});};
-      this.resize=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width,height=root.getBoundingClientRect().height;if(height!==this.height){this.height=height;document.documentElement.style.setProperty('--appbar-height',height+'px');}if(width!==this.width){this.width=width;this.schedule();}});
+      this.resize=new ResizeObserver(()=>{const height=root.getBoundingClientRect().height;if(height!==this.height){this.height=height;document.documentElement.style.setProperty('--appbar-height',height+'px');}this.schedule();});
       this.resize.observe(root);
+      this.resize.observe(this.classic);
       // The overflow button and separators are layout outputs. Observing their
       // own visibility changes queues another layout on every animation frame.
       this.changes = new MutationObserver(records => {
@@ -26,6 +48,7 @@
             (record.target !== this.more && !record.target.classList.contains('ribbon-sep')))) this.schedule();
       });
       this.changes.observe(this.actions,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','disabled']});
+      this.changes.observe(this.classic,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','disabled']});
       this.visibility=new MutationObserver(this.schedule);this.visibility.observe(document.body,{attributes:true,attributeFilter:['class']});
       window.addEventListener('resize',this.schedule);document.fonts?.ready.then(this.schedule);
       for(const tab of this.tabs){
@@ -45,6 +68,26 @@
       });
       this.setCollapsed(read(COLLAPSE_KEY)==='1',false);
       this.select(this.tabs.some(tab=>tab.dataset.ribbonTab===read(TAB_KEY))?read(TAB_KEY):this.tabs[0]?.dataset.ribbonTab,false);
+      this.setLayout(document.documentElement.dataset.ribbonLayout === 'true');
+    }
+    setLayout(ribbon) {
+      if (this.ribbon === ribbon) return;
+      window.ExcelLensOverlays.menus.close(false);
+      this.ribbon = ribbon;
+      document.documentElement.dataset.ribbonLayout = String(ribbon);
+      const focused = document.activeElement;
+      for (const {node, marker, group, menuItem} of this.positions) {
+        node.removeAttribute('data-toolbar-overflow');
+        if (menuItem) {
+          if (ribbon) node.setAttribute('role','menuitem');
+          else node.removeAttribute('role');
+        }
+        if (ribbon) marker.after(node);
+        else group.append(node);
+      }
+      this.peek(false);
+      this.fit();
+      if (focused !== document.body && focused?.getClientRects().length) focused.focus({preventScroll:true});
     }
     get collapsed(){return this.root.hasAttribute('data-ribbon-collapsed');}
     get peeking(){return this.root.hasAttribute('data-ribbon-peek');}
@@ -77,6 +120,7 @@
     // anchor to a visible button and the user learns where the command lives.
     reveal(id){
       const node=document.getElementById(id),panel=node?.closest?.('[data-ribbon-panel]');
+      if(!this.ribbon)return node;
       if(panel&&panel.dataset.ribbonPanel!==this.current)this.select(panel.dataset.ribbonPanel);
       if(panel){
         if(this.collapsed&&node.matches('[aria-haspopup="menu"]'))this.peek(true);
@@ -85,6 +129,24 @@
       return node;
     }
     fit(){
+      if (!this.ribbon) {
+        if (!this.classic.clientWidth) return;
+        const items = [];
+        for (const node of this.classic.children) {
+          node.removeAttribute('data-toolbar-overflow');
+          const width = node.getBoundingClientRect().width;
+          if (width) items.push({node, width, priority:Number(node.dataset.classicPriority)});
+        }
+        const gap = parseFloat(getComputedStyle(this.classic).columnGap) || 0;
+        const shown = AdaptiveToolbar.choose(items, this.classic.getBoundingClientRect().width, gap);
+        const focused = document.activeElement;
+        for (const {node} of items) {
+          if (shown.has(node)) continue;
+          node.setAttribute('data-toolbar-overflow', '');
+          if (node === focused) document.getElementById('commandOpenBtn').focus({preventScroll:true});
+        }
+        return;
+      }
       const actions=this.actions,panel=this.panels.find(node=>!node.hidden);
       if(!panel||!actions.clientWidth)return;
       const set=(node,value)=>{if(node&&node.hidden!==value)node.hidden=value;};

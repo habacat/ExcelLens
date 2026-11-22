@@ -8,7 +8,7 @@
   // tab. Fall back to the overflow button, then to the top of the sheet, so a
   // menu never lands in the window corner.
   function anchorRect(node) {
-    for (const candidate of [node, document.getElementById('ribbonMoreBtn')]) {
+    for (const candidate of [node, document.getElementById('ribbonMoreBtn'), document.getElementById('commandOpenBtn')]) {
       if (visible(candidate)) return candidate.getBoundingClientRect();
     }
     const region = document.querySelector('.grid-region')?.getBoundingClientRect();
@@ -55,14 +55,15 @@
       const menu = document.getElementById(trigger.dataset.menu);
       if (menu) this.show(trigger, menu);
     }
-    show(trigger, menu) {
+    show(trigger, menu, anchor = trigger) {
       this.close(false);
       // Owners may fill or veto a menu immediately before it opens.
       if (!menu.dispatchEvent(new CustomEvent('menuopen', {cancelable: true}))) return;
       menu.hidden = false;
-      place(menu, trigger);
-      trigger.setAttribute('aria-expanded', 'true');
-      this.current = {trigger, menu};
+      place(menu, anchor);
+      const ownsMenu = trigger.dataset.menu === menu.id;
+      if (ownsMenu) trigger.setAttribute('aria-expanded', 'true');
+      this.current = {trigger, menu, ownsMenu};
       menu.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)')?.focus({preventScroll:true});
     }
     close(focus = true) {
@@ -70,9 +71,9 @@
       if (!open) return;
       this.current = null;
       open.menu.hidden = true;
-      open.trigger.setAttribute('aria-expanded', 'false');
+      if (open.ownsMenu) open.trigger.setAttribute('aria-expanded', 'false');
       if (focus) {
-        const trigger = visible(open.trigger) ? open.trigger : document.getElementById('ribbonMoreBtn');
+        const trigger = [open.trigger, document.getElementById('ribbonMoreBtn'), document.getElementById('commandOpenBtn')].find(visible);
         if (visible(trigger)) trigger.focus({preventScroll: true});
       }
     }

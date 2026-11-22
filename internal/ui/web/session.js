@@ -46,11 +46,18 @@
       window.addEventListener('pagehide',()=>{clearTimeout(timer);channel.close()},{once:true});
     });
   }
+  let cacheCleared=false;
   window.ExcelLensSession=Object.freeze({
+    get cacheCleared(){return cacheCleared;},
+    returnHomeAfterCacheReset(){
+      if(cacheCleared)return;
+      cacheCleared=true;
+      window.location.replace(window.location.pathname);
+    },
     nativeLaunch:valid(launch),
     get restoring(){return valid(stored) && id===stored;},
     get id(){return id},
     ready,
-    apply(headers){headers.set('X-ExcelLens-Session',id);return headers;}
+    apply(headers){headers.set('X-ExcelLens-Session',id);headers.set('X-ExcelLens-Cache-Epoch',document.documentElement.dataset.cacheEpoch);return headers;}
   });
 })();

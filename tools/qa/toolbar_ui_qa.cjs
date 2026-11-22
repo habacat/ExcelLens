@@ -71,6 +71,10 @@ const measure = () => h.page.run(() => {
     h = await launch({out, errors: report.errors, duration: '12m'});
     const p = h.page;
     await p.file('#fileInput', source); await p.wait(ready); await settled();
+    // This suite exercises the optional tabbed layout, including its overflow.
+    await p.run(() => document.getElementById('openBtn').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,cancelable:true})));
+    await p.click('#toolbarLayoutToggle');
+    await p.wait('window.ExcelLensRibbon.ribbon === true');
     await p.run(() => {
       localStorage.removeItem('ExcelLens.ribbonCollapsed'); window.ExcelLensRibbon.setCollapsed(false); window.ExcelLensRibbon.select('home');
       const fetch = window.fetch.bind(window); window.__toolbarReads = 0;

@@ -14,7 +14,7 @@ class Client{
   async shot(file){await this.call('Page.bringToFront');await this.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');const r=await this.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(file,Buffer.from(r.data,'base64'));}
   close(){for(const item of this.pending.values()){clearTimeout(item.timer);item.reject(Error('QA browser closed'));}this.pending.clear();this.socket.close();}
 }
-async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe'),launchFile,systemClipboard=false}){
+async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe'),launchFile,systemClipboard=false,trayInput=false}){
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'excellens-ui-qa-'));
   const profile = path.join(storage, 'chrome');
   const clients = [];
@@ -61,7 +61,9 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
   const startServer=async()=>{
     const args=['-duration',duration,'-storage',storage];
     if(launchFile)args.push('-launch-file',path.resolve(launchFile));
-    server=spawn(exe,args,{cwd:path.resolve(__dirname,'../..'),windowsHide:true,stdio:['ignore','pipe','pipe']});
+    if(trayInput)args.push('-tray-stdin');
+    server=spawn(exe,args,{cwd:path.resolve(__dirname,'../..'),windowsHide:true,stdio:[trayInput?'pipe':'ignore','pipe','pipe']});
+    if(trayInput)harness.tray=command=>server.stdin.write(command+'\n');
     harness.address=await new Promise((resolve,reject)=>{let text='',errors='';server.stderr.on('data',x=>errors+=x);server.stdout.on('data',x=>{text+=x;if(text.includes('\n')){try{resolve(JSON.parse(text.split('\n')[0]).url);}catch(e){reject(e);}}});server.once('error',reject);server.once('exit',code=>reject(Error('uiprobe exited '+code+' '+errors)));});
   };
   harness.restart=async()=>{await stop(server);await startServer();return harness.address;};

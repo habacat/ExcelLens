@@ -707,6 +707,7 @@
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/open");
       xhr.setRequestHeader("X-ExcelLens-Token", TOKEN);
+      xhr.setRequestHeader("X-ExcelLens-Cache-Epoch", document.documentElement.dataset.cacheEpoch);
       if (window.ExcelLensSession?.id) xhr.setRequestHeader("X-ExcelLens-Session", window.ExcelLensSession.id);
       xhr.upload.onprogress = event => {
         if (event.lengthComputable) activity?.report(event.loaded, event.total, '', fmtBytes(event.loaded) + ' / ' + fmtBytes(event.total));
@@ -4248,7 +4249,7 @@
   }
 
   // Name the way forward when an edit key is pressed while reading.
-  const readOnlyHint = () => $('editCopyOpen').hidden ? '当前是只读浏览，原文件不会被修改' : '当前是只读浏览。要修改内容，请点“开始”里的“编辑副本”';
+  const readOnlyHint = () => $('editCopyOpen').hidden ? '当前是只读浏览，原文件不会被修改' : '当前是只读浏览。要修改内容，请选择“编辑副本”';
 
   // Excel-style keyboard routing: do not hijack editing, browser selection or
   // modal dialog controls. Only the grid receives caret/navigation keys;
@@ -4378,6 +4379,7 @@
   }
 
   function bindEvents() {
+    document.addEventListener('toolbar-setting-error', event => toast(event.detail, 'error'));
     commandPalette.bind();
     $("openBtn").addEventListener("click", chooseFile);
     $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});

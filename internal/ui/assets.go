@@ -20,6 +20,10 @@ var Files embed.FS
 // Index injects the same registry used by native entry points. JSON is emitted
 // with HTML escaping, and the token is generated internally as hexadecimal.
 func Index(token string) ([]byte, error) {
+	return IndexWithLayout(token, false, 0)
+}
+
+func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, error) {
 	data, err := Files.ReadFile("web/index.html")
 	if err != nil {
 		return nil, err
@@ -102,6 +106,7 @@ func Index(token string) ([]byte, error) {
 		return nil, err
 	}
 	replacer := strings.NewReplacer("__APP_TOKEN__", token,
+		"__RIBBON_LAYOUT__", strconv.FormatBool(ribbon), "__CACHE_EPOCH__", strconv.FormatUint(cacheEpoch, 10),
 		"__APP_VERSION__", buildinfo.Version,
 		"__MAX_SOURCE_ROWS__", strconv.Itoa(formats.ExternalRows),
 		"__FILE_ACCEPT__", formats.Accept(), "__FILE_FORMATS__", string(config))

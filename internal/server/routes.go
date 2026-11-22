@@ -20,6 +20,7 @@ func (a *App) registerWorkbookRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/assets/", a.handleAssets)
 	mux.HandleFunc("/api/notes", a.handleSourceNotes)
 	mux.HandleFunc("/api/status", a.handleStatus)
+	mux.HandleFunc("/api/interface", a.handleInterfaceSettings)
 	mux.HandleFunc("/api/named-views", a.handleNamedViews)
 	mux.HandleFunc("/api/named-views/resolve", a.handleNamedViewResolve)
 	mux.HandleFunc("/api/recent", a.handleRecent)

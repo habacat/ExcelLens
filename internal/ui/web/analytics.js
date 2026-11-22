@@ -1191,7 +1191,7 @@
     $('analysisCreateSheet').addEventListener('click',createSheet);$('analysisAddColumn').addEventListener('click',addColumn);$('analysisAddRows').addEventListener('click',addRows);$('analysisDeleteSheet').addEventListener('click',deleteSheet);
     root.addEventListener('keydown',e=>{if(e.key==='Escape'){$('analysisDrill').hidden=true;const shade=root.querySelector('.analysis-modal-shade');if(!shade)close();e.stopPropagation()}});
     window.addEventListener('resize',()=>{if(state.opened)charts?.resize();});
-    window.addEventListener('beforeunload',event=>{if(hasUnsaved()){event.preventDefault();event.returnValue='';}});
+    window.addEventListener('beforeunload',event=>{if(hasUnsaved()&&!window.ExcelLensSession?.cacheCleared){event.preventDefault();event.returnValue='';}});
   }
   bind();
   async function navigateSheet(id,row,column){

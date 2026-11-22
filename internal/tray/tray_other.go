@@ -14,6 +14,10 @@ type Options struct {
 	OnOpenExports        func() error
 	OnOpenNotes          func() error
 	OnOpenLayouts        func() error
+	OnOpenProgram        func() error
+	RibbonLayout         func() (bool, error)
+	SetRibbonLayout      func(bool) error
+	OnClearAllCaches     func() (string, error)
 	OnClearCache         func() (string, error)
 	OnClearTemp          func() (string, error)
 	ContextMenuInstalled func() bool

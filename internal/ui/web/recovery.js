@@ -10,7 +10,11 @@
       Object.assign(this,{kind,api,onRestore,onStatus,prepareCopy});
       this.records=new Map();this.encoded=new Map();this.pending=new Map();this.revision=0;this.owner='';this.inflight=null;this.running=null;this.timer=0;this.error='';this.blocked=false;this.initialized=false;this.loading=true;this.failures=0;
       this.ready=this.initialize();
-      window.addEventListener('beforeunload',event=>{if(this.dirty){event.preventDefault();event.returnValue='';this.flush(true);}});
+      window.addEventListener('beforeunload',event=>{
+        if(!this.dirty)return;
+        if(!window.ExcelLensSession?.cacheCleared){event.preventDefault();event.returnValue='';}
+        this.flush(true);
+      });
       window.addEventListener('pagehide',()=>{this.flush(true);});
       window.addEventListener('online',()=>{if(this.dirty&&!this.blocked)this.flush();});
     }

@@ -1,0 +1,152 @@
+{
+  "version": "1.13.1",
+  "result": "PASS",
+  "defaultLayout": "classic",
+  "classic": {
+    "dimensions": [
+      {
+        "width": 1920,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 220,
+        "formulaInput": 753
+      },
+      {
+        "width": 1600,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 220,
+        "formulaInput": 433
+      },
+      {
+        "width": 1391,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 220,
+        "formulaInput": 568
+      },
+      {
+        "width": 1280,
+        "dpi": 1.25,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 220,
+        "formulaInput": 457
+      },
+      {
+        "width": 1024,
+        "dpi": 1.5,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 156,
+        "formulaInput": 216.6875
+      },
+      {
+        "width": 901,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 125.25,
+        "formulaInput": 577
+      },
+      {
+        "width": 760,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 90,
+        "formulaInput": 436
+      },
+      {
+        "width": 671,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 67.75,
+        "formulaInput": 395
+      },
+      {
+        "width": 640,
+        "dpi": 1.25,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 30,
+        "formulaInput": 364
+      },
+      {
+        "width": 420,
+        "dpi": 2,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 30,
+        "formulaInput": 194
+      },
+      {
+        "width": 320,
+        "dpi": 1,
+        "topbar": 37,
+        "formulaBar": 35,
+        "commandSearch": 30,
+        "formulaInput": 94
+      }
+    ],
+    "checks": [
+      "Classic is the default; desktop, narrow and breakpoint widths preserve one top row, working font and search controls, hit targets and formula space",
+      "Header context menu and tray callbacks both switch the same persisted preference; control identity, command search and workbook binding survive the switch without new source jobs",
+      "A tray layout change keeps an in-progress edit and the active formula field",
+      "Clear all caches returns both tabs to home, empties disk cache, preserves source bytes, and reopens the workbook with its leading-zero ID"
+    ]
+  },
+  "ribbon": {
+    "height": 73,
+    "widthCount": 8,
+    "checks": [
+      "Eight widths and four pixel ratios: core commands, tabs, command search, workbook name and formula controls fit and receive pointer input without new source tasks",
+      "At 760 px 3 commands fold into the overflow menu and still run",
+      "The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon queues no more layouts over 12 frames",
+      "Resizing the bar itself, independent of the window, recomputes overflow",
+      "Each of the five tabs shows exactly its own panel",
+      "Every tab command is registered in command search; eight open their dialogs; a command on another tab brings its tab forward and anchors its menu to the button",
+      "A column menu opened from command search while folded is anchored to its visible button; Escape closes it and restores focus",
+      "Ctrl+F1 folds the bar, a tab opens it over the sheet for one command, and the choice is remembered",
+      "Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet"
+    ]
+  },
+  "editor": {
+    "layouts": 65,
+    "presets": [
+      "off",
+      "warm",
+      "green",
+      "mist",
+      "blush",
+      "ice",
+      "lavender",
+      "graphite",
+      "navy",
+      "forest",
+      "warmdark",
+      "plum",
+      "brown"
+    ]
+  },
+  "maintenance": {
+    "windowsNativeMenuAndGoRegression": [
+      "TestFullCacheResetClosesTabsAndPreservesFilesAndLayout",
+      "TestFullCacheResetWaitsForRequestsAndPreservesSourceInsideCache",
+      "TestFullCacheResetReleasesMappedIndexAndKeepsConfirmedEdit",
+      "TestOpenProgramDirectoryUsesExecutableEvenFromAnotherFolder",
+      "TestNativeMenuReflectsToolbarChoiceAndCacheActions"
+    ],
+    "mappedSourceRows": 262145,
+    "openTabsReturnedHome": 2,
+    "sourceAndSavedEditPreserved": true,
+    "reopensAndReindexes": true
+  },
+  "environment": "Windows x64, production web assets served in an isolated profile and headless Chromium; native Win32 menu constructed and queried without displaying it",
+  "interactiveDesktopAcceptance": false,
+  "nativeOfficeRetest": false
+}

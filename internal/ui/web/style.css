@@ -399,11 +399,51 @@ body.editing-copy .brand-area { flex: 1 1 auto; max-width: none; margin-right: 0
   .edit-grid-actions .group-start { margin-left: 4px; }
 }
 
+.classic-actions, .classic-before, .classic-after { display: none; }
+.appbar { container: app-tools / inline-size; }
+.app-actions, .ribbon-panel { flex-shrink: 1; }
+#toolbarLayoutToggle::before { content: ""; width: 14px; }
+#toolbarLayoutToggle[aria-checked="true"]::before { content: "✓"; color: var(--accent); }
+:root[data-ribbon-layout="false"] :is(.ribbon-tabs,.app-actions,.titlebar > .status-spacer) { display: none; }
+:root[data-ribbon-layout="false"] .classic-actions {
+  display: flex; flex: 1 1 0; min-width: 0; align-items: center; gap: 2px;
+}
+.classic-actions .tool-button, :is(.classic-before,.classic-after) .tool-button { padding: 0 7px; }
+.classic-actions :is([data-toolbar-overflow], [data-toolbar-when-enabled]:disabled, #historyBackBtn:disabled, #historyForwardBtn:disabled) { display: none; }
+.classic-actions .tool-button > .icon:first-child, :is(.classic-before,.classic-after) .tool-button > .icon { color: var(--muted); }
+:root[data-ribbon-layout="false"] .brand-area { max-width: min(16cqi, 240px); }
+:root[data-ribbon-layout="false"] .global-status { max-width: min(12cqi, 160px); }
+:root[data-ribbon-layout="false"] .command-field { flex: 0 0 clamp(30px, calc(25cqi - 100px), 220px); }
+:root[data-ribbon-layout="false"] .classic-before,
+:root[data-ribbon-layout="false"] .classic-after { display: flex; align-items: center; gap: 2px; }
+.classic-after :is(#copyFormulaBtn,#copyValueBtn) {
+  height: var(--ctl-bar); padding: 0 7px; border: 0; border-radius: var(--r-2);
+  background: transparent; color: var(--ink); font: inherit; white-space: nowrap; cursor: pointer;
+}
+.classic-after :is(#copyFormulaBtn,#copyValueBtn):hover:not(:disabled) { background: var(--hover); }
+.classic-after :is(#copyFormulaBtn,#copyValueBtn):disabled { color: var(--faint); cursor: default; }
+.classic-after kbd { display: none; }
+.formula-toolbar :is(.classic-before,.classic-after) .tool-button { height: var(--ctl-bar); }
+body.editing-copy .titlebar > .classic-actions { display: none; }
+:root[data-ribbon-layout="false"] body.editing-copy .brand-area { max-width: none; }
+@container app-tools (max-width: 900px) {
+  :root[data-ribbon-layout="false"] .command-field { padding: 0 6px; gap: 5px; }
+  :root[data-ribbon-layout="false"] .command-field kbd { display: none; }
+  :root[data-ribbon-layout="false"] .command-field-label { display: block; }
+}
+@container app-tools (max-width: 670px) {
+  :root[data-ribbon-layout="false"] .command-field { flex-basis: 30px; justify-content: center; padding: 0; }
+  :root[data-ribbon-layout="false"] .command-field-label { display: none; }
+  :root[data-ribbon-layout="false"] :is(.mode-badge,#helpBtn,#exitBtn,.global-status) { display: none; }
+  .classic-actions .tool-button { gap: 0; padding: 0 6px; font-size: 0; }
+  .classic-actions .caret { display: none; }
+}
+
 /* ---------- Workspace ---------- */
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 /* Every field in the top bars shares one size, reading or editing. */
 .formula-toolbar {
-  --field-height: var(--ctl-bar); min-width: 0; display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+  --field-height: var(--ctl-bar); min-width: 0; display: flex; align-items: center; gap: 4px; padding: 4px 8px; container: formula-tools / inline-size;
   border-bottom: 1px solid var(--line); background: var(--surface);
 }
 .formula-toolbar .toolbar-field { height: var(--field-height); padding: 0 7px; }
@@ -460,6 +500,20 @@ textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 body.editing-copy .formula-toolbar > :not(.edit-toolbar-control),
 body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellTooltip) { display: none !important; }
 @media (max-width: 700px) { .formula-value, .fx-label { display: none; } .name-box { width: 76px; } }
+@container formula-tools (max-width: 1390px) {
+  .classic-before :is(#dataRulesOpenBtn,#recordCardOpenBtn), .classic-after :is(#copyFormulaBtn,#traceDependentsBtn) { display: none; }
+}
+@container formula-tools (max-width: 900px) {
+  :root[data-ribbon-layout="false"] :is(.classic-before,.formula-value) { display: none; }
+  .classic-after :is(#copyValueBtn,#tracePrecedentsBtn) { display: none; }
+  .classic-after .font-picker { width: 90px; }
+}
+@container formula-tools (max-width: 520px) {
+  .classic-after .ribbon-field { padding: 0; }
+  .classic-after .ribbon-field > .icon { display: none; }
+  .classic-after .font-picker { width: 82px; }
+  :root[data-ribbon-layout="false"] .name-box { width: 62px; }
+}
 
 /* ---------- Sheet tabs and status ---------- */
 .bottom-bar { min-width: 0; display: grid; grid-template-rows: 26px 22px; border-top: 1px solid var(--line); background: var(--inset); }

@@ -12,7 +12,7 @@
 | [releases/1.9.1.md](releases/1.9.1.md) | 区域编辑、透视对象和标签页进度 |
 | [releases/1.9.0.md](releases/1.9.0.md) | 最新公开版本的升级及验收范围 |
 | [user/formats.md](user/formats.md) | 当前格式、精度、缓存、压缩包及导出边界 |
-| [user/interface.md](user/interface.md) | 选项卡功能区、命令搜索与功能查找 |
+| [user/interface.md](user/interface.md) | 经典工具栏、可选选项卡、命令搜索与托盘 |
 | [user/calculator.md](user/calculator.md) | 计算器语义、用法及限制 |
 | [user/conversion.md](user/conversion.md) | 手动格式转换、日期顺序、失败处理和计算建议 |
 | [user/recovery-and-issues.md](user/recovery-and-issues.md) | 查询/导出任务恢复、计算表及草稿恢复、异常核对清单 |
@@ -70,6 +70,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.13.1.md](releases/1.13.1.md) | 工具栏布局切换、程序目录与全部缓存清理 |
 | [releases/1.13.0.md](releases/1.13.0.md) | 选项卡功能区、窄窗操作、护眼预设与选区显示 |
 | [releases/1.12.2.md](releases/1.12.2.md) | 正式双包与多工具路径兼容 |
 | [releases/1.12.1.md](releases/1.12.1.md) | 1.12 核查工作流和资源一致性正式包 |

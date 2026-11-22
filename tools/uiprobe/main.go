@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"log"
@@ -20,6 +21,7 @@ func main() {
 	duration := flag.Duration("duration", 5*time.Minute, "maximum server lifetime")
 	storage := flag.String("storage", "", "reuse an excellens-ui-qa-* directory directly under the OS temp directory")
 	launchFile := flag.String("launch-file", "", "open a fixture in its own native launch session")
+	trayInput := flag.Bool("tray-stdin", false, "exercise tray callbacks in this isolated test profile")
 	flag.Parse()
 	var root string
 	var err error
@@ -67,6 +69,26 @@ func main() {
 		log.Fatal(err)
 	}
 	signals := make(chan os.Signal, 1)
+	if *trayInput {
+		go func() {
+			input := bufio.NewScanner(os.Stdin)
+			for input.Scan() {
+				var err error
+				switch input.Text() {
+				case "ribbon", "classic":
+					err = app.SetRibbonLayout(input.Text() == "ribbon")
+				case "clear-all":
+					_, err = app.ClearAllCaches()
+				default:
+					log.Printf("unknown tray test action")
+					continue
+				}
+				if err != nil {
+					log.Printf("tray action failed: %v", err)
+				}
+			}
+		}()
+	}
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(signals)
 	go func() {

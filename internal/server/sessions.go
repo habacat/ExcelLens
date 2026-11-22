@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -102,6 +103,8 @@ func (a *App) sessionWithLaunch(id, launchPath string) (*browserSession, error) 
 // PreparePathForLaunch lets the browser paint before the first API request
 // reads the native file. Only the new tab waits, outside the sessions lock.
 func (a *App) PreparePathForLaunch(path string) (string, error) {
+	a.cacheResetMu.RLock()
+	defer a.cacheResetMu.RUnlock()
 	id := randomID()
 	if _, err := a.sessionWithLaunch(id, path); err != nil {
 		return "", err
@@ -134,6 +137,16 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/") {
 			defaultRoutes.ServeHTTP(w, r)
+			return
+		}
+		a.cacheResetMu.RLock()
+		defer a.cacheResetMu.RUnlock()
+		if r.URL.Path == "/api/interface" {
+			defaultRoutes.ServeHTTP(w, r)
+			return
+		}
+		if epoch := r.Header.Get("X-ExcelLens-Cache-Epoch"); epoch != "" && epoch != strconv.FormatUint(a.cacheEpoch.Load(), 10) {
+			writeError(w, http.StatusConflict, "全部缓存已清理，请返回首页重新打开文件")
 			return
 		}
 		id := r.Header.Get("X-ExcelLens-Session")

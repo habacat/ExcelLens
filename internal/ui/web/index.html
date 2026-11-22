@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-ribbon-layout="__RIBBON_LAYOUT__" data-cache-epoch="__CACHE_EPOCH__">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -126,6 +126,7 @@
         <button id="ribbonTabView" type="button" role="tab" data-ribbon-tab="view" aria-controls="ribbonView" aria-selected="false" tabindex="-1">视图</button>
         <button id="ribbonTabReview" type="button" role="tab" data-ribbon-tab="review" aria-controls="ribbonReview" aria-selected="false" tabindex="-1">核对</button>
       </div>
+      <div class="classic-actions" role="toolbar" aria-label="常用命令"></div>
       <span class="status-spacer"></span>
       <span id="globalStatus" class="global-status">等待选择文件</span>
       <button id="commandOpenBtn" class="command-field" type="button" title="查找功能或工作表（Ctrl+K）" aria-label="命令面板" aria-haspopup="dialog" aria-controls="commandDialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span class="command-field-label">查找功能</span><kbd>Ctrl K</kbd></button>
@@ -240,6 +241,9 @@
     <button id="copyEvidenceBtn" type="button" role="menuitem">复制证据摘要</button>
   </div>
   <div id="ribbonMoreMenu" class="menu" role="menu" aria-label="更多命令" hidden></div>
+  <div id="toolbarLayoutMenu" class="menu" role="menu" aria-label="工具栏布局" hidden>
+    <button id="toolbarLayoutToggle" type="button" role="menuitemcheckbox" aria-checked="false">选项卡布局</button>
+  </div>
   <div id="sourceIntegrityNotice" class="source-integrity-notice" role="status" hidden></div>
 
   <input id="fileInput" type="file" accept="__FILE_ACCEPT__" hidden>
@@ -287,12 +291,14 @@
       <button id="historyBackBtn" class="icon-button" type="button" disabled title="返回上一位置（Alt+←）" aria-label="返回上一位置"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-left"/></svg></button>
       <button id="historyForwardBtn" class="icon-button" type="button" disabled title="前进到下一位置（Alt+→）" aria-label="前进到下一位置"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-right"/></svg></button>
       <input id="nameBox" class="toolbar-field name-box edit-toolbar-control" value="A1" title="名称框（Ctrl+G）" aria-label="名称框：地址或名称" spellcheck="false" autocomplete="off">
+      <div class="classic-before" role="group" aria-label="工作表工具"></div>
       <div class="fx-label edit-toolbar-control" aria-hidden="true">fx</div>
       <textarea id="editGridFormula" aria-autocomplete="list" aria-controls="editFormulaSuggestions" aria-expanded="false" class="toolbar-field formula-input edit-toolbar-control" rows="1" aria-label="编辑栏" spellcheck="false" hidden></textarea>
       <div id="formulaText" class="toolbar-field formula-input formula-inspector-input" role="textbox" aria-label="公式栏" aria-readonly="true" tabindex="0" data-placeholder="选择单元格查看公式或数值"></div>
       <button id="formulaExpandBtn" class="formula-expand-button edit-toolbar-control" type="button" aria-label="展开公式栏" aria-controls="formulaText editGridFormula" aria-expanded="false" title="展开公式栏"></button>
       <select id="editGridKind" class="toolbar-field toolbar-select edit-toolbar-control" aria-label="输入类型" hidden><option value="auto">自动类型</option><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option></select>
       <div id="formulaValue" class="formula-value" title="文件里保存的计算结果">-</div>
+      <div class="classic-after" role="group" aria-label="字体与公式操作"></div>
       <button id="cellDetailBtn" class="icon-button" type="button" disabled title="单元格信息（Ctrl+1）" aria-label="单元格信息"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-info"/></svg></button>
     </div>
 
@@ -1276,6 +1282,7 @@
   <script src="/assets/relations.js"></script>
   <script src="/assets/overlays.js"></script>
   <script src="/assets/toolbar.js"></script>
+  <script src="/assets/toolbar-settings.js"></script>
   <script src="/assets/command-palette.js"></script>
   <script src="/assets/viewport-cache.js"></script>
   <script src="/assets/app.js"></script>

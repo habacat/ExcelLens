@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"excellens/internal/recovery"
@@ -36,6 +37,9 @@ type App struct {
 	archiveView      *archiveView
 	archiveTask      *archiveTask
 	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
+	cacheResetMu     sync.RWMutex  // root only: drain requests before discarding active caches
+	cacheEpoch       atomic.Uint64
+	toolbar          toolbarPreference
 	sourceMu         sync.Mutex
 	sourcePins       map[*workbook.Workbook]int
 	sourceUploads    map[string]int
