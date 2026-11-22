@@ -139,7 +139,7 @@ func TestBrowserTabsKeepIndependentWorkbooksAndCaches(t *testing.T) {
 	checkStatus(sessionA, "audit_a.xlsx", "First")
 	checkStatus(sessionB, "audit_b.xlsx", "Invest")
 	// Clearing unused caches from the tray never invalidates active tabs.
-	oldCache := filepath.Join(CacheDir(), "history-unused")
+	oldCache := filepath.Join(CacheDir(), strings.Repeat("a", 64))
 	if err := os.MkdirAll(oldCache, 0700); err != nil {
 		t.Fatal(err)
 	}

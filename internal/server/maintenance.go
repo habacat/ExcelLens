@@ -39,6 +39,10 @@ func (a *App) ClearUnusedCaches() (string, error) {
 		}
 	}
 	root := workbook.CacheRoot()
+	protected, err := rootApp.cacheSourceProtection(root)
+	if err != nil {
+		return "", err
+	}
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
 		return "缓存目录为空", nil
@@ -49,7 +53,8 @@ func (a *App) ClearUnusedCaches() (string, error) {
 	count := 0
 	var failed []string
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		_, holdsSource := protected[cachePathKey(entry.Name())]
+		if !entry.IsDir() || holdsSource || !disposableCacheGroup(entry.Name()) {
 			continue
 		}
 		dir := filepath.Join(root, entry.Name())

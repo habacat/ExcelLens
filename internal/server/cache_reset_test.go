@@ -46,7 +46,7 @@ func TestFullCacheResetClosesTabsAndPreservesFilesAndLayout(t *testing.T) {
 	if err := os.WriteFile(upload, []byte("001,12"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	history := filepath.Join(workbook.CacheRoot(), "old", "row.idx")
+	history := filepath.Join(workbook.CacheRoot(), strings.Repeat("a", 64), "row.idx")
 	if err := os.MkdirAll(filepath.Dir(history), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -106,15 +106,32 @@ func TestFullCacheResetClosesTabsAndPreservesFilesAndLayout(t *testing.T) {
 
 func TestFullCacheResetWaitsForRequestsAndPreservesSourceInsideCache(t *testing.T) {
 	isolateTestStorage(t)
-	dir := filepath.Join(workbook.CacheRoot(), "sources")
+	dir := filepath.Join(workbook.CacheRoot(), strings.Repeat("c", 64))
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	source := filepath.Join(dir, "source.xlsx")
 	writeMultiSheetWorkbook(t, source)
+	unused := filepath.Join(dir, "unused.idx")
+	if err := os.WriteFile(unused, []byte("index"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(workbook.CacheRoot(), "personal", "original.csv")
+	if err := os.MkdirAll(filepath.Dir(other), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, []byte("001"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	a := prepareFeatureApp(t, source)
 	defer a.Close()
 	guard := make(chan struct{})
+	if _, err := a.ClearUnusedCaches(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(source); err != nil {
+		t.Fatal("history cleanup removed the current source", err)
+	}
 	release := make(chan struct{})
 	requestDone := make(chan struct{})
 	go func() {
@@ -136,6 +153,12 @@ func TestFullCacheResetWaitsForRequestsAndPreservesSourceInsideCache(t *testing.
 	}
 	if _, err := os.Stat(source); err != nil {
 		t.Fatal("source inside cache was removed", err)
+	}
+	if _, err := os.Stat(unused); !os.IsNotExist(err) {
+		t.Fatal("a protected source incorrectly retained its cache siblings", err)
+	}
+	if data, err := os.ReadFile(other); err != nil || string(data) != "001" {
+		t.Fatal("non-cache directory was modified", err)
 	}
 }
 

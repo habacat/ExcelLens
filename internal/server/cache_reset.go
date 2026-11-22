@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -21,34 +22,10 @@ func (a *App) ClearAllCaches() (string, error) {
 	root.cacheResetMu.Lock()
 	defer root.cacheResetMu.Unlock()
 	dir := workbook.CacheRoot()
-	for _, path := range []string{workbook.DataRoot(), dir} {
-		st, err := os.Lstat(path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return "", err
-		}
-		if err == nil && !st.IsDir() {
-			return "", fmt.Errorf("缓存目录不是普通目录：%s", path)
-		}
-	}
-	sources, err := editBasePaths()
+	keep, err := root.cacheSourceProtection(dir)
 	if err != nil {
-		return "", fmt.Errorf("无法核对已保存的编辑来源：%w", err)
+		return "", fmt.Errorf("无法核对缓存目录中的源文件：%w", err)
 	}
-	for _, wb := range root.referencedWorkbooks() {
-		path := wb.Path
-		if wb.ArchiveOrigin != nil {
-			path = wb.ArchiveOrigin.Path
-		}
-		sources = append(sources, path)
-	}
-	for _, tab := range root.activeBrowserWorkbooks() {
-		tab.archiveMu.Lock()
-		if view := tab.archiveView; view != nil {
-			sources = append(sources, view.rootPath)
-		}
-		tab.archiveMu.Unlock()
-	}
-	keep := protectedCacheSources(dir, sources)
 	// Closing sessions joins index, query, edit and archive workers and releases
 	// their leases. Do not hold the cache or archive lock while waiting for them.
 	root.closeBrowserSessions()
@@ -84,29 +61,115 @@ func (a *App) ClearAllCaches() (string, error) {
 	}
 }
 
+func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
+	for _, path := range []string{workbook.DataRoot(), dir} {
+		st, err := os.Lstat(path)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		if err == nil && !st.IsDir() {
+			return nil, fmt.Errorf("缓存目录不是普通目录：%s", path)
+		}
+	}
+	sources, err := editBasePaths()
+	if err != nil {
+		return nil, fmt.Errorf("无法核对已保存的编辑来源：%w", err)
+	}
+	for _, wb := range root.referencedWorkbooks() {
+		path := wb.Path
+		if wb.ArchiveOrigin != nil {
+			path = wb.ArchiveOrigin.Path
+		}
+		sources = append(sources, path)
+	}
+	for _, tab := range root.activeBrowserWorkbooks() {
+		tab.archiveMu.Lock()
+		if view := tab.archiveView; view != nil {
+			sources = append(sources, view.rootPath)
+		}
+		tab.archiveMu.Unlock()
+	}
+	return protectedCacheSources(dir, sources)
+}
+
 // A local file can itself have been opened from below the cache directory.
 // Protect its source bytes (and SQLite sidecars) even in that unusual case.
-func protectedCacheSources(dir string, paths []string) map[string]bool {
+func protectedCacheSources(dir string, paths []string) (map[string]bool, error) {
 	keep := make(map[string]bool)
-	for _, path := range paths {
-		for _, name := range []string{path, path + "-wal", path + "-shm", path + "-journal"} {
-			if real, err := filepath.EvalSymlinks(name); err == nil {
-				name = real
+	realDir, err := filepath.EvalSymlinks(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return keep, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	rootInfo, err := os.Stat(realDir)
+	if err != nil {
+		return nil, err
+	}
+	remember := func(base, name string) {
+		rel, err := filepath.Rel(base, name)
+		if err != nil || rel == "." || !filepath.IsLocal(rel) {
+			return
+		}
+		rel = cachePathKey(rel)
+		keep[rel] = true
+		for parent := filepath.Dir(rel); parent != "."; parent = filepath.Dir(parent) {
+			if _, seen := keep[parent]; !seen {
+				keep[parent] = false
 			}
-			rel, err := filepath.Rel(dir, name)
-			if err != nil || rel == "." || !filepath.IsLocal(rel) {
+		}
+	}
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		// Keep both the name used to open the source and the actual directory
+		// entries. Windows expands 8.3 names when resolving either operand.
+		for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+			name := path + suffix
+			remember(dir, name)
+			real, err := filepath.EvalSymlinks(name)
+			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			rel = cachePathKey(rel)
-			keep[rel] = true
-			for parent := filepath.Dir(rel); parent != "."; parent = filepath.Dir(parent) {
-				if !keep[parent] {
-					keep[parent] = false
+			if err != nil {
+				return nil, err
+			}
+			remember(realDir, real)
+			// A drive alias or UNC spelling can still refer to the same
+			// directory. Anchor the resolved filename to the actual root ID.
+			for parent := filepath.Dir(real); ; parent = filepath.Dir(parent) {
+				st, err := os.Stat(parent)
+				if err != nil {
+					return nil, err
+				}
+				if os.SameFile(st, rootInfo) {
+					remember(parent, real)
+					break
+				}
+				if parent == filepath.Dir(parent) {
+					break
 				}
 			}
 		}
 	}
-	return keep
+	return keep, nil
+}
+
+// Workbook fingerprints name the only workbook cache groups. Archive member
+// caches use an archive SHA-256, and queries can have their own scratch group.
+// Other entries may be original files the user stored beside these caches.
+func disposableCacheGroup(name string) bool {
+	if name == "queries" {
+		return true
+	}
+	digest, archive := strings.CutPrefix(name, "archive-")
+	if len(digest) != 64 && (archive || len(digest) != 40) {
+		return false
+	}
+	_, err := hex.DecodeString(digest)
+	return err == nil
 }
 
 func cachePathKey(path string) string {
@@ -128,6 +191,9 @@ func clearCacheEntries(root *os.Root, dir string, keep map[string]bool) error {
 	}
 	var failed []error
 	for _, entry := range entries {
+		if dir == "." && (!entry.IsDir() || !disposableCacheGroup(entry.Name())) {
+			continue
+		}
 		name := filepath.Join(dir, entry.Name())
 		absolute := filepath.Join(root.Name(), name)
 		protected, ancestor := keep[cachePathKey(name)]
