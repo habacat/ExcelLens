@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"excellens/internal/workbook"
 )
 
 func TestRenamedWorkbookReusesSearchAndViewCache(t *testing.T) {
@@ -129,13 +131,18 @@ func TestCacheCleanupProtectsCurrentWorkbook(t *testing.T) {
 	a := prepareFeatureApp(t, path)
 	defer a.Close()
 	active := a.currentWorkbook().CacheDir
-	old := filepath.Join(CacheDir(), "old-workbook")
-	if err := os.MkdirAll(old, 0700); err != nil {
+	previous := filepath.Join(t.TempDir(), "previous.csv")
+	if err := os.WriteFile(previous, []byte("id,value\n001,10\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(old, "dummy"), []byte("data"), 0600); err != nil {
+	oldBook, err := workbook.OpenWorkbook(previous)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := oldBook.BuildIndex(oldBook.Sheets[0], nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	old := oldBook.CacheDir
 	if _, err := a.ClearUnusedCaches(); err != nil {
 		t.Fatal(err)
 	}
