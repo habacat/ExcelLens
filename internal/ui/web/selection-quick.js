@@ -49,7 +49,10 @@
       if(!bound.area||first<1||last>this.s.index.maxCol||rows<1){this.toast('快速分析请选择已用范围内的一个连续区域','warning');return;}
       if(last-first+1>this.limits.columns||rows*(last-first+1)>this.limits.cells){this.toast(`快速分析最多 ${this.limits.columns} 列、${this.limits.cells.toLocaleString()} 格，请缩小选区`,'warning');return;}
       this.clear();++this.navigation;this.bound=bound;
-      $('selectionQuickSource').textContent=`${this.s.sheet}!${bound.request.start}:${bound.request.end} · ${rows.toLocaleString()} 行`;
+      // The column span is read from the source, so columns hidden on screen count too. Say so when it applies.
+      const hidden=[];for(let col=first;col<=last;col++)if(this.s.hiddenColumns?.has(col))hidden.push(this.colName(col));
+      const hiddenNote=hidden.length?` · 含隐藏列 ${hidden.slice(0,6).join('、')}${hidden.length>6?` 等 ${hidden.length} 列`:''}`:'';
+      $('selectionQuickSource').textContent=`${this.s.sheet}!${bound.request.start}:${bound.request.end} · ${rows.toLocaleString()} 行${hiddenNote}`;
       $('selectionQuickSkip').checked=false;
       const left=$('selectionQuickMinuend'),right=$('selectionQuickSubtrahend');left.replaceChildren(new Option('不比较','0'));right.replaceChildren();
       for(let col=first;col<=last;col++){left.append(new Option(this.colName(col),String(col)));right.append(new Option(this.colName(col),String(col)));}

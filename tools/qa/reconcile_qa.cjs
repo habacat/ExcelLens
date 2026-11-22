@@ -23,7 +23,7 @@ let h;
     await p.run(()=>{const select=document.querySelector('#reconcileFields .reconcile-mode');select.value='number';select.dispatchEvent(new Event('change'));});
     await p.click('#reconcileRun');await p.wait('!document.querySelector("#reconcileResults").hidden&&document.querySelector("#reconcileProgress").textContent==="核对完成"');
     const start=await p.evaluate('window.qaStarts.at(-1)'),status=await p.api('/api/reconcile/status?id='+start.jobId),r=status.result;
-    assert.deepEqual(r.counts,{equal:1,different:1,leftOnly:1,rightOnly:1,duplicate:1,review:0,invalidKeys:2,leftRecords:6,rightRecords:7});assert.equal(r.samples.find(g=>g.status==='different').comparisons[0].delta,'0.01');
+    assert.deepEqual(r.counts,{equal:1,withinTolerance:0,different:1,leftOnly:1,rightOnly:1,duplicate:1,review:0,invalidKeys:2,leftRecords:6,rightRecords:7});assert.equal(r.samples.find(g=>g.status==='different').comparisons[0].delta,'0.01');
     assert.equal(await p.evaluate('window.qaInjected'),undefined);assert.equal(await p.evaluate('document.querySelectorAll("#reconcileTable img").length'),0);assert((await p.evaluate('document.querySelector("#reconcileTable").textContent')).includes(unsafe));
     report.checks.push('adding another CSV preserves the primary workbook; actual UI uses exact amounts, leading-zero keys, separate duplicate and invalid-key counts; source markup renders as literal text');
     await p.shot(path.join(out,'comparison.png'));

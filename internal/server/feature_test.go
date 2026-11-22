@@ -237,9 +237,10 @@ func TestFreezeUIAndSearchResultsAreAvailableAsStaticAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	assets := map[string][]string{
-		"/assets/freeze.js": {"class FrozenPanes", "followScroll", "fetchPart"},
-		"/assets/app.js":    {"searchSession", "searchCache", "goSearchResult", "openFreezeDialog", "applyFreeze", "copySelection", "stepSearch", "recordVisit"},
-		"/assets/style.css": {".freeze-top", ".freeze-left", ".search-dialog[open]", ".grid-cell.range-cell"},
+		"/assets/freeze.js":   {"class FrozenPanes", "followScroll", "fetchPart"},
+		"/assets/app.js":      {"searchSession", "searchCache", "goSearchResult", "openFreezeDialog", "applyFreeze", "copySelection", "stepSearch", "recordVisit"},
+		"/assets/style.css":   {".freeze-top", ".freeze-left", ".grid-cell.range-cell"},
+		"/assets/dialogs.css": {".search-dialog[open]"},
 	}
 	for path, required := range assets {
 		r := featureCall(t, app, "GET", path, "")

@@ -137,7 +137,7 @@ async function main() {
   }
 }
 
-main().catch(error => { report.failure = String(error.stack); process.exitCode = 1; }).finally(() => {
+main().catch(error => { report.result = 'FAIL'; report.failure = String(error.stack); process.exitCode = 1; }).finally(() => {
   const target = path.join(out, report.result === 'PASS' ? 'edit-toolbar-browser.json' : 'private/edit-toolbar-failure.json');
   fs.writeFileSync(target, JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report));

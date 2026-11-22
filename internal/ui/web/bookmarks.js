@@ -5,8 +5,8 @@
   const $=id=>document.getElementById(id);
   const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
   class Bookmarks {
-    constructor({state,api,toast,openDialog,navigateToCell,onChange,canNotes=()=>false,applyNotes}){
-      this.canNotes=canNotes;this.applyNotes=applyNotes;this.s=state;this.api=api;this.toast=toast;this.openDialog=openDialog;this.navigate=navigateToCell;this.onChange=onChange;
+    constructor({state,api,toast,openDialog,navigateToCell,onChange,canNotes=()=>false,applyNotes,confirm=options=>window.ExcelLensOverlays.confirm(options)}){
+      this.canNotes=canNotes;this.applyNotes=applyNotes;this.confirm=confirm;this.s=state;this.api=api;this.toast=toast;this.openDialog=openDialog;this.navigate=navigateToCell;this.onChange=onChange;
       this.items=[];this.keys=new Set();this.loadedBook='';this.request=0;this.pending=null;this.saving=false;this.targetBook='';
       $('bookmarkOpenBtn').addEventListener('click',()=>this.open());
       $('bookmarkSaveBtn').addEventListener('click',()=>this.save());
@@ -113,10 +113,12 @@
       finally{if(ticket===this.request){this.saving=false;$('bookmarkSaveBtn').disabled=false;}}
     }
     async remove(bookmark){
-      if(this.saving||this.loadedBook!==this.s.workbookKey)return;
-      if(!confirm(`删除 ${bookmark.sheet}!${bookmark.ref} 的标记？原始 Excel 不受影响。`))return;
+      const book=this.s.workbookKey;
+      if(this.saving||this.loadedBook!==book)return;
+      if(!await this.confirm({title:'删除标记',message:`删除 ${bookmark.sheet}!${bookmark.ref} 的标记？`,confirmLabel:'删除',danger:true}))return;
+      if(this.saving||this.s.workbookKey!==book||this.loadedBook!==book||!this.items.includes(bookmark))return;
       const note=$('bookmarkNote').value,tag=$('bookmarkTag').value;
-      const book=this.s.workbookKey,ticket=++this.request;this.pending?.abort();this.saving=true;$('bookmarkSaveBtn').disabled=true;
+      const ticket=++this.request;this.pending?.abort();this.saving=true;$('bookmarkSaveBtn').disabled=true;
       try{const data=await this.api('/api/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',id:bookmark.id})});if(ticket!==this.request||!this.accept(data,book))return;this.refreshCurrent(note,tag);}
       catch(e){if(ticket===this.request&&book===this.s.workbookKey)this.toast(e.message,'error')}
       finally{if(ticket===this.request){this.saving=false;$('bookmarkSaveBtn').disabled=false;}}

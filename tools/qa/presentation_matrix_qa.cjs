@@ -15,12 +15,14 @@ async function zoom(p,value){await p.run(value=>{const current=Number(document.q
 async function source(p,sheet){const value=await p.api('/api/sheet?'+new URLSearchParams({sheet,row:'1',rowWindow:'1',limit:'12',cols:'6'}));return value.rows.map(row=>({number:row.number,style:row.style||0,cells:(row.cells||[]).map(cell=>({ref:cell.ref,raw:cell.raw,display:cell.display,type:cell.type||'',style:cell.style||0,hasFormula:cell.hasFormula,cacheMissing:!!cell.cacheMissing,richText:cell.richText,conditional:cell.conditional}))}));}
 async function fonts(p,selector){const doc=await p.call('DOM.getDocument'),node=await p.call('DOM.querySelector',{nodeId:doc.root.nodeId,selector});if(!node.nodeId)throw Error('Missing font probe '+selector);const value=(await p.call('CSS.getPlatformFontsForNode',{nodeId:node.nodeId})).fonts;assert(value.length&&value.some(font=>font.glyphCount>0),'No actual platform glyph fonts: '+selector);return value;}
 async function shot(p,name){const file=path.join(out,name+'.png');await p.shot(file);report.screenshots.push(path.relative(root,file));}
-async function sample(p,native=false){return p.run(native=>{
+let fixtureDate;
+async function sample(p,native=false){return p.run((native,fixtureDate)=>{
   const context=document.createElement('canvas').getContext('2d');
   const refs=native?['B2','B3','B4']:['B3','B4','E3','D7','B8','D4','C4'];
   const cells=refs.map(ref=>{
     const node=document.querySelector((ref.startsWith('B')?'#freezeLeftCells':'#rowsLayer')+' .grid-cell[data-ref='+ref+']');if(!node)throw Error('Missing painted '+ref);
-    const s=getComputedStyle(node),model=node._xlModel,text=model.conditional?.display??model.display??model.raw;
+    const s=getComputedStyle(node),model=node._xlModel;
+    const text=!native&&ref==='D4'?fixtureDate:(model.conditional?.display??model.display??model.raw);
     context.font=s.fontStyle+' '+s.fontWeight+' '+s.fontSize+' '+s.fontFamily;
     const measured=context.measureText(text).width,available=parseFloat(s.width)-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-parseFloat(s.borderLeftWidth)-parseFloat(s.borderRightWidth);
     return {ref,raw:model.raw,type:model.type||'',display:text,text:node.textContent,marker:!!node.querySelector('.cell-number-overflow'),font:s.fontFamily,fontSize:s.fontSize,measured,available,width:node.getBoundingClientRect().width,styleWidth:node.style.width};
@@ -34,7 +36,7 @@ async function sample(p,native=false){return p.run(native=>{
     out.leading=document.querySelector('#freezeLeftCells [data-ref=A4]').textContent;out.hidden=!!document.querySelector('.grid-cell[data-row="6"]');out.missingCache=!!document.querySelector('#rowsLayer [data-ref=E4]')?._xlModel?.cacheMissing;out.executed=!!window.badPresentation;
   }else out.leading=document.querySelector('#freezeLeftCells [data-ref=A2]').textContent;
   return out;
-},native);}
+},native,fixtureDate);}
 function verify(value,expected,sourceRows){
   assert.equal(value.dpi,expected.dpi);assert.equal(value.zoom,expected.zoom);assert.equal(value.font,expected.font);assert(value.nodes<3000,'unbounded viewport nodes');
   const originals=new Map(sourceRows.flatMap(row=>row.cells).map(cell=>[cell.ref,cell]));
@@ -55,6 +57,13 @@ function verify(value,expected,sourceRows){
   report.assetSHA256={};for(const name of ['app.js','cellview.js','freeze.js','richtext.js','conditional.js','merges.js','geometry.js','style.css','printing-model.js','printing-render.js','printing.js','printing.css']){const served=await p.run(async name=>await(await fetch('/assets/'+name)).text(),name),sha=createHash('sha256').update(served).digest('hex');assert.equal(sha,hash(path.join(root,'internal','ui','web',name)),name);report.assetSHA256[name]=sha;}
   await p.run(()=>{window.__presentationCalls=[];const original=window.fetch;window.fetch=function(input,options){window.__presentationCalls.push(new URL(typeof input==='string'?input:input.url,location.href).pathname);return original(input,options);};});
   await open(p,files[0]);const original=await source(p,'呈现');await freeze(p,2,2);
+  // D4 is serial 45292 in built-in format 14. Measure its expected regional
+  // spelling independently of the grid text, which may already be hashes.
+  const dateCell=original.flatMap(row=>row.cells).find(cell=>cell.ref==='D4');
+  assert.equal(dateCell.raw,'45292');assert.equal(dateCell.display,'2024-01-01');
+  const pattern=(await p.api('/api/styles')).styles[dateCell.style].shortDate||'yyyy-mm-dd';
+  const dateParts={yyyy:'2024',yy:'24',mm:'01',m:'1',dd:'01',d:'1'};
+  fixtureDate=pattern.replace(/y+|m+|d+/g,token=>dateParts[token]);
   for(const dpi of [1,1.25,1.5,2])for(const scale of [70,100,125])for(const font of ['', '宋体','Arial','Consolas']){
     report.current={source:'xlsx',dpi,zoom:scale,font};await p.call('Emulation.setDeviceMetricsOverride',{width:1250,height:900,deviceScaleFactor:dpi,mobile:false});await zoom(p,scale);await choose(p,'fontSelect',font);
     const value=await sample(p);verify(value,report.current,original);report.cases.push({source:'xlsx',...value});

@@ -89,7 +89,9 @@ async function freeze(p,rows,cols){
       report.checks.push({name:'60-cached-reversals',zoom,frozen,steps:samples.length,requests:initial.requests,first:samples[0],last:samples.at(-1)});
       if(zoom===100&&!frozen)await shot(p,'deep-after-wheel');
       await p.run(()=>{const grid=document.querySelector('#grid');grid.scrollTop=grid.scrollHeight-grid.clientHeight;});await p.wait(ready);await settle(p);
-      const end=await snapshot(p);valid(end);assert.equal(end.physical,end.maxPhysical);report.checks.push({name:'last-row',zoom,frozen,sample:end});
+      // Near fifteen million pixels the browser reports the end one pixel past
+      // scrollHeight-clientHeight whenever the viewport height is odd.
+      const end=await snapshot(p);valid(end);assert(Math.abs(end.physical-end.maxPhysical)<=1,'Did not reach the scroll end: '+end.physical+' of '+end.maxPhysical);report.checks.push({name:'last-row',zoom,frozen,sample:end});
       await p.run(()=>{document.querySelector('#grid').scrollTop=0;});await p.wait(ready);await settle(p);
       const top=await p.run(()=>({physical:document.querySelector('#grid').scrollTop,first:document.querySelector('#rowsLayer .grid-row')?.dataset.row}));
       assert.equal(top.physical,0);assert(Number(top.first)<=5);report.checks.push({name:'return-to-first-row',zoom,frozen,...top});

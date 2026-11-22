@@ -2,8 +2,8 @@
 // service and an isolated headless browser. Node is a development tool only.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process'),{createHash}=require('node:crypto');
-const root=path.resolve(__dirname,'../..'),version=require('./project_config.cjs').version();
-const out=path.join(root,'validation',version,'private','icon-alignment');fs.mkdirSync(out,{recursive:true});
+const root=path.resolve(__dirname,'../..'),config=require('./project_config.cjs'),version=config.version(),receipts=path.join(root,'validation',config.validationVersion());
+const out=path.join(receipts,'private','icon-alignment');fs.mkdirSync(out,{recursive:true});
 const serverExe=process.argv[2];if(!serverExe)throw Error('Usage: node tools/qa/icon_alignment_qa.cjs ISOLATED_QA_SERVER_EXE');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),digest=data=>createHash('sha256').update(data).digest('hex');
 const source=path.join(out,'icons.csv');fs.writeFileSync(source,'item,amount\none,1.25\ntwo,2.50\n');
@@ -22,7 +22,7 @@ async function click(selector){const r=await evaluate(`(()=>{const r=document.qu
 async function capture(name,selector){const clip=selector?await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,scale:2};})()`):undefined;const r=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false,...(clip?{clip}:{})});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
 async function metrics(selector,{text=false}={}){
   const value=await evaluate(`(${function(selector){
-    const n=document.querySelector(selector),svg=n.querySelector('.button-icon'),r=n.getBoundingClientRect(),i=svg.getBoundingClientRect(),b=svg.getBBox(),s=getComputedStyle(n);
+    const n=document.querySelector(selector),svg=n.querySelector('.icon'),r=n.getBoundingClientRect(),i=svg.getBoundingClientRect(),raw=svg.getBBox(),k=svg.viewBox.baseVal?.width?1:24/parseFloat(getComputedStyle(svg).width),b={x:raw.x*k,y:raw.y*k,width:raw.width*k,height:raw.height*k},s=getComputedStyle(n);
     return {selector,width:r.width,height:r.height,dx:i.x+i.width/2-r.x-r.width/2,dy:i.y+i.height/2-r.y-r.height/2,bbox:{x:b.x,y:b.y,width:b.width,height:b.height},stroke:getComputedStyle(svg).stroke,color:s.color,hidden:svg.getAttribute('aria-hidden'),focusable:svg.getAttribute('focusable'),hit:document.elementFromPoint(i.x+i.width/2,i.y+i.height/2)?.closest('button,a')===n};
   }.toString()})(${JSON.stringify(selector)})`);
   assert(Math.abs(value.dy)<.05,selector+' icon vertical center: '+value.dy);
@@ -57,20 +57,20 @@ async function startServer(){
       if(width===1900&&scale===1)await capture('home-'+preset,'.landing-recent');
     }
     await cdp('Emulation.setDeviceMetricsOverride',{width:1900,height:1000,deviceScaleFactor:1,mobile:false});await evaluate('document.querySelector("input[name=readingPreset][value=off]").click()');await settle();
-    const before=count('/api/recent');await click('#recentRefreshBtn .button-icon');await waitFor('!document.querySelector("#recentList").textContent.includes("读取最近文件")');await pause(150);assert.equal(count('/api/recent'),before+1);report.interactions.push('refresh SVG click sends one recent request');
+    const before=count('/api/recent');await click('#recentRefreshBtn .icon');await waitFor('!document.querySelector("#recentList").textContent.includes("读取最近文件")');await pause(150);assert.equal(count('/api/recent'),before+1);report.interactions.push('refresh SVG click sends one recent request');
     await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
     const focus=await evaluate('(()=>{const n=document.querySelector("#recentRefreshBtn");n.focus();return {id:document.activeElement.id,outline:getComputedStyle(n).outlineStyle};})()');assert.equal(focus.id,'recentRefreshBtn');assert.notEqual(focus.outline,'none');report.keyboardFocus=focus;
     const input=await cdp('Runtime.evaluate',{expression:'document.querySelector("#fileInput")'});await cdp('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[source]});
     await waitFor('!document.querySelector("#workspace").hidden&&document.querySelector("#indexOverlay").hidden&&window.ExcelLensPerformance().hasVisibleCoverage');
-    await click('.grid-cell[data-ref="A2"]');report.detail=await metrics('#cellDetailBtn');await click('#cellDetailBtn .button-icon');await waitFor('document.querySelector("#detailDialog").open');await click('#detailDialog .dialog-close');await waitFor('!document.querySelector("#detailDialog").open');report.interactions.push('detail SVG opens panel; centered close button closes it');
-    await click('#searchOpenBtn');await waitFor('document.querySelector("#searchDialog").open');report.history=await metrics('#searchHistoryBtn');await click('#searchHistoryBtn .button-icon');await waitFor('!document.querySelector("#searchHistoryPanel").hidden');assert.equal(await evaluate('document.querySelector("#searchHistoryBtn").getAttribute("aria-expanded")'),'true');report.interactions.push('history SVG toggles search history');
+    await click('.grid-cell[data-ref="A2"]');report.detail=await metrics('#cellDetailBtn');await click('#cellDetailBtn .icon');await waitFor('document.querySelector("#detailDialog").open');await click('#detailDialog .dialog-close');await waitFor('!document.querySelector("#detailDialog").open');report.interactions.push('detail SVG opens panel; centered close button closes it');
+    await click('#searchOpenBtn');await waitFor('document.querySelector("#searchDialog").open');report.history=await metrics('#searchHistoryBtn');await click('#searchHistoryBtn .icon');await waitFor('!document.querySelector("#searchHistoryPanel").hidden');assert.equal(await evaluate('document.querySelector("#searchHistoryBtn").getAttribute("aria-expanded")'),'true');report.interactions.push('history SVG toggles search history');
     await evaluate('document.querySelector("#searchInput").value="one"');await click('#searchBtn');await waitFor('!document.querySelector("#copySearchResultsBtn").disabled');report.searchCopy=await metrics('#copySearchResultsBtn');report.searchSave=await metrics('#saveSearchResultsBtn');await capture('search-controls','.search-results-toolbar');await click('#searchDialog .dialog-close');
     await click('#analysisOpenBtn');await waitFor('!document.querySelector("#analysisRoot").hidden&&Number(document.querySelector("#analysisFieldCount").textContent)===2');report.fields=await metrics('#analysisLoadFields',{text:true});
-    const fieldsBefore=count('/api/analysis/fields');await click('#analysisLoadFields .button-icon');await pause(200);assert.equal(count('/api/analysis/fields'),fieldsBefore+1);report.interactions.push('update-fields SVG reloads fields once');await capture('analysis-update-fields','.analysis-source-config');await click('#analysisClose');
+    const fieldsBefore=count('/api/analysis/fields');await click('#analysisLoadFields .icon');await pause(200);assert.equal(count('/api/analysis/fields'),fieldsBefore+1);report.interactions.push('update-fields SVG reloads fields once');await capture('analysis-update-fields','.analysis-source-config');await click('#analysisClose');
     // The empty CSV has no embedded pictures. Reveal only the viewer shell for
     // layout QA; this is not evidence for the workbook image-loading pipeline.
     await evaluate('document.querySelector("#pictureViewer").hidden=false');report.rotation=await metrics('#pictureRotate');report.pictureCopy=await metrics('#pictureCopy');report.pictureSave=await metrics('#pictureDownload');
-    await click('#pictureRotate .button-icon');assert((await evaluate('document.querySelector("#picturePreview").style.transform')).includes('rotate(90deg)'));report.interactions.push('rotation SVG reaches the initialized viewer handler');await capture('picture-controls','.picture-viewer-controls');await click('#pictureClose');
+    await click('#pictureRotate .icon');assert((await evaluate('document.querySelector("#picturePreview").style.transform')).includes('rotate(90deg)'));report.interactions.push('rotation SVG reaches the initialized viewer handler');await capture('picture-controls','.picture-viewer-controls');await click('#pictureClose');
     await click('#homeBtn');await waitFor('!document.querySelector("#welcome").hidden&&!!document.querySelector(".recent-item")');
     report.compact=await evaluate(`(${function(){
       // A labeled rendering fixture exercises hidden/dynamic button families
@@ -89,6 +89,6 @@ async function startServer(){
     if(browser.exitCode===null&&browser.signalCode===null){await Promise.race([new Promise(resolve=>browser.once('exit',resolve)),pause(1500)]);if(browser.exitCode===null&&browser.signalCode===null)browser.kill();}
     Object.assign(report,{sourceSHA256,sourceUnchanged:digest(fs.readFileSync(source))===sourceSHA256});fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2)+'\n');
     const receipt={...report,cases:report.cases.map(({width,scale,preset})=>({width,scale,preset})),privateEvidence:'private/icon-alignment/result.json'};
-    fs.writeFileSync(path.join(root,'validation',version,'icon-alignment.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify({result:report.result,cases:report.cases.length,interactions:report.interactions,failure:report.failure},null,2));
+    fs.writeFileSync(path.join(receipts,'icon-alignment.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify({result:report.result,cases:report.cases.length,interactions:report.interactions,failure:report.failure},null,2));
   }
 })();

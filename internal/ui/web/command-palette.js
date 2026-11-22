@@ -7,8 +7,8 @@
     return Math.max(0, Math.min(index - Math.floor(limit / 2), total - limit));
   }
   class CommandPalette {
-    constructor(actions, {node, sheets, selectSheet, canOpen, openDialog, closeDialog, toast}) {
-      Object.assign(this, {actions, node, sheets, selectSheet, canOpen, openDialog, closeDialog, toast});
+    constructor(actions, {node, sheets, selectSheet, canOpen, openDialog, closeDialog, toast, reveal}) {
+      Object.assign(this, {actions, node, sheets, selectSheet, canOpen, openDialog, closeDialog, toast, reveal});
       this.visible = [];
       this.index = 0;
     }
@@ -38,7 +38,10 @@
       try {
         await Promise.resolve().then(() => {
           if (this.unavailable(action)) return;
-          return action.button ? this.node(action.button).click() : action.run();
+          if (!action.button) return action.run();
+          // Bring the control's tab forward first, so its menu has an anchor.
+          this.reveal?.(action.button);
+          return this.node(action.button).click();
         });
       } catch (error) { this.toast(error.message, 'error'); }
     }
@@ -51,9 +54,24 @@
       this.openDialog('commandDialog');
       input.focus({preventScroll:true});
     }
+    // Every word must appear in the name, search words or shortcut. Commands
+    // whose own name matches come first: exact, then prefix, then anywhere.
+    matches(query) {
+      const terms = query.split(/\s+/).filter(Boolean);
+      if (!terms.length) return [...this.actions];
+      const ranked = [];
+      for (const [order, action] of this.actions.entries()) {
+        const name = action.name.toLocaleLowerCase();
+        const all = [action.name, action.tags, action.shortcut].join(' ').toLocaleLowerCase();
+        if (!terms.every(term => all.includes(term))) continue;
+        const rank = name === query ? 0 : name.startsWith(terms[0]) ? 1 : terms.every(term => name.includes(term)) ? 2 : 3;
+        ranked.push({action, rank, order});
+      }
+      return ranked.sort((a, b) => a.rank - b.rank || a.order - b.order).map(item => item.action);
+    }
     render() {
       const query = this.node('commandSearch').value.toLocaleLowerCase().trim();
-      this.visible = this.actions.filter(a => !query || [a.name,a.tags,a.shortcut].join(' ').toLocaleLowerCase().includes(query));
+      this.visible = this.matches(query);
       if (query) {
         for (const sheet of this.sheets()) {
           if (sheet.name.toLocaleLowerCase().includes(query)) {
@@ -81,6 +99,12 @@
         item.append(label,shortcut);
         item.addEventListener('click', () => this.run(action));
         fragment.append(item);
+      }
+      if (!this.visible.length) {
+        const empty = doc.createElement('div');
+        empty.className = 'command-empty';
+        empty.textContent = '没有匹配的功能或工作表';
+        fragment.append(empty);
       }
       list.replaceChildren(fragment);
       list.querySelector('.active')?.scrollIntoView({block:'nearest'});

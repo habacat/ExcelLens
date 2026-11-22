@@ -3,6 +3,7 @@
  * and never assumes a missing file is safe to delete automatically. */
 (() => {
   'use strict';
+  const glyph=name=>`<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
   class RecentWorkbooks {
     constructor({api, open, toast}) {
       this.api=api; this.open=open; this.toast=toast;
@@ -60,9 +61,8 @@
     }
     empty(message) {
       const el=document.createElement('div');el.className='recent-empty';
-      const icon=document.createElement('strong');icon.textContent='最近文件';
       const detail=document.createElement('span');detail.textContent=message;
-      el.append(icon,detail);return el;
+      el.append(detail);return el;
     }
     render() {
       const q=this.search.value.trim().toLocaleLowerCase();
@@ -91,15 +91,15 @@
         const size=document.createElement('span');size.className='recent-size';size.textContent=this.formatSize(item.fileSize);
         size.title=size.textContent==='—'?'原文件大小未知':'原文件大小：'+size.textContent;
         const buttons=document.createElement('div');buttons.className='recent-controls';
-        const pin=document.createElement('button');pin.type='button';pin.className='recent-action'+(item.pinned?' is-pinned':'');pin.dataset.action='pin';pin.textContent=item.pinned?'◆':'◇';pin.title=item.pinned?'取消置顶':'置顶最近文件';pin.setAttribute('aria-label',pin.title);
-        const remove=document.createElement('button');remove.type='button';remove.className='recent-action';remove.dataset.action='remove';remove.textContent='×';remove.title='从最近记录移除（不删除文件）';remove.setAttribute('aria-label',remove.title);
+        const pin=document.createElement('button');pin.type='button';pin.className='recent-action'+(item.pinned?' is-pinned':'');pin.dataset.action='pin';pin.innerHTML=glyph('pin');pin.title=item.pinned?'取消置顶':'置顶';pin.setAttribute('aria-label',pin.title);
+        const remove=document.createElement('button');remove.type='button';remove.className='recent-action';remove.dataset.action='remove';remove.innerHTML=glyph('x');remove.title='从列表移除（不删除文件）';remove.setAttribute('aria-label',remove.title);
         buttons.append(pin,remove);side.append(date,size,buttons);btn.append(icon,content,side);
         btn.setAttribute('role','button');btn.tabIndex=0;btn.title=item.available?'点击直接打开':'文件不在原位置，请重新选择文件';
         frag.appendChild(btn);
       }
-      if(!matching.length)frag.appendChild(this.empty(q?'没有匹配的文件':'打开过的工作簿会显示在这里。'));
+      if(!matching.length)frag.appendChild(this.empty(q?'没有匹配的文件':'打开过的文件会列在这里'));
       this.list.replaceChildren(frag);
-      document.getElementById('recentSummary').textContent=`共 ${this.items.length} 个工作簿`;
+      document.getElementById('recentSummary').textContent=this.items.length?`共 ${this.items.length} 个文件`:'';
     }
     async handleClick(e) {
       const itemNode=e.target.closest?.('.recent-item');

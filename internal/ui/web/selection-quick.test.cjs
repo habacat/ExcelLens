@@ -40,6 +40,10 @@ function harness(override){
   return {quick,state,nodes,calls,html,charts,toasts,navigations,events,model:env.window.ExcelLensSelectionQuickModel,pinned:n=>pinned=n};
 }
 
+test('the source line names hidden columns inside the selection and says nothing when there are none',()=>{
+  const plain=harness();plain.quick.open();assert.doesNotMatch(plain.nodes.get('selectionQuickSource').textContent,/隐藏列/);
+  const hidden=harness();hidden.state.hiddenColumns=new Set([2,5]);hidden.quick.open();assert.match(hidden.nodes.get('selectionQuickSource').textContent,/ · 4 行 · 含隐藏列 B$/);
+});
 test('quick selection only reads on explicit run, preserves exact values, and renders hostile source labels as text',async()=>{
   const h=harness();h.quick.open();assert.equal(h.calls.length,0);assert.match(h.nodes.get('selectionQuickSource').textContent,/<img src=x>/);await h.quick.run();assert.equal(h.calls.length,1);
   assert.equal(h.quick.page.columns[0].segments[1].summary.maximum,'9007199254740993.31');assert(h.html.every(x=>!x.includes('<script>bad')&&!x.includes('<img src=x>')));assert.match(h.nodes.get('selectionQuickBody').textContent,/公式无结果/);assert.equal(h.charts.at(-1).data.rows[0].values[0].exact,'');

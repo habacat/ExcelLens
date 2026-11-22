@@ -40,8 +40,8 @@
   }
   function themeFor(canvas){
     const style=getComputedStyle(canvas),get=(key,fallback)=>style.getPropertyValue(key).trim()||fallback;
-    return {themed:document.documentElement.hasAttribute('data-reading-preset'),paper:get('--reading-surface','#fff'),ink:get('--reading-ink','#2c4852'),
-      muted:get('--reading-muted','#768a97'),grid:get('--reading-grid-line','#e8eef1'),error:get('--reading-error','#b16f72')};
+    return {themed:document.documentElement.hasAttribute('data-reading-preset'),paper:get('--surface','#fff'),ink:get('--ink','#2c4852'),
+      muted:get('--muted','#768a97'),grid:get('--line-soft','#e8eef1'),error:get('--danger','#b16f72')};
   }
   function paint(ctx,w,h,result,mode='bar',theme={},numberSettings=window.ExcelLensAnalysisNumbers.get()){
     const {themed=false,paper='#fff',ink='#2c4852',muted='#768a97',grid='#e8eef1'}=theme;

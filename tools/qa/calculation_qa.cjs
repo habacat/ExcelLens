@@ -60,7 +60,7 @@ async function dragWindow(dx,dy){const p=await evaluate(`(()=>{const r=document.
   await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Emulation.setDeviceMetricsOverride',{width:1600,height:950,deviceScaleFactor:1,mobile:false});
   await cdp('Page.navigate',{url:address});await waitFor('!!document.querySelector("#fileInput")');
   const home=await evaluate(`({title:document.querySelector('.landing-content h1').textContent,subtitle:document.querySelector('.landing-subline').textContent,hint:!!document.querySelector('.drop-hint'),oldText:document.body.textContent.includes('按最近打开时间排列，置顶优先')})`);
-  assert.equal(home.title.trim(),'浏览数据');assert.equal(home.subtitle.trim(),'浏览Excel、CSV、TXT与SQlite');assert(!home.hint&&!home.oldText);checks.push('Home copy matches the requested wording');await screenshot('home');
+  assert.equal(home.title.trim(),'浏览数据');assert.equal(home.subtitle.trim(),'浏览Excel、CSV、TXT与SQLite');assert(!home.hint&&!home.oldText);checks.push('Home copy matches the requested wording');await screenshot('home');
   const doc=await cdp('DOM.getDocument'),input=await cdp('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#fileInput'});
   await cdp('DOM.setFileInputFiles',{nodeId:input.nodeId,files:[path.resolve(sample)]});
   await waitFor('!!document.querySelector(".archive-member")',60000);await click('.archive-member');await click('#archiveOpen');

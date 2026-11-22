@@ -48,7 +48,7 @@ test('comparison charts plot exact derived ratios with percentage axes and never
 test('existing charts repaint paper and labels on preset changes and restore the original palette without changing results',()=>{
   const h=setup();h.draw(h.canvas,h.result);
   assert.equal(h.paint[0],'#fff');assert(h.text.some(t=>t.color==='#92a0ac'));assert(h.lines.includes('#e8eef1'));
-  Object.assign(h.variables,{'--reading-surface':'#2e333a','--reading-ink':'#dce2e8','--reading-muted':'#abb5bf','--reading-grid-line':'#39424c'});
+  Object.assign(h.variables,{'--surface':'#2e333a','--ink':'#dce2e8','--muted':'#abb5bf','--line-soft':'#39424c'});
   h.paint.length=0;h.text.length=0;h.lines.length=0;h.change(true);
   assert.equal(h.paint[0],'#2e333a');assert(h.text.every(t=>t.color==='#abb5bf'));assert(h.lines.every(c=>c==='#39424c'));
   assert(h.paint.includes('#287b78'),'series colors must remain distinct from page chrome');

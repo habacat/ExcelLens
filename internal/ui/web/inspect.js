@@ -48,7 +48,7 @@
       $('inspectScopeWrap').hidden=duplicates;
       $('inspectColumnWrap').hidden=!duplicates;
       $('inspectSkipHeaderWrap').hidden=!duplicates;
-      $('inspectHint').textContent=duplicates?'按原始单元格值判重；数字忽略显示格式，文本忽略大小写，空值不参与。':'仅选择符合条件的单元格；不修改 Excel 或重算公式。';
+      $('inspectHint').textContent=duplicates?'按原始值判重：数字不看显示格式，文本不分大小写，空值不参与。':'';
     }
     options(){
       const s=this.state,mode=$('inspectMode').value;
@@ -155,7 +155,7 @@
     }
     step(step){if(!this.matches.length)return;this.navigateHit((this.current+step+this.matches.length)%this.matches.length);}
     clear(){this.cancel();this.sheet='';this.matches=[];this.hits.clear();this.showCount=0;this.current=-1;
-      $('inspectProgress').textContent='选择条件后开始检查';$('inspectResultList').replaceChildren();
+      $('inspectProgress').textContent='';$('inspectResultList').replaceChildren();
       $('inspectMore').hidden=true;$('inspectNext').disabled=$('inspectPrev').disabled=true;
       this.onChange();
     }

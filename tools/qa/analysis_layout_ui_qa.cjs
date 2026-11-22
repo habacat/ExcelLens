@@ -20,7 +20,7 @@ async function resizeCharts(p){await p.wait('[...document.querySelectorAll("#ana
   await p.file('#fileInput',file);await p.wait('window.ExcelLensPerformance?.().hasVisibleCoverage&&!window.ExcelLensPerformance().sheetLoading');await p.click('#analysisOpenBtn');await p.wait(ready);await p.click('[data-analysis-tab="templates"]');await frame(p);
   const baselineQueries=await p.evaluate('window.layoutQA.queries'),count=await p.evaluate('window.ExcelLensAnalysisTemplates.length');
   for(const [width,height,dpr=1]of [[1600,1050],[2560,1080],[1920,1080],[1280,720],[1024,768],[760,800],[600,900],[420,860],[360,640],[800,600,2],[640,480],[1280,720,1.25],[1067,700,1.5]]){
-    await viewport(p,width,height,dpr);const f=await facts(p,'#analysisTemplateGrid');assert.equal(f.total,count);assert.equal(f.overflow,false,JSON.stringify(f));assert.equal(f.titleSize,'13px');assert.equal(f.bodySize,'11px');assert.equal(f.queries,baselineQueries);report.templates.push(f);
+    await viewport(p,width,height,dpr);const f=await facts(p,'#analysisTemplateGrid');assert.equal(f.total,count);assert.equal(f.overflow,false,JSON.stringify(f));assert.equal(f.titleSize,'13px');assert.equal(f.bodySize,'12px');assert.equal(f.queries,baselineQueries);report.templates.push(f);
     if(width===1600)await shot(p,'templates-desktop');if(width===420)await shot(p,'templates-420');if(dpr===2)await shot(p,'templates-dpi2');
   }
   assert(report.templates.find(x=>x.width===1600).columns>=4);assert(report.templates.find(x=>x.width===2560).columns>report.templates.find(x=>x.width===1600).columns);assert.equal(report.templates.find(x=>x.width===420).columns,1);assert(report.templates.find(x=>x.width===1600).fullyVisible>=24);

@@ -2,6 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
+  const icon = name => `<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
   const TOKEN = document.querySelector('meta[name="app-token"]')?.content || "";
   const fileFormats = window.ExcelLensFileFormats.create(JSON.parse($("fileFormats").textContent));
   window.ExcelLensClipboard?.configure(fileFormats.clipboard);
@@ -271,6 +272,9 @@
     toast.timer = setTimeout(() => { node.hidden = true; }, 5200);
   }
 
+  // Commands that only need an open workbook.
+  const workbookCommands = ['copyMenuBtn','selectionQuickBtn','transposeOpenBtn'];
+
   function renderSourceIntegrity() {
     const notice = $("sourceIntegrityNotice");
     notice.textContent = S.source.archiveNotice || (S.source.incomplete ? S.source.notice || "当前数据为不完整片段，不能代表全量账目。" : "");
@@ -296,6 +300,7 @@
     $("bookmarkOpenBtn").disabled = false;
     $("columnsBtn").disabled = false;
     $('rowsBtn').disabled=false;
+    for (const id of workbookCommands) $(id).disabled = false;
     editCopy?.availability(true);
   }
 
@@ -326,6 +331,7 @@
     $("clearFilterBtn").disabled = true;
     $("columnsBtn").disabled = true;
     $('rowsBtn').disabled=true;
+    for (const id of workbookCommands) $(id).disabled = true;
     hideColumnsMenu();
   }
 
@@ -636,8 +642,16 @@
       toast(error.message,'error');
     } finally {
       activity?.end();
-      if(launch){S.opening=false;printingCenter?.controls();$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
+      if(launch){finishOpening();$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
     }
+  }
+
+  // Panels that stay unavailable while a file opens are refreshed when it ends;
+  // otherwise their buttons remain disabled until the next sheet switch.
+  function finishOpening(){
+    S.opening=false;
+    dataRulesCenter?.controls();printingCenter?.controls();recordCardCenter?.controls();
+    selectionQuick?.changed();cellExplanation?.changed();profileCenter?.changed();
   }
 
   function chooseFile() {
@@ -678,8 +692,7 @@
       throw error;
     } finally {
       activity?.end();
-      S.opening = false;
-      printingCenter?.controls();
+      finishOpening();
       $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = false;
     }
   }
@@ -1157,6 +1170,13 @@
     pictures?.schedule();
   }
 
+  // A size or visibility change moves cells without a scroll or selection
+  // event, so the selection frame and crosshair are put back here.
+  function relayoutGrid(){
+    invalidateViewport();updateCanvasSize();frozenPanes.reset();scheduleViewport(true);
+    paintRangeFrames();
+  }
+
   function ensureExtent(row,col){
     if(!S.indexReady)return;
     const neededRows=Math.min(sourceRowLimit(),Math.max(S.maxRow,row+18));
@@ -1190,20 +1210,22 @@
       toast('保存尺寸失败：'+error.message,'error');
     }
     if(S.sheet!==sheet||S.sheetEpoch!==epoch)return;
-    invalidateViewport();updateCanvasSize();frozenPanes.reset();scheduleViewport(true);
+    relayoutGrid();
   }
-  function promptResize(kind,explicitIndex){
+  async function promptResize(kind,explicitIndex){
     if(kind==='row'&&S.filtered){toast('请先清除筛选，再调整单行高度','warning');return;}
     const index=explicitIndex||((kind==='row')?(S.selected?.row||1):(S.selected?.col||1));
     const oldValue=kind==='row'?rowHeight(index):colWidth(index);
-    const label=kind==='row'?`第 ${index} 行高度`:`${colName(index)} 列宽度`;
-    const value=window.prompt(`${label}（像素；输入0恢复默认）`,String(Math.round(oldValue/scale())));
-    if(value===null)return;
-    const size=Number(value);
-    if(!Number.isInteger(size)||(size!==0&&(kind==='row'?(size<14||size>500):(size<32||size>800)))){
-      toast('尺寸无效：行高14–500px，列宽32–800px，0表示重置','warning');return;
-    }
-    commitResize(kind,index,size);
+    const [low,high]=kind==='row'?[14,500]:[32,800],sheet=S.sheet,epoch=S.sheetEpoch;
+    // 0 still means the default size, as it did in the earlier prompt.
+    const valid=text=>/^\d+$/.test(text)&&(Number(text)===0||(Number(text)>=low&&Number(text)<=high));
+    const answer=await window.ExcelLensOverlays.ask({
+      title:kind==='row'?`第 ${index} 行的行高`:`${colName(index)} 列的列宽`,
+      label:`像素，${low}–${high}`,value:String(Math.round(oldValue/scale())),inputMode:'numeric',alternative:'恢复默认',
+      validate:text=>valid(text)?'':`请输入 ${low} 到 ${high} 之间的整数`});
+    // The question stays open while other work finishes; act only on the same sheet.
+    if(!answer||S.sheet!==sheet||S.sheetEpoch!==epoch)return;
+    commitResize(kind,index,answer.alternative?0:Number(answer.value));
   }
   function bindResizeGrip(grip,kind,index){
     grip.title=kind==='row'?`拖动调整第 ${index} 行高度；双击按内容自动适应`:
@@ -1378,9 +1400,8 @@
   }
 
   function hideColumnsMenu(){
-    const menu=$('columnsMenu');
-    menu.hidden=true;
-    $('columnsBtn').setAttribute('aria-expanded','false');
+    const menus=window.ExcelLensOverlays.menus;
+    if(menus.current?.menu===$('columnsMenu'))menus.close(false);
   }
   function refreshColumnMenuTarget(){
     const span=parseColumnSpan($('columnTarget').value);
@@ -1388,26 +1409,19 @@
     $('showSelectedColumnBtn').disabled=!hasColumnOfType(span,true);
     const multiple=span&&span.start!==span.end;
     $('hideSelectedColumnBtn').textContent=multiple?'隐藏选中列':'隐藏此列';
-    $('showSelectedColumnBtn').textContent=multiple?'显示隐藏列':'显示隐藏列';
+    $('showSelectedColumnBtn').textContent='显示隐藏列';
   }
   function targetColumnSpan(){
     const span=parseColumnSpan($('columnTarget').value);
     if(!span)toast('请输入有效的列或区域，如 A、AB、A:C','warning');
     return span;
   }
-  function openColumnsMenu(){
-    if(!S.indexReady)return;
-    const menu=$('columnsMenu');
-    if(!menu.hidden){hideColumnsMenu();return;}
+  function prepareColumnsMenu(event){
+    if(!S.indexReady){event.preventDefault();return;}
     const selectedCol=S.selected?.col||nextVisibleColumn(1),label=columnSpanLabel(selectedColumnSpan())||colName(selectedCol);
     $('columnMenuSelection').textContent='选择列';
     $('columnTarget').value=label;
     refreshColumnMenuTarget();
-    menu.hidden=false;
-    $('columnsBtn').setAttribute('aria-expanded','true');
-    const anchor=$('columnsBtn').getBoundingClientRect();
-    menu.style.left=Math.min(anchor.left,window.innerWidth-menu.offsetWidth-8)+'px';
-    menu.style.top=Math.min(window.innerHeight-menu.offsetHeight-8,anchor.bottom+5)+'px';
   }
   // Serialize visibility writes: fast consecutive clicks must persist in the
   // same order as the optimistic UI state. Stale failures may not roll back
@@ -1430,7 +1444,7 @@
       if(S.hiddenColumns.has(next))next=previousVisibleColumn(S.selected.col-1)||S.selected.col;
       if(!S.hiddenColumns.has(next))selectCellByAddress(`${colName(next)}${S.selected.row}`,S.selectedVisualIndex);
     }
-    invalidateViewport();updateCanvasSize();frozenPanes.reset();scheduleViewport(true);
+    relayoutGrid();
     const revision=++visibilityRevision;
     const save=()=>api('/api/layout',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sheet,kind:'visibility',mode,index:index||0,end:end||0,hidden:Boolean(hidden)})});
@@ -1441,7 +1455,7 @@
     }catch(error){
       if(S.sheet===sheet&&S.sheetEpoch===epoch&&visibilityRevision===revision){
         S.columnMode=previousMode;S.columnOverrides=previousOverrides;
-        applyColumnVisibility();invalidateViewport();updateCanvasSize();frozenPanes.reset();scheduleViewport(true);
+        applyColumnVisibility();relayoutGrid();
       }
       toast('保存列显隐失败：'+error.message,'error');
     }
@@ -1571,7 +1585,7 @@
           if(bounds&&r>=bounds.displayStart&&r<=bounds.displayEnd&&c>=bounds.startCol&&c<=bounds.endCol&&
              (!bufferedColumns||bufferedColumns.has(c)))continue;
           rowMissing=true;
-          ctx.fillStyle=fallbackColor('--reading-paper',"#f8fafc");ctx.fillRect(Math.max(left,x),Math.max(top,y),
+          ctx.fillStyle=fallbackColor('--paper',"#f8fafc");ctx.fillRect(Math.max(left,x),Math.max(top,y),
             Math.min(w,x+cellW)-Math.max(left,x),Math.min(h,y+cellH)-Math.max(top,y));
           if(!S.showStyles||S.sourceGridLines){
             ctx.strokeStyle=fallbackColor('--grid-line-color',"#edf0f2");ctx.beginPath();
@@ -1581,8 +1595,8 @@
           }
         }
         if(rowMissing&&!S.filtered&&r>pinned.rows){
-          ctx.fillStyle=fallbackColor('--reading-surface',"#f3f6f9");ctx.fillRect(0,y,ROW_HEAD,Math.min(cellH,h-y));
-          ctx.fillStyle=fallbackColor('--reading-muted',"#8493a4");ctx.textAlign="right";ctx.textBaseline="middle";
+          ctx.fillStyle=fallbackColor('--surface',"#f3f6f9");ctx.fillRect(0,y,ROW_HEAD,Math.min(cellH,h-y));
+          ctx.fillStyle=fallbackColor('--muted',"#8493a4");ctx.textAlign="right";ctx.textBaseline="middle";
           ctx.fillText(String(r),ROW_HEAD-8,y+cellH/2);
         }
       }
@@ -3297,7 +3311,6 @@
   function updateAutoFilterButton() {
     S.largeData=S.indexReady&&Number(S.index?.totalRows||0)>fileFormats.largeDataRows;
     $('multiSortBtn').disabled=!S.indexReady;
-    $('multiSortBtn').title='按多列优先级排序';
     for(const id of ['autoFilterSortAsc','autoFilterSortDesc'])$(id).disabled=!S.indexReady;
     $('largeDataStatus').hidden=!S.largeData;
     $('largeDataStatus').title=`关闭纵向 Ctrl+方向键扫描；查重区域最多${Number(fileFormats.largeDataRows).toLocaleString('zh-CN')}行。筛选与排序共用${Number(fileFormats.queryTempBytes/1024**3).toLocaleString('zh-CN')} GiB临时空间，超出时不发布新结果。`;
@@ -3305,10 +3318,9 @@
     const button=$("filterOpenBtn");
     button.classList.toggle("format-active",enabled);
     button.setAttribute("aria-pressed",String(enabled));
-    button.title=enabled?`关闭自动筛选（表头第 ${S.autoFilter.row} 行，Ctrl+Shift+L）`:
-      "选中表头整行后开启自动筛选（Ctrl+Shift+L）";
-    button.innerHTML=enabled?'<span class="tool-icon">▾</span>筛选中':
-      '<span class="tool-icon">▽</span>筛选';
+    button.title=enabled?`关闭筛选（表头在第 ${S.autoFilter.row} 行，Ctrl+Shift+L）`:
+      "以当前行为表头开启筛选（Ctrl+Shift+L）";
+    button.innerHTML=icon('filter')+'筛选';
     const headerButton=$('textHeaderBtn');
     headerButton.hidden=S.source?.format!=='txt';
     headerButton.disabled=!S.indexReady;
@@ -3723,7 +3735,10 @@
         const percent = Number(data.progress || 0);
         activity?.job(data);
         $("filterBar").style.width = `${percent}%`;
-        $("filterProgressText").textContent = `${data.stage || "正在筛选"} · ${data.scanned || 0}/${data.total || 0} 行`;
+        // A finished scan is not a finished filter: the rows are not on screen
+        // yet, and saving a view or starting another query is still refused.
+        $("filterProgressText").textContent = data.status === "done" ? "正在显示筛选结果…" :
+          `${data.stage || "正在筛选"} · ${data.scanned || 0}/${data.total || 0} 行`;
         if (data.status === "done") {
           activity?.stage('正在显示筛选结果',95,99);
           const abort=new AbortController();S.filterCommitAbort=abort;
@@ -3932,7 +3947,7 @@
     document.documentElement.style.setProperty("--row-height", `${rowHeight()}px`);
     document.documentElement.style.setProperty("--col-width", `${colWidth()}px`);
     document.documentElement.style.setProperty("--header-height", `${headerHeight()}px`);
-	if(S.previewOnly&&S.previewData){resetGridDOM();updateCanvasSize();renderInitialPreview();return;}
+	if(S.previewOnly&&S.previewData){resetGridDOM();updateCanvasSize();renderInitialPreview();paintRangeFrames();return;}
     invalidateViewport();
     updateCanvasSize();
     frozenPanes.schedule(true);
@@ -3941,6 +3956,8 @@
       grid.scrollLeft = ROW_HEAD+colLeft(col)-colWidth(col)*2;
     }
     scheduleViewport(true);
+    // A sheet that fits the window raises no scroll event when it is zoomed.
+    paintRangeFrames();
   }
 
   async function toggleFullscreen() {
@@ -3952,7 +3969,7 @@
 
   function updateFullscreenButton() {
     const full = Boolean(document.fullscreenElement);
-    $("fullscreenBtn").innerHTML = full ? '<span class="tool-icon">⛶</span>退出全屏' : '<span class="tool-icon">⛶</span>全屏';
+    $("fullscreenBtn").innerHTML = icon('fullscreen') + (full ? '退出全屏' : '全屏');
     setTimeout(() => scheduleViewport(true), 80);
   }
 
@@ -4110,72 +4127,75 @@
     dragAnchor=null;dragBase=[];
   }
 
-  // Keyboard-first command palette keeps the main toolbar compact.
+  // Every command, including those on other tabs, is reachable by name.
+  // Names match the control labels; tags carry the words people search for,
+  // including the names these commands had before.
   const {buttonCommand, CommandPalette} = window.ExcelLensCommands;
   const ACTIONS = [
-    buttonCommand('打开文件','openBtn','工作簿 选择 文件'),
-    buttonCommand('数据分析','analysisOpenBtn','透视 汇总 图表 分析表'),
-    buttonCommand('双表对账','reconcileOpenBtn','主键 差异 未匹配 重复键 对账'),
-    buttonCommand('关联提取','relationsOpenBtn','连接 左表 右表 未匹配 关联'),
-    buttonCommand('命名视图','namedViewOpenBtn','保存 应用 视图 筛选 排序 布局'),
+    buttonCommand('打开文件','openBtn','工作簿 选择 文件','Ctrl+O'),
+    buttonCommand('搜索','searchOpenBtn','查找公式或值 查找 公式 值','Ctrl+F'),
+    buttonCommand('筛选','filterOpenBtn','自动筛选 表头 下拉','Ctrl+Shift+L'),
+    buttonCommand('清除筛选','clearFilterBtn','清除 筛选 恢复 原序'),
+    buttonCommand('排序','multiSortBtn','多级自定义排序 多级 多列 升序 降序 自定义'),
+    buttonCommand('冻结窗格','freezeBtn','表头 行 列 固定'),
+    buttonCommand('导出','exportOpenBtn','保存 CSV XLSX HTML 数据 导出中心','Ctrl+Shift+E'),
+    {name:'导出当前选区',shortcut:'',tags:'区域 导出',run:()=>exportCenter.open('selection')},
+    {name:'导出整个工作簿',shortcut:'',tags:'全部 Sheet 工作表',run:()=>exportCenter.open('all')},
+    buttonCommand('编辑副本','editCopyOpen','改值 粘贴 另存 撤销 修改'),
+    buttonCommand('分析','analysisOpenBtn','数据分析 透视 汇总 图表 分析表'),
+    buttonCommand('统计选区','profileOpenBtn','数据洞察 精确统计 汇总 求和 公式 异常 计数','Ctrl+Alt+S'),
+    buttonCommand('计算','calculatorOpenBtn','公式计算 加减乘除 金额','Ctrl+Alt+C'),
+    buttonCommand('复制选区','copySelectionBtn','Excel 格式 复制 保留颜色 粘贴','Ctrl+C'),
+    buttonCommand('复制为纯文本','copyPlainBtn','复制选区为纯文本 TSV 不带格式 粘贴 值'),
+    buttonCommand('选择性复制','copySpecialBtn','表头 TSV Markdown JSON 原值 公式 复制','Ctrl+Alt+Shift+C'),
+    buttonCommand('复制当前值','copyValueBtn','复制当前单元格值 复制 值 单格'),
+    buttonCommand('复制公式','copyFormulaBtn','复制当前公式 复制 公式 原文','Ctrl+Shift+C'),
+    buttonCommand('复制地址','copyAddressBtn','复制跨 Sheet 地址 引用 定位 复制'),
+    buttonCommand('复制证据摘要','copyEvidenceBtn','复制审计证据摘要 审计 数值 公式 复制 底稿 来源'),
+    buttonCommand('压缩包里的其他文件','archiveBtn','浏览当前压缩包 压缩包 文件 成员 浏览'),
+    buttonCommand('高级筛选','advancedFilterBtn','高级条件筛选 筛选 条件 AND 多条件'),
+    {name:'按当前单元格的值筛选',shortcut:'',tags:'根据当前单元格值筛选 快捷筛选 等于 当前值',run:()=>filterSelectedValue()},
+    buttonCommand('TXT 表头','textHeaderBtn','设置文本表头 文本 表头 字段 设置'),
+    buttonCommand('查找重复值','duplicateOpenBtn','高亮重复值 查重 高亮 重复单号 收款人 账号 重复数据','Ctrl+Shift+D'),
+    buttonCommand('定位条件','inspectOpenBtn','查找 定位特殊单元格 公式 常量 错误 空值','Ctrl+Alt+G'),
+    buttonCommand('数据规则','dataRulesOpenBtn','查看数据规则 数据验证 有效性 下拉列表 验证条件'),
+    buttonCommand('记录卡片','recordCardOpenBtn','查看记录卡片 宽表 字段 长文本 原值 记录'),
+    buttonCommand('快速分析选区','selectionQuickBtn','选区快速分析 分布 差额 趋势 小图 同行 比较','Ctrl+Q'),
+    buttonCommand('转置查看选区','transposeOpenBtn','转置阅读当前选区 行列 交换 宽表 原坐标'),
+    buttonCommand('显示公式','formulaViewBtn','显示或隐藏全部公式 公式视图 显示 隐藏 计算结果','Ctrl+`'),
+    buttonCommand('追踪引用','tracePrecedentsBtn','公式追踪 引用 上游'),
+    buttonCommand('追踪从属','traceDependentsBtn','追踪从属单元格 公式 下游 依赖 从属'),
+    buttonCommand('名称与表','catalogueOpenBtn','名称与表目录 定义名称 表对象 结构化引用 区域','Ctrl+F3'),
+    buttonCommand('单元格信息','cellDetailBtn','原值 源类型 公式 缓存 统计 解释','Ctrl+1'),
     buttonCommand('显示或隐藏列','columnsBtn','列 显隐 隐藏 显示'),
     buttonCommand('行与大纲','rowsBtn','行 隐藏 显示 分组 折叠 展开'),
+    buttonCommand('原格式','formatBtn','显示/隐藏原格式 显示 隐藏 背景 颜色 字体 边框'),
     buttonCommand('显示或隐藏图片','imagesBtn','图片 图形 显示 隐藏'),
-    buttonCommand('清除筛选','clearFilterBtn','清除 筛选 恢复 原序'),
-    buttonCommand('设置文本表头','textHeaderBtn','TXT 文本 表头 字段'),
-    buttonCommand('浏览当前压缩包','archiveBtn','压缩包 文件 成员'),
-    buttonCommand('返回上一位置','historyBackBtn','历史 返回 位置','Alt+←'),
-    buttonCommand('前进到下一位置','historyForwardBtn','历史 前进 位置','Alt+→'),
-    buttonCommand('单元格信息','cellDetailBtn','原值 源类型 公式 缓存 统计 解释','Ctrl+1'),
-    buttonCommand('复制当前单元格值','copyValueBtn','复制 值 单格'),
-    buttonCommand('复制当前公式','copyFormulaBtn','复制 公式 原文'),
-    buttonCommand('追踪从属单元格','traceDependentsBtn','公式 下游 依赖 从属'),
-    buttonCommand('退出程序','exitBtn','退出 关闭 程序'),
-    {name:'比较快照',shortcut:'',tags:'保存 分析 趋势 差额 历史 比较',run:()=>window.ExcelLensSnapshots?.open()},
-    {name:'转置阅读当前选区',shortcut:'',tags:'行列 交换 宽表 只读 原坐标',run:()=>transposeCenter.open()},
-    {name:'任务恢复',shortcut:'',tags:'继续 查询 筛选 排序 导出 下载 中断',run:()=>taskRecovery.open()},
-    buttonCommand('公式计算','calculatorOpenBtn','加减乘除 金额 公式 计算','Ctrl+Alt+C'),
-    buttonCommand('导出中心','exportOpenBtn','保存 CSV XLSX PDF 数据','Ctrl+Shift+E'),
-    buttonCommand('编辑副本','editCopyOpen','改值 粘贴 另存 撤销'),
-    {name:'导出当前选区',shortcut:'',tags:'区域 导出',run:()=>exportCenter.open('selection')},
-    {name:'导出整个工作簿',shortcut:'',tags:'全部 Sheet',run:()=>exportCenter.open('all')},
-    buttonCommand('数据洞察 · 精确统计','profileOpenBtn','汇总 求和 公式 异常 计数','Ctrl+Alt+S'),
-    buttonCommand('审计标记 · 备注复核','bookmarkOpenBtn','异常 核实 审核 提醒 标签 待复核','Ctrl+Alt+B'),
-    {name:'复制审计证据摘要',shortcut:'',tags:'数值 公式 复制 底稿 来源',run:()=>copyCellEvidence()},
-    {name:'复制跨 Sheet 地址',shortcut:'',tags:'引用 定位 复制 地址',run:()=>copyQualifiedAddress()},
-    buttonCommand('查找公式或值','searchOpenBtn','搜索 查找','Ctrl+F'),
-    buttonCommand('返回最近文件','homeBtn','最近打开 首页 历史 工作簿'),
-    buttonCommand('快捷键与操作帮助','helpBtn','帮助 快捷键 操作说明'),
-    {name:'跳至数据区域边界',shortcut:'Ctrl+方向键',tags:'移动 跳过 空值 快速定位',run:()=>jumpDataEdge('down')},
-    {name:'跳转到单元格',shortcut:'Ctrl+G',tags:'定位 行 列',run:()=>{$('nameBox').focus();$('nameBox').select();}},
-    buttonCommand('名称与表目录','catalogueOpenBtn','定义名称 表对象 结构化引用 区域','Ctrl+F3'),
-    buttonCommand('查看数据规则','dataRulesOpenBtn','数据验证 有效性 下拉列表 验证条件'),
-    buttonCommand('查看记录卡片','recordCardOpenBtn','宽表 字段 长文本 原值 记录 只读'),
-	{name:'选区快速分析',shortcut:'Ctrl+Q',tags:'分布 差额 趋势 小图 同行 比较',run:()=>selectionQuick?.open()},
+    buttonCommand('命名视图','namedViewOpenBtn','保存 应用 视图 筛选 排序 布局'),
     buttonCommand('分页预览','printPreviewOpenBtn','打印 纸张 页边距 缩放 重复标题','Ctrl+P'),
-    {name:'打开所选单元格超链接',shortcut:'Ctrl+Enter',tags:'超链接 跳转 工作表 网页',run:()=>followCellHyperlink(S.selected?.hyperlink)},
-    buttonCommand('自动筛选','filterOpenBtn','表头 下拉','Ctrl+Shift+L'),
-    buttonCommand('显示或隐藏全部公式','formulaViewBtn','公式 显示 计算结果 公式视图','Ctrl+`'),
-    buttonCommand('定位条件 · 公式/错误/空值','inspectOpenBtn','查找 定位特殊单元格 常量 错误','Ctrl+Alt+G'),
-    buttonCommand('高亮重复值','duplicateOpenBtn','查重 重复单号 收款人 账号 重复数据','Ctrl+Shift+D'),
-    buttonCommand('多级自定义排序','multiSortBtn','排序 多列 数据 升序 降序'),
-    buttonCommand('高级条件筛选','advancedFilterBtn','筛选 条件 AND'),
-    buttonCommand('冻结窗格','freezeBtn','表头 行 列'),
-    {name:'设置当前行高',shortcut:'',tags:'行高 调整 大小',run:()=>promptResize('row')},
-    {name:'设置当前列宽',shortcut:'',tags:'列宽 调整 大小',run:()=>promptResize('col')},
-    buttonCommand('显示/隐藏原格式','formatBtn','背景 颜色 字体'),
-    {name:'工作表列表',shortcut:'',tags:'Sheet 导航',run:()=>{$('sheetListBtn').click();}},
-    {name:'复制选区（Excel 格式）',shortcut:'Ctrl+C',tags:'复制 保留颜色 格式 粘贴',run:()=>copySelection()},
-    {name:'复制选区为纯文本',shortcut:'',tags:'TSV 不带格式 粘贴 值',run:()=>copySelection(true)},
-    {name:'选择性复制',shortcut:'Ctrl+Alt+Shift+C',tags:'表头 TSV Markdown JSON 原值 公式 复制',run:()=>copySpecial.open()},
-    {name:'根据当前单元格值筛选',shortcut:'',tags:'快捷筛选 等于 当前值',run:()=>filterSelectedValue()},
+    buttonCommand('全屏','fullscreenBtn','窗口','F11'),
+    {name:'设置当前行高',shortcut:'Alt+H,O,H',tags:'行高 调整 大小',run:()=>promptResize('row')},
+    {name:'设置当前列宽',shortcut:'Alt+H,O,W',tags:'列宽 调整 大小',run:()=>promptResize('col')},
     {name:'当前列宽自动适应',shortcut:'Alt+H,O,I',tags:'列宽 自动 调整',run:()=>autoFitSize('col',S.selected?.col||1)},
     {name:'当前行高自动适应',shortcut:'Alt+H,O,A',tags:'行高 自动 调整',run:()=>autoFitSize('row',S.selected?.row||1)},
-    buttonCommand('公式追踪','tracePrecedentsBtn','引用 上游'),
-    buttonCommand('全屏','fullscreenBtn','窗口','F11'),
+    buttonCommand('对账','reconcileOpenBtn','双表对账 主键 差异 未匹配 重复键'),
+    buttonCommand('关联','relationsOpenBtn','关联提取 连接 左表 右表 未匹配'),
+    buttonCommand('标记与备注','bookmarkOpenBtn','审计标记 备注复核 异常 核实 审核 提醒 标签 待复核','Ctrl+Alt+B'),
+    buttonCommand('比较快照','snapshotsOpenBtn','保存 分析 趋势 差额 历史 比较'),
+    buttonCommand('任务恢复','taskRecoveryOpenBtn','继续 查询 筛选 排序 导出 下载 中断'),
+    {name:'跳转到单元格',shortcut:'Ctrl+G',tags:'定位 行 列 名称框',run:()=>{$('nameBox').focus();$('nameBox').select();}},
+    {name:'跳到数据区域边界',shortcut:'Ctrl+方向键',tags:'跳至数据区域边界 移动 跳过 空值 快速定位',run:()=>jumpDataEdge('down')},
+    buttonCommand('返回上一位置','historyBackBtn','历史 返回 位置','Alt+←'),
+    buttonCommand('前进到下一位置','historyForwardBtn','历史 前进 位置','Alt+→'),
+    {name:'打开所选单元格的超链接',shortcut:'Ctrl+Enter',tags:'打开所选单元格超链接 跳转 工作表 网页',run:()=>followCellHyperlink(S.selected?.hyperlink)},
+    {name:'全部工作表',shortcut:'',tags:'工作表列表 Sheet 导航',run:()=>{$('sheetListBtn').click();}},
+    buttonCommand('返回首页','homeBtn','返回最近文件 最近打开 历史 工作簿'),
+    buttonCommand('快捷键','helpBtn','快捷键与操作帮助 帮助 操作说明'),
+    buttonCommand('退出程序','exitBtn','退出 关闭 程序'),
   ];
   const commandPalette = new CommandPalette(ACTIONS, {
-    node:$, sheets:() => S.sheets, selectSheet, canOpen:() => S.opened, openDialog, closeDialog, toast
+    node:$, sheets:() => S.sheets, selectSheet, canOpen:() => S.opened, openDialog, closeDialog, toast,
+    reveal:id => window.ExcelLensRibbon?.reveal(id)
   });
   const openCommandPalette = () => commandPalette.open();
 
@@ -4227,6 +4247,9 @@
     return false;
   }
 
+  // Name the way forward when an edit key is pressed while reading.
+  const readOnlyHint = () => $('editCopyOpen').hidden ? '当前是只读浏览，原文件不会被修改' : '当前是只读浏览。要修改内容，请点“开始”里的“编辑副本”';
+
   // Excel-style keyboard routing: do not hijack editing, browser selection or
   // modal dialog controls. Only the grid receives caret/navigation keys;
   // read-only application commands also work after toolbar clicks.
@@ -4271,9 +4294,6 @@
 
     if(ctrl&&!alt&&!shift&&key==='k'){take(openCommandPalette);return;}
     if(ctrl&&!alt&&!shift&&key==='s'){take(()=>exportCenter.open());return;}
-    if(ctrl&&!alt&&!shift&&key==='p'){
-      take(()=>{exportCenter.open();toast('工作表采用虚拟滚动；请使用导出中心生成可完整打印的 HTML 或文件');});return;
-    }
     if(ctrl&&!alt&&!shift&&key==='f'){take(()=>openSearch());return;}
     if((ctrl&&!alt&&!shift&&key==='g')||event.key==='F5'){
       take(()=>{$('nameBox').focus();$('nameBox').select();});return;
@@ -4318,11 +4338,8 @@
       });return;
     }
     if(!gridFocused)return;
-    if(ctrl&&!alt&&['x','v','z','y'].includes(key)){
-      take(()=>toast('ExcelLens 是只读查看器，不能剪切、粘贴或修改原表'));return;
-    }
-    if(!ctrl&&!alt&&(event.key==='Backspace'||event.key==='Delete')){
-      take(()=>toast('当前为只读模式；删除操作不会修改原 Excel 文件'));return;
+    if((ctrl&&!alt&&['x','v','z','y'].includes(key))||(!ctrl&&!alt&&(event.key==='Backspace'||event.key==='Delete'))){
+      take(()=>toast(readOnlyHint()));return;
     }
     if(ctrl&&!alt&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)){
       const direction={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[event.key];
@@ -4382,16 +4399,13 @@
         $("nameBox").blur();
       }
     });
-    $('columnsBtn').addEventListener('click',openColumnsMenu);
+    $('columnsMenu').addEventListener('menuopen',prepareColumnsMenu);
     $('columnTarget').addEventListener('input',refreshColumnMenuTarget);
     $('hideSelectedColumnBtn').addEventListener('click',()=>{const span=targetColumnSpan();if(span)setColumnVisibility(span.start===span.end?'column':'range',span.start,true,span.end);});
     $('showSelectedColumnBtn').addEventListener('click',()=>{const span=targetColumnSpan();if(span)setColumnVisibility(span.start===span.end?'column':'range',span.start,false,span.end);});
     $('showAllColumnsBtn').addEventListener('click',()=>setColumnVisibility('show-all'));
     $('hideAllColumnsBtn').addEventListener('click',()=>setColumnVisibility('hide-all'));
     $('restoreColumnsBtn').addEventListener('click',()=>setColumnVisibility('original'));
-    document.addEventListener('pointerdown',event=>{
-      if(!event.target.closest('#columnsMenu,#columnsBtn'))hideColumnsMenu();
-    });
     $("searchOpenBtn").addEventListener("click", () => openSearch());
     $("multiSortBtn").addEventListener("click",()=>multiSort.show());
     $("inspectOpenBtn").addEventListener("click",()=>selectionInspector.open());
@@ -4467,6 +4481,15 @@
     $("cellDetailBtn").addEventListener("click", showCellDetail);
     $("copyFormulaBtn").addEventListener("click", () => copyText(S.selected?.formula || ""));
     $("copyValueBtn").addEventListener("click", () => copyText(S.selected?.display ?? S.selected?.raw ?? ""));
+    $('copySelectionBtn').addEventListener('click', () => copySelection());
+    $('copyPlainBtn').addEventListener('click', () => copySelection(true));
+    $('copySpecialBtn').addEventListener('click', () => copySpecial.open());
+    $('copyAddressBtn').addEventListener('click', () => copyQualifiedAddress());
+    $('copyEvidenceBtn').addEventListener('click', () => copyCellEvidence());
+    $('selectionQuickBtn').addEventListener('click', () => selectionQuick?.open());
+    $('transposeOpenBtn').addEventListener('click', () => transposeCenter?.open());
+    $('snapshotsOpenBtn').addEventListener('click', () => window.ExcelLensSnapshots?.open());
+    $('taskRecoveryOpenBtn').addEventListener('click', () => taskRecovery.open());
     $("fullscreenBtn").addEventListener("click", toggleFullscreen);
     document.addEventListener("fullscreenchange", updateFullscreenButton);
     $("zoomOutBtn").addEventListener("click", () => setZoom(S.zoom - 5));

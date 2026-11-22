@@ -9,7 +9,7 @@
 .tab-activity {
   box-sizing: border-box;
   position: fixed;
-  inset: auto 0 max(54px, env(safe-area-inset-bottom)) 0;
+  inset: auto 0 max(66px, env(safe-area-inset-bottom)) 0;
   margin: 0 auto;
   width: max-content;
   max-width: calc(100% - 24px);
@@ -18,12 +18,12 @@
   align-items: center;
   gap: 9px;
   padding: 8px 12px;
-  border: 1px solid var(--reading-line,#cbdad3);
-  border-radius: 8px;
-  background: var(--reading-surface,#f9fcfb);
-  color: var(--reading-ink,#203b38);
-  box-shadow: 0 3px 14px #172d3420;
-  font: 500 13px/1.4 "Segoe UI","Microsoft YaHei UI",sans-serif;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  font: 500 var(--fs-3)/1.4 var(--font-ui);
   pointer-events: none;
   will-change: opacity;
 }
@@ -33,30 +33,30 @@
 .home-view .tab-activity, dialog .tab-activity {bottom:max(18px, env(safe-area-inset-bottom));}
 .tab-activity::backdrop {background:transparent;pointer-events:none;}
 .activity-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.activity-value {flex:none;color:var(--reading-muted,#526960);font-variant-numeric:tabular-nums;font-size:12px;}
+.activity-value {flex:none;color:var(--muted);font-variant-numeric:tabular-nums;font-size:var(--fs-2);}
 .activity-ring {
   flex: none;
   width: 16px;
   height: 16px;
   box-sizing: border-box;
-  border: 2px solid var(--reading-line,#cbdad3);
-  border-top-color: var(--reading-accent,#317766);
-  border-right-color: var(--reading-accent,#317766);
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
   border-radius: 50%;
   animation: activity-spin .85s linear infinite;
 }
-.activity-cancel {pointer-events:auto;flex:none;padding:2px 5px;border:0;border-radius:3px;background:transparent;color:var(--reading-accent,#246758);font:inherit;cursor:pointer;}
-.activity-cancel:hover {background:var(--reading-active,#e1eee6);}
+.activity-cancel {pointer-events:auto;flex:none;padding:2px 5px;border:0;border-radius:3px;background:transparent;color:var(--accent);font:inherit;cursor:pointer;}
+.activity-cancel:hover {background:var(--active);}
 .home-activity-slot {position:relative;height:0;}
 .home-activity-slot .tab-activity, .recent-meta .tab-activity {
   position:absolute;inset:8px auto auto 0;width:max-content;max-width:100%;margin:0;padding:0;
   border:0;border-radius:0;box-shadow:none;background:transparent;color:inherit;
 }
 .home-activity-slot .activity-value {color:inherit;}
-.recent-item.recent-working {background:var(--reading-active,#eef7f2);}
+.recent-item.recent-working {background:var(--active);}
 .recent-meta .tab-activity {
   inset:0;max-width:none;width:auto;gap:6px;font-size:12px;
-  background:var(--reading-active,#eef7f2);color:var(--reading-ink,#244b41);
+  background:var(--active);color:var(--ink);
 }
 .recent-meta {position:relative;min-height:16px;}
 .recent-meta .activity-ring {width:13px;height:13px;}
@@ -77,16 +77,17 @@
 @keyframes ui-rise {from {opacity:0;translate:0 3px;} to {opacity:1;translate:0 0;}}
 @keyframes ui-reveal {from {opacity:0;} to {opacity:1;}}
 
-:is(.tool-button,.mini-button,.primary-button,.compact-button,.command-entry,.sheet-tab,.recent-action,
-    .recent-item,.recent-refresh,.activity-cancel,.calculator-icon,.calculator-notes-toggle,.analysis-nav button) {
+:is(.tool-button,.mini-button,.primary-button,.icon-button,.search-tool-button,.analysis-outline-button,.analysis-primary-button,
+    .analysis-quiet-button,.command-entry,.command-field,.sheet-tab,.ribbon-tabs button,.recent-action,.recent-item,.activity-cancel,
+    .calculator-icon,.calculator-notes-toggle,.analysis-nav button) {
   transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease),
     translate var(--motion-fast) var(--motion-ease);
 }
-:is(.tool-button,.mini-button,.primary-button,.recent-action,.recent-refresh,.activity-cancel,.calculator-icon):active:not(:disabled) {
+:is(.mini-button,.primary-button,.analysis-outline-button,.analysis-primary-button,.recent-action,.activity-cancel,.calculator-icon):active:not(:disabled) {
   translate: 0 1px;
 }
-:is(.auto-filter-popover,.columns-menu,.cell-context-menu,.reading-mode-panel,.calculator-completion):not([hidden]) {
+:is(.menu,.auto-filter-popover,.columns-menu,.cell-context-menu,.reading-mode-panel,.calculator-completion):not([hidden]) {
   animation: ui-rise var(--motion-fast) var(--motion-ease);
 }
 :where(dialog[open]) {animation:ui-rise var(--motion-normal) var(--motion-ease);}
@@ -106,6 +107,5 @@
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after {animation:none!important;transition:none!important;scroll-behavior:auto!important;}
   .tab-activity[aria-hidden="true"] {visibility:hidden;}
-  .landing-open-button:hover:not(:disabled) {transform:none;}
-  :is(.tool-button,.mini-button,.primary-button,.recent-action,.recent-refresh,.activity-cancel,.calculator-icon,.landing-open-button):active:not(:disabled) {translate:none;transform:none;}
+  :is(.mini-button,.primary-button,.analysis-outline-button,.analysis-primary-button,.recent-action,.activity-cancel,.calculator-icon,.landing-open-button):is(:hover,:active):not(:disabled) {translate:none;}
 }

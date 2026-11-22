@@ -43,7 +43,7 @@ async function drag(first,last){
     await waitFor('document.readyState==="complete"&&!!window.ExcelLensSession');await evaluate('window.ExcelLensSession.ready');
     await run(()=>{
       window.qaFilters=[];window.qaExportStarts=[];window.qaCopied='';
-      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.qaCopied=text;}}});
+      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.qaCopied=text;},write:async items=>{window.qaCopied=await(await items[0].getType('text/plain')).text();}}});
       const original=window.fetch.bind(window);window.qaFetch=original;
       window.fetch=async(url,options)=>{
         const name=String(url),response=await original(url,options);

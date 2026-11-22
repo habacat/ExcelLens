@@ -2,8 +2,8 @@
 // All inputs are synthetic; no desktop browser or user workbook is opened.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process'),{createHash}=require('node:crypto');
-const root=path.resolve(__dirname,'../..'),version=require('./project_config.cjs').version();
-const out=path.join(root,'validation',version,'private','background-details');fs.mkdirSync(out,{recursive:true});
+const root=path.resolve(__dirname,'../..'),config=require('./project_config.cjs'),version=config.version(),receipts=path.join(root,'validation',config.validationVersion());
+const out=path.join(receipts,'private','background-details');fs.mkdirSync(out,{recursive:true});
 const exe=process.argv[2];if(!exe)throw Error('Usage: node tools/qa/background_details_qa.cjs QA_SERVER_EXE');
 const pause=ms=>new Promise(r=>setTimeout(r,ms)),digest=b=>createHash('sha256').update(b).digest('hex');
 const csv=path.join(out,'background.csv');
@@ -105,7 +105,7 @@ async function start(){
     const reads=()=>requests.filter(p=>/\/api\/(sheet|layout|index|preview)/.test(p)).length;
     await pause(200);const before=reads();await click('.grid-cell[data-ref="I18"]');assert.equal(await evaluate('document.querySelector("#nameBox").value'),'I18');
     await click('#crosshairToggle');assert.equal(await evaluate('document.querySelector("#crosshairToggle").checked'),false);await key(' ','Space',32);assert.equal(await evaluate('document.querySelector("#crosshairToggle").checked'),true);
-    const focus=await evaluate('(()=>{const n=document.querySelector("#crosshairToggle"),s=getComputedStyle(n);return {id:document.activeElement.id,outline:s.outlineStyle,appearance:s.appearance,tick:getComputedStyle(n,"::before").opacity,width:n.getBoundingClientRect().width};})()');assert.equal(focus.id,'crosshairToggle');assert.equal(focus.outline,'solid');assert.equal(focus.appearance,'none');assert.equal(focus.tick,'1');assert.equal(focus.width,10);
+    const focus=await evaluate('(()=>{const n=document.querySelector("#crosshairToggle"),s=getComputedStyle(n);return {id:document.activeElement.id,outline:s.outlineStyle,appearance:s.appearance,tick:getComputedStyle(n,"::before").opacity,width:n.getBoundingClientRect().width};})()');assert.equal(focus.id,'crosshairToggle');assert.equal(focus.outline,'solid');assert.equal(focus.appearance,'auto');assert.equal(focus.width,13);
     assert.equal(await evaluate('document.querySelector("#nameBox").value'),'I18');assert.equal(reads(),before);report.checks.push('empty-cell pointer pass-through; mouse and Space toggle without source reads or selection changes');
     await click('#crosshairColorBtn');await click('input[name="crosshairColor"][value="purple"]');await key('Escape','Escape',27);assert.equal(await evaluate('document.querySelector("#crosshairColorBtn").getAttribute("aria-expanded")'),'false');
     await cdp('Emulation.setEmulatedMedia',{features:[{name:'forced-colors',value:'active'}]});assert.equal(await evaluate('getComputedStyle(document.querySelector("#crosshairToggle")).appearance'),'auto');await capture('checkbox-forced-colors','.crosshair-controls');await cdp('Emulation.setEmulatedMedia',{features:[]});
@@ -117,7 +117,8 @@ async function start(){
     await capture('grid-frozen-scrolled');await capture('frozen-top-texture','#freezeTop');await capture('frozen-left-texture','#freezeLeft');
     const frozenReads=sourceReads();await click('#readingModeBtn');await click('#gridTextureToggle');assert.equal(await evaluate('document.querySelector("#gridBackdrop").hidden'),true);await capture('grid-frozen-off');
     await click('#gridTextureToggle');await key('Escape','Escape',27);assert.equal(sourceReads(),frozenReads);await boundary('G15');report.checks.push('frozen and normal blank areas switch together without source reads; one shared texture phase');
-    await click('#advancedFilterBtn');await evaluate('document.querySelector(".filter-column").value="B";document.querySelector(".filter-operator").value="equals";document.querySelector(".filter-value").value="保留"');await click('#applyFilterBtn');await waitFor('!document.querySelector("#filterStatus").hidden&&!document.querySelector("#applyFilterBtn").disabled');await click('#filterDialog .dialog-close');await settle();
+    // The command sits on the Data tab; its own handler is what this step needs.
+    await evaluate('document.querySelector("#advancedFilterBtn").click()');await evaluate('document.querySelector(".filter-column").value="B";document.querySelector(".filter-operator").value="equals";document.querySelector(".filter-value").value="保留"');await click('#applyFilterBtn');await waitFor('!document.querySelector("#filterStatus").hidden&&!document.querySelector("#applyFilterBtn").disabled');await click('#filterDialog .dialog-close');await settle();
     report.filtered=await boundary('G15',{filtered:true});assert(report.filtered.bottom<report.zoom125.bottom);await capture('grid-filtered');await click('#clearFilterBtn');await waitFor('document.querySelector("#filterStatus").hidden');
     await click('#nameBox');await evaluate('document.querySelector("#nameBox").value="G1000000000"');await key('Enter','Enter',13);await waitFor('document.querySelector(".grid-cell.selected")?.dataset.ref==="G1000000000"&&window.ExcelLensPerformance().hasVisibleCoverage');
     report.billionCoordinates=await boundary(null);report.billionCoordinates.performance=await evaluate('window.ExcelLensPerformance()');assert(report.billionCoordinates.performance.visibleNodes<10000);assert.equal(await evaluate('getComputedStyle(document.querySelector("#gridCanvas")).getPropertyValue("--row-header-width")'),'72px');await capture('grid-billion-coordinates');
@@ -150,6 +151,6 @@ async function start(){
     if(server?.exitCode===null)server.kill();if(socket?.readyState===1){await cdp('Browser.close').catch(()=>{});socket.close();}if(browser.exitCode===null&&browser.signalCode===null){await Promise.race([new Promise(r=>browser.once('exit',r)),pause(1500)]);if(browser.exitCode===null&&browser.signalCode===null)browser.kill();}
     report.sourceUnchanged=[...inputs].every(([file,hash])=>digest(fs.readFileSync(file))===hash);assert(report.sourceUnchanged);report.sources=[...inputs].map(([file,sha256])=>({file:path.basename(file),sha256}));
     fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2)+'\n');const receipt={...report,privateEvidence:'private/background-details/result.json'};delete receipt.tall?.performance;
-    fs.writeFileSync(path.join(root,'validation',version,'background-details.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify({result:report.result,home:report.home.length,grid:report.grid.length,checks:report.checks,failure:report.failure},null,2));
+    fs.writeFileSync(path.join(receipts,'background-details.json'),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify({result:report.result,home:report.home.length,grid:report.grid.length,checks:report.checks,failure:report.failure},null,2));
   }
 })();

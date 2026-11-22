@@ -17,6 +17,8 @@ assert.equal(fromLeft.right,'1.15px solid #ef452a');
 const fromBelow=seam.resolve({}, {}, {borderTop:'1px dashed #26aa66'});
 assert.equal(fromBelow.bottom,'1px dashed #26aa66');
 const styles=fs.readFileSync(path.join(web,'style.css'),'utf8');
-assert.match(styles,/\.grid-row\s*\{border-bottom:0!important/,'row stroke must not overlap the cell border');
-assert.match(styles,/\.grid-cell\s*\{border-left:0;border-top:0;border-right:\.45px solid/,'only right and bottom default seams are painted');
+// The seam declarations live in the main grid rules; match them wherever they sit in the block.
+assert.match(styles,/\.grid-row\s*\{[^}]*border-bottom:\s*0\s*!important/,'row stroke must not overlap the cell border');
+assert.match(styles,/\.grid-cell\s*\{[^}]*border-left:\s*0;\s*border-top:\s*0;\s*border-right:\s*\.4px solid var\(--grid-line-color\);\s*border-bottom:\s*\.4px solid var\(--grid-line-color\)/,'only right and bottom default seams are painted');
+assert.equal((styles.match(/(?:^|\n)\.grid-(?:row|cell)\s*\{[^}]*border-(?:right|bottom):/g)||[]).length,2,'one rule each owns the row and cell seams');
 console.log('PASS: border single-owner rules (thin/custom left-top/dashed/medium)');

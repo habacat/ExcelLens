@@ -1,7 +1,25 @@
-.chart-export-dialog{width:min(820px,94vw);max-width:94vw;max-height:92vh;padding:0;color:var(--reading-ink,#263b55);background:var(--reading-paper,#fff);border:1px solid var(--reading-line,#dfe4e9);border-radius:7px}
-.chart-export-dialog[open]{display:flex;flex-direction:column;overflow:hidden}.chart-export-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--reading-line,#dfe4e9);flex:none}.chart-export-head h3{margin:0;font-size:14px}
-#chartExportForm{padding:12px 14px 0;flex:none}#chartExportOptions{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 10px;padding:10px;border:1px solid var(--reading-line,#dfe4e9)}#chartExportOptions label{display:flex;flex-direction:column;gap:5px;font-size:11px}#chartExportOptions input{width:88px}#chartExportOptions .field-control{height:30px;background:var(--reading-inset,#f4f7f8);color:var(--reading-ink,#263b55);border-color:var(--reading-line,#dfe4e9)}
-.chart-export-actions{display:flex;gap:8px;flex-wrap:wrap}.chart-export-status{padding:9px 14px;margin:0;font-size:11px;line-height:1.5;overflow-wrap:anywhere;flex:none;max-height:70px;overflow:auto;color:var(--reading-muted,#627184)}.chart-export-status:empty{display:none}.chart-export-status.is-error{color:var(--reading-error,#b75046)}
-.chart-export-result{padding:0 14px 12px;overflow:auto;min-height:80px;font-size:11px}.chart-export-result p{overflow-wrap:anywhere}.chart-export-preview{margin-top:10px;background:var(--reading-inset,#f4f7f8);border:1px solid var(--reading-line,#dfe4e9)}.chart-export-preview img{display:block;width:100%;height:auto}.chart-export-result a{display:inline-block;text-decoration:none}.chart-export-result a[aria-disabled="true"]{opacity:.55;cursor:wait}.chart-export-dialog :is(button,input,select,a):focus-visible{outline:2px solid var(--reading-accent,#17674f);outline-offset:2px}
-.analysis-dashboard-actions [data-report-image]{white-space:nowrap}.selection-quick-series-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-@media(max-width:620px){.chart-export-head,.chart-export-status,.chart-export-result{padding-inline:10px}#chartExportForm{padding-inline:10px}#chartExportOptions{gap:8px}#chartExportOptions label:last-child{width:100%}#chartExportOptions label:last-child select{max-width:100%}}
+/* Chart image export. */
+.chart-export-dialog { width: min(820px, 94vw); max-width: 94vw; max-height: 92vh; padding: 0; }
+.chart-export-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.chart-export-head { flex: none; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px 8px var(--dialog-pad); border-bottom: 1px solid var(--line-soft); }
+.chart-export-head h3 { margin: 0; font-size: var(--fs-4); font-weight: 600; }
+#chartExportForm { flex: none; padding: 14px var(--dialog-pad) 0; }
+#chartExportOptions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; padding: 0; border: 0; }
+#chartExportOptions label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: var(--fs-2); }
+#chartExportOptions input { width: 88px; }
+.chart-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chart-export-status { flex: none; max-height: 70px; margin: 0; padding: 9px var(--dialog-pad); overflow: auto; color: var(--muted); font-size: var(--fs-2); line-height: 1.5; overflow-wrap: anywhere; }
+.chart-export-status:empty { display: none; }
+.chart-export-status.is-error { color: var(--danger); }
+.chart-export-result { min-height: 80px; padding: 0 var(--dialog-pad) 14px; overflow: auto; font-size: var(--fs-2); }
+.chart-export-result p { overflow-wrap: anywhere; }
+.chart-export-preview { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--inset); overflow: hidden; }
+.chart-export-preview img { display: block; width: 100%; height: auto; }
+.chart-export-result a { display: inline-flex; text-decoration: none; }
+.chart-export-result a[aria-disabled="true"] { opacity: .55; cursor: wait; }
+.analysis-dashboard-actions [data-report-image] { white-space: nowrap; }
+.selection-quick-series-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 620px) {
+  #chartExportOptions label:last-child { width: 100%; }
+  #chartExportOptions label:last-child select { max-width: 100%; }
+}

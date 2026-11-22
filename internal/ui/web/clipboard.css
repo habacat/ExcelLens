@@ -1,4 +1,30 @@
-.clipboard-dialog{width:min(780px,calc(100vw - 28px));max-height:calc(100dvh - 28px);box-sizing:border-box;overflow:auto;padding:20px;border:1px solid var(--reading-line,#cdded7);border-radius:7px;background:var(--reading-surface,#fff);color:var(--reading-ink,#263f37);font:12px/1.5 "Segoe UI","Microsoft YaHei UI",sans-serif;box-shadow:0 15px 45px #18372d30}
-.clipboard-dialog::backdrop{background:#18372d40}.clipboard-dialog *{box-sizing:border-box}.clipboard-dialog button,.clipboard-dialog input,.clipboard-dialog select{font:inherit}.clipboard-dialog input{accent-color:var(--reading-accent,#256f5a)}.clipboard-dialog :focus-visible{outline:2px solid var(--reading-accent,#256f5a);outline-offset:2px}.clipboard-dialog button:disabled{opacity:.45;cursor:default}.clipboard-dialog fieldset{border:0;min-width:0;margin:0;padding:0}
-.clipboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:15px}.clipboard-head h3{font-size:18px;margin:0 0 5px}.clipboard-head p{margin:0;color:var(--reading-muted,#71877d);overflow-wrap:anywhere}.clipboard-head button{flex:none}.clipboard-options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.clipboard-options>label{display:grid;gap:5px}.clipboard-options select{width:100%;min-width:0}.clipboard-header-option,.clipboard-checks{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:13px 0}.clipboard-header-option>label,.clipboard-checks>label{display:flex;gap:5px;align-items:center}.clipboard-header-option input[type=number]{width:105px}.clipboard-note{color:var(--reading-muted,#71877d);font-size:11px;line-height:1.6;margin:10px 0}.clipboard-label{display:block;margin:10px 0 6px}.clipboard-input-label{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px}.clipboard-text{width:100%;resize:vertical;min-height:100px;max-height:40vh;padding:10px;border:1px solid var(--reading-line,#d7e3dc);border-radius:4px;background:var(--reading-inset,#f7faf8);color:inherit;font:12px/1.6 Consolas,"Microsoft YaHei UI",monospace;white-space:pre;overflow:auto}.clipboard-status{min-height:19px;margin:12px 0;color:var(--reading-muted,#71877d);overflow-wrap:anywhere}.clipboard-status.has-error{color:var(--reading-error,#b14040)}.clipboard-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px}.clipboard-footer small{margin-right:auto;color:var(--reading-muted,#71877d);font-size:11px}.clipboard-table-wrap{max-height:220px;overflow:auto;margin:12px 0;scrollbar-width:thin}.clipboard-table-wrap table{border-collapse:collapse;min-width:100%;font-size:11px;font-variant-numeric:tabular-nums}.clipboard-table-wrap td{max-width:220px;min-width:75px;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;padding:7px 9px;border:1px solid var(--reading-line,#d7e3dc)}
-@media(max-width:520px){.clipboard-dialog{padding:14px}.clipboard-options{grid-template-columns:1fr;gap:9px}.clipboard-footer{flex-wrap:wrap}.clipboard-footer small{width:100%}.clipboard-checks{gap:8px 13px}.clipboard-text{max-height:26vh}}
+/* Selective copy and paste. */
+.clipboard-dialog { width: min(780px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: var(--dialog-pad); overflow: auto; }
+.clipboard-dialog * { box-sizing: border-box; }
+.clipboard-dialog fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.clipboard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.clipboard-head h3 { margin: 0 0 2px; font-size: var(--fs-4); font-weight: 600; }
+.clipboard-head p { margin: 0; color: var(--muted); font-size: var(--fs-2); overflow-wrap: anywhere; }
+.clipboard-head button { flex: none; }
+.clipboard-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.clipboard-options > label { display: grid; gap: 5px; color: var(--muted); font-size: var(--fs-2); }
+.clipboard-options select { width: 100%; min-width: 0; }
+.clipboard-header-option, .clipboard-checks { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0; }
+:is(.clipboard-header-option, .clipboard-checks) > label { display: flex; align-items: center; gap: 6px; }
+.clipboard-header-option input[type=number] { width: 104px; }
+.clipboard-label { display: block; margin: 10px 0 5px; color: var(--muted); font-size: var(--fs-2); }
+.clipboard-input-label { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 5px; color: var(--muted); font-size: var(--fs-2); }
+.clipboard-text { width: 100%; min-height: 100px; max-height: 40vh; padding: 9px 10px; overflow: auto; resize: vertical; background: var(--inset); font: var(--fs-2)/1.6 var(--font-mono); white-space: pre; }
+.clipboard-status { min-height: 19px; margin: 12px 0; color: var(--muted); overflow-wrap: anywhere; }
+.clipboard-status.has-error { color: var(--danger); }
+.clipboard-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.clipboard-footer small { margin-right: auto; color: var(--muted); font-size: var(--fs-2); }
+.clipboard-table-wrap { max-height: 220px; margin: 12px 0; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-2); }
+.clipboard-table-wrap table { min-width: 100%; border-collapse: collapse; font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
+.clipboard-table-wrap td { min-width: 75px; max-width: 220px; padding: 6px 9px; border: 1px solid var(--line-soft); vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .clipboard-options { grid-template-columns: 1fr; gap: 9px; }
+  .clipboard-footer { flex-wrap: wrap; }
+  .clipboard-footer small { width: 100%; }
+  .clipboard-text { max-height: 26vh; }
+}

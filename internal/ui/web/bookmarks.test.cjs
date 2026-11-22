@@ -3,10 +3,10 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(api){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',dataset:{},disabled:false,open:false,addEventListener(){},close(){this.open=false;}});return nodes.get(id);};
-  const ctx={window:{},document:{getElementById:node},AbortController,confirm:()=>true};
+  const ctx={window:{},document:{getElementById:node},AbortController};
   vm.runInNewContext(fs.readFileSync(__dirname+'/bookmarks.js','utf8'),ctx);
   const state={opened:true,fileName:'same.xlsx',workbookKey:'A',sheet:'Data',selected:{ref:'A1',display:'42'}},notices=[];
-  const marks=new ctx.window.ExcelLensBookmarks({state,api,toast:message=>notices.push(message),openDialog(){},onChange(){}});marks.render=()=>{};
+  const marks=new ctx.window.ExcelLensBookmarks({state,api,toast:message=>notices.push(message),openDialog(){},onChange(){},confirm:async()=>true});marks.render=()=>{};
   return {marks,state,node,notices};
 }
 test('late loads cannot install marks from another workbook even when filenames match and abort is ignored',async()=>{
@@ -33,4 +33,34 @@ test('typing a newer draft while saving retains the draft and installs the saved
   pending.resolve({items:[{id:'saved',sheet:'Data',ref:'A1',note:'first draft',tag:'待复核'}]});await save;
   assert.equal(h.node('bookmarkNote').value,'second draft');assert.equal(h.node('bookmarkNote').dataset.id,'saved');
   assert.match(h.notices.at(-1),/未保存/);
+});
+test('confirming an old delete after loading another workbook sends no deletion',async()=>{
+  const decision=deferred(),deleted=[];
+  const h=setup(async(url,options)=>{
+    if(options.method==='POST')deleted.push(JSON.parse(options.body).id);
+    return {items:[{id:'same-id',sheet:'Data',ref:'A1'}]};
+  });
+  await h.marks.load();
+  h.marks.confirm=()=>decision.promise;
+  const pending=h.marks.remove(h.marks.items[0]);
+  h.state.workbookKey='B';
+  h.marks.resetBook();
+  await h.marks.load();
+  decision.resolve(true);
+  await pending;
+  assert.deepEqual(deleted,[]);
+});
+test('deleting a current bookmark submits only after explicit confirmation',async()=>{
+  const deleted=[],mark={id:'current',sheet:'Data',ref:'A1'};
+  const h=setup(async(url,options)=>{
+    if(options.method==='POST')deleted.push(JSON.parse(options.body).id);
+    return {items:deleted.length?[]:[mark]};
+  });
+  await h.marks.load();
+  h.marks.confirm=async()=>false;
+  await h.marks.remove(mark);
+  assert.deepEqual(deleted,[]);
+  h.marks.confirm=async()=>true;
+  await h.marks.remove(mark);
+  assert.deepEqual(deleted,['current']);
 });

@@ -656,10 +656,7 @@
   }
   function askText(title,initial='',hint='请输入名称'){
     return new Promise(resolve=>{
-      const shade=document.createElement('div');shade.className='analysis-modal-shade';shade.innerHTML=`<div class="analysis-modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><input class="analysis-control" maxlength="80" placeholder="${esc(hint)}"><div><button data-no type="button" class="analysis-outline-button">取消</button><button data-yes type="button" class="analysis-primary-button">确定</button></div></div>`;
-      shade.style.cssText='position:absolute;inset:0;z-index:12;background:#1c2c3950;display:grid;place-items:center';
-      const box=shade.firstChild;box.style.cssText='border:1px solid var(--reading-line,#e2e9ed);box-shadow:0 20px 50px #1b3f4750;border-radius:12px;padding:22px;width:min(360px,86vw)';
-      const h=box.querySelector('h3');h.style.margin='0 0 16px';box.querySelector('div').style.cssText='display:flex;justify-content:flex-end;gap:9px;margin-top:17px';
+      const shade=document.createElement('div');shade.className='analysis-modal-shade';shade.innerHTML=`<div class="analysis-modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><input class="analysis-control" maxlength="80" placeholder="${esc(hint)}"><div class="analysis-modal-actions"><button data-no type="button" class="analysis-outline-button">取消</button><button data-yes type="button" class="analysis-primary-button">确定</button></div></div>`;
       const input=shade.querySelector('input');input.value=initial;
       const done=v=>{shade.remove();resolve(v)};shade.querySelector('[data-no]').onclick=()=>done(null);shade.querySelector('[data-yes]').onclick=()=>done(input.value.trim());
       shade.addEventListener('keydown',e=>{if(e.key==='Escape')done(null);if(e.key==='Enter')done(input.value.trim())});root.append(shade);input.focus();input.select();
@@ -759,7 +756,7 @@
     }
     // Render all report shells, but only query charts as they approach the
     // viewport. A large dashboard must not sequentially rescan 80 workbooks.
-    if(!reports.length){const el=document.createElement('div');el.className='analysis-chart-card';el.style.cssText='padding:45px;color:#80909a;grid-column:1/-1;text-align:center';el.textContent='这里还没有报表。先完成一次透视分析，点击「保存报表」后即可在仪表盘中查看。';host.append(el);return}
+    if(!reports.length){const el=document.createElement('div');el.className='analysis-empty';el.textContent='还没有报表。在“透视分析”里点“保存报表”，报表会出现在这里。';host.append(el);return}
     const contentScroll=root.querySelector('.analysis-main');
     const lazyObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
       for(const entry of entries){if(entry.isIntersecting){lazyObserver.unobserve(entry.target);entry.target.__loadAnalysisCard?.()}}

@@ -1,417 +1,173 @@
-/* Reading presets share one palette across the complete web workspace.
- * These are display colors. Original workbook styles stay in --xl-* and in
- * the source model; no filters invert pictures, charts or notification hues. */
+/* Reading presets replace the palette defined in style.css. These are display
+ * colors only: workbook styles stay in --xl-* and in the source model, and no
+ * filter inverts pictures, charts or notification hues. */
 :root[data-reading-preset="warm"] {
-  --reading-paper:#f4eedf;--reading-surface:#f4eedf;--reading-inset:#eae3d3;
-  --reading-ink:#393b35;--reading-muted:#686b60;--reading-line:#d5cebd;--reading-grid-line:#e0d9c9;
-  --reading-accent:#365f7d;--reading-active:#dce4db;--reading-on-accent:#fff;
+  --paper: #f4eedf; --surface: #f4eedf; --inset: #eae3d3;
+  --ink: #393b35; --muted: #686b60; --line: #d5cebd; --line-soft: #e0d9c9;
+  --accent: #365f7d; --active: #dce4db; --on-accent: #fff;
 }
 :root[data-reading-preset="green"] {
-  --reading-paper:#e5f0e4;--reading-surface:#e5f0e4;--reading-inset:#d9e7d9;
-  --reading-ink:#2d4238;--reading-muted:#5d7264;--reading-line:#c2d6c5;--reading-grid-line:#cfdfd0;
-  --reading-accent:#286c58;--reading-active:#c9ded1;--reading-on-accent:#fff;
+  --paper: #e5f0e4; --surface: #e5f0e4; --inset: #d9e7d9;
+  --ink: #2d4238; --muted: #5d7264; --line: #c2d6c5; --line-soft: #cfdfd0;
+  --accent: #286c58; --active: #c9ded1; --on-accent: #fff;
 }
 :root[data-reading-preset="mist"] {
-  --reading-paper:#e9edf2;--reading-surface:#e9edf2;--reading-inset:#dce3eb;
-  --reading-ink:#344353;--reading-muted:#607284;--reading-line:#c6d0dc;--reading-grid-line:#d5dde6;
-  --reading-accent:#356589;--reading-active:#d0dfea;--reading-on-accent:#fff;
+  --paper: #e9edf2; --surface: #e9edf2; --inset: #dce3eb;
+  --ink: #344353; --muted: #607284; --line: #c6d0dc; --line-soft: #d5dde6;
+  --accent: #356589; --active: #d0dfea; --on-accent: #fff;
 }
 :root[data-reading-preset="blush"] {
-  --reading-paper:#f4e6e3;--reading-surface:#f4e6e3;--reading-inset:#ecd9d5;
-  --reading-ink:#463c3c;--reading-muted:#7a6465;--reading-line:#d9c4c1;--reading-grid-line:#e2d0cd;
-  --reading-accent:#8a4d61;--reading-active:#e4cdd3;--reading-on-accent:#fff;
+  --paper: #f4e6e3; --surface: #f4e6e3; --inset: #ecd9d5;
+  --ink: #463c3c; --muted: #7a6465; --line: #d9c4c1; --line-soft: #e2d0cd;
+  --accent: #8a4d61; --active: #e4cdd3; --on-accent: #fff;
 }
 :root[data-reading-preset="ice"] {
-  --reading-paper:#e3eef7;--reading-surface:#e3eef7;--reading-inset:#d5e3ee;
-  --reading-ink:#2e4557;--reading-muted:#61788b;--reading-line:#c0d2e0;--reading-grid-line:#cfdeea;
-  --reading-accent:#386b93;--reading-active:#c9dfed;--reading-on-accent:#fff;
+  --paper: #e3eef7; --surface: #e3eef7; --inset: #d5e3ee;
+  --ink: #2e4557; --muted: #61788b; --line: #c0d2e0; --line-soft: #cfdeea;
+  --accent: #386b93; --active: #c9dfed; --on-accent: #fff;
 }
 :root[data-reading-preset="lavender"] {
-  --reading-paper:#eee8f4;--reading-surface:#eee8f4;--reading-inset:#e3daed;
-  --reading-ink:#443d53;--reading-muted:#736781;--reading-line:#d0c4de;--reading-grid-line:#dfd5e8;
-  --reading-accent:#725585;--reading-active:#ddd0e8;--reading-on-accent:#fff;
+  --paper: #eee8f4; --surface: #eee8f4; --inset: #e3daed;
+  --ink: #443d53; --muted: #736781; --line: #d0c4de; --line-soft: #dfd5e8;
+  --accent: #725585; --active: #ddd0e8; --on-accent: #fff;
 }
 :root[data-reading-preset="graphite"] {
-  --reading-paper:#272b30;--reading-surface:#2e333a;--reading-inset:#23272c;
-  --reading-ink:#dce2e8;--reading-muted:#abb5bf;--reading-line:#46505b;--reading-grid-line:#39424c;
-  --reading-accent:#a1c9ea;--reading-active:#3b4e61;--reading-on-accent:#1e2b36;
+  --paper: #272b30; --surface: #2e333a; --inset: #23272c;
+  --ink: #dce2e8; --muted: #abb5bf; --line: #46505b; --line-soft: #39424c;
+  --accent: #a1c9ea; --active: #3b4e61; --on-accent: #1e2b36;
 }
 :root[data-reading-preset="navy"] {
-  --reading-paper:#202b38;--reading-surface:#283747;--reading-inset:#1b2531;
-  --reading-ink:#dbe7f2;--reading-muted:#a4bacd;--reading-line:#40566b;--reading-grid-line:#344657;
-  --reading-accent:#9acbf2;--reading-active:#354f68;--reading-on-accent:#192a39;
+  --paper: #202b38; --surface: #283747; --inset: #1b2531;
+  --ink: #dbe7f2; --muted: #a4bacd; --line: #40566b; --line-soft: #344657;
+  --accent: #9acbf2; --active: #354f68; --on-accent: #192a39;
 }
 :root[data-reading-preset="forest"] {
-  --reading-paper:#23312b;--reading-surface:#2c3b33;--reading-inset:#1d2923;
-  --reading-ink:#dfebe2;--reading-muted:#a9c0af;--reading-line:#455e4e;--reading-grid-line:#364b3f;
-  --reading-accent:#a0d1b5;--reading-active:#3c5747;--reading-on-accent:#1c3024;
+  --paper: #23312b; --surface: #2c3b33; --inset: #1d2923;
+  --ink: #dfebe2; --muted: #a9c0af; --line: #455e4e; --line-soft: #364b3f;
+  --accent: #a0d1b5; --active: #3c5747; --on-accent: #1c3024;
 }
 :root[data-reading-preset="warmdark"] {
-  --reading-paper:#2d2927;--reading-surface:#36312e;--reading-inset:#25211f;
-  --reading-ink:#e6e1d9;--reading-muted:#bfb1a4;--reading-line:#5a4f48;--reading-grid-line:#463e39;
-  --reading-accent:#d8b89d;--reading-active:#55473f;--reading-on-accent:#30241b;
+  --paper: #2d2927; --surface: #36312e; --inset: #25211f;
+  --ink: #e6e1d9; --muted: #bfb1a4; --line: #5a4f48; --line-soft: #463e39;
+  --accent: #d8b89d; --active: #55473f; --on-accent: #30241b;
 }
 :root[data-reading-preset="plum"] {
-  --reading-paper:#282436;--reading-surface:#322c41;--reading-inset:#211d2d;
-  --reading-ink:#e5e0f2;--reading-muted:#b8aecc;--reading-line:#534a66;--reading-grid-line:#40394f;
-  --reading-accent:#c6ade8;--reading-active:#4b3d63;--reading-on-accent:#2c203b;
+  --paper: #282436; --surface: #322c41; --inset: #211d2d;
+  --ink: #e5e0f2; --muted: #b8aecc; --line: #534a66; --line-soft: #40394f;
+  --accent: #c6ade8; --active: #4b3d63; --on-accent: #2c203b;
 }
 :root[data-reading-preset="brown"] {
-  --reading-paper:#2d251d;--reading-surface:#372f26;--reading-inset:#251e17;
-  --reading-ink:#ede4d6;--reading-muted:#c3b29c;--reading-line:#5e503f;--reading-grid-line:#493e31;
-  --reading-accent:#dfbf8e;--reading-active:#584731;--reading-on-accent:#332619;
+  --paper: #2d251d; --surface: #372f26; --inset: #251e17;
+  --ink: #ede4d6; --muted: #c3b29c; --line: #5e503f; --line-soft: #493e31;
+  --accent: #dfbf8e; --active: #584731; --on-accent: #332619;
 }
+/* Values derived from whichever preset is active. */
 :root[data-reading-preset] {
-  --line:var(--reading-line);--line-soft:var(--reading-grid-line);--muted:var(--reading-muted);
-  --reading-scroll-thumb:color-mix(in srgb,var(--reading-muted) 70%,var(--reading-surface));
-  --blue:var(--reading-accent);--blue-dark:var(--reading-accent);--blue-soft:var(--reading-active);
-  --text:var(--reading-ink);color:var(--reading-ink);background:var(--reading-inset);
+  --canvas: var(--inset);
+  /* The light presets are soft already: hints are no fainter than secondary text. */
+  --faint: var(--muted);
+  --line-strong: color-mix(in srgb, var(--muted) 40%, var(--line));
+  --accent-strong: color-mix(in srgb, var(--accent) 82%, var(--ink));
+  --accent-line: color-mix(in srgb, var(--accent) 40%, var(--surface));
+  --ref: var(--accent);
+  --range-grid-line: color-mix(in srgb, var(--line-soft) 90%, #000);
 }
-:root[data-reading-tone="dark"] {color-scheme:dark;--grid-line-color:color-mix(in srgb,var(--reading-grid-line) 84%,var(--reading-paper));}
-:root[data-reading-preset] body {background:var(--reading-inset);color:var(--reading-ink);}
-:root[data-reading-preset] body.home-view #globalStatus {color:var(--reading-muted);}
-:root[data-reading-preset] :is(.appbar,.formula-toolbar,.bottom-bar,.status-strip,.sheet-controls,
-  .float-dialog,.dialog-head,.dialog-footer,.reading-mode-panel,.index-card,
-  .cell-context-menu,.columns-menu,.auto-filter-popover,.sheet-edge-button,.calculator-dock,.cell-tooltip,
-  .formula-ref-tooltip,.formula-expanded,.calculator-window,.calculator-completion,.archive-list,
-  .landing-shell,.landing-topline,.landing-recent,.landing-footer,.inspect-panel,.inspect-titlebar,
-  .inspect-list-header,.inspect-more,.history-panel,.picture-viewer-bar) {
-  background:var(--reading-surface);color:var(--reading-ink);border-color:var(--reading-line);
+:root[data-reading-tone="dark"] {
+  color-scheme: dark;
+  --faint: color-mix(in srgb, var(--muted) 86%, var(--surface));
+  --danger: #ffb4b4; --danger-soft: #452d32; --danger-line: #79515a;
+  --warn: #f0d49a; --warn-soft: #423823; --warn-line: #75623f;
+  --ok: #b3e6c8; --ok-soft: #263e32; --ok-line: #496c56;
+  --mark: #e0a243;
+  --hover: color-mix(in srgb, var(--ink) 9%, transparent);
+  --shadow-rgb: 0 0 0;
+  --backdrop: rgb(0 0 0 / .5);
+  --grid-paper: var(--paper);
+  --grid-head: var(--surface);
+  --grid-head-ink: var(--muted);
+  --grid-head-line: var(--line);
+  --grid-corner: var(--surface);
+  --grid-line-color: color-mix(in srgb, var(--line-soft) 84%, var(--paper));
+  --grid-freeze-line: var(--line-strong);
+  --grid-accent: var(--accent);
+  --grid-on-accent: var(--on-accent);
+  --grid-accent-ink: var(--accent);
+  --grid-accent-soft: var(--active);
+  --grid-accent-line: var(--line);
+  --grid-band: color-mix(in srgb, var(--surface) 55%, var(--paper));
+  --cell-ink: var(--ink);
+  --cell-formula-ink: var(--accent);
+  --range-grid-line: color-mix(in srgb, var(--line-soft) 84%, #fff);
+  --crosshair-row-fill: color-mix(in srgb, var(--crosshair-color) 18%, transparent);
+  --crosshair-column-fill: color-mix(in srgb, var(--crosshair-color) 23%, transparent);
+  --crosshair-both-fill: color-mix(in srgb, var(--crosshair-color) 30%, transparent);
 }
-:root[data-reading-preset] :is(.welcome-screen,.workspace,.dialog-body,.search-results,
-  .recent-list,.recent-item,.calculator-scroll,.result-item,.command-entry,.inspect-hit,.profile-detail) {
-  background:var(--reading-paper);color:var(--reading-ink);
-}
-:root[data-reading-preset] :is(.brand-name,.dialog-title,.index-title,.landing-product,.recent-name,
-  .recent-heading h2,.recent-empty strong,.feature-row b,.auto-filter-titlebar strong,
-  .formula-preview-heading,.quick-stats,.selection-status,.freeze-status,.selection-link,
-  .formula-value,.detail-value,.cell-tooltip b,.inspect-titlebar h2,.inspect-fields>label,.inspect-hit strong,
-  .sheet-picker-item,.command-entry,.result-ref,.result-snippet,.profile-number,.profile-detail h4,
-  .profile-data-line code,.bookmark-head,.bookmark-desc,.search-advanced-help) {color:var(--reading-ink);}
-:root[data-reading-preset] :is(.file-badge,.global-status,.status-strip,.dialog-summary,.recent-meta,
-  .recent-date,.recent-summary,.recent-heading p,.landing-topright,.landing-footer,.landing-credits,
-  .progress-label,.index-detail,.cell-tooltip .tooltip-formula,.auto-filter-count,.auto-filter-summary,
-  .columns-menu-heading,.fx-label,.sort-description,.sort-header-row,.sort-level-number,.inspect-hint,
-  .inspect-overline,.inspect-progress,.inspect-empty,.inspect-list-header,.inspect-close,.result-sheet,
-  .field-row label,.search-option label,.search-visible-count,.search-navigation .dialog-summary,
-  .search-advanced-feedback,.filter-help,.freeze-note,.detail-label,.dialog-subtle,.export-intro,
-  .export-field,.export-task-line,.profile-controls>label,.profile-filter-label,.profile-caption,
-  .profile-divider,.history-heading,.history-item,.history-meta,.history-empty,.command-shortcut,
-  .command-entry small,.sheet-number,.calculator-grip,.calculator-completion button span,
-  .tool-button .disclosure,.picture-viewer-hint) {color:var(--reading-muted);}
-:root[data-reading-preset] :is(input:not([type="radio"]):not([type="checkbox"]),select,textarea,
-  .formula-input,.formula-inspector-input,.font-picker,.name-box,.field-control,.column-target,
-  .recent-search-wrap,.search-advanced-help,.sort-level,.calculator-head,.calculator-columns,
-  .calculator-row-number,.freeze-option,.profile-stat,.export-range-value,.export-options,
-  .export-progress,.bookmark-target,.search-advanced-help code,.remove-rule) {
-  background:var(--reading-inset);color:var(--reading-ink);border-color:var(--reading-line);
-}
-:root[data-reading-preset] :is(input,textarea)::placeholder {color:var(--reading-muted);opacity:1;}
-:root[data-reading-preset] :is(.formula-token,.formula-expand-button,.formula-preview-actions button,
-  .formula-inspector-input .formula-text,.calculator-formula,.calculator-value) {color:var(--reading-ink);}
-:root[data-reading-preset] :is(.formula-expand-button,.formula-preview-actions button,.mini-button,
-  .recent-refresh,.search-tool-button,.freeze-option,.sort-level-remove,.calculator-convert,.inspect-actions button,
-  .inspect-list-header button,.search-query-snippets button,.search-query-fields button,.profile-ref,
-  .auto-filter-sort button) {
-  background:var(--reading-inset);border-color:var(--reading-line);
-}
-:root[data-reading-preset] :is(.tool-button,.mini-button,.sheet-tab,.sheet-list-button,.sheet-edge-button,
-  .zoom-button,.reading-mode-button,.reading-mode-heading button,.dialog-close,.recent-action,
-  .cell-context-menu button,.columns-menu button,.auto-filter-titlebar button,.calculator-icon,
-  .calculator-notes-toggle,.calculator-dock,.search-tool-button,.formula-expand-button,.calculator-convert,
-  .recent-refresh,
-  .inspect-list-header button,.search-query-snippets button,.search-query-fields button,.profile-ref,
-  .history-refresh,.add-rule-button,.remove-rule,.sort-level-remove,.auto-filter-selectbar,
-  .auto-filter-selectbar button,.auto-filter-sort button,.auto-filter-more) {color:var(--reading-ink);}
-:root[data-reading-preset] :is(.tool-button,.mini-button,.sheet-tab,.sheet-list-button,.sheet-edge-button,
-  .zoom-button,.reading-mode-button,.reading-mode-heading button,.dialog-close,.recent-action,
-  .cell-context-menu button,.columns-menu button,.calculator-icon,.calculator-notes-toggle,.calculator-dock,
-  .calculator-convert,.inspect-list-header button,.inspect-more,.inspect-close,.inspect-actions button,
-  .formula-preview-actions button,.recent-refresh,.search-tool-button,.search-query-snippets button,
-  .search-query-fields button,.profile-ref,.sheet-picker-item,.result-item,.command-entry,.history-item,
-  .history-refresh,.bookmark-visit,.add-rule-button,.remove-rule,.sort-level-remove,.freeze-option,
-  .auto-filter-sort button,.auto-filter-selectbar button,.auto-filter-more):hover:not(:disabled),
-:root[data-reading-preset] :is(.recent-item:hover,.recent-item:focus-within,.archive-member:hover,
-  .recent-item.recent-working,.auto-filter-item:hover,.result-item.active,.command-entry.active,
-  .command-entry:focus-visible,.calculator-completion button.is-active,.inspect-hit:hover,.inspect-hit.current,
-  .reading-option:has(input:checked),.sheet-tab.active,.reading-mode-button.is-active,.format-active,
-  .reading-mode-button:focus-visible,.calculator-notes-toggle[aria-pressed="true"]) {
-  background:var(--reading-active);color:var(--reading-accent);border-color:var(--reading-line);
-}
-:root[data-reading-preset] .sheet-controls .sheet-tab.active {border-top-color:var(--reading-accent);}
-:root[data-reading-preset] .reading-option:has(input:checked) {border-color:var(--reading-accent);}
-:root[data-reading-preset] .sheet-controls :is(.sheet-list-button,.sheet-tab,.sheet-edge-button) {border-right-color:var(--reading-line);border-left-color:var(--reading-line);}
-:root[data-reading-preset] .sheet-edge-button:disabled {color:color-mix(in srgb,var(--reading-muted) 55%,var(--reading-surface));}
-:root[data-reading-preset] .columns-menu button:disabled {color:color-mix(in srgb,var(--reading-muted) 55%,var(--reading-surface));}
-:root[data-reading-preset] .sheet-controls .sheet-tab.has-tab-color {border-top-color:var(--sheet-tab-color);background:color-mix(in srgb,var(--sheet-tab-color) 16%,var(--reading-surface));color:var(--reading-ink);}
-:root[data-reading-preset] .sheet-tab.has-tab-color:is(.active,:hover) {background:color-mix(in srgb,var(--sheet-tab-color) 25%,var(--reading-surface));}
-:root[data-reading-preset] #formulaViewBtn[aria-pressed="true"] {background:var(--reading-active);color:var(--reading-accent);box-shadow:inset 0 0 0 1px var(--reading-line);}
-:root[data-reading-preset] :is(.primary-button,.primary-mini,.tool-button.primary,.export-primary) {
-  background:var(--reading-accent);color:var(--reading-on-accent);border-color:var(--reading-accent);
-}
-:root[data-reading-preset] :is(.primary-button,.primary-mini,.tool-button.primary,.export-primary):hover:not(:disabled) {
-  background:var(--reading-accent);color:var(--reading-on-accent);
-}
-:root[data-reading-preset] .analysis-toolbar-button {
-  background:var(--reading-active)!important;color:var(--reading-accent)!important;border-color:var(--reading-line)!important;
-}
-:root[data-reading-preset] .inspect-actions button {color:var(--reading-ink);}
-:root[data-reading-preset] .inspect-actions .inspect-run {background:var(--reading-accent);color:var(--reading-on-accent);border-color:var(--reading-accent);}
-:root[data-reading-preset] .sheet-picker-item.active {background:var(--reading-active);color:var(--reading-accent);}
-:root[data-reading-preset] :is(.dialog-head,.dialog-footer,.result-item,.history-item,.menu-divider,
-  .auto-filter-options,.auto-filter-footer,.reading-option,.reading-swatch,.calculator-row>div,
-  .calculator-columns>span,.archive-member,.recent-item,.recent-summary,.recent-file-icon,.profile-stat,
-  .profile-detail,.profile-data-line,.bookmark-item,.history-panel,.history-heading,.search-results-pane,
-  .search-dialog .search-results,.command-entry,.inspect-hit,.formula-preview-actions,.freeze-custom) {border-color:var(--reading-line);}
-:root[data-reading-preset] input:is([type="radio"],[type="checkbox"]) {accent-color:var(--reading-accent);}
-:root[data-reading-preset] .reading-mode-panel {width:min(268px,calc(100vw - 32px));}
-:root[data-reading-preset] .calculator-value.is-error {color:var(--reading-error,#b43e43);}
-:root[data-reading-preset] :is(.calculator-formula,.calculator-note):focus {background:var(--reading-paper);box-shadow:inset 0 0 0 2px var(--reading-accent);}
-:root[data-reading-preset] .calculator-row.is-active .calculator-row-number {background:var(--reading-active);color:var(--reading-accent);}
-:root[data-reading-preset] :is(.recent-file-icon,.recent-item.is-missing .recent-file-icon,.recent-last-tag,
-  .bookmark-tag,.picture-button .image-count) {background:var(--reading-active);color:var(--reading-accent);border-color:var(--reading-line);}
-:root[data-reading-preset] .recent-search-wrap input {background:transparent;}
-:root[data-reading-preset] .command-entry:is(.active,:hover,:focus-visible) :is(.command-shortcut,small) {color:inherit;}
-:root[data-reading-preset] .recent-action.is-pinned {color:var(--reading-accent);}
-:root[data-reading-preset] :is(.menu-divider,.columns-menu .menu-divider,.picture-separator) {background:var(--reading-line);}
-:root[data-reading-preset] .progress-track {background:var(--reading-inset);}
-:root[data-reading-preset] .progress-fill {background:var(--reading-accent);}
-:root[data-reading-preset] .formula-inspector-input:empty::before {color:var(--reading-muted);}
-:root[data-reading-preset] :is(.formula-token:hover,.formula-token.is-hovered,.formula-token:focus-visible) {background:var(--reading-active);}
-:root[data-reading-preset] :is(.quick-stat-copy:hover,.selection-link:hover,.cell-tooltip .tooltip-hyperlink) {color:var(--reading-accent);}
-:root[data-reading-preset] .help-grid span:nth-child(odd) {color:var(--reading-accent);}
-:root[data-reading-preset] :is(button,a,input,select,textarea):focus-visible {outline-color:var(--reading-accent);}
-:root[data-reading-preset] :is(.field-control,.column-target,.analysis-control):focus,
-:root[data-reading-preset] .recent-search-wrap:focus-within {border-color:var(--reading-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--reading-accent) 20%,transparent);}
-:root[data-reading-preset] .landing-open-zone {background:var(--reading-inset);color:var(--reading-ink);}
-:root[data-reading-preset] .landing-content h1 {color:var(--reading-ink);}
-:root[data-reading-preset] :is(.landing-eyebrow,.landing-title-period) {color:var(--reading-accent);}
-:root[data-reading-preset] :is(.landing-subline,.landing-bottomnote,.landing-open-zone .drop-hint) {color:var(--reading-muted);border-color:var(--reading-line);}
-:root[data-reading-preset] .landing-open-button,
-:root[data-reading-preset] .landing-open-button:hover:not(:disabled) {background:var(--reading-accent);color:var(--reading-on-accent);}
-:root[data-reading-preset] .landing-live-dot {background:var(--reading-accent);box-shadow:0 0 0 3px var(--reading-active);}
 
-/* Viewer chrome follows the preset; the source image is never filtered. */
-:root[data-reading-preset] .picture-viewer {background:var(--reading-inset);color:var(--reading-ink);}
-:root[data-reading-preset] .picture-viewer-controls :is(button,a) {color:var(--reading-ink);}
-:root[data-reading-preset] .picture-viewer-controls :is(button,a):hover:not(:disabled) {background:var(--reading-active);}
-:root[data-reading-preset] .picture-stage {background-color:var(--reading-paper);background-image:repeating-conic-gradient(var(--reading-inset) 0% 25%,transparent 0% 50%);background-size:24px 24px;background-position:0 0;}
-
-/* Analysis and calculation share the page palette, including their inputs. */
-:root[data-reading-preset] #analysisRoot {
-  --a-ink:var(--reading-ink);--a-muted:var(--reading-muted);--a-line:var(--reading-line);
-  --a-main:var(--reading-accent);--a-soft:var(--reading-inset);background:var(--reading-paper);color:var(--reading-ink);
-}
-:root[data-reading-preset] #analysisRoot :is(.analysis-topbar,.analysis-builder,.analysis-sheet-layout,
-  .analysis-table-wrap,.analysis-chart-card,.analysis-dashboard-card,.analysis-template-card,.analysis-drill,
-  .analysis-back,.analysis-pagination button,.analysis-card-loading,.analysis-table-card,
-  .analysis-builder-footer,.analysis-chart-select,.analysis-field-info-btn,.analysis-rule,
-  .analysis-symbol-button,.analysis-metric-row button,.analysis-drill-head button) {background:var(--reading-surface);color:var(--reading-ink);border-color:var(--reading-line);}
-:root[data-reading-preset] #analysisRoot :is(.analysis-main,.analysis-sheet-empty,.analysis-sheet-list,
-  .analysis-metric,.analysis-field-list,.analysis-dropzone,.analysis-field-profile,.analysis-control,
-  .analysis-edit-grid th,.analysis-edit-grid td:first-child,.analysis-data-table th,.analysis-drill-table th,
-  .analysis-quiet-button,.analysis-outline-button,.analysis-category-list button,.analysis-field-chip .analysis-field-info) {background:var(--reading-inset);color:var(--reading-ink);border-color:var(--reading-line);}
-:root[data-reading-preset] #analysisRoot :is(h1,h2,h3,strong,.analysis-data-table td,.analysis-template-card strong,
-  .analysis-edit-grid textarea,.analysis-edit-grid input,.analysis-brand,.analysis-nav button,
-  .analysis-short-label,.analysis-profile-head,.analysis-profile-stat strong,.analysis-drill-table td,
-  .analysis-sheet-list button,.analysis-rule-header,.analysis-data-table button.analysis-drill-link) {color:var(--reading-ink);}
-:root[data-reading-preset] #analysisRoot :is(p,small,.analysis-source-label,.analysis-subtitle,.analysis-label,
-  .analysis-autosave,.analysis-eyebrow,.analysis-overline,.analysis-zone-label,.analysis-field-info,
-  .analysis-sheet-list-hint,.analysis-conversion-note,.analysis-template-card small,.analysis-caption,
-  .analysis-metric-label,.analysis-metric-note,.analysis-card-header span,.analysis-chart-tools,
-  .analysis-chart-hint,.analysis-template-foot,.analysis-dashboard-grip,.analysis-back span,
-  .analysis-profile-range,.analysis-profile-item span,.analysis-pagination,.analysis-drill-head span) {color:var(--reading-muted);}
-:root[data-reading-preset] #analysisRoot :is(.analysis-sheet-list button.is-active,.analysis-nav button.is-active,
-  .analysis-category-list button.is-active,.analysis-selected-chip,.analysis-field-chip,.analysis-progress,
-  .analysis-data-table tfoot td,.analysis-data-table tr:hover td,.analysis-sheet-empty-icon) {background:var(--reading-active);color:var(--reading-accent);border-color:var(--reading-line);}
-:root[data-reading-preset] #analysisRoot .analysis-primary-button,
-:root[data-reading-preset] #analysisRoot .analysis-primary-button:hover:not(:disabled) {background:var(--reading-accent);color:var(--reading-on-accent);border-color:var(--reading-accent);}
-:root[data-reading-preset] #analysisRoot :is(.analysis-side-section,.analysis-chart-head,.analysis-table-head,
-  .analysis-dashboard-card-head,.analysis-card-header,.analysis-data-table td,.analysis-drill-table td,
-  .analysis-edit-grid td,.analysis-profile-item) {border-color:var(--reading-line);}
-:root[data-reading-preset] #analysisRoot :is(.analysis-nav button,.analysis-sheet-list button,
-  .analysis-symbol-button,.analysis-field-info-btn,.analysis-category-list button,
-  .analysis-outline-button,.analysis-back,.analysis-quiet-button,.analysis-metric-row button,
-  .analysis-pagination button,.analysis-field-chip .analysis-field-info):hover:not(:disabled) {
-  background:var(--reading-active);color:var(--reading-accent);border-color:var(--reading-line);
-}
-:root[data-reading-preset] #analysisRoot :is(.analysis-profile-head button,.analysis-profile-item button,
-  .analysis-zone-label button,.analysis-dashboard-card-head button,.analysis-template-ico,
-  .analysis-drill-table .analysis-source-row,.analysis-selected-chip button,.analysis-field-chip .analysis-type) {color:var(--reading-accent);}
-:root[data-reading-preset] #analysisRoot .analysis-nav button.is-active {border-bottom-color:var(--reading-accent);}
-:root[data-reading-preset] #analysisRoot :is(.analysis-edit-grid th input,.analysis-edit-grid td textarea):focus {
-  background:var(--reading-paper);outline-color:var(--reading-accent);
-}
-:root[data-reading-preset] #analysisRoot .analysis-modal {background:var(--reading-surface);color:var(--reading-ink);border-color:var(--reading-line);}
-:root[data-reading-preset] #analysisRoot .analysis-progress-track {background:var(--reading-inset);}
-:root[data-reading-preset] #analysisRoot .analysis-progress-track span {background:var(--reading-accent);}
-:root[data-reading-preset] #analysisRoot .analysis-chart-tooltip {background:var(--reading-inset);color:var(--reading-ink);border:1px solid var(--reading-line);}
+/* Reference colors are chosen for light paper; lift them on dark surfaces. */
+:root[data-reading-tone="dark"] .formula-token { color: color-mix(in srgb, var(--formula-ref-color) 55%, var(--ink)); }
 
 /* Dark sheets use live CSS variables: scrolling, frozen panes and restored
  * cached nodes all repaint without API requests or a grid reconstruction. */
-:root[data-reading-tone="dark"] :is(.grid-region,.grid-canvas,.rows-layer,.freeze-pane,.freeze-top,.freeze-left,.freeze-corner) {background:var(--reading-paper);border-color:var(--reading-line);}
-:root[data-reading-tone="dark"] :is(.column-headers,.column-head,.column-head.corner,.row-head,
-  .pinned-row-heads,.pinned-row-head,.freeze-header,.freeze-row-heads) {background:var(--reading-surface);color:var(--reading-muted);border-color:var(--reading-line);}
-:root[data-reading-tone="dark"] .grid-region :is(.column-head.active,.row-head:hover,.pinned-row-head.active,
-  .active-row .row-head,.whole-row-selected .row-head,.text-table-view .table-column-head.active) {background:color-mix(in srgb,var(--selection-color,#3c7dc3) 18%,var(--reading-surface));color:var(--reading-ink);}
 :root[data-reading-tone="dark"] .grid-region .grid-cell {
-  background-color:color-mix(in srgb,var(--xl-fill,var(--reading-paper)) 14%,var(--reading-paper));
-  color:color-mix(in srgb,var(--xl-color,var(--reading-ink)) 22%,var(--reading-ink));
-  border-color:var(--grid-line-color);
+  background-color: color-mix(in srgb, var(--xl-fill, var(--paper)) 14%, var(--paper));
+  color: color-mix(in srgb, var(--xl-color, var(--ink)) 22%, var(--ink));
 }
-:root[data-reading-tone="dark"] .grid-region .cell-rich-text {--rich-auto-color:var(--reading-ink);}
-:root[data-reading-tone="dark"] .grid-region .cell-rich-text > span {--rich-ink:color-mix(in srgb,var(--rich-color,var(--reading-ink)) 22%,var(--reading-ink));}
-:root[data-reading-tone="dark"] .grid-region :is(.selected,.range-cell) .cell-rich-text > span {--rich-ink:color-mix(in srgb,var(--rich-color,var(--reading-ink)) 8%,var(--reading-ink));}
-:root[data-reading-tone="dark"] .grid-region .grid-row {border-color:var(--grid-line-color);}
-:root[data-reading-tone="dark"] .grid-region .grid-cell.selected {outline-color:var(--selection-color,#3c7dc3);background-image:linear-gradient(var(--selection-night-fill,#9acbff1f),var(--selection-night-fill,#9acbff1f))!important;color:color-mix(in srgb,var(--xl-color,var(--reading-ink)) 8%,var(--reading-ink));}
+:root[data-reading-tone="dark"] .grid-region .cell-rich-text { --rich-auto-color: var(--ink); }
+:root[data-reading-tone="dark"] .grid-region .cell-rich-text > span { --rich-ink: color-mix(in srgb, var(--rich-color, var(--ink)) 22%, var(--ink)); }
+:root[data-reading-tone="dark"] .grid-region :is(.selected, .range-cell) .cell-rich-text > span { --rich-ink: color-mix(in srgb, var(--rich-color, var(--ink)) 8%, var(--ink)); }
+:root[data-reading-tone="dark"] .grid-region .grid-cell.selected {
+  outline-color: var(--selection-color, #3c7dc3);
+  background-image: linear-gradient(var(--selection-night-fill, #9acbff1f), var(--selection-night-fill, #9acbff1f)) !important;
+  color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink));
+}
 :root[data-reading-tone="dark"] .grid-region .grid-cell.range-cell {
-  background-image:linear-gradient(var(--selection-night-fill,#9acbff1f),var(--selection-night-fill,#9acbff1f))!important;
-  color:color-mix(in srgb,var(--xl-color,var(--reading-ink)) 8%,var(--reading-ink));
+  background-image: linear-gradient(var(--selection-night-fill, #9acbff1f), var(--selection-night-fill, #9acbff1f)) !important;
+  color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink));
 }
-:root[data-reading-tone="dark"] .text-table-view :is(.table-column-head,.table-header-row .grid-cell,.pinned-cell.auto-filter-header) {background-color:var(--reading-surface);color:var(--reading-ink);}
-:root[data-reading-tone="dark"] :is(.column-filter,.table-column-letter) {color:var(--reading-muted);}
-:root[data-reading-tone="dark"] .column-filter:hover {background:var(--reading-active);color:var(--reading-accent);}
-:root[data-reading-tone="dark"] .worksheet-picture.picture-load-failed {background:var(--reading-inset);outline-color:var(--reading-line);}
-:root[data-reading-tone="dark"] .worksheet-picture.picture-load-failed::after {color:var(--reading-muted);}
-:root[data-reading-tone="dark"] :is(.auto-filter-button,.auto-filter-sort button,.auto-filter-more,.auto-filter-selectbar button) {background:var(--reading-active);color:var(--reading-accent);border-color:var(--reading-line);}
-:root[data-reading-tone="dark"] .grid-scroll {background:var(--reading-paper);}
-:root[data-reading-preset] * {scrollbar-color:var(--reading-scroll-thumb) var(--reading-inset);}
-/* Keep Chromium's custom 40px minimum thumb length authoritative. Only
- * colors change here; existing thickness, corners and drag mapping remain. */
-:root[data-reading-preset] .grid-scroll {scrollbar-width:auto;scrollbar-color:auto;}
-:root[data-reading-preset] *::-webkit-scrollbar,
-:root[data-reading-preset] *::-webkit-scrollbar-track,
-:root[data-reading-preset] *::-webkit-scrollbar-corner,
-:root[data-reading-preset] *::-webkit-scrollbar-button {background-color:var(--reading-inset);border-color:var(--reading-inset);}
-:root[data-reading-preset] *::-webkit-scrollbar-thumb {background:var(--reading-scroll-thumb);border-color:var(--reading-inset);}
-:root[data-reading-preset] *::-webkit-scrollbar-thumb:hover {background:var(--reading-muted);}
-:root[data-reading-tone="dark"] .index-overlay {background:color-mix(in srgb,var(--reading-paper) 78%,transparent);}
 
-/* Preserve the meaning of success, warning and error colors in dark themes. */
-:root[data-reading-tone="dark"] {
-  --reading-error:#ffb4b4;
-}
-:root[data-reading-tone="dark"] :is(.toast,.analysis-toast) {
-  --toast-bg:var(--reading-surface);--toast-color:var(--reading-ink);--toast-border:var(--reading-line);
-}
-:root[data-reading-tone="dark"] [data-tone="success"] {--toast-bg:#263e32;--toast-color:#b3e6c8;--toast-border:#496c56;}
-:root[data-reading-tone="dark"] [data-tone="warning"] {--toast-bg:#423823;--toast-color:#f0d49a;--toast-border:#75623f;}
-:root[data-reading-tone="dark"] [data-tone="error"] {--toast-bg:#452d32;--toast-color:#ffbfc5;--toast-border:#79515a;}
-:root[data-reading-tone="dark"] :is(.inline-error,.archive-error,.search-advanced-feedback.is-invalid) {color:var(--reading-error);}
-:root[data-reading-tone="dark"] :is(.source-integrity-notice,.archive-notice,.filter-status) {background:#423823;color:#f0d49a;border-color:#75623f;}
-:root[data-reading-tone="dark"] :is(.export-advisory,.archive-partial-choice,.archive-member.incomplete .archive-file-kind) {color:#f0d49a;}
-:root[data-reading-tone="dark"] .inline-error {background:#452d32;border-color:#79515a;}
-:root[data-reading-tone="dark"] .export-result {background:#263e32;color:#b3e6c8;border-color:#496c56;}
-:root[data-reading-tone="dark"] .export-success {color:#b3e6c8;}
-:root[data-reading-tone="dark"] #analysisRoot :is(.analysis-rule-remove,.analysis-sheet-tools .danger,.analysis-card-loading.analysis-card-error) {color:var(--reading-error);}
-
-/* The crosshair is independent from explicit cell/range selection. Keeping
- * its state in CSS also updates frozen and cached cells without a repaint. */
+/* The crosshair is independent from explicit cell and range selection. Its
+ * state lives in CSS, so frozen and cached cells update without a repaint. */
 :root {
-  --crosshair-color:#3c7dc3;
-  --selection-color:#109968;--selection-night-fill:rgba(255,255,255,.12);--selection-active-fill:#3c7dc31f;
-  --crosshair-row-fill:color-mix(in srgb,var(--crosshair-color) 8%,transparent);
-  --crosshair-column-fill:color-mix(in srgb,var(--crosshair-color) 11%,transparent);
-  --crosshair-both-fill:color-mix(in srgb,var(--crosshair-color) 17%,transparent);
+  --crosshair-color: #3c7dc3;
+  --selection-color: #109968; --selection-night-fill: rgba(255, 255, 255, .12); --selection-active-fill: #3c7dc31f;
+  --crosshair-row-fill: color-mix(in srgb, var(--crosshair-color) 8%, transparent);
+  --crosshair-column-fill: color-mix(in srgb, var(--crosshair-color) 11%, transparent);
+  --crosshair-both-fill: color-mix(in srgb, var(--crosshair-color) 17%, transparent);
 }
-:root[data-reading-tone="dark"] {
-  --crosshair-row-fill:color-mix(in srgb,var(--crosshair-color) 18%,transparent);
-  --crosshair-column-fill:color-mix(in srgb,var(--crosshair-color) 23%,transparent);
-  --crosshair-both-fill:color-mix(in srgb,var(--crosshair-color) 30%,transparent);
-}
-:root[data-crosshair-enabled="false"] {--crosshair-row-fill:transparent;--crosshair-column-fill:transparent;--crosshair-both-fill:transparent;}
-.crosshair-tails {position:absolute;inset:0;z-index:18;pointer-events:none;overflow:hidden;}
-.crosshair-tails[hidden], :root[data-crosshair-enabled="false"] .crosshair-tails, .has-range .crosshair-tails {display:none;}
-.crosshair-tails i {position:absolute;pointer-events:none;}
-.crosshair-tails .row-tail {background:var(--crosshair-row-fill);}
-.crosshair-tails .column-tail {background:var(--crosshair-column-fill);}
-:root .grid-region :is(.grid-row.active-row .grid-cell,.pinned-cell.crosshair-row):not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-row-fill),var(--crosshair-row-fill));}
-:root .grid-region .grid-cell.active-column:not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-column-fill),var(--crosshair-column-fill));}
-:root .grid-region :is(.grid-row.active-row .grid-cell.active-column,.pinned-cell.crosshair-row.active-column):not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {background-image:linear-gradient(var(--crosshair-both-fill),var(--crosshair-both-fill));}
-:root[data-reading-tone="dark"][data-crosshair-enabled="true"] .grid-region :is(.grid-row.active-row .grid-cell,.pinned-cell.crosshair-row,.grid-cell.active-column):not(:is(.selected,.range-cell,.precedent,.formula-referenced,.column-range-cell,.search-match)) {color:color-mix(in srgb,var(--xl-color,var(--reading-ink)) 8%,var(--reading-ink));}
-.crosshair-controls {display:flex;align-items:center;gap:3px;flex:none;color:var(--reading-muted,#687e92);}
-.crosshair-toggle {display:flex;align-items:center;gap:5px;min-height:20px;white-space:nowrap;cursor:pointer;font-size:10px;}
-.crosshair-toggle input {
-  appearance:none;display:grid;place-items:center;flex:none;width:10px;height:10px;margin:0;
-  border:1px solid var(--reading-muted,#8597a6);border-radius:2px;
-  background:var(--reading-surface,#fff);color:var(--reading-accent,#3c7dc3);cursor:inherit;
-}
-.crosshair-toggle input::before {
-  content:"";width:5px;height:3px;border:solid currentColor;border-width:0 0 1.3px 1.3px;
-  transform:translateY(-.7px) rotate(-45deg);opacity:0;
-}
-.crosshair-toggle input:checked {border-color:var(--reading-accent,#3c7dc3);background:var(--reading-active,#eaf2f9);}
-.crosshair-toggle input:checked::before {opacity:1;}
-.crosshair-toggle:hover input {border-color:var(--reading-accent,#3c7dc3);}
-.crosshair-toggle input:focus-visible {outline:2px solid var(--reading-accent,#3c7dc3);outline-offset:2px;}
-@media(forced-colors:active) {
-  .crosshair-toggle input {appearance:auto;}
-  .crosshair-toggle input::before {display:none;}
-}
-.crosshair-color-button {height:20px;display:flex;align-items:center;gap:3px;border:0;border-radius:3px;background:transparent;color:inherit;padding:0 3px;cursor:pointer;}
-.crosshair-color-button:hover,.crosshair-color-button:focus-visible {background:var(--reading-active,#e8eef3);}
-.crosshair-current-color {width:10px;height:10px;border-radius:2px;background:var(--crosshair-color);border:1px solid #8a9aa155;}
-.crosshair-panel .reading-option:has(input:checked) {border-color:var(--reading-accent,#6f9bb2);background:var(--reading-active,#f3f7fa);}
+:root[data-crosshair-enabled="false"] { --crosshair-row-fill: transparent; --crosshair-column-fill: transparent; --crosshair-both-fill: transparent; }
+.crosshair-tails { position: absolute; inset: 0; z-index: 18; pointer-events: none; overflow: hidden; }
+.crosshair-tails[hidden], :root[data-crosshair-enabled="false"] .crosshair-tails, .has-range .crosshair-tails { display: none; }
+.crosshair-tails i { position: absolute; pointer-events: none; }
+.crosshair-tails .row-tail { background: var(--crosshair-row-fill); }
+.crosshair-tails .column-tail { background: var(--crosshair-column-fill); }
+:root .grid-region :is(.grid-row.active-row .grid-cell, .pinned-cell.crosshair-row):not(:is(.selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-row-fill), var(--crosshair-row-fill)); }
+:root .grid-region .grid-cell.active-column:not(:is(.selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill)); }
+:root .grid-region :is(.grid-row.active-row .grid-cell.active-column, .pinned-cell.crosshair-row.active-column):not(:is(.selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-both-fill), var(--crosshair-both-fill)); }
+:root[data-reading-tone="dark"][data-crosshair-enabled="true"] .grid-region :is(.grid-row.active-row .grid-cell, .pinned-cell.crosshair-row, .grid-cell.active-column):not(:is(.selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink)); }
+
+/* A rectangle shares one perimeter. The active cell keeps its worksheet fill. */
+:root .grid-region .grid-cell.selected { outline-color: var(--selection-color); background-image: linear-gradient(var(--selection-active-fill), var(--selection-active-fill)) !important; }
+:root .grid-region:is(.has-cell-selection, .has-range) .grid-cell.selected { outline: 0; box-shadow: none; background-image: none !important; }
+.grid-region.has-range { --crosshair-row-fill: transparent; --crosshair-column-fill: transparent; --crosshair-both-fill: transparent; }
+:root .grid-region :is(.column-head.active, .pinned-row-head.active, .grid-row.active-row .row-head) { background: color-mix(in srgb, var(--selection-color) 18%, var(--grid-head)); color: var(--ink); }
+:root .grid-region .column-head.column-selected { background: color-mix(in srgb, var(--selection-color) 20%, var(--grid-head)) !important; color: var(--ink); box-shadow: inset 0 -2px 0 var(--selection-color); }
+:root .grid-region .grid-row.whole-row-selected .grid-cell:not(.selected):not(.range-cell),
+:root .grid-region .grid-cell.column-range-cell:not(.selected):not(.range-cell) { background-image: linear-gradient(color-mix(in srgb, var(--selection-color) 16%, transparent), color-mix(in srgb, var(--selection-color) 16%, transparent)) !important; }
+:root .grid-region .grid-row.whole-row-selected .row-head { background: color-mix(in srgb, var(--selection-color) 20%, var(--grid-head)); color: var(--ink); box-shadow: inset -3px 0 0 var(--selection-color); }
 
 /* A viewport-sized, non-interactive decoration outside the indexed extent.
  * Both masks fade in from the data edges; their overlap stays one surface. */
 .grid-backdrop {
-  position:absolute;inset:0 var(--grid-v-scrollbar,0px) var(--grid-h-scrollbar,0px) 0;z-index:19;
-  pointer-events:none;contain:strict;
-  clip-path:inset(var(--backdrop-header,0px) 0 0 var(--backdrop-row-head,0px));
-  background:linear-gradient(135deg,color-mix(in srgb,var(--reading-accent,#50788d) 3%,transparent),color-mix(in srgb,var(--reading-accent,#50788d) 1%,transparent));
-  mask-image:linear-gradient(to right,transparent,#000 96px),linear-gradient(to bottom,transparent,#000 80px);
-  mask-size:calc(100% - var(--backdrop-data-right,100%)) 100%,100% calc(100% - var(--backdrop-data-bottom,100%));
-  mask-position:right top,left bottom;mask-repeat:no-repeat;mask-composite:add;
+  position: absolute; inset: 0 var(--grid-v-scrollbar, 0px) var(--grid-h-scrollbar, 0px) 0; z-index: 19;
+  pointer-events: none; contain: strict;
+  clip-path: inset(var(--backdrop-header, 0px) 0 0 var(--backdrop-row-head, 0px));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 3%, transparent), color-mix(in srgb, var(--accent) 1%, transparent));
+  mask-image: linear-gradient(to right, transparent, #000 96px), linear-gradient(to bottom, transparent, #000 80px);
+  mask-size: calc(100% - var(--backdrop-data-right, 100%)) 100%, 100% calc(100% - var(--backdrop-data-bottom, 100%));
+  mask-position: right top, left bottom; mask-repeat: no-repeat; mask-composite: add;
 }
 .grid-backdrop::before {
-  content:"";position:absolute;inset:0;background:var(--reading-muted,#6e8b9b);opacity:.11;
-  mask-image:url('/assets/home-texture.svg');mask-size:504px 432px;mask-repeat:repeat;mask-position:19px 11px;
+  content: ""; position: absolute; inset: 0; background: var(--muted); opacity: .11;
+  mask-image: url('/assets/home-texture.svg'); mask-size: 504px 432px; mask-repeat: repeat; mask-position: 19px 11px;
 }
-.grid-backdrop[hidden] {display:none;}
-.large-data-status {color:var(--reading-accent,#496f86);white-space:nowrap;}
-.status-strip #gridStatus,.status-strip #selectionStatus {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.status-strip .quick-stats {min-width:0;overflow:hidden;}
-
-/* A rectangle shares one perimeter. The active cell keeps its worksheet fill. */
-:root .grid-region .grid-cell.selected {outline-color:var(--selection-color);background-image:linear-gradient(var(--selection-active-fill),var(--selection-active-fill))!important;}
-:root .grid-region:is(.has-cell-selection,.has-range) .grid-cell.selected {outline:0;box-shadow:none;background-image:none!important;}
-.grid-region.has-range {--crosshair-row-fill:transparent;--crosshair-column-fill:transparent;--crosshair-both-fill:transparent;}
-:root[data-reading-preset] .grid-region {--range-grid-line:color-mix(in srgb,var(--reading-grid-line,#e6e6e6) 90%,#000);}
-:root[data-reading-tone="dark"] .grid-region {--range-grid-line:color-mix(in srgb,var(--reading-grid-line) 84%,#fff);}
-:root .grid-region :is(.column-head.active,.pinned-row-head.active,.grid-row.active-row .row-head) {background:color-mix(in srgb,var(--selection-color) 18%,var(--reading-surface,#f4f6f8));color:var(--reading-ink,#234a6a);}
-:root .grid-region .column-head.column-selected {background:color-mix(in srgb,var(--selection-color) 20%,var(--reading-surface,#f4f6f8))!important;color:var(--reading-ink,#234a6a);box-shadow:inset 0 -2px 0 var(--selection-color);}
-:root .grid-region .grid-row.whole-row-selected .grid-cell:not(.selected):not(.range-cell),
-:root .grid-region .grid-cell.column-range-cell:not(.selected):not(.range-cell) {background-image:linear-gradient(color-mix(in srgb,var(--selection-color) 16%,transparent),color-mix(in srgb,var(--selection-color) 16%,transparent))!important;}
-:root .grid-region .grid-row.whole-row-selected .row-head {background:color-mix(in srgb,var(--selection-color) 20%,var(--reading-surface,#f4f6f8));color:var(--reading-ink,#234a6a);box-shadow:inset -3px 0 0 var(--selection-color);}
-.reading-mode-panel {max-height:min(75vh,460px);overflow-y:auto;}
-.reading-texture-option {
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin-top:12px;padding:12px 2px 2px;border-top:1px solid var(--reading-line,#e1e7eb);cursor:pointer;
-}
-.reading-texture-option > span {display:flex;flex-direction:column;gap:5px;}
-.reading-texture-option strong {font-size:12px;font-weight:500;}
-.reading-texture-option small {font-size:10px;line-height:1.5;color:var(--reading-muted,#748491);}
-.reading-texture-option input {
-  appearance:none;position:relative;flex:none;box-sizing:border-box;width:28px;height:16px;margin:0;
-  border:1px solid var(--reading-muted,#8799a6);border-radius:9px;
-  background:var(--reading-inset,#edf1f3);color:var(--reading-muted,#748491);cursor:inherit;
-}
-.reading-texture-option input::before {
-  content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:currentColor;
-}
-.reading-texture-option input:checked {background:var(--reading-accent,#427d92);border-color:var(--reading-accent,#427d92);color:var(--reading-on-accent,#fff);}
-.reading-texture-option input:checked::before {transform:translateX(12px);}
-.reading-texture-option input:focus-visible {outline:2px solid var(--reading-accent,#427d92);outline-offset:3px;}
-@media(forced-colors:active) {
-  .reading-texture-option input {appearance:auto;}
-  .reading-texture-option input::before {display:none;}
-}
-.recent-item {grid-template-columns:36px minmax(0,1fr) auto;}
-.recent-side {display:grid;grid-template-columns:auto auto;align-items:center;column-gap:12px;}
-.recent-side .recent-date {text-align:right;}
-.recent-size {text-align:right;white-space:nowrap;color:var(--reading-muted,#617d7a);font-size:11px;font-variant-numeric:tabular-nums;}
-.recent-side .recent-controls {grid-column:1/-1;}
-.recent-meta>span:first-child {flex:none;}
-.recent-meta>span:last-child {min-width:0;flex:1;}
-@media(max-width:910px){.recent-item{grid-template-columns:30px minmax(0,1fr) auto;gap:8px}.recent-side{column-gap:9px}.recent-size{font-size:10px}}
+.grid-backdrop[hidden] { display: none; }

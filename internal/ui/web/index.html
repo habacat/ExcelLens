@@ -9,35 +9,103 @@
   <title>ExcelLens</title>
   <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
   <link rel="stylesheet" href="/assets/style.css">
-  <link rel="stylesheet" href="/assets/calculator.css">
-  <link rel="stylesheet" href="/assets/recovery.css">
-  <link rel="stylesheet" href="/assets/analytics.css">
-  <link rel="stylesheet" href="/assets/composition.css">
-  <link rel="stylesheet" href="/assets/field-picker.css">
-  <link rel="stylesheet" href="/assets/relations.css">
-  <link rel="stylesheet" href="/assets/analysis-clusters.css">
-  <link rel="stylesheet" href="/assets/clipboard.css">
-  <link rel="stylesheet" href="/assets/reconcile.css">
-  <link rel="stylesheet" href="/assets/named-views.css">
-	<link rel="stylesheet" href="/assets/catalogue.css">
-	<link rel="stylesheet" href="/assets/data-rules.css">
-	<link rel="stylesheet" href="/assets/printing.css">
-	<link rel="stylesheet" href="/assets/record-card.css">
-	<link rel="stylesheet" href="/assets/selection-quick.css">
-	<link rel="stylesheet" href="/assets/chart-export.css">
-  <link rel="stylesheet" href="/assets/row-views.css">
-  <link rel="stylesheet" href="/assets/recipes.css">
   <link rel="stylesheet" href="/assets/themes.css">
-  <link rel="stylesheet" href="/assets/tracing.css">
-  <link rel="stylesheet" href="/assets/home.css">
-  <link rel="stylesheet" href="/assets/task-recovery.css">
-  <link rel="stylesheet" href="/assets/transpose.css">
-  <link rel="stylesheet" href="/assets/snapshots.css">
-  <link rel="stylesheet" href="/assets/edit-copy.css">
-  <link rel="stylesheet" href="/assets/dialog-controls.css">
   <link rel="stylesheet" href="/assets/motion.css">
+  <link rel="stylesheet" href="/assets/dialogs.css">
+  <link rel="stylesheet" href="/assets/home.css">
+  <link rel="stylesheet" href="/assets/analysis-clusters.css">
+  <link rel="stylesheet" href="/assets/analytics.css">
+  <link rel="stylesheet" href="/assets/calculator.css">
+  <link rel="stylesheet" href="/assets/catalogue.css">
+  <link rel="stylesheet" href="/assets/chart-export.css">
+  <link rel="stylesheet" href="/assets/clipboard.css">
+  <link rel="stylesheet" href="/assets/composition.css">
+  <link rel="stylesheet" href="/assets/data-rules.css">
+  <link rel="stylesheet" href="/assets/edit-copy.css">
+  <link rel="stylesheet" href="/assets/field-picker.css">
+  <link rel="stylesheet" href="/assets/named-views.css">
+  <link rel="stylesheet" href="/assets/printing.css">
+  <link rel="stylesheet" href="/assets/recipes.css">
+  <link rel="stylesheet" href="/assets/reconcile.css">
+  <link rel="stylesheet" href="/assets/record-card.css">
+  <link rel="stylesheet" href="/assets/recovery.css">
+  <link rel="stylesheet" href="/assets/relations.css">
+  <link rel="stylesheet" href="/assets/row-views.css">
+  <link rel="stylesheet" href="/assets/selection-quick.css">
+  <link rel="stylesheet" href="/assets/snapshots.css">
+  <link rel="stylesheet" href="/assets/task-recovery.css">
+  <link rel="stylesheet" href="/assets/tracing.css">
+  <link rel="stylesheet" href="/assets/transpose.css">
 </head>
 <body class="home-view">
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <symbol id="i-open" viewBox="0 1 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 9.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/></symbol>
+    <symbol id="i-edit" viewBox="0.1 -0.15 24 24"><path d="m4.5 19.5.7-3.7L16.2 4.8a2.05 2.05 0 0 1 2.9 2.9L8.1 18.8ZM14.6 6.4l3 3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+    <symbol id="i-search" viewBox="0.5 0.5 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-filter" viewBox="0 0.75 24 24"><path d="M4 5.5h16l-6.2 7.4v5.3l-3.6 1.8v-7.1Z"/></symbol>
+    <symbol id="i-filter-off" viewBox="0 1.25 24 24"><path d="M10.2 12.9 4 5.5h16l-6.2 7.4M10.2 12.9V20l2.4-1.2M15.5 16.5l4.5 4.5m0-4.5-4.5 4.5"/></symbol>
+    <symbol id="i-sort" viewBox="0.4 0 24 24"><path d="M7 5v14m0 0-3.2-3.2M7 19l3.2-3.2M13 7h8M13 12h6M13 17h4"/></symbol>
+    <symbol id="i-freeze" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M9 4.5v15"/></symbol>
+    <symbol id="i-chart" viewBox="0 1 24 24"><path d="M4 20h16M7.5 20v-6M12 20V6M16.5 20v-9.5"/></symbol>
+    <symbol id="i-sigma" viewBox="0.25 0 24 24"><path d="M17 6H7.5l5 6-5 6H17"/></symbol>
+    <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5.5" y="3.5" width="13" height="17" rx="2"/><path d="M8.7 7.5h6.6"/><path stroke-width="2.2" d="M8.8 12h.01M12 12h.01M15.2 12h.01M8.8 16h.01M12 16h.01M15.2 16h.01"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-duplicate" viewBox="0 0 24 24"><circle cx="9.3" cy="12" r="5.6"/><circle cx="14.7" cy="12" r="5.6"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2.8v3.7M12 17.5v3.7M2.8 12h3.7M17.5 12h3.7"/></symbol>
+    <symbol id="i-rules" viewBox="0 0.05 24 24"><path d="M10 7h10M10 12h10M10 17h10M4 7l1.1 1.1L7.2 6M4 12l1.1 1.1L7.2 11M4 17l1.1 1.1L7.2 16"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M7 10h4M7 14h8M15 10h2"/></symbol>
+    <symbol id="i-spark" viewBox="-0.5 0 24 24"><path d="M13 3 5.5 13.5H11l-1 7.5 7.5-10.5H12Z"/></symbol>
+    <symbol id="i-transpose" viewBox="-0.8 -0.4 24 24"><path d="M6 4v6a6 6 0 0 0 6 6h7m0 0-3.2-3.2M19 16l-3.2 3.2M6 4 3.4 6.8M6 4l2.6 2.8"/></symbol>
+    <symbol id="i-header" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M9.5 9.5v10M15 9.5v10"/></symbol>
+    <symbol id="i-fx" viewBox="-0.25 0 24 24"><path d="M3.5 20c1.7 0 2.4-1 2.7-2.8L8 6.8C8.3 5 9 4 10.7 4M4.5 10.5h6M14 12l6 7m0-7-6 7"/></symbol>
+    <symbol id="i-trace-in" viewBox="0.25 0.25 24 24"><rect x="13" y="13" width="7.5" height="7.5" rx="1.2"/><path d="m4 4 7.5 7.5m0 0V6.8m0 4.7H6.8"/></symbol>
+    <symbol id="i-trace-out" viewBox="-0.25 -0.25 24 24"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.2"/><path d="M12.5 12.5 20 20m0 0v-4.7m0 4.7h-4.7"/></symbol>
+    <symbol id="i-tag" viewBox="0.189 0.189 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h6.1a1.5 1.5 0 0 1 1.1.4l7.2 7.2a1.5 1.5 0 0 1 0 2.2l-6.1 6.1a1.5 1.5 0 0 1-2.2 0l-7.2-7.2a1.5 1.5 0 0 1-.4-1.1Z"/><path stroke-width="2.2" d="M8.4 8.4h.01"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M9.2 4.5v15M14.8 4.5v15"/></symbol>
+    <symbol id="i-rows" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M3.5 14.5h17"/></symbol>
+    <symbol id="i-format" viewBox="0 0 24 24"><path d="m7 15.5 5-11.5 5 11.5M8.7 11.5h6.6M4.5 20h15"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-5 4 4 2.5-2.5L20 18"/></symbol>
+    <symbol id="i-views" viewBox="0 0.5 24 24"><path d="M12 4 3.5 8.5 12 13l8.5-4.5ZM3.5 12.5 12 17l8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
+    <symbol id="i-page" viewBox="0 0 24 24"><path d="M7.5 3.5H14l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1.5-1.5ZM14 3.5V8h4M9 13h6M9 16.5h6"/></symbol>
+    <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><path d="M4 7.5h14m0 0-3.2-3.2M18 7.5l-3.2 3.2M20 16.5H6m0 0 3.2-3.2M6 16.5l3.2 3.2"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-flag" viewBox="-0.75 0.75 24 24"><path d="M5.5 21V4.5m0 0h11.5l-2.2 4 2.2 4H5.5"/></symbol>
+    <symbol id="i-snapshot" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2L9 5h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"/><circle cx="12" cy="13" r="3.2"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4.5v4.2h4.2M12 8v4.5l3 1.8"/></symbol>
+    <symbol id="i-archive" viewBox="0 0.25 24 24"><rect x="3.5" y="4.5" width="17" height="4.5" rx="1"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path stroke-width="2.4" d="M6 12h.01M12 12h.01M18 12h.01"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0.25 24 24"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 -0.25 24 24"><path d="m6.5 14.5 5.5-5.5 5.5 5.5"/></symbol>
+    <symbol id="i-chevron-left" viewBox="-0.25 0 24 24"><path d="m14.5 6.5-5.5 5.5 5.5 5.5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0.25 0 24 24"><path d="m9.5 6.5 5.5 5.5-5.5 5.5"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.800.4-1.2 1-1.2 1.9"/><path stroke-width="2.2" d="M12 16.7h.01"/></symbol>
+    <symbol id="i-power" viewBox="0 0.122 24 24"><path d="M12 3.5v8M7 6.5a8 8 0 1 0 10 0"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5m0 0 5.5-5.5M5 12l5.5 5.5"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14m0 0-5.5-5.5M19 12l-5.5 5.5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path stroke-width="2.2" d="M12 7.7h.01"/></symbol>
+    <symbol id="i-undo" viewBox="0 0.75 24 24"><path d="M9 14 4.5 9.5 9 5M4.5 9.5H14a5.5 5.5 0 0 1 0 11h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0.75 24 24"><path d="m15 14 4.5-4.5L15 5M19.5 9.5H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol>
+    <symbol id="i-list" viewBox="0.25 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><path stroke-width="2.2" d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4.5v4.2h-4.2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0.25 24 24"><path d="M9 4.5h6l-1 6 3 3.5H7l3-3.5ZM12 14v6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-range" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="1.5" stroke-dasharray="3 2.6"/></symbol>
+    <symbol id="i-font" viewBox="0 0 24 24"><path d="m5 19 6-14h2l6 14M7.6 14h8.8"/></symbol>
+    <symbol id="i-check" viewBox="0 0.25 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5.5 4h10.2L20 8.3v10.2a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4ZM8 4v5h7V4M8 20v-6h8v6"/></symbol>
+    <symbol id="i-exit" viewBox="0 0 24 24"><path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14M10 16l4-4-4-4M14 12H4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0.25 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l.8 11.6A1.5 1.5 0 0 0 9.3 20h5.4a1.5 1.5 0 0 0 1.5-1.4L17 7"/></symbol>
+    <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/><rect x="8.5" y="8.5" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><path stroke-width="2.2" d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></symbol>
+  </svg>
   <div id="tabActivity" class="tab-activity" popover="manual" hidden>
     <span class="activity-ring" aria-hidden="true"></span>
     <span class="activity-label" role="status" aria-live="polite" aria-atomic="true"></span>
@@ -45,62 +113,133 @@
     <button id="cancelIndexBtn" type="button" class="activity-cancel" hidden>取消</button>
   </div>
   <header class="appbar">
-    <div class="brand-area">
-      <img class="brand-mark" src="/assets/icon.svg" alt="ExcelLens" width="27" height="27">
-      <div class="brand-name">ExcelLens</div>
-      <div id="fileBadge" class="file-badge" title="当前工作簿">未打开工作簿</div>
+    <div class="titlebar">
+      <button id="homeBtn" class="brand-button" type="button" title="返回首页" aria-label="返回首页"><img class="brand-mark" src="/assets/icon.svg" alt="" width="22" height="22"></button>
+      <div class="brand-area">
+        <div id="fileBadge" class="file-badge" title="当前工作簿">未打开工作簿</div>
+        <span id="modeBadge" class="mode-badge" title="原文件保持不变">只读</span>
+      </div>
+      <div id="ribbonTabs" class="ribbon-tabs" role="tablist" aria-label="功能区">
+        <button id="ribbonTabHome" type="button" role="tab" data-ribbon-tab="home" aria-controls="ribbonHome" aria-selected="true">开始</button>
+        <button id="ribbonTabData" type="button" role="tab" data-ribbon-tab="data" aria-controls="ribbonData" aria-selected="false" tabindex="-1">数据</button>
+        <button id="ribbonTabFormula" type="button" role="tab" data-ribbon-tab="formula" aria-controls="ribbonFormula" aria-selected="false" tabindex="-1">公式</button>
+        <button id="ribbonTabView" type="button" role="tab" data-ribbon-tab="view" aria-controls="ribbonView" aria-selected="false" tabindex="-1">视图</button>
+        <button id="ribbonTabReview" type="button" role="tab" data-ribbon-tab="review" aria-controls="ribbonReview" aria-selected="false" tabindex="-1">核对</button>
+      </div>
+      <span class="status-spacer"></span>
+      <span id="globalStatus" class="global-status">等待选择文件</span>
+      <button id="commandOpenBtn" class="command-field" type="button" title="查找功能或工作表（Ctrl+K）" aria-label="命令面板" aria-haspopup="dialog" aria-controls="commandDialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span class="command-field-label">查找功能</span><kbd>Ctrl K</kbd></button>
+      <button id="helpBtn" class="icon-button" type="button" title="快捷键" aria-label="快捷键"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-help"/></svg></button>
+      <button id="exitBtn" class="icon-button" type="button" title="退出程序" aria-label="退出程序"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-power"/></svg></button>
     </div>
-    <div class="app-actions">
-      <span id="globalStatus" data-toolbar-priority="4" class="global-status">等待选择文件</span>
-      <button id="archiveBtn" data-toolbar-priority="2" class="tool-button" type="button" hidden title="浏览当前压缩包">压缩包文件</button>
-      <button id="homeBtn" data-toolbar-priority="2" class="tool-button icon-only" title="返回首页 / 最近文件" aria-label="返回首页">⌂</button>
-      <button id="openBtn" data-toolbar-priority="0" class="tool-button primary" title="打开 XLSX / XLS / CSV / TXT / SQLite 文件"><span class="tool-icon">＋</span>打开</button>
-      <button id="historyBackBtn" data-toolbar-priority="4" data-toolbar-when-enabled class="tool-button icon-only" disabled title="返回上一位置 (Alt+←)" aria-label="返回上一位置">←</button>
-      <button id="historyForwardBtn" data-toolbar-priority="4" data-toolbar-when-enabled class="tool-button icon-only" disabled title="前进到下一位置 (Alt+→)" aria-label="前进到下一位置">→</button>
-      <button id="searchOpenBtn" data-toolbar-priority="0" class="tool-button" disabled title="搜索公式或数值"><span class="tool-icon">⌕</span>搜索</button>
-      <button id="filterOpenBtn" data-toolbar-priority="0" class="tool-button" disabled title="选中表头行后开启筛选（Ctrl+Shift+L）" aria-pressed="false"><span class="tool-icon">▽</span>筛选</button>
-      <button id="textHeaderBtn" data-toolbar-priority="1" class="tool-button" type="button" hidden disabled title="识别或更改 TXT 表头">表头</button>
-      <button id="inspectOpenBtn" data-command-only class="tool-button" disabled title="定位条件：公式、常量、错误、空值与缺少缓存的公式"><span class="tool-icon">◎</span>定位条件</button>
-      <button id="duplicateOpenBtn" data-command-only class="tool-button" disabled title="检查重复值并高亮定位"><span class="tool-icon">≋</span>查重</button>
-      <button id="multiSortBtn" data-toolbar-priority="0" class="tool-button" disabled title="按多列优先级排序"><span class="tool-icon">⇅</span>排序</button>
-      <button id="advancedFilterBtn" data-command-only class="tool-button" disabled title="高级筛选：按列组合多个条件"><span class="tool-icon">≡</span>条件</button>
-      <button id="freezeBtn" data-toolbar-priority="2" class="tool-button" disabled title="冻结工作表行和列"><span class="tool-icon">▣</span><span id="freezeBtnLabel">冻结</span></button>
-      <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button export-primary" disabled title="导出工作表、选区、筛选结果或全部 Sheet（Ctrl+Shift+E）"><span class="tool-icon">⇩</span>导出</button>
-      <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden>编辑副本</button>
-      <button id="bookmarkOpenBtn" data-command-only class="tool-button" disabled title="审计标记：对单元格添加本机备注，不修改源文件"><span class="tool-icon">⚑</span>标记</button>
-      <button id="analysisOpenBtn" data-toolbar-priority="0" class="tool-button analysis-toolbar-button" type="button" title="数据分析：透视汇总、图表、可编辑工作表"><span class="tool-icon">▦</span>分析</button>
-	  <button id="printPreviewOpenBtn" data-command-only class="tool-button" type="button" disabled aria-haspopup="dialog" title="源表分页预览（Ctrl+P）"><span class="tool-icon">▤</span>分页</button>
-      <button id="reconcileOpenBtn" data-command-only class="tool-button" type="button" title="按主键核对两个来源，查看差异、未匹配及重复键">对账</button>
-      <button id="relationsOpenBtn" data-command-only class="tool-button" type="button" title="关联与未匹配提取">关联</button>
-      <button id="namedViewOpenBtn" data-command-only class="tool-button" type="button" title="保存和应用命名视图：筛选、排序、冻结和布局">视图</button>
-      <button id="profileOpenBtn" data-toolbar-priority="3" class="tool-button" disabled title="数据洞察：精确统计选区中的数值、公式和异常"><span class="tool-icon">∑</span>统计</button>
-      <button id="calculatorOpenBtn" data-toolbar-priority="3" class="tool-button" type="button" title="公式计算（Ctrl+Alt+C）"><span class="tool-icon">±</span>计算</button>
-      <button id="commandOpenBtn" data-toolbar-priority="0" class="tool-button" title="命令面板 (Ctrl+K)" aria-label="命令面板" aria-haspopup="dialog" aria-controls="commandDialog"><span class="tool-icon" aria-hidden="true">⌘</span>命令</button>
-      <button id="formulaViewBtn" data-command-only class="tool-button" disabled aria-pressed="false" title="显示全部公式（Ctrl+`）"><span class="tool-icon">ƒx</span>公式视图</button>
-      <button id="columnsBtn" data-command-only class="tool-button" disabled type="button" aria-haspopup="menu" aria-expanded="false" title="显示或隐藏列"><span class="tool-icon">▥</span>列 <span class="disclosure">⌄</span></button>
-      <button id="rowsBtn" data-command-only class="tool-button" disabled type="button" aria-haspopup="dialog" title="行显隐、分组大纲和临时显示">行与大纲</button>
-      <button id="imagesBtn" data-command-only class="tool-button picture-button" type="button" aria-pressed="true" hidden title="显示或隐藏图片"><span class="tool-icon">▧</span>图片</button>
-      <button id="formatBtn" data-command-only class="tool-button format-active" disabled aria-pressed="true" title="切换显示原工作簿中的字体、填充色、边框和对齐格式"><span class="tool-icon">◩</span>原格式</button>
-      <button id="clearFilterBtn" data-toolbar-priority="1" data-toolbar-when-enabled class="tool-button" disabled title="清除当前筛选"><span class="tool-icon">×</span>清除筛选</button>
-      <button id="fullscreenBtn" data-command-only class="tool-button" title="全屏显示"><span class="tool-icon">⛶</span>全屏</button>
-      <button id="helpBtn" data-command-only class="tool-button icon-only" title="快捷键和操作帮助" aria-label="帮助">?</button>
-      <button id="exitBtn" data-command-only class="tool-button icon-only" title="退出程序" aria-label="退出程序"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6.35 6.35a8 8 0 1 0 11.3 0"/></svg></button>
+    <div class="app-actions" role="toolbar" aria-label="功能区命令">
+      <div id="ribbonHome" class="ribbon-panel" role="tabpanel" data-ribbon-panel="home" aria-labelledby="ribbonTabHome">
+        <button id="openBtn" data-toolbar-priority="0" class="tool-button" type="button" title="打开文件（Ctrl+O）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>打开</button>
+        <button id="archiveBtn" data-toolbar-priority="2" class="tool-button" type="button" hidden title="压缩包里的其他文件"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>压缩包</button>
+        <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="导出（Ctrl+Shift+E）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>导出</button>
+        <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden title="在副本里修改，原文件不变"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg><span id="editCopyOpenLabel">编辑副本</span></button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="copyMenuBtn" data-toolbar-priority="2" class="tool-button" type="button" disabled aria-haspopup="menu" aria-expanded="false" aria-controls="copyMenu" data-menu="copyMenu" title="复制"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg>复制<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="searchOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="搜索（Ctrl+F）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>搜索</button>
+        <button id="filterOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="筛选（Ctrl+Shift+L）" aria-pressed="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg>筛选</button>
+        <button id="clearFilterBtn" data-toolbar-priority="1" data-toolbar-when-enabled class="tool-button" type="button" disabled title="清除筛选"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-filter-off"/></svg>清除筛选</button>
+        <button id="multiSortBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="排序"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sort"/></svg>排序</button>
+        <button id="freezeBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="冻结窗格"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-freeze"/></svg><span id="freezeBtnLabel">冻结</span></button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="analysisOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" title="透视、图表和分析表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg>分析</button>
+        <button id="profileOpenBtn" data-toolbar-priority="2" class="tool-button" type="button" disabled title="统计选区（Ctrl+Alt+S）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sigma"/></svg>统计</button>
+        <button id="calculatorOpenBtn" data-toolbar-priority="3" class="tool-button" type="button" title="计算（Ctrl+Alt+C）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-calc"/></svg>计算</button>
+      </div>
+      <div id="ribbonData" class="ribbon-panel" role="tabpanel" data-ribbon-panel="data" aria-labelledby="ribbonTabData" hidden>
+        <button id="advancedFilterBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="按多个条件筛选"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg>高级筛选</button>
+        <button id="textHeaderBtn" data-toolbar-priority="1" class="tool-button" type="button" hidden disabled title="TXT 表头"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-header"/></svg>表头</button>
+        <button id="duplicateOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="查找重复值（Ctrl+Shift+D）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-duplicate"/></svg>查重</button>
+        <button id="inspectOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="定位公式、常量、错误和空白（Ctrl+Alt+G）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target"/></svg>定位条件</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="dataRulesOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="数据验证规则"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rules"/></svg>数据规则</button>
+        <button id="recordCardOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-card"/></svg>记录卡片</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="selectionQuickBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="快速分析选区（Ctrl+Q）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-spark"/></svg>快速分析</button>
+        <button id="transposeOpenBtn" data-toolbar-priority="2" class="tool-button" type="button" disabled aria-haspopup="dialog" title="行列互换查看选区"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-transpose"/></svg>转置</button>
+      </div>
+      <div id="ribbonFormula" class="ribbon-panel" role="tabpanel" data-ribbon-panel="formula" aria-labelledby="ribbonTabFormula" hidden>
+        <button id="formulaViewBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-pressed="false" title="显示公式（Ctrl+`）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-fx"/></svg>显示公式</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="tracePrecedentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="当前公式引用了哪些单元格"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-in"/></svg>追踪引用</button>
+        <button id="traceDependentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="哪些公式引用了当前单元格"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-out"/></svg>追踪从属</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="catalogueOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="名称与表（Ctrl+F3）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tag"/></svg>名称与表</button>
+      </div>
+      <div id="ribbonView" class="ribbon-panel" role="tabpanel" data-ribbon-panel="view" aria-labelledby="ribbonTabView" hidden>
+        <button id="columnsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-haspopup="menu" aria-expanded="false" aria-controls="columnsMenu" data-menu="columnsMenu" title="显示或隐藏列"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-columns"/></svg>列<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
+        <button id="rowsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-haspopup="dialog" title="行显隐和分组"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rows"/></svg>行与大纲</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="formatBtn" data-toolbar-priority="0" class="tool-button format-active" type="button" disabled aria-pressed="true" title="显示原工作簿的字体、颜色和边框"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-format"/></svg>原格式</button>
+        <button id="imagesBtn" data-toolbar-priority="1" class="tool-button picture-button" type="button" aria-pressed="true" hidden title="显示或隐藏图片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg>图片</button>
+        <label class="ribbon-field" data-toolbar-priority="2" title="显示字体"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-font"/></svg>
+          <select id="fontSelect" class="toolbar-field toolbar-select font-picker" aria-label="显示字体">
+            <option value="">原表字体</option>
+            <option value="宋体">宋体</option>
+            <option value="新宋体">新宋体</option>
+            <option value="楷体">楷体</option>
+            <option value="仿宋">仿宋</option>
+            <option value="微软雅黑">微软雅黑</option>
+            <option value="等线">等线</option>
+            <option value="黑体">黑体</option>
+            <option value="华文宋体">华文宋体</option>
+            <option value="华文楷体">华文楷体</option>
+            <option value="华文仿宋">华文仿宋</option>
+            <option value="隶书">隶书</option>
+            <option value="Arial">Arial</option>
+            <option value="Calibri">Calibri</option>
+            <option value="Consolas">Consolas</option>
+          </select>
+        </label>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="namedViewOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" title="保存和应用筛选、排序、冻结与布局"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-views"/></svg>命名视图</button>
+        <button id="printPreviewOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="分页预览（Ctrl+P）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-page"/></svg>分页预览</button>
+        <button id="fullscreenBtn" data-toolbar-priority="2" class="tool-button" type="button" title="全屏（F11）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-fullscreen"/></svg>全屏</button>
+      </div>
+      <div id="ribbonReview" class="ribbon-panel" role="tabpanel" data-ribbon-panel="review" aria-labelledby="ribbonTabReview" hidden>
+        <button id="reconcileOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" title="按主键核对两张表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-compare"/></svg>对账</button>
+        <button id="relationsOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" title="关联两张表并提取未匹配行"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-link"/></svg>关联</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="bookmarkOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="标记和备注（Ctrl+Alt+B）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-flag"/></svg>标记</button>
+        <span class="ribbon-sep" aria-hidden="true"></span>
+        <button id="snapshotsOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" title="比较保存过的分析结果"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-snapshot"/></svg>比较快照</button>
+        <button id="taskRecoveryOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" aria-haspopup="dialog" title="继续中断的搜索、筛选和导出"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-history"/></svg>任务恢复</button>
+      </div>
+      <button id="ribbonMoreBtn" class="tool-button ribbon-more" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-controls="ribbonMoreMenu" title="更多命令"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-more"/></svg>更多</button>
+      <span class="status-spacer"></span>
+      <button id="ribbonCollapseBtn" class="icon-button ribbon-collapse" type="button" aria-pressed="false" title="折叠功能区（Ctrl+F1）" aria-label="折叠功能区"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-up"/></svg></button>
     </div>
     <div id="editGridBar" class="edit-grid-bar" role="toolbar" aria-label="副本编辑" hidden>
-      <div class="edit-grid-state"><span>副本编辑</span><output id="editGridStatus" role="status" aria-live="polite"></output></div>
+      <div class="edit-grid-state"><span>编辑副本</span><output id="editGridStatus" role="status" aria-live="polite"></output></div>
       <div class="edit-grid-actions">
-        <button id="editGridUndo" class="tool-button" type="button" title="撤销（Ctrl+Z）">撤销</button>
-        <button id="editGridRedo" class="tool-button" type="button" title="重做（Ctrl+Y）">重做</button>
-        <button id="editGridRange" class="tool-button" type="button" aria-haspopup="dialog">区域编辑</button>
-        <button id="editGridMore" class="tool-button" type="button" aria-haspopup="dialog">更多编辑</button>
-        <button id="editGridRefresh" class="tool-button" type="button" hidden>刷新修订</button>
-        <button id="editGridRetry" class="tool-button" type="button" hidden>核对提交</button>
-        <button id="editGridSave" class="tool-button primary" type="button" title="生成副本（Ctrl+S）">生成副本</button>
-        <a id="editGridDownload" class="tool-button" hidden>下载副本</a>
-        <button id="editGridExit" class="tool-button" type="button">退出编辑</button>
+        <button id="editGridUndo" class="tool-button" type="button" title="撤销（Ctrl+Z）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg>撤销</button>
+        <button id="editGridRedo" class="tool-button" type="button" title="重做（Ctrl+Y）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-redo"/></svg>重做</button>
+        <button id="editGridRange" class="tool-button group-start" type="button" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-range"/></svg>区域编辑</button>
+        <button id="editGridMore" class="tool-button" type="button" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span id="editGridMoreLabel">更多编辑</span></button>
+        <button id="editGridRefresh" class="tool-button" type="button" hidden><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg>刷新修订</button>
+        <button id="editGridRetry" class="tool-button" type="button" hidden><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg>核对提交</button>
+        <button id="editGridSave" class="tool-button primary group-start" type="button" title="生成副本（Ctrl+S）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-save"/></svg>生成副本</button>
+        <a id="editGridDownload" class="tool-button" hidden><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download"/></svg>下载副本</a>
+        <button id="editGridExit" class="tool-button" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-exit"/></svg>退出编辑</button>
       </div>
     </div>
   </header>
+  <div id="copyMenu" class="menu" role="menu" aria-label="复制" hidden>
+    <button id="copySelectionBtn" type="button" role="menuitem">复制选区<kbd>Ctrl+C</kbd></button>
+    <button id="copyPlainBtn" type="button" role="menuitem">复制为纯文本</button>
+    <button id="copySpecialBtn" type="button" role="menuitem">选择性复制…<kbd>Ctrl+Alt+Shift+C</kbd></button>
+    <div class="menu-divider" role="separator"></div>
+    <button id="copyValueBtn" type="button" role="menuitem" disabled>复制当前值</button>
+    <button id="copyFormulaBtn" type="button" role="menuitem" disabled>复制公式<kbd>Ctrl+Shift+C</kbd></button>
+    <button id="copyAddressBtn" type="button" role="menuitem">复制地址</button>
+    <button id="copyEvidenceBtn" type="button" role="menuitem">复制证据摘要</button>
+  </div>
+  <div id="ribbonMoreMenu" class="menu" role="menu" aria-label="更多命令" hidden></div>
   <div id="sourceIntegrityNotice" class="source-integrity-notice" role="status" hidden></div>
 
   <input id="fileInput" type="file" accept="__FILE_ACCEPT__" hidden>
@@ -109,8 +248,8 @@
   <section id="welcome" class="welcome-screen" aria-label="打开工作簿">
     <div class="landing-shell">
       <div class="landing-topline">
-        <span class="landing-product"><img src="/assets/icon.svg" width="25" height="25" alt="">ExcelLens</span>
-        <div class="landing-topright"><button id="homeExitBtn" class="tool-button icon-only" type="button" title="退出程序" aria-label="退出程序"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6.35 6.35a8 8 0 1 0 11.3 0"/></svg></button></div>
+        <span class="landing-product"><img src="/assets/icon.svg" width="24" height="24" alt="">ExcelLens</span>
+        <div class="landing-topright"><button id="homeExitBtn" class="icon-button" type="button" title="退出程序" aria-label="退出程序"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-power"/></svg></button></div>
       </div>
       <div class="landing-main">
         <div id="dropZone" class="landing-open-zone">
@@ -120,8 +259,8 @@
           </div>
           <div class="landing-content">
             <h1>浏览数据</h1>
-            <p class="landing-subline">浏览Excel、CSV、TXT与SQlite</p>
-            <button id="chooseFileBtn" type="button" class="landing-open-button"><span class="landing-btn-icon">＋</span>选择数据文件 <span class="landing-btn-arrow" aria-hidden="true">↗</span></button>
+            <p class="landing-subline">浏览Excel、CSV、TXT与SQLite</p>
+            <button id="chooseFileBtn" type="button" class="landing-open-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>选择数据文件<kbd>Ctrl+O</kbd></button>
             <div id="homeActivitySlot" class="home-activity-slot"></div>
             <div id="welcomeError" class="inline-error" hidden role="alert"></div>
           </div>
@@ -131,10 +270,10 @@
             <h2>最近打开</h2>
             <div class="recent-heading-actions">
               <button id="taskRecoveryHome" class="mini-button" type="button" aria-haspopup="dialog" aria-controls="taskRecoveryDialog" hidden>任务恢复</button>
-              <button type="button" id="recentRefreshBtn" class="recent-refresh" aria-label="刷新最近文件" title="刷新最近文件"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+              <button type="button" id="recentRefreshBtn" class="icon-button" aria-label="刷新最近文件" title="刷新"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></button>
             </div>
           </div>
-          <div class="recent-search-wrap"><span aria-hidden="true">⌕</span><input id="recentSearch" type="search" placeholder="搜索文件名或路径" autocomplete="off" aria-label="搜索历史文件"></div>
+          <div class="recent-search-wrap"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><input id="recentSearch" type="search" placeholder="搜索文件名或路径" autocomplete="off" aria-label="搜索最近文件"></div>
           <div id="recentList" class="recent-list" aria-live="polite"><div class="recent-empty">读取最近文件…</div></div>
           <div id="recentSummary" class="recent-summary"></div>
         </aside>
@@ -145,46 +284,22 @@
 
   <section id="workspace" class="workspace" hidden>
     <div class="formula-toolbar">
-      <input id="nameBox" class="toolbar-field name-box edit-toolbar-control" value="A1" title="名称框：输入地址或名称；A1、A1:D50、B:B、3:5 或 Sheet!A1:B9 可直接选择" aria-label="名称框：地址或名称">
-	  <button id="catalogueOpenBtn" class="mini-button catalogue-open" type="button" disabled aria-haspopup="dialog" title="名称与表目录（Ctrl+F3）">名称与表</button>
-	  <button id="dataRulesOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="查看当前单元格或本表保存的数据验证条件">数据规则</button>
-	  <button id="recordCardOpenBtn" class="mini-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行，适合宽表和长文本">记录卡片</button>
-      <div class="fx-label edit-toolbar-control">fx</div>
+      <button id="historyBackBtn" class="icon-button" type="button" disabled title="返回上一位置（Alt+←）" aria-label="返回上一位置"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-left"/></svg></button>
+      <button id="historyForwardBtn" class="icon-button" type="button" disabled title="前进到下一位置（Alt+→）" aria-label="前进到下一位置"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-right"/></svg></button>
+      <input id="nameBox" class="toolbar-field name-box edit-toolbar-control" value="A1" title="名称框（Ctrl+G）" aria-label="名称框：地址或名称" spellcheck="false" autocomplete="off">
+      <div class="fx-label edit-toolbar-control" aria-hidden="true">fx</div>
       <textarea id="editGridFormula" aria-autocomplete="list" aria-controls="editFormulaSuggestions" aria-expanded="false" class="toolbar-field formula-input edit-toolbar-control" rows="1" aria-label="编辑栏" spellcheck="false" hidden></textarea>
-      <div id="formulaText" class="toolbar-field formula-input formula-inspector-input" role="textbox" aria-label="公式栏：点击高亮引用单元格，悬停引用显示保存值和公式" aria-readonly="true" tabindex="0" data-placeholder="选择单元格以查看公式或数值"></div>
-      <button id="formulaExpandBtn" class="formula-expand-button edit-toolbar-control" type="button" aria-label="展开公式栏" aria-controls="formulaText editGridFormula" aria-expanded="false" title="展开公式栏（长公式换行显示）"></button>
+      <div id="formulaText" class="toolbar-field formula-input formula-inspector-input" role="textbox" aria-label="公式栏" aria-readonly="true" tabindex="0" data-placeholder="选择单元格查看公式或数值"></div>
+      <button id="formulaExpandBtn" class="formula-expand-button edit-toolbar-control" type="button" aria-label="展开公式栏" aria-controls="formulaText editGridFormula" aria-expanded="false" title="展开公式栏"></button>
       <select id="editGridKind" class="toolbar-field toolbar-select edit-toolbar-control" aria-label="输入类型" hidden><option value="auto">自动类型</option><option value="text">文本</option><option value="number">数值</option><option value="boolean">布尔值</option><option value="formula">公式</option></select>
-      <div id="formulaValue" class="formula-value" title="Excel 文件中保存的计算结果">-</div>
-      <select id="fontSelect" class="toolbar-field toolbar-select font-picker" title="显示字体：原表字体优先；切换不会更改源 Excel 文件" aria-label="工作表显示字体">
-        <option value="">原表字体</option>
-        <option value="宋体">宋体</option>
-        <option value="新宋体">新宋体</option>
-        <option value="楷体">楷体</option>
-        <option value="仿宋">仿宋</option>
-        <option value="微软雅黑">微软雅黑</option>
-        <option value="等线">等线</option>
-        <option value="黑体">黑体</option>
-        <option value="华文宋体">华文宋体</option>
-        <option value="华文楷体">华文楷体</option>
-        <option value="华文仿宋">华文仿宋</option>
-        <option value="隶书">隶书</option>
-        <option value="Arial">Arial</option>
-        <option value="Calibri">Calibri</option>
-        <option value="Consolas">Consolas</option>
-      </select>
-      <div class="formula-actions">
-        <button id="copyFormulaBtn" class="mini-button" disabled title="复制公式">复制公式</button>
-        <button id="copyValueBtn" class="mini-button" disabled title="复制单元格数值">复制值</button>
-        <button id="tracePrecedentsBtn" class="mini-button" disabled title="查看当前公式引用的单元格">追踪引用</button>
-        <button id="traceDependentsBtn" class="mini-button" disabled title="查找引用当前单元格的公式">追踪从属</button>
-        <button id="cellDetailBtn" class="mini-button icon-mini" disabled title="查看单元格详细信息" aria-label="查看单元格详细信息"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg></button>
-      </div>
+      <div id="formulaValue" class="formula-value" title="文件里保存的计算结果">-</div>
+      <button id="cellDetailBtn" class="icon-button" type="button" disabled title="单元格信息（Ctrl+1）" aria-label="单元格信息"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-info"/></svg></button>
     </div>
 
     <main class="grid-region">
       <span id="editGridMeasure" aria-hidden="true"></span>
       <textarea id="editGridInput" aria-autocomplete="list" aria-controls="editFormulaSuggestions" aria-expanded="false" aria-label="单元格内编辑" spellcheck="false" rows="1" autocomplete="off" hidden></textarea>
-      <button id="editGridListButton" class="edit-grid-list-button" type="button" aria-label="选择列表值" title="选择列表值 (Alt+↓)" aria-haspopup="listbox" aria-expanded="false" aria-controls="editGridList" hidden><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button id="editGridListButton" class="edit-grid-list-button" type="button" aria-label="选择列表值" title="选择列表值 (Alt+↓)" aria-haspopup="listbox" aria-expanded="false" aria-controls="editGridList" hidden><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
       <select id="editGridList" class="edit-grid-list" aria-label="单元格允许的值" size="5" hidden></select>
       <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
         <div id="gridCanvas" class="grid-canvas">
@@ -226,28 +341,31 @@
       <div id="formulaEntryFrames" class="range-frames formula-entry-frames" aria-hidden="true"></div>
     </main>
 
-      <div id="cellMenu" class="cell-context-menu" role="menu" hidden>
-        <button id="menuOpenHyperlink" type="button" role="menuitem" hidden>Open hyperlink</button>
-        <button id="menuCopyValue" type="button" role="menuitem">复制选区（含静态格式）</button>
-        <button id="menuCopyPlain" type="button" role="menuitem">复制选区为纯文本</button>
+      <div id="cellMenu" class="cell-context-menu" role="menu" aria-label="单元格" hidden>
+        <button id="menuOpenHyperlink" type="button" role="menuitem" hidden>打开超链接</button>
+        <button id="menuCopyValue" type="button" role="menuitem">复制<kbd>Ctrl+C</kbd></button>
+        <button id="menuCopyPlain" type="button" role="menuitem">复制为纯文本</button>
         <button id="menuCopySpecial" type="button" role="menuitem">选择性复制…</button>
-        <button id="menuFilterValue" type="button" role="menuitem">按所选单元格值筛选</button>
-        <button id="menuCopyFormula" type="button" role="menuitem">复制公式</button>
-        <button id="menuCopyAddress" type="button" role="menuitem">复制跨 Sheet 单元格地址</button>
-        <button id="menuCopyEvidence" type="button" role="menuitem">复制审计证据摘要</button>
+        <button id="menuCopyFormula" type="button" role="menuitem">复制公式<kbd>Ctrl+Shift+C</kbd></button>
+        <button id="menuCopyAddress" type="button" role="menuitem">复制地址</button>
+        <button id="menuCopyEvidence" type="button" role="menuitem">复制证据摘要</button>
+        <div class="menu-divider" role="separator"></div>
+        <button id="menuFilterValue" type="button" role="menuitem">按此值筛选</button>
         <button id="menuSearchValue" type="button" role="menuitem">搜索此值</button>
+        <button id="menuDuplicates" type="button" role="menuitem">查找本列重复值</button>
+        <button id="menuInspect" type="button" role="menuitem">定位条件…</button>
         <button id="menuTrace" type="button" role="menuitem">追踪引用</button>
-        <button id="menuInspect" type="button" role="menuitem">定位条件（公式 / 错误 / 空白）</button>
-        <button id="menuDuplicates" type="button" role="menuitem">检查当前列重复值</button>
-		<button id="menuDataRules" type="button" role="menuitem" disabled>查看数据规则</button>
-		<button id="menuRecordCard" type="button" role="menuitem" disabled>查看记录卡片</button>
-		<button id="menuPrintPreview" type="button" role="menuitem" disabled>分页预览</button>
+        <div class="menu-divider" role="separator"></div>
         <button id="menuFreezeHere" type="button" role="menuitem">冻结到此处</button>
-        <button id="menuExportRange" type="button" role="menuitem">导出当前选区...</button>
-        <button id="menuProfileRange" type="button" role="menuitem">分析当前选区...</button>
-		<button id="menuSelectionQuick" type="button" role="menuitem">选区快速分析（Ctrl+Q）</button>
-		<button id="menuTranspose" type="button" role="menuitem">转置阅读</button>
-        <button id="menuBookmark" type="button" role="menuitem">标记此单元格...</button>
+        <button id="menuBookmark" type="button" role="menuitem">添加标记…</button>
+        <button id="menuRecordCard" type="button" role="menuitem" disabled>记录卡片</button>
+        <button id="menuDataRules" type="button" role="menuitem" disabled>数据规则</button>
+        <div class="menu-divider" role="separator"></div>
+        <button id="menuSelectionQuick" type="button" role="menuitem">快速分析<kbd>Ctrl+Q</kbd></button>
+        <button id="menuProfileRange" type="button" role="menuitem">统计选区…</button>
+        <button id="menuTranspose" type="button" role="menuitem">转置查看</button>
+        <button id="menuExportRange" type="button" role="menuitem">导出选区…</button>
+        <button id="menuPrintPreview" type="button" role="menuitem" disabled>分页预览</button>
       </div>
       <div id="editGridMenu" class="cell-context-menu" role="menu" aria-label="编辑选区" hidden>
         <button type="button" role="menuitem" data-edit-action="cut">剪切<kbd>Ctrl+X</kbd></button>
@@ -285,26 +403,29 @@
     </div>
     <footer class="bottom-bar">
       <div class="sheet-controls">
-        <button id="sheetListBtn" class="sheet-list-button" title="全部工作表">☷</button>
-        <button id="sheetPrevBtn" class="sheet-edge-button" type="button" aria-label="向左切换工作表" title="查看前面的工作表">‹</button>
+        <button id="sheetListBtn" class="sheet-list-button" type="button" title="全部工作表" aria-label="全部工作表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-list"/></svg></button>
+        <button id="sheetPrevBtn" class="sheet-edge-button" type="button" aria-label="向左翻工作表" title="前面的工作表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg></button>
         <div id="sheetTabs" class="sheet-tabs" role="tablist" aria-label="工作表"></div>
-        <button id="editSheetAdd" class="sheet-edge-button" type="button" aria-label="新建工作表" title="新建工作表">＋</button>
-        <button id="sheetNextBtn" class="sheet-edge-button" type="button" aria-label="向右切换工作表" title="查看后面的工作表">›</button>
+        <button id="editSheetAdd" class="sheet-edge-button" type="button" aria-label="新建工作表" title="新建工作表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
+        <button id="sheetNextBtn" class="sheet-edge-button" type="button" aria-label="向右翻工作表" title="后面的工作表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-right"/></svg></button>
       </div>
       <div class="status-strip">
         <span id="gridStatus">未选择工作表</span>
         <span id="largeDataStatus" class="large-data-status" hidden>超大数据模式</span>
         <span id="freezeStatus" class="freeze-status" hidden></span>
-        <button id="selectionStatus" class="selection-status selection-link" type="button" title="打开选区精确统计"></button>
-        <span id="quickStats" class="quick-stats" title="选区即时统计"></span>
         <span id="filterStatus" class="filter-status" hidden>已筛选</span>
+        <button id="selectionStatus" class="selection-status selection-link" type="button" title="统计选区"></button>
+        <span id="quickStats" class="quick-stats"></span>
         <span class="status-spacer"></span>
-        <div id="traceDock" class="trace-dock" hidden><button id="traceRestoreBtn" type="button" title="展开追踪结果">追踪</button><button id="traceOriginBtn" type="button" title="回到追踪起点" aria-label="回到追踪起点">↶</button><button id="traceEndBtn" type="button" title="结束追踪" aria-label="结束追踪">×</button></div>
-        <div class="crosshair-controls"><label class="crosshair-toggle" title="高亮活动单元格所在的行和列"><input id="crosshairToggle" type="checkbox" checked><span>行列高亮</span></label><button id="crosshairColorBtn" class="crosshair-color-button" type="button" title="行列高亮颜色" aria-label="行列高亮颜色" aria-haspopup="dialog" aria-controls="crosshairPanel" aria-expanded="false"><span class="crosshair-current-color" aria-hidden="true"></span><span aria-hidden="true">▾</span></button></div>
-        <button id="readingModeBtn" class="reading-mode-button" type="button" title="护眼模式" aria-label="护眼模式：原色" aria-haspopup="dialog" aria-controls="readingModePanel" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button id="calculatorDock" class="calculator-dock" type="button" hidden>计算</button><button id="zoomOutBtn" class="zoom-button" title="缩小">−</button>
-        <span id="zoomValue" class="zoom-value">100%</span>
-        <button id="zoomInBtn" class="zoom-button" title="放大">＋</button>
+        <div id="traceDock" class="trace-dock" hidden><button id="traceRestoreBtn" type="button" title="展开追踪结果">追踪</button><button id="traceOriginBtn" type="button" title="回到追踪起点" aria-label="回到追踪起点"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg></button><button id="traceEndBtn" type="button" title="结束追踪" aria-label="结束追踪"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
+        <div class="crosshair-controls"><label class="crosshair-toggle" title="高亮当前单元格所在的行和列"><input id="crosshairToggle" type="checkbox" checked><span>行列高亮</span></label><button id="crosshairColorBtn" class="crosshair-color-button" type="button" title="行列高亮颜色" aria-label="行列高亮颜色" aria-haspopup="dialog" aria-controls="crosshairPanel" aria-expanded="false"><span class="crosshair-current-color" aria-hidden="true"></span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button></div>
+        <button id="readingModeBtn" class="reading-mode-button" type="button" title="护眼模式" aria-label="护眼模式：原色" aria-haspopup="dialog" aria-controls="readingModePanel" aria-expanded="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-eye"/></svg></button>
+        <button id="calculatorDock" class="calculator-dock" type="button" hidden>计算</button>
+        <div class="zoom-controls" role="group" aria-label="缩放">
+          <button id="zoomOutBtn" class="zoom-button" type="button" title="缩小" aria-label="缩小"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-minus"/></svg></button>
+          <span id="zoomValue" class="zoom-value">100%</span>
+          <button id="zoomInBtn" class="zoom-button" type="button" title="放大" aria-label="放大"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
+        </div>
       </div>
     </footer>
     <div id="readingModePanel" class="reading-mode-panel" role="dialog" aria-label="护眼模式" hidden>
@@ -364,8 +485,8 @@
       <div class="archive-footer"><span id="archiveSummary" class="dialog-summary" aria-live="polite"></span><button type="button" id="archivePrev" class="mini-button">上一页</button><button type="button" id="archiveNext" class="mini-button">下一页</button></div>
       <div id="archiveProgress" class="archive-progress" hidden><div class="activity-line"><span id="archiveActivity" class="activity-slot"></span><span id="archiveStage" role="status"></span></div><progress id="archiveBar" max="100"></progress><button type="button" id="archiveCancel" class="mini-button">取消读取</button></div>
       <p id="archiveError" class="archive-error" role="alert" hidden></p>
-      <label id="archivePartialChoice" class="archive-partial-choice" hidden><input id="archiveAllowPartial" type="checkbox">我知道数据不完整，仅查看现存 TXT 片段（末条未结束记录不纳入表格）</label>
-      <div class="dialog-actions"><span class="dialog-summary">双击或按 Enter 打开；仅缓存选中的文件。</span><span class="status-spacer"></span><button type="button" id="archiveOpen" class="primary-button compact" disabled>打开文件</button></div>
+      <label id="archivePartialChoice" class="archive-partial-choice" hidden><input id="archiveAllowPartial" type="checkbox"> 数据不完整，只查看现存的 TXT 片段（末条未结束的记录不计入）</label>
+      <div class="dialog-actions"><button type="button" id="archiveOpen" class="primary-button compact" disabled>打开文件</button></div>
     </div>
   </dialog>
 
@@ -392,7 +513,7 @@
         </div>
       </div>
       <div id="searchAdvanced" class="search-advanced" hidden>
-        <div class="search-advanced-head"><span>查询表达式</span><button type="button" id="searchSyntaxHelp" class="search-tool-button" title="查看语法">?</button></div>
+        <div class="search-advanced-head"><span>查询表达式</span><button type="button" id="searchSyntaxHelp" class="search-tool-button" title="语法说明" aria-label="语法说明"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-help"/></svg></button></div>
         <textarea id="searchAdvancedInput" class="field-control" spellcheck="false" rows="3" placeholder='[机构]:"北京" AND [账面价值]>=1000000' aria-label="高级查询表达式"></textarea>
         <div id="searchAdvancedFeedback" class="search-advanced-feedback" role="status">多个条件按同一行判断 · 支持括号、排除、数值与日期</div>
         <div id="searchAdvancedSnippets" class="search-query-snippets" aria-label="查询语法快捷示例"></div>
@@ -405,9 +526,9 @@
       <div class="search-entry">
         <input id="searchInput" class="field-control" placeholder="输入要查找的内容" autocomplete="off" aria-label="查找内容">
         <button id="searchBtn" class="primary-button compact" type="button">查找</button>
-        <button id="searchHistoryBtn" class="search-tool-button" type="button" title="搜索历史" aria-label="搜索历史" aria-expanded="false"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+        <button id="searchHistoryBtn" class="search-tool-button" type="button" title="搜索历史" aria-label="搜索历史" aria-expanded="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg></button>
       </div>
-      <label class="task-progress-choice"><input id="searchRecoverable" type="checkbox">保留进度</label>
+      <label class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="searchRecoverable" type="checkbox">保留进度</label>
       <div id="searchHistoryPanel" class="history-panel" hidden>
         <div class="history-heading">最近搜索 <button id="searchHistoryRefreshBtn" type="button" class="mini-button history-refresh" title="刷新搜索记录">刷新</button></div>
         <div id="searchHistoryList" class="history-list"></div>
@@ -421,14 +542,14 @@
         <div class="search-results-toolbar">
           <span id="searchVisibleCount" class="search-visible-count" hidden></span>
           <div class="search-results-actions">
-            <button id="searchPrevBtn" class="search-tool-button" disabled type="button" title="上一条 (Shift+F3)" aria-label="上一条结果">↑</button>
-            <button id="searchNextBtn" class="search-tool-button" disabled type="button" title="下一条 (F3)" aria-label="下一条结果">↓</button>
-            <button id="copySearchResultsBtn" class="search-tool-button" type="button" title="复制结果" aria-label="复制结果" disabled><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>
-            <button id="saveSearchResultsBtn" class="search-tool-button" type="button" title="导出为 CSV" aria-label="导出结果" disabled><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></button>
+            <button id="searchPrevBtn" class="search-tool-button" disabled type="button" title="上一条（Shift+F3）" aria-label="上一条结果"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-up"/></svg></button>
+            <button id="searchNextBtn" class="search-tool-button" disabled type="button" title="下一条（F3）" aria-label="下一条结果"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
+            <button id="copySearchResultsBtn" class="search-tool-button" type="button" title="复制结果" aria-label="复制结果" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+            <button id="saveSearchResultsBtn" class="search-tool-button" type="button" title="导出为 CSV" aria-label="导出结果" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download"/></svg></button>
           </div>
         </div>
         <div class="search-local-filters">
-          <input id="searchResultFilter" class="field-control" placeholder="筛选结果" aria-label="在当前结果中筛选" title="仅筛选已找到的结果">
+          <input id="searchResultFilter" class="field-control" placeholder="在结果里筛选" aria-label="在当前结果中筛选">
           <select id="searchResultSheet" class="field-control" title="按工作表筛选搜索结果" aria-label="按工作表筛选搜索结果"><option value="">全部工作表</option></select>
         </div>
         <div id="searchResults" class="search-results" role="listbox" aria-label="搜索结果"></div>
@@ -436,62 +557,78 @@
     </div>
   </dialog>
 
-  <dialog id="freezeDialog" class="float-dialog freeze-dialog">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">冻结窗格</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+  <dialog id="freezeDialog" class="float-dialog freeze-dialog" data-light-dismiss aria-labelledby="freezeDialogTitle">
+    <form method="dialog" class="dialog-head"><div id="freezeDialogTitle" class="dialog-title">冻结窗格</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
       <div class="freeze-quick">
         <button id="freezeFirstRowBtn" class="freeze-option" type="button">冻结首行</button>
         <button id="freezeFirstColBtn" class="freeze-option" type="button">冻结首列</button>
-        <button id="freezeAtCellBtn" class="freeze-option" type="button">冻结至选中单元格</button>
+        <button id="freezeAtCellBtn" class="freeze-option" type="button">冻结到当前单元格</button>
         <button id="freezeResetBtn" class="freeze-option" type="button">取消冻结</button>
       </div>
       <div class="freeze-custom">
-        <div class="field-row"><label for="freezeRowsInput">冻结前几行</label><input id="freezeRowsInput" class="field-control" type="number" min="0" max="30" value="0"></div>
-        <div class="field-row"><label for="freezeColsInput">冻结前几列</label><input id="freezeColsInput" class="field-control" type="number" min="0" max="12" value="0"></div>
+        <div class="field-row"><label for="freezeRowsInput">行数（最多 30）</label><input id="freezeRowsInput" class="field-control" type="number" min="0" max="30" value="0"></div>
+        <div class="field-row"><label for="freezeColsInput">列数（最多 12）</label><input id="freezeColsInput" class="field-control" type="number" min="0" max="12" value="0"></div>
         <div class="dialog-actions"><button id="freezeApplyBtn" class="primary-button compact" type="button">应用</button></div>
       </div>
-      <div class="freeze-note">冻结设置按工作簿及工作表保存在本机。最多冻结30行、12列；视口过小时自动缩减显示数量。</div>
     </div>
   </dialog>
 
-  <dialog id="helpDialog" class="float-dialog help-dialog">
+  <dialog id="helpDialog" class="float-dialog help-dialog" data-light-dismiss aria-label="快捷键">
     <form method="dialog" class="dialog-head"><div class="dialog-title">快捷键</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body help-grid">
-      <span>↑ ↓ ← →</span><span>移动当前单元格</span>
-      <span>Shift + 方向键</span><span>扩大或缩小选区</span>
-      <span>Ctrl + 单击 / 拖拽</span><span>追加不连续单元格或矩形选区；底部自动显示精确求和、平均值和计数，点击结果可复制</span>
-      <span>Ctrl + C</span><span>复制值 / 选区，支持表格静态格式；不支持时退回 TSV</span>
-      <span>Ctrl + Shift + C</span><span>复制原始公式</span>
-      <span>Ctrl + G / F5</span><span>聚焦名称框：A1、A1:D50、B:B、3:5</span>
-      <span>Ctrl + O / Ctrl + S</span><span>打开本地文件 / 导出中心（只读）</span>
-      <span>Ctrl + 1 / F2</span><span>查看当前单元格的格式与原始公式（只读）</span>
-      <span>Ctrl + F</span><span>搜索公式或数值</span>
-      <span>Ctrl + `</span><span>公式视图：显示公式 / 保存结果</span>
-      <span>Ctrl + Alt + G</span><span>定位条件：公式、常量、错误、空白</span>
-      <span>Ctrl + Shift + D</span><span>指定列重复值高亮</span>
-      <span>点击公式栏</span><span>彩色高亮公式引用；悬停查看缓存值及原始公式</span>
-      <span>双击公式引用</span><span>定位对应单元格（跨 Sheet 可跳转）</span>
-      <span>F3 / Shift + F3</span><span>下一个 / 上一个搜索结果</span>
-      <span>Alt + ← / Alt + →</span><span>返回 / 前进访问位置</span>
-      <span>Ctrl + Home / Ctrl + End</span><span>工作表起点 / 已用区域终点</span>
-      <span>Shift + Home / Ctrl + Shift + End</span><span>扩选至本行开头 / 有效区域末尾</span>
-      <span>Alt + PageUp / PageDown</span><span>按可视宽度向左 / 向右移动</span>
-      <span>Alt + ↓</span><span>打开选中列的筛选下拉菜单</span>
-      <span>双击行列边界</span><span>按内容自动适应；列宽采用限量抽样</span>
-      <span>Alt → H → O → I / A</span><span>自动调整当前列宽 / 行高；W / H 设置尺寸</span>
-      <span>公式栏右侧箭头</span><span>展开多行查看长公式；默认无可见滚动条</span>
-      <span>Ctrl + Space</span><span>选中当前数据列</span>
-      <span>Shift + Space</span><span>选中当前数据行</span>
-      <span>Ctrl + A</span><span>选中已使用区域</span>
-      <span>Ctrl + PageUp / PageDown</span><span>切换前一个 / 后一个 Sheet</span>
-      <span>Ctrl + Shift + E</span><span>打开多格式导出中心</span>
-      <span>Ctrl + Alt + S</span><span>选区数据洞察</span>
-      <span>Ctrl + Alt + C</span><span>打开公式计算</span>
-      <span>计算</span><span>输入 =，输入数字或点击单元格，Enter 计算</span>
-      <span>Ctrl + Alt + B</span><span>审计标记 / 备注管理</span>
-      <span>Ctrl + K</span><span>快速命令面板</span>
-      <span>Alt + Enter</span><span>查看单元格详细信息</span>
-      <span>Tab / Shift + Tab</span><span>向右 / 向左移动</span>
+      <section class="help-group"><h3>移动</h3><dl>
+        <dt>移动当前单元格</dt><dd>方向键</dd>
+        <dt>向右、向左移动</dt><dd>Tab / Shift+Tab</dd>
+        <dt>跳到数据区域边界</dt><dd>Ctrl+方向键</dd>
+        <dt>工作表起点、已用区域终点</dt><dd>Ctrl+Home / Ctrl+End</dd>
+        <dt>按屏向左、向右</dt><dd>Alt+PageUp / PageDown</dd>
+        <dt>上一张、下一张工作表</dt><dd>Ctrl+PageUp / PageDown</dd>
+        <dt>跳到指定地址</dt><dd>Ctrl+G 或 F5</dd>
+        <dt>返回、前进到访问过的位置</dt><dd>Alt+← / Alt+→</dd>
+      </dl></section>
+      <section class="help-group"><h3>选择</h3><dl>
+        <dt>扩大或缩小选区</dt><dd>Shift+方向键</dd>
+        <dt>追加不连续的选区</dt><dd>Ctrl+单击或拖动</dd>
+        <dt>选中当前列、当前行</dt><dd>Ctrl+Space / Shift+Space</dd>
+        <dt>选中已用区域</dt><dd>Ctrl+A</dd>
+        <dt>扩选到行首、区域末尾</dt><dd>Shift+Home / Ctrl+Shift+End</dd>
+      </dl></section>
+      <section class="help-group"><h3>复制</h3><dl>
+        <dt>复制选区</dt><dd>Ctrl+C</dd>
+        <dt>复制公式</dt><dd>Ctrl+Shift+C</dd>
+        <dt>选择性复制</dt><dd>Ctrl+Alt+Shift+C</dd>
+      </dl></section>
+      <section class="help-group"><h3>查找和数据</h3><dl>
+        <dt>搜索</dt><dd>Ctrl+F</dd>
+        <dt>下一个、上一个结果</dt><dd>F3 / Shift+F3</dd>
+        <dt>筛选</dt><dd>Ctrl+Shift+L</dd>
+        <dt>打开当前列的筛选菜单</dt><dd>Alt+↓</dd>
+        <dt>定位条件</dt><dd>Ctrl+Alt+G</dd>
+        <dt>查找重复值</dt><dd>Ctrl+Shift+D</dd>
+        <dt>快速分析选区</dt><dd>Ctrl+Q</dd>
+        <dt>统计选区</dt><dd>Ctrl+Alt+S</dd>
+      </dl></section>
+      <section class="help-group"><h3>公式和单元格</h3><dl>
+        <dt>显示公式</dt><dd>Ctrl+`</dd>
+        <dt>单元格信息</dt><dd>Ctrl+1 或 F2</dd>
+        <dt>名称与表</dt><dd>Ctrl+F3</dd>
+        <dt>打开单元格里的超链接</dt><dd>Ctrl+Enter</dd>
+        <dt>高亮公式引用的单元格</dt><dd>单击公式栏</dd>
+        <dt>跳到公式引用的单元格</dt><dd>双击引用</dd>
+      </dl></section>
+      <section class="help-group"><h3>窗口和工具</h3><dl>
+        <dt>查找功能</dt><dd>Ctrl+K</dd>
+        <dt>打开文件</dt><dd>Ctrl+O</dd>
+        <dt>导出</dt><dd>Ctrl+Shift+E 或 Ctrl+S</dd>
+        <dt>分页预览</dt><dd>Ctrl+P</dd>
+        <dt>计算</dt><dd>Ctrl+Alt+C</dd>
+        <dt>标记</dt><dd>Ctrl+Alt+B</dd>
+        <dt>折叠或展开功能区</dt><dd>Ctrl+F1</dd>
+        <dt>缩放</dt><dd>Ctrl+滚轮</dd>
+        <dt>自动调整列宽、行高</dt><dd>Alt+H, O, I / A</dd>
+        <dt>设置列宽、行高</dt><dd>Alt+H, O, W / H</dd>
+      </dl></section>
     </div>
   </dialog>
 
@@ -522,30 +659,29 @@
       </div>
       <details class="reconcile-batches"><summary>跨批次异常跟踪</summary><div class="reconcile-fields-actions"><label>基线核查包 <input id="batchBaseline" type="file" accept=".zip"></label><label>当期核查包 <input id="batchCurrent" type="file" accept=".zip"></label><button id="batchCompare" class="mini-button" type="button">比较异常明细</button></div></details>
       <div class="reconcile-fields-actions"><select id="versionScope" class="field-control" aria-label="版本比较范围"><option value="all">整本同名工作表</option><option value="pair">所选两张工作表</option><option value="keyed">所选两表按业务主键对齐</option></select><button id="versionCompare" type="button" class="mini-button">比较工作簿版本</button></div>
-      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><button id="reconcileImport" type="button" class="mini-button" disabled>载入核查记录</button><input id="reconcileRecordFile" type="file" accept=".json" hidden><span class="reconcile-muted">表头填0表示无表头；编辑表读取已保存内容。</span></div>
+      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><button id="reconcileImport" type="button" class="mini-button" disabled>载入核查记录</button><input id="reconcileRecordFile" type="file" accept=".json" hidden><span class="reconcile-muted">表头行填 0 表示没有表头；编辑表按已保存的内容核对。</span></div>
       <datalist id="reconcileLeftOptions"></datalist><datalist id="reconcileRightOptions"></datalist>
-      <div class="reconcile-mapping-title"><strong>主键</strong><span class="reconcile-muted">最多4组；重复键单独列出</span><button id="reconcileAddKey" type="button" class="mini-button">添加主键</button></div><div id="reconcileKeys" class="reconcile-mappings"></div>
-      <div class="reconcile-mapping-title"><strong>比较字段</strong><span class="reconcile-muted">最多8组；数值差额保持精确</span><button id="reconcileAddField" type="button" class="mini-button">添加字段</button></div><div id="reconcileFields" class="reconcile-mappings"></div>
+      <div class="reconcile-mapping-title"><strong>主键</strong><span class="reconcile-muted">最多 4 组</span><button id="reconcileAddKey" type="button" class="mini-button">添加主键</button></div><div id="reconcileKeys" class="reconcile-mappings"></div>
+      <div class="reconcile-mapping-title"><strong>比较字段</strong><span class="reconcile-muted">最多 8 组</span><button id="reconcileAddField" type="button" class="mini-button">添加字段</button></div><div id="reconcileFields" class="reconcile-mappings"></div>
       <div class="reconcile-run-tools"><label><input id="reconcileIncludeEqual" type="checkbox">包含一致记录</label><span class="status-spacer"></span><button id="reconcileCancel" type="button" class="mini-button" hidden>取消核对</button><button id="reconcileRun" type="button" class="primary-button compact" disabled>开始核对</button></div>
       <div id="reconcileProgress" class="reconcile-progress" role="status" hidden></div>
       <section id="reconcileResults" hidden><div class="reconcile-result-heading"><strong>核对结果</strong><button id="reconcileClear" type="button" class="mini-button">清除结果</button><span class="status-spacer"></span><label><input id="reconcileProtectCSV" type="checkbox" checked>CSV文本保护</label><button id="reconcileExport" type="button" class="mini-button">导出完整CSV</button><button id="reconcileBundle" type="button" class="mini-button">导出核查包</button></div><p id="reconcileResultSource" class="reconcile-result-source"></p><div id="reconcileCounts" class="reconcile-counts"></div><div class="reconcile-sample-tools"><select id="reconcileResultFilter" class="field-control" aria-label="筛选样例及核查包明细"><option value="">全部类型</option><option value="different">差异</option><option value="within_tolerance">容差内</option><option value="left_only">仅左侧</option><option value="right_only">仅右侧</option><option value="duplicate">重复主键</option><option value="review">需核对</option><option value="invalid_key">无效主键</option><option value="equal">一致</option></select><span id="reconcileSampleNote" class="reconcile-muted"></span></div><div class="reconcile-result-scroll"><table id="reconcileTable" class="reconcile-table"></table></div></section>
     </div>
   </dialog>
 
-  <dialog id="multiSortDialog" class="float-dialog multi-sort-dialog" aria-label="多级排序">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">多级排序 <span class="dialog-subtle">先按第一条件排序，再比较下一条件</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+  <dialog id="multiSortDialog" class="float-dialog multi-sort-dialog" aria-label="排序">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">排序</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
       <label class="sort-header-row">表头行 <input id="sortHeaderRow" class="field-control" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" title="表头行不参与排序"></label>
       <div id="sortLevels" class="sort-levels"></div>
-      <button id="sortAddLevel" type="button" class="mini-button">＋ 添加排序条件</button>
-      <div class="dialog-actions"><button type="button" id="sortReset" class="mini-button">恢复原始顺序</button><label class="task-progress-choice"><input id="sortRecoverable" type="checkbox">保留进度</label><span class="status-spacer"></span><button type="button" id="sortApply" class="primary-button compact">应用排序</button></div>
+      <button id="sortAddLevel" type="button" class="mini-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>添加条件</button>
+      <div class="dialog-actions"><button type="button" id="sortReset" class="mini-button">恢复原始顺序</button><label class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="sortRecoverable" type="checkbox">保留进度</label><span class="status-spacer"></span><button type="button" id="sortApply" class="primary-button compact">应用排序</button></div>
     </div>
   </dialog>
 
   <dialog id="textHeaderDialog" class="float-dialog text-header-dialog" aria-label="TXT 表头设置">
     <form method="dialog" class="dialog-head"><div class="dialog-title">TXT 表头</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
-      <p class="sort-description">字段名固定显示在顶部，可直接筛选和排序。原始行号和文件内容保持不变。</p>
       <label class="sort-header-row">表头所在行 <input id="textHeaderRow" class="field-control" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1"></label>
       <div class="dialog-actions"><button id="textHeaderAuto" type="button" class="mini-button">重新自动识别</button><button id="textHeaderPlain" type="button" class="mini-button">普通文本视图</button><span class="status-spacer"></span><button id="textHeaderApply" type="button" class="primary-button compact">应用表头</button></div>
     </div>
@@ -558,26 +694,26 @@
 
   <dialog id="filterDialog" class="float-dialog workbook-tool-dialog filter-dialog" aria-labelledby="filterDialogTitle">
     <form method="dialog" class="dialog-head">
-      <div id="filterDialogTitle" class="dialog-title">筛选条件</div>
+      <div id="filterDialogTitle" class="dialog-title">高级筛选</div>
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
     </form>
     <div class="dialog-body">
       <div id="filterHelp" class="filter-help">显示满足全部条件的行</div>
       <div id="filterRules" class="filter-rules"></div>
-      <button id="addFilterRuleBtn" class="add-rule-button">＋ 添加条件</button>
+      <button id="addFilterRuleBtn" class="add-rule-button" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>添加条件</button>
       <div id="filterProgress" class="filter-progress" hidden>
         <div class="progress-track"><div id="filterBar" class="progress-fill"></div></div>
         <div class="activity-line progress-label"><span id="filterActivity" class="activity-slot"></span><span id="filterProgressText">正在筛选…</span></div>
       </div>
     </div>
     <footer class="filter-footer">
-      <label id="filterProgressChoice" class="task-progress-choice"><input id="filterRecoverable" type="checkbox">保留进度</label>
+      <label id="filterProgressChoice" class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="filterRecoverable" type="checkbox">保留进度</label>
       <button id="cancelFilterJobBtn" class="mini-button" hidden>取消任务</button>
       <button id="applyFilterBtn" class="primary-button compact">应用筛选</button>
     </footer>
   </dialog>
 
-  <dialog id="sheetDialog" class="float-dialog sheet-dialog">
+  <dialog id="sheetDialog" class="float-dialog sheet-dialog" data-light-dismiss aria-label="工作表">
     <form method="dialog" class="dialog-head">
       <div class="dialog-title">工作表</div>
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
@@ -601,7 +737,7 @@
     </div>
   </dialog>
 
-  <dialog id="detailDialog" class="float-dialog detail-dialog" aria-labelledby="detailTitle">
+  <dialog id="detailDialog" class="float-dialog detail-dialog" data-light-dismiss aria-labelledby="detailTitle">
     <form method="dialog" class="dialog-head">
       <div id="detailTitle" class="dialog-title">单元格信息</div>
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
@@ -611,10 +747,9 @@
   </dialog>
 
 
-  <dialog id="exportDialog" class="float-dialog export-dialog">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">导出中心 <span class="dialog-subtle">ExcelLens 只读快照</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+  <dialog id="exportDialog" class="float-dialog export-dialog" aria-label="导出">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">导出</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body export-body">
-        <div class="export-intro">关闭此窗口后，导出任务继续运行。</div>
       <div class="export-field-grid">
         <label class="export-field"><span>导出范围</span><select id="exportScope" class="field-control"><option value="sheet">当前工作表</option><option value="selection">当前选区</option><option value="visible">当前可见行</option><option value="filtered">完整筛选结果</option><option value="all">整个工作簿</option></select></label>
         <label class="export-field"><span>文件格式</span><select id="exportFormat" class="field-control"><option value="xlsx">Excel 工作簿（.xlsx）</option><option value="csv">CSV（Excel 兼容）</option><option value="tsv">制表符分隔（.tsv）</option><option value="jsonl">结构化数据（.jsonl）</option><option value="html">带格式 HTML（.html）</option><option value="zipcsv">CSV 打包文件（.zip）</option></select></label>
@@ -622,11 +757,11 @@
         <div class="export-field"><span>当前选区</span><div id="exportRangeLabel" class="export-range-value">尚未选择</div></div>
       </div>
       <div class="export-options">
-        <label><input id="exportStyles" type="checkbox" checked> 保留原始单元格格式（XLSX/HTML）</label>
+        <label><input id="exportStyles" type="checkbox" checked> 保留单元格格式</label>
         <label><input id="exportBOM" type="checkbox" checked> CSV 使用 UTF-8 BOM</label>
-        <label><input id="exportCSVGuard" type="checkbox" checked> 防止文本值被当作公式执行</label>
-        <label><input id="exportHidden" type="checkbox" checked> 导出隐藏的 Sheet</label>
-        <label><input id="exportRecoverable" type="checkbox"> 保留进度</label>
+        <label><input id="exportCSVGuard" type="checkbox" checked> 防止文本被当作公式执行</label>
+        <label><input id="exportHidden" type="checkbox" checked> 包含隐藏的工作表</label>
+        <label title="中断后可从“任务恢复”继续"><input id="exportRecoverable" type="checkbox"> 保留进度</label>
       </div>
       <div id="exportAdvisory" class="export-advisory" aria-live="polite"></div>
       <div id="exportProgress" class="export-progress" hidden>
@@ -634,15 +769,15 @@
         <div class="progress-track"><div id="exportBar" class="progress-fill"></div></div>
         <div id="exportDetails" class="dialog-summary">正在准备数据...</div>
       </div>
-      <div id="exportResult" class="export-result" hidden><span class="export-success">✓ 文件已生成</span><a id="exportDownload" class="export-download" href="#">下载导出文件</a><button id="exportViewReport" class="mini-button" type="button" hidden>查看差异明细</button><span id="exportFileDetails"></span><span id="exportSnapshot" class="export-source"></span></div>
-        <div class="export-actions"><button id="exportFolderBtn" class="mini-button" type="button" title="打开本机导出文件夹">打开导出目录</button><span class="status-spacer"></span><button id="exportRetryBtn" class="mini-button" type="button" hidden>恢复查询</button><button id="exportCancelBtn" class="mini-button" type="button" hidden>取消任务</button><button id="exportStartBtn" class="primary-button compact" type="button">开始导出</button></div>
+      <div id="exportResult" class="export-result" hidden><span class="export-success">文件已生成</span><a id="exportDownload" class="export-download" href="#">下载导出文件</a><button id="exportViewReport" class="mini-button" type="button" hidden>查看差异明细</button><span id="exportFileDetails"></span><span id="exportSnapshot" class="export-source"></span></div>
+        <div class="export-actions"><button id="exportFolderBtn" class="mini-button" type="button">打开导出目录</button><span class="status-spacer"></span><button id="exportRetryBtn" class="mini-button" type="button" hidden>恢复查询</button><button id="exportCancelBtn" class="mini-button" type="button" hidden>取消任务</button><button id="exportStartBtn" class="primary-button compact" type="button">开始导出</button></div>
     </div>
   </dialog>
 
-  <dialog id="profileDialog" class="float-dialog profile-dialog">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">数据洞察</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+  <dialog id="profileDialog" class="float-dialog profile-dialog" aria-label="统计选区">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">统计选区</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
-      <div class="profile-controls"><label>分析范围 <input id="profileStart" class="field-control" placeholder="A1"></label><span class="profile-divider">—</span><input id="profileEnd" class="field-control" aria-label="结束单元格" placeholder="D500"><label class="profile-filter-label"><input id="profileFiltered" type="checkbox">仅筛选行</label><label class="profile-filter-label"><input id="profileDistribution" type="checkbox">分位数与分布</label><button id="profileAnalyzeBtn" class="primary-button compact" type="button">分析</button><button id="profileCancelBtn" class="mini-button" type="button" hidden>取消</button></div>
+      <div class="profile-controls"><label>范围 <input id="profileStart" class="field-control" placeholder="A1"></label><span class="profile-divider">—</span><input id="profileEnd" class="field-control" aria-label="结束单元格" placeholder="D500"><label class="profile-filter-label"><input id="profileFiltered" type="checkbox">仅筛选行</label><label class="profile-filter-label"><input id="profileDistribution" type="checkbox">分位数与分布</label><button id="profileAnalyzeBtn" class="primary-button compact" type="button">统计</button><button id="profileCancelBtn" class="mini-button" type="button" hidden>取消</button></div>
       <div id="profilePending" class="dialog-summary" role="status" aria-live="polite" hidden></div>
 	  <button id="profileQuickBtn" class="mini-button" type="button">快速分析</button>
       <div id="profileSummary" class="profile-summary" hidden></div>
@@ -650,22 +785,22 @@
     </div>
   </dialog>
 
-  <dialog id="bookmarkDialog" class="float-dialog bookmark-dialog">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">审计标记 <span class="dialog-subtle">随工作簿内容识别 · 不写入 Excel</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+  <dialog id="bookmarkDialog" class="float-dialog bookmark-dialog" aria-label="标记">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">标记</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
       <div id="bookmarkTarget" class="bookmark-target">请选择单元格</div>
-      <div class="bookmark-entry"><select id="bookmarkTag" class="field-control"><option value="待复核">待复核</option><option value="异常">异常</option><option value="重要">重要</option><option value="已核实">已核实</option><option value="普通">普通</option></select><textarea id="bookmarkNote" rows="2" maxlength="800" placeholder="记录待核事项、证据线索或复核结论（仅保存在本机）"></textarea><button id="bookmarkSaveBtn" class="primary-button compact" type="button">添加标记</button></div>
-      <div class="bookmark-tools"><input id="bookmarkSearch" class="field-control" placeholder="搜索工作表、地址、标记或备注"><button id="bookmarkExportBtn" type="button" class="mini-button">导出标记 CSV</button><button id="bookmarkRefreshBtn" type="button" class="mini-button">刷新</button></div>
-      <div id="bookmarkNoteActions" class="bookmark-tools" hidden><button id="bookmarkSourceNotes" type="button" class="mini-button">查看本表原批注</button><button id="bookmarkWriteNotes" class="mini-button" type="button">将所选标记写入编辑副本</button></div>
+      <div class="bookmark-entry"><select id="bookmarkTag" class="field-control"><option value="待复核">待复核</option><option value="异常">异常</option><option value="重要">重要</option><option value="已核实">已核实</option><option value="普通">普通</option></select><textarea id="bookmarkNote" rows="2" maxlength="800" placeholder="写下待核事项或结论"></textarea><button id="bookmarkSaveBtn" class="primary-button compact" type="button">添加标记</button></div>
+      <div class="bookmark-tools"><input id="bookmarkSearch" class="field-control" placeholder="搜索工作表、地址、标记或备注"><button id="bookmarkExportBtn" type="button" class="mini-button">导出 CSV</button><button id="bookmarkRefreshBtn" type="button" class="mini-button">刷新</button></div>
+      <div id="bookmarkNoteActions" class="bookmark-tools" hidden><button id="bookmarkSourceNotes" type="button" class="mini-button">本表原批注</button><button id="bookmarkWriteNotes" class="mini-button" type="button">把所选标记写入编辑副本</button></div>
       <section id="sourceNotesPanel" hidden><p id="sourceNotesStatus" role="status"></p><div id="sourceNotesList" class="bookmark-list"></div><button id="sourceNotesPrev" class="mini-button" type="button">上一页</button> <button id="sourceNotesNext" class="mini-button" type="button">下一页</button></section>
       <div id="bookmarkList" class="bookmark-list"></div>
       <div id="bookmarkCount" class="dialog-summary"></div>
     </div>
   </dialog>
 
-  <dialog id="commandDialog" class="float-dialog command-dialog">
-    <form method="dialog" class="dialog-head"><div class="dialog-title">快速命令 <span class="dialog-subtle">Ctrl+K</span></div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
-    <div class="dialog-body"><input id="commandSearch" class="field-control command-input" placeholder="查找功能、快捷键、工作表..." autocomplete="off"/><div id="commandList" class="command-list" role="listbox"></div></div>
+  <dialog id="commandDialog" class="float-dialog command-dialog" data-light-dismiss aria-label="查找功能">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">查找功能</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body"><input id="commandSearch" class="field-control command-input" placeholder="输入功能或工作表的名称" autocomplete="off" aria-label="查找功能或工作表"><div id="commandList" class="command-list" role="listbox"></div></div>
   </dialog>
 
   <div id="autoFilterPopover" class="auto-filter-popover" hidden role="dialog" aria-label="列筛选菜单">
@@ -674,19 +809,19 @@
       <button type="button" id="autoFilterClose" aria-label="关闭">×</button>
     </div>
     <div class="auto-filter-sort">
-      <button type="button" id="autoFilterSortAsc">↑ 升序</button>
-      <button type="button" id="autoFilterSortDesc">↓ 降序</button>
+      <button type="button" id="autoFilterSortAsc">升序</button>
+      <button type="button" id="autoFilterSortDesc">降序</button>
     </div>
     <input type="search" id="autoFilterFind" class="field-control" placeholder="搜索列中的值" autocomplete="off" aria-label="搜索筛选值">
     <div class="auto-filter-selectbar">
-      <label><input type="checkbox" id="autoFilterAll"> 全选当前列表</label>
-      <button type="button" id="autoFilterClear">清除此列</button>
+      <label><input type="checkbox" id="autoFilterAll"> 全选</label>
+      <button type="button" id="autoFilterClear">清除本列筛选</button>
     </div>
     <div id="autoFilterOptions" class="auto-filter-options" role="group" aria-label="筛选值选项"></div>
     <button type="button" id="autoFilterMore" class="auto-filter-more" hidden>显示更多</button>
     <div id="autoFilterSummary" class="auto-filter-summary" aria-live="polite"></div>
     <div class="auto-filter-footer">
-      <label class="task-progress-choice"><input id="autoFilterRecoverable" type="checkbox">保留进度</label>
+      <label class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="autoFilterRecoverable" type="checkbox">保留进度</label>
       <button type="button" id="autoFilterCancel" class="mini-button">取消</button>
       <button type="button" id="autoFilterApply" class="primary-button compact">确定</button>
     </div>
@@ -695,22 +830,22 @@
   <div id="toast" class="toast" role="status" hidden></div>
 
   <aside id="inspectPanel" class="inspect-panel" aria-label="定位条件和重复值检查" hidden>
-    <div class="inspect-titlebar"><div><span class="inspect-overline">DATA INSPECTOR</span><h2>定位与数据检查</h2></div>
+    <div class="inspect-titlebar"><h2>定位条件</h2>
       <button id="inspectClose" class="inspect-close" type="button" aria-label="关闭检查窗口">×</button></div>
     <div class="inspect-fields">
-      <label>检查类型<select id="inspectMode">
+      <label>查找<select id="inspectMode">
         <option value="formulas">公式单元格</option><option value="constants">常量单元格</option>
         <option value="errors">Excel 错误值</option><option value="blanks">空白单元格</option>
         <option value="missing_cache">公式缺少缓存结果</option><option value="duplicates">重复值高亮</option>
       </select></label>
-      <label id="inspectScopeWrap">检查范围<select id="inspectScope"><option value="selection">当前选区</option><option value="used">工作表已用区域</option></select></label>
-      <label id="inspectColumnWrap" hidden>检查列<input id="inspectColumn" type="text" maxlength="3" placeholder="例如 D"></label>
+      <label id="inspectScopeWrap">范围<select id="inspectScope"><option value="selection">当前选区</option><option value="used">工作表已用区域</option></select></label>
+      <label id="inspectColumnWrap" hidden>列<input id="inspectColumn" type="text" maxlength="3" placeholder="例如 D"></label>
       <label id="inspectSkipHeaderWrap" class="inspect-checkbox" hidden><input id="inspectSkipHeader" type="checkbox" checked> 跳过表头</label>
-      <p id="inspectHint" class="inspect-hint">只读检查，不修改原文件。</p>
-      <div class="inspect-actions"><button id="inspectRun" class="inspect-run" type="button">开始检查</button><button id="inspectCancel" type="button" hidden>取消</button><button id="inspectClear" type="button">清除高亮</button><button id="inspectCopy" type="button" title="复制当前结果地址为文本">复制结果</button></div>
-      <div id="inspectProgress" class="inspect-progress" role="status" aria-live="polite">选择条件后开始检查</div>
+      <p id="inspectHint" class="inspect-hint"></p>
+      <div class="inspect-actions"><button id="inspectRun" class="inspect-run" type="button">查找</button><button id="inspectCancel" type="button" hidden>取消</button><button id="inspectClear" type="button">清除高亮</button><button id="inspectCopy" type="button">复制结果</button></div>
+      <div id="inspectProgress" class="inspect-progress" role="status" aria-live="polite"></div>
     </div>
-    <div class="inspect-list-header"><span>匹配的单元格</span><div><button id="inspectPrev" type="button" disabled title="上一条">↑</button><button id="inspectNext" type="button" disabled title="下一条">↓</button></div></div>
+    <div class="inspect-list-header"><span>匹配的单元格</span><div><button id="inspectPrev" type="button" disabled title="上一条" aria-label="上一条"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-up"/></svg></button><button id="inspectNext" type="button" disabled title="下一条" aria-label="下一条"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button></div></div>
     <div id="inspectResultList" class="inspect-results"></div>
     <button id="inspectMore" class="inspect-more" type="button" hidden>继续显示结果</button>
   </aside>
@@ -983,17 +1118,17 @@
         <button id="pictureZoomIn" type="button" title="放大（+）" aria-label="放大">＋</button>
         <button id="pictureFit" type="button" title="适合窗口（0）">适应</button>
         <button id="pictureActual" type="button" title="实际像素（1）">1:1</button>
-        <button id="pictureRotate" type="button" title="顺时针旋转（R）" aria-label="旋转"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button>
+        <button id="pictureRotate" type="button" title="顺时针旋转（R）" aria-label="旋转"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></button>
         <span class="picture-separator" aria-hidden="true"></span>
-        <button id="pictureCopy" type="button" title="复制图片" aria-label="复制图片"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button>
-        <a id="pictureDownload" href="#" download="ExcelLens-image" title="保存原图" aria-label="保存原图"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg></a>
+        <button id="pictureCopy" type="button" title="复制图片" aria-label="复制图片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+        <a id="pictureDownload" href="#" download="ExcelLens-image" title="保存原图" aria-label="保存原图"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download"/></svg></a>
         <button id="pictureClose" class="picture-close" type="button" title="关闭（Esc）" aria-label="关闭图片">×</button>
       </div>
     </div>
     <div id="pictureStage" class="picture-stage" aria-label="拖动平移图片、滚动鼠标滚轮缩放">
       <img id="picturePreview" alt="工作表图片预览" draggable="false">
     </div>
-    <div class="picture-viewer-hint">滚轮缩放 · 拖动平移 · 双击切换原始大小</div>
+    <div class="picture-viewer-hint">滚轮缩放，拖动平移，双击切换原始大小</div>
   </div>
   <dialog id="analysisPlanDialog" class="float-dialog analysis-plan-dialog" aria-labelledby="analysisPlanTitle">
     <form method="dialog" class="dialog-head"><div id="analysisPlanTitle" class="dialog-title">分析方案</div><button class="dialog-close" value="cancel" aria-label="关闭分析方案">×</button></form>
@@ -1014,7 +1149,7 @@
   </dialog>
   <section id="analysisRoot" class="analysis-root" hidden aria-label="数据分析工作区">
     <div class="analysis-topbar">
-      <div class="analysis-brand"><span class="analysis-brand-icon">▦</span><strong>分析工作区</strong><span class="analysis-source-label" id="analysisSourceCaption"></span></div>
+      <div class="analysis-brand"><span class="analysis-brand-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg></span><strong>分析</strong><span class="analysis-source-label" id="analysisSourceCaption"></span></div>
       <nav class="analysis-nav" aria-label="分析视图">
         <button data-analysis-tab="pivot" class="is-active">透视分析</button>
         <button data-analysis-tab="dashboard">仪表盘</button>
@@ -1022,7 +1157,7 @@
         <button data-analysis-tab="templates">模板库</button>
         <button id="analysisSnapshotsOpen" type="button">比较快照</button>
       </nav>
-      <div class="analysis-top-actions"><button id="analysisSettingsOpen" class="analysis-quiet-button" type="button" aria-haspopup="dialog">设置</button><span id="analysisAutoSave" class="analysis-autosave" role="status" aria-live="polite"></span><button id="analysisRetrySave" class="analysis-quiet-button" type="button" hidden>重试保存</button><button id="analysisBackupExport" class="analysis-quiet-button" type="button" title="导出所有编辑表及报表配置">备份</button><button id="analysisDraftRecovery" class="analysis-quiet-button" type="button">恢复草稿</button><button id="analysisBackupImport" class="analysis-quiet-button" type="button" title="从此前的分析工作区备份恢复">导入备份</button><input id="analysisBackupFile" type="file" accept=".json,application/json" hidden><button id="analysisClose" class="analysis-back" type="button">返回工作簿 <span aria-hidden="true">×</span></button></div>
+      <div class="analysis-top-actions"><button id="analysisSettingsOpen" class="analysis-quiet-button" type="button" aria-haspopup="dialog">设置</button><span id="analysisAutoSave" class="analysis-autosave" role="status" aria-live="polite"></span><button id="analysisRetrySave" class="analysis-quiet-button" type="button" hidden>重试保存</button><button id="analysisBackupExport" class="analysis-quiet-button" type="button" title="导出全部编辑表和报表配置">备份</button><button id="analysisDraftRecovery" class="analysis-quiet-button" type="button">恢复草稿</button><button id="analysisBackupImport" class="analysis-quiet-button" type="button">导入备份</button><input id="analysisBackupFile" type="file" accept=".json,application/json" hidden><button id="analysisClose" class="analysis-back" type="button" title="返回工作簿"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-left"/></svg><span>返回工作簿</span></button></div>
     </div>
     <div class="analysis-layout">
       <aside id="analysisBuilder" class="analysis-builder">
@@ -1031,9 +1166,9 @@
           <label class="analysis-label" for="analysisSourceSelect">数据来源</label>
           <select id="analysisSourceSelect" class="analysis-control"></select>
           <label id="analysisScopeLabel" class="analysis-label" for="analysisSourceScope">分析范围</label>
-          <div id="analysisScopeControls" class="analysis-source-range"><select id="analysisSourceScope" class="analysis-control"><option value="full">完整源表</option><option value="filtered">完整筛选结果</option><option value="visible">当前可见行</option><option value="selection">画面选区</option></select><button id="analysisSourceRefresh" class="analysis-quiet-button" type="button" title="按工作簿当前画面重新捕获范围">重新捕获</button></div>
+          <div id="analysisScopeControls" class="analysis-source-range"><select id="analysisSourceScope" class="analysis-control"><option value="full">完整源表</option><option value="filtered">完整筛选结果</option><option value="visible">当前可见行</option><option value="selection">画面选区</option></select><button id="analysisSourceRefresh" class="analysis-quiet-button" type="button" title="按工作簿当前的筛选和选区重新取范围">重新捕获</button></div>
           <div class="analysis-source-state"><div id="analysisScopeInfo" class="analysis-caption" role="status" aria-live="polite"></div><button id="analysisSourceCancel" class="analysis-quiet-button" type="button" hidden>取消</button></div>
-          <div class="analysis-row-inline"><label id="analysisHeaderLabel" class="analysis-short-label" for="analysisHeaderRow">表头行 <input id="analysisHeaderRow" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1" class="analysis-control"></label><button id="analysisLoadFields" type="button" class="analysis-quiet-button button-with-icon">更新字段 <svg class="button-icon button-icon-small" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.8L21 8M21 3v5h-5"/></svg></button></div>
+          <div class="analysis-row-inline"><label id="analysisHeaderLabel" class="analysis-short-label" for="analysisHeaderRow">表头行 <input id="analysisHeaderRow" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1" class="analysis-control"></label><button id="analysisLoadFields" type="button" class="analysis-quiet-button button-with-icon">更新字段 <svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></button></div>
           <div id="analysisSourceInfo" class="analysis-caption"></div>
         </div>
         <div class="analysis-side-section analysis-fields-section">
@@ -1047,31 +1182,31 @@
           <label class="analysis-short-label analysis-layout-choice" for="analysisLayout">布局<select id="analysisLayout" class="analysis-control"><option value="">平铺</option><option value="tree">层级展开</option></select></label>
           <div class="analysis-dropzone" data-analysis-zone="rows"><div class="analysis-zone-label"><span>行维度</span><span>最多3个</span></div><div id="analysisRowsZone" class="analysis-zone-chips"></div></div>
           <div class="analysis-dropzone" data-analysis-zone="columns"><div class="analysis-zone-label"><span>列维度</span><span>最多1个</span></div><div id="analysisColumnsZone" class="analysis-zone-chips"></div></div>
-          <div class="analysis-dropzone" data-analysis-zone="values"><div class="analysis-zone-label"><span>汇总指标</span><button id="analysisAddMetric" type="button" class="analysis-quiet-button" title="一次扫描支持最多6个独立指标">＋ 指标</button></div><div id="analysisValuesZone" class="analysis-zone-chips"></div><div id="analysisMetricEditor" class="analysis-metric-editor"></div></div>
+          <div class="analysis-dropzone" data-analysis-zone="values"><div class="analysis-zone-label"><span>汇总指标</span><button id="analysisAddMetric" type="button" class="analysis-quiet-button" title="最多 6 个指标">添加指标</button></div><div id="analysisValuesZone" class="analysis-zone-chips"></div><div id="analysisMetricEditor" class="analysis-metric-editor"></div></div>
           <div class="analysis-row-inline"><label class="analysis-short-label">汇总方式<select id="analysisAggregate" class="analysis-control"><option value="sum">求和</option><option value="count">计数</option><option value="average">平均值</option><option value="min">最小值</option><option value="max">最大值</option><option value="distinct">去重计数</option></select></label>
             <label class="analysis-short-label">排序<select id="analysisSort" class="analysis-control"><option value="value_desc">按值降序</option><option value="value_asc">按值升序</option><option value="label_asc">按分类升序</option><option value="label_desc">按分类降序</option></select></label></div>
           <div class="analysis-row-inline"><label class="analysis-short-label">前 N 项<input id="analysisTop" class="analysis-control" type="number" min="0" max="1000" value="30" title="0表示全部；层级模式对每个父级分别取前N项"></label><label class="analysis-short-label">小数位<input id="analysisPrecision" class="analysis-control" type="number" min="0" max="10" value="2"></label></div>
         </div>
-        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">筛选条件</span><button id="analysisAddFilter" type="button" class="analysis-symbol-button" title="增加筛选条件">＋</button></div><div id="analysisFilterList" class="analysis-mini-list"></div></div>
-        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">数据加工</span><button id="analysisAddConversion" type="button" class="analysis-quiet-button" title="新增转换列；点击运行分析后才转换，原列保持不变">格式转换</button><button id="analysisAddTransform" type="button" class="analysis-symbol-button" title="添加计算列">＋</button></div><div id="analysisTransformList" class="analysis-mini-list"></div></div>
-        <div class="analysis-builder-footer"><button id="analysisRun" type="button" class="analysis-primary-button">运行分析 <span>↗</span></button><button id="analysisCancel" type="button" class="analysis-quiet-button" hidden>取消任务</button></div>
+        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">筛选条件</span><button id="analysisAddFilter" type="button" class="analysis-symbol-button" title="添加筛选条件" aria-label="添加筛选条件"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div><div id="analysisFilterList" class="analysis-mini-list"></div></div>
+        <div class="analysis-side-section"><div class="analysis-section-head"><span class="analysis-overline">数据加工</span><button id="analysisAddConversion" type="button" class="analysis-quiet-button" title="新增转换列，运行分析时才转换">格式转换</button><button id="analysisAddTransform" type="button" class="analysis-symbol-button" title="添加计算列" aria-label="添加计算列"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button></div><div id="analysisTransformList" class="analysis-mini-list"></div></div>
+        <div class="analysis-builder-footer"><button id="analysisRun" type="button" class="analysis-primary-button">运行分析</button><button id="analysisCancel" type="button" class="analysis-quiet-button" hidden>取消任务</button></div>
       </aside>
       <main class="analysis-main">
         <section class="analysis-panel" data-analysis-panel="pivot">
-          <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" disabled title="将筛选及计算列加工后的原始明细提取到独立编辑表（最多1万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" disabled>导出结果</button></div></div></div>
+          <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" disabled title="把加工后的明细提取到编辑表（最多 1 万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" disabled>导出结果</button></div></div></div>
           <div id="analysisProgress" class="analysis-progress" hidden><div class="analysis-progress-top"><span class="activity-line"><span id="analysisActivity" class="activity-slot" data-native-percent></span><span id="analysisProgressText">正在分析…</span></span><strong id="analysisProgressPercent"></strong></div><div class="analysis-progress-track"><span id="analysisProgressBar"></span></div></div>
           <div id="analysisMetrics" class="analysis-metrics" hidden></div>
-          <div class="analysis-chart-card"><div class="analysis-card-header"><div><h3>数据可视化</h3><span id="analysisChartSummary">选择分类和指标后生成图表</span></div><div class="analysis-chart-tools"><button id="analysisSnapshotSave" type="button" class="analysis-outline-button" disabled>保存快照</button><button id="analysisChartImage" type="button" class="analysis-outline-button" disabled>导出图片</button><label for="analysisChartMetric" id="analysisChartMetricLabel" hidden>指标</label><select id="analysisChartMetric" class="analysis-chart-select" hidden aria-label="选择图表指标"></select><label for="analysisChartSelect">类型</label><select id="analysisChartSelect" class="analysis-chart-select"><option value="bar">纵向柱状</option><option value="horizontal">横向条形</option><option value="line">折线</option><option value="area">面积</option><option value="donut">环形</option><option value="pie">饼图</option><option value="scatter">散点</option><option value="stacked">堆叠柱状</option><option value="heatmap">热力矩阵</option></select></div></div>
+          <div class="analysis-chart-card"><div class="analysis-card-header"><div><h3>图表</h3><span id="analysisChartSummary">选择分类和指标后生成图表</span></div><div class="analysis-chart-tools"><button id="analysisSnapshotSave" type="button" class="analysis-outline-button" disabled>保存快照</button><button id="analysisChartImage" type="button" class="analysis-outline-button" disabled>导出图片</button><label for="analysisChartMetric" id="analysisChartMetricLabel" hidden>指标</label><select id="analysisChartMetric" class="analysis-chart-select" hidden aria-label="选择图表指标"></select><label for="analysisChartSelect">类型</label><select id="analysisChartSelect" class="analysis-chart-select"><option value="bar">纵向柱状</option><option value="horizontal">横向条形</option><option value="line">折线</option><option value="area">面积</option><option value="donut">环形</option><option value="pie">饼图</option><option value="scatter">散点</option><option value="stacked">堆叠柱状</option><option value="heatmap">热力矩阵</option></select></div></div>
           <div class="analysis-plot-wrap"><canvas id="analysisChart" aria-label="交互式汇总图表" role="img"></canvas><div id="analysisChartHint" class="analysis-chart-hint">选择左侧字段，或从模板库选择分析方案。</div><div id="analysisChartTooltip" class="analysis-chart-tooltip" hidden></div></div></div>
-          <div class="analysis-table-card"><div class="analysis-card-header"><div><h3>透视结果</h3><span id="analysisTableSummary">等待生成结果</span></div><span id="analysisTableHint" class="analysis-table-hint">点击数值查看对应明细 ↗</span></div><div id="analysisTreeTools" class="analysis-tree-tools" hidden><button id="analysisTreeCollapse" class="analysis-quiet-button" type="button">收起全部</button><span class="status-spacer"></span><button id="analysisTreePrevious" class="analysis-quiet-button" type="button">上一页</button><span id="analysisTreePage" role="status"></span><button id="analysisTreeNext" class="analysis-quiet-button" type="button">下一页</button></div><div class="analysis-table-scroll"><table id="analysisPivotTable" class="analysis-data-table"></table></div></div>
+          <div class="analysis-table-card"><div class="analysis-card-header"><div><h3>透视结果</h3><span id="analysisTableSummary">等待生成结果</span></div><span id="analysisTableHint" class="analysis-table-hint">点数值查看明细</span></div><div id="analysisTreeTools" class="analysis-tree-tools" hidden><button id="analysisTreeCollapse" class="analysis-quiet-button" type="button">收起全部</button><span class="status-spacer"></span><button id="analysisTreePrevious" class="analysis-quiet-button" type="button">上一页</button><span id="analysisTreePage" role="status"></span><button id="analysisTreeNext" class="analysis-quiet-button" type="button">下一页</button></div><div class="analysis-table-scroll"><table id="analysisPivotTable" class="analysis-data-table"></table></div></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="dashboard" hidden>
           <div class="analysis-content-head"><h2>仪表盘</h2><button id="analysisDashboardRefresh" class="analysis-outline-button">刷新数据</button></div>
           <div id="analysisDashboardCards" class="analysis-dashboard-grid"></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="sheets" hidden>
-          <div class="analysis-content-head"><h2>编辑工作表</h2><button id="analysisCreateSheet" class="analysis-primary-button">＋ 新建工作表</button></div>
-          <div class="analysis-sheet-layout"><nav id="analysisSheetList" class="analysis-sheet-list" aria-label="已创建编辑表"></nav><div class="analysis-sheet-editor"><div class="analysis-sheet-tools"><strong id="analysisSheetTitle">选择编辑表</strong><div><button id="analysisPasteSpecial" class="analysis-quiet-button" disabled title="选择性粘贴 Ctrl+Shift+V">选择性粘贴</button><button id="analysisUndo" class="analysis-quiet-button" disabled title="撤销最近一次已保存的编辑 Ctrl+Z">↶ 撤销</button><button id="analysisRedo" class="analysis-quiet-button" disabled title="重做 Ctrl+Y">↷ 重做</button><button id="analysisAddColumn" class="analysis-quiet-button" disabled>＋列</button><button id="analysisAddRows" class="analysis-quiet-button" disabled>＋10行</button><button id="analysisDeleteSheet" class="analysis-quiet-button danger" disabled>删除</button></div></div><div id="analysisEditableGrid" class="analysis-edit-grid"></div><div id="analysisSheetPagination" class="analysis-pagination"></div></div></div>
+          <div class="analysis-content-head"><h2>编辑工作表</h2><button id="analysisCreateSheet" class="analysis-primary-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>新建工作表</button></div>
+          <div class="analysis-sheet-layout"><nav id="analysisSheetList" class="analysis-sheet-list" aria-label="已创建编辑表"></nav><div class="analysis-sheet-editor"><div class="analysis-sheet-tools"><strong id="analysisSheetTitle">选择编辑表</strong><div><button id="analysisPasteSpecial" class="analysis-quiet-button" disabled title="选择性粘贴（Ctrl+Shift+V）">选择性粘贴</button><button id="analysisUndo" class="analysis-quiet-button" disabled title="撤销（Ctrl+Z）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg>撤销</button><button id="analysisRedo" class="analysis-quiet-button" disabled title="重做（Ctrl+Y）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-redo"/></svg>重做</button><button id="analysisAddColumn" class="analysis-quiet-button" disabled>添加列</button><button id="analysisAddRows" class="analysis-quiet-button" disabled>添加 10 行</button><button id="analysisDeleteSheet" class="analysis-quiet-button danger" disabled>删除</button></div></div><div id="analysisEditableGrid" class="analysis-edit-grid"></div><div id="analysisSheetPagination" class="analysis-pagination"></div></div></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="templates" hidden>
           <div class="analysis-content-head"><h2>模板库</h2><input id="analysisTemplateSearch" type="search" class="analysis-control analysis-template-search" placeholder="搜索模板…"></div>
@@ -1080,7 +1215,7 @@
       </main>
     </div>
     <aside id="analysisDrill" class="analysis-drill" role="dialog" aria-label="源数据下钻" hidden>
-      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="保留当前分组原始行号，另存到可编辑工作表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭">×</button></div></div>
+      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="连同原始行号存到编辑表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭">×</button></div></div>
       <div id="analysisDrillTable" class="analysis-drill-table"></div><div id="analysisDrillPaging" class="analysis-pagination"></div>
     </aside>
     <div id="analysisToast" class="analysis-toast" role="status" hidden></div>
@@ -1139,6 +1274,7 @@
   <script src="/assets/field-picker.js"></script>
   <script src="/assets/relations-model.js"></script>
   <script src="/assets/relations.js"></script>
+  <script src="/assets/overlays.js"></script>
   <script src="/assets/toolbar.js"></script>
   <script src="/assets/command-palette.js"></script>
   <script src="/assets/viewport-cache.js"></script>
@@ -1157,7 +1293,7 @@
   <script src="/assets/composition.js"></script>
   <dialog id="analysisIssuesDialog" class="analysis-issues-dialog" aria-labelledby="analysisIssuesTitle">
     <div class="analysis-issues-head"><div><h3 id="analysisIssuesTitle">异常与排除项目</h3><p id="analysisIssuesSummary"></p></div><button id="analysisIssuesClose" type="button" class="analysis-outline-button">关闭</button></div>
-    <div class="analysis-issues-tools"><button id="analysisIssuesExtract" class="analysis-outline-button" type="button">提取编辑表</button><button id="analysisIssuesExport" class="analysis-primary-button" type="button">导出完整CSV</button><label><input id="analysisIssuesCSVGuard" type="checkbox" checked title="为公式形式的文本加单引号；需要逐字保留原文时取消勾选">CSV文本保护</label></div>
+    <div class="analysis-issues-tools"><button id="analysisIssuesExtract" class="analysis-outline-button" type="button">提取编辑表</button><button id="analysisIssuesExport" class="analysis-primary-button" type="button">导出完整CSV</button><label title="给公式形式的文本加单引号；要逐字保留原文时取消"><input id="analysisIssuesCSVGuard" type="checkbox" checked>CSV 文本保护</label></div>
     <p id="analysisIssuesTextNote" class="analysis-issues-note"></p>
     <div class="analysis-issues-scroll"><table id="analysisIssuesTable" class="analysis-data-table"></table></div>
   </dialog>

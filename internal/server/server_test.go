@@ -38,7 +38,7 @@ func TestInitialPageClearlyExplainsHowToStart(t *testing.T) {
 	}
 	body := res.Body.String()
 	for _, required := range []string{
-		"浏览数据", "浏览Excel、CSV、TXT与SQlite", "选择文件",
+		"浏览数据", "浏览Excel、CSV、TXT与SQLite", "选择文件",
 		"全屏", "追踪引用", "追踪从属", "筛选条件", "冻结窗格",
 		"gridCanvas", "columnHeaders", "rowsLayer", "cellTooltip", "freezeTop", "freezeLeft",
 	} {
@@ -65,9 +65,11 @@ func TestGridAssetsExposeNativeSpreadsheetInteractions(t *testing.T) {
 			"tracePrecedents", "applyFilter", "showTooltip", "selectInitialCell",
 		},
 		"/assets/style.css": {
-			".active-row", ".active-column", ".grid-cell.selected",
+			".active-row", ".grid-cell.selected",
 			"scrollbar-width: thin", ".column-filter", ".grid-scroll",
 		},
+		// The row and column highlight is drawn by the crosshair rules.
+		"/assets/themes.css": {".active-row", ".active-column"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req = localTestConnection(req)

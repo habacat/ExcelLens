@@ -51,11 +51,13 @@ test('fifty million source rows require one size run and sparse user overrides',
 
 test('shared resize resets source sizes and preserves source widths when removing an override',async()=>{
   const geometry=create();geometry.rows.load({2:55},[{min:2,max:2,size:40}]);geometry.cols.load({1:220});
-  const S={indexReady:true,filtered:false,sheet:'data',sheetEpoch:1,hiddenColumns:new Set(),sourceColumnWidths:{1:145},columnWidths:{1:220},rowSizes:{2:55}},requests=[],no=()=>{};
-  const context={S,geometry,api:async(url,options)=>requests.push(JSON.parse(options.body)),toast:no,invalidateViewport:no,updateCanvasSize:no,frozenPanes:{reset:no},scheduleViewport:no};
-  const app=fs.readFileSync(__dirname+'/app.js','utf8'),a=app.indexOf('  async function commitResize('),b=app.indexOf('  function promptResize(',a);vm.runInNewContext(app.slice(a,b)+';this.resize=commitResize;',context);
+  const S={indexReady:true,filtered:false,sheet:'data',sheetEpoch:1,hiddenColumns:new Set(),sourceColumnWidths:{1:145},columnWidths:{1:220},rowSizes:{2:55}},requests=[],no=()=>{};let relayouts=0;
+  const context={S,geometry,api:async(url,options)=>requests.push(JSON.parse(options.body)),toast:no,relayoutGrid:()=>relayouts++};
+  const app=fs.readFileSync(__dirname+'/app.js','utf8'),a=app.indexOf('  async function commitResize('),b=app.indexOf('  async function promptResize(',a);assert(a>0&&b>a);vm.runInNewContext(app.slice(a,b)+';this.resize=commitResize;',context);
   await context.resize('col',1,0);assert.equal(geometry.cols.measure(1),145);assert.equal(S.columnWidths[1],undefined);assert.equal(requests[0].size,0);
   await context.resize('row',2,0);assert.equal(geometry.rows.measure(2),40);assert.equal(S.rowSizes[2],undefined);
+  // Each resize lays the grid out again, which also puts the selection frame back.
+  assert.equal(relayouts,2);
 });
 
 test('recycled preview cells adopt source column positions without collapsing merged widths',()=>{

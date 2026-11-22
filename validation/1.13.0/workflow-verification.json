@@ -1,0 +1,123 @@
+{
+  "version": "1.13.0",
+  "result": "PASS",
+  "method": "Local Go service with isolated headless Chromium and generated workbooks; bookmark confirmation also tested with two workbook identities.",
+  "ribbon": {
+    "widthsCSSPixels": [
+      1600,
+      1366,
+      1024,
+      900,
+      760,
+      640,
+      420,
+      320
+    ],
+    "checks": [
+      "Eight widths and four pixel ratios: core commands, tabs, command search, workbook name and formula controls fit and receive pointer input without new source tasks",
+      "At 760 px 3 commands fold into the overflow menu and still run",
+      "The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon queues no more layouts over 12 frames",
+      "Resizing the bar itself, independent of the window, recomputes overflow",
+      "Each of the five tabs shows exactly its own panel",
+      "Every tab command is registered in command search; eight open their dialogs; a command on another tab brings its tab forward and anchors its menu to the button",
+      "A column menu opened from command search while folded is anchored to its visible button; Escape closes it and restores focus",
+      "Ctrl+F1 folds the bar, a tab opens it over the sheet for one command, and the choice is remembered",
+      "Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet"
+    ],
+    "sourceUnchanged": true,
+    "embeddedUIAssetSHA256": {
+      "toolbar.js": "d9951efa87e64f2faf2f3a8ad87b7e4b0b7cb965314283aa80ad1b27bde9387d",
+      "overlays.js": "6210fb08a60a04090ce483aa662f6c48e42671ce93855b10c9cc6f41cf72149b",
+      "style.css": "afa5eeb67a135adb98c1a6d3862c6b7ed7caecd32354ad16ecff5e8845ff80f1",
+      "app.js": "83199cabe5125a2366937a9462696e6825469861915a968be2b595e3ef8910cc",
+      "index.html": "4776eaae0ec7cc52b57fdbd3939dba2764a06d485768a57f9d8f580c0ade39b6"
+    }
+  },
+  "presentation": {
+    "workbooks": [
+      "XLSX",
+      "BIFF8"
+    ],
+    "cases": 60,
+    "checks": [
+      "48 independent OOXML DPI/zoom/font combinations preserve exact source models, inherited row style, conditional display, Unicode rich runs, hidden rows, merged geometry and main/frozen numeric width decisions measured independently from computed fonts",
+      "DPR2 preview retains original source fonts and physical paper despite Consolas screen override and 125 percent grid zoom; 50/150/fit screen zoom changes no paper dimensions or print reads",
+      "12 native BIFF8 default-font boundary combinations use the shared main/frozen presenter without changing number/text types, source coordinates, formula caches or leading-zero identifiers"
+    ],
+    "sourceUnchanged": true
+  },
+  "namedViews": {
+    "checks": [
+      "the actual UI saves committed predicates and natural sorting together with row heights, column widths, hidden columns, font, zoom, formula view and frozen panes",
+      "applying an unfiltered view restores all data and display controls; reapplying the saved view runs a fresh query whose complete natural row order and source coordinates match the saved rules",
+      "cancelling a late start reclaims its completed server result without replacing the active view; source validation failure also keeps the active filter and layout",
+      "updating keeps the applied query and complete layout; source-like view names render as text; reload retains the catalog without automatically running a saved query; deletion removes only its selected configuration",
+      "TXT sticky field headers are reconstructed from the actual saved source row; a view applied from another XLSX sheet returns to its bound sheet and preserves exact native numeric comparisons"
+    ],
+    "sourceUnchanged": true
+  },
+  "bookmarks": {
+    "confirmationFromPreviousWorkbook": "no delete request",
+    "cancel": "no delete request",
+    "currentConfirmation": "one delete request"
+  },
+  "desktopManualAcceptance": false,
+  "nativeExcelWpsRetest": false,
+  "performanceBenchmark": false,
+  "editor": {
+    "layouts": 65,
+    "presets": [
+      "off",
+      "warm",
+      "green",
+      "mist",
+      "blush",
+      "ice",
+      "lavender",
+      "graphite",
+      "navy",
+      "forest",
+      "warmdark",
+      "plum",
+      "brown"
+    ],
+    "sizeAndPixelRatio": [
+      [
+        1600,
+        1
+      ],
+      [
+        960,
+        1.25
+      ],
+      [
+        800,
+        1
+      ],
+      [
+        420,
+        1.5
+      ],
+      [
+        320,
+        1
+      ]
+    ],
+    "keyboardFocus": "keyboard",
+    "returnToReader": true
+  },
+  "browserScriptsPassed": [
+    "analysis_comparisons_ui_qa",
+    "analysis_numbers_ui_qa",
+    "biff_formula_ui_qa",
+    "data_rules_ui_qa",
+    "edit_grid_ui_qa",
+    "icon_alignment_qa",
+    "named_views_qa",
+    "notifications_qa",
+    "presentation_matrix_qa",
+    "reading_theme_qa",
+    "selection_quick_ui_qa",
+    "toolbar_ui_qa"
+  ]
+}

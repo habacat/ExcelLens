@@ -112,8 +112,9 @@ async function loadRecovery(button){
     assert.equal(await evaluate('document.querySelector("#analysisIssuesTable tbody tr td").textContent'),'A1');await shot('issues-light');
     await run(()=>{document.querySelector('input[name="readingPreset"][value="graphite"]').click();});await cdp('Emulation.setDeviceMetricsOverride',{width:1000,height:900,deviceScaleFactor:1,mobile:false});await shot('issues-dark-narrow');
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesDialog")).backgroundColor'),'rgb(46, 51, 58)');
-    assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesClose")).backgroundColor'),'rgb(35, 39, 44)');
-    assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesTable td")).borderBottomColor'),'rgb(70, 80, 91)');
+    // Bordered buttons sit on the dialog surface; rows use the soft rule.
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesClose")).backgroundColor'),'rgb(46, 51, 58)');
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesTable td")).borderBottomColor'),'rgb(57, 66, 76)');
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesTable button")).color'),'rgb(161, 201, 234)');
     await click('#analysisIssuesExtract');await waitFor('!!document.querySelector(".analysis-modal-shade input")');await run(()=>{document.querySelector('.analysis-modal-shade input').value='完整核对编辑表';});await click('.analysis-modal-shade [data-yes]');
     await waitFor('window.ExcelLensAnalytics.diagnostics().tab==="sheets"');const materialized=(await api('/api/analysis/workspace')).sheets.find(item=>item.name==='完整核对编辑表');assert(materialized);

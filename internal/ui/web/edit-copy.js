@@ -139,7 +139,9 @@
       const {book, sheet, ref} = this.context();
       if (!book || this.abort || this.grid.active || el('Dialog').open) return;
       this.starting = true;
-      el('Open').disabled = true; el('Open').textContent = '正在检查…';
+      // The entry keeps its icon; only the label changes while checking.
+      const label = el('OpenLabel') || el('Open');
+      el('Open').disabled = true; label.textContent = '正在检查…';
       const ok = await this.run('正在检查编辑源…', async signal => {
         const data = await this.post('start', {book}, signal);
         if (this.context().book !== book || document.body.classList.contains('home-view')) throw Error('当前文件已切换');
@@ -147,7 +149,7 @@
         await this.grid.enter(data, signal);
       });
       this.starting = false;
-      el('Open').disabled = false; el('Open').textContent = '编辑副本';
+      el('Open').disabled = false; label.textContent = '编辑副本';
       if (!ok && this.context().book === book && !document.body.classList.contains('home-view')) {
         el('Title').textContent = '编辑副本';
         el('Work').hidden = true; el('ListView').hidden = false;

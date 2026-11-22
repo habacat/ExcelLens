@@ -22,6 +22,16 @@ test('command browsing always renders the selected result beyond the first thirt
     const start=h.windowStart(total,index,60);assert(start>=0);assert(start<=index&&index<start+60);assert(start<=Math.max(0,total-60));
   }
 });
+test('command search ranks name matches first, needs every word and still finds earlier names',()=>{
+  const h=fixture(),names=query=>Array.from(h.palette.matches(query),action=>action.name);
+  h.palette.actions=[h.buttonCommand('高级筛选','a','高级条件筛选 条件'),h.buttonCommand('清除筛选','b','恢复'),h.buttonCommand('筛选','c','自动筛选 表头','Ctrl+Shift+L'),h.buttonCommand('转置查看选区','d','转置阅读当前选区 行列')];
+  assert.deepEqual(names(''),['高级筛选','清除筛选','筛选','转置查看选区']);
+  assert.deepEqual(names('筛选'),['筛选','高级筛选','清除筛选']);
+  assert.deepEqual(names('筛选 条件'),['高级筛选']);
+  assert.deepEqual(names('转置阅读'),['转置查看选区']);
+  assert.deepEqual(names('ctrl+shift+l'),['筛选']);
+  assert.deepEqual(names('不存在'),[]);
+});
 test('synchronous command failures are reported without an uncaught UI exception',async()=>{
   const h=fixture();h.palette.run({run(){throw Error('read failed');}});await tick();assert.deepEqual(h.closed,['commandDialog']);assert.deepEqual(h.errors,[['read failed','error']]);
 });

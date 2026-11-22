@@ -1,9 +1,17 @@
-.recovery-dialog{width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:18px;border:1px solid var(--reading-line,#becbc5);border-radius:6px;background:var(--reading-surface,#fff);color:var(--reading-ink,#263c32);font:12px "Segoe UI","Microsoft YaHei UI",sans-serif;box-shadow:0 12px 40px #19362d30}
-.recovery-dialog::backdrop{background:#102d2340}
-.recovery-head,.recovery-tools{display:flex;align-items:center;gap:8px}.recovery-head{justify-content:space-between}.recovery-head strong{font-size:15px}
-.recovery-dialog p{line-height:1.6;margin:10px 0}.recovery-status{color:var(--reading-muted,#617366);overflow-wrap:anywhere}
-.recovery-dialog button{padding:5px 10px;border:1px solid var(--reading-line,#c8d7ce);border-radius:3px;background:var(--reading-surface,#fff);color:inherit;font:inherit;cursor:pointer}.recovery-dialog button:hover{background:var(--reading-active,#edf5f0)}.recovery-dialog button:focus-visible{outline:2px solid var(--reading-accent,#29805a);outline-offset:2px}.recovery-dialog button:disabled{opacity:.5;cursor:default}
-.recovery-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;margin:14px 0;padding:2px}.recovery-entry{text-align:left;font-variant-numeric:tabular-nums}
-.recovery-preview{max-height:160px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-left:3px solid var(--reading-accent,#29805a);background:var(--reading-active,#f5f9f6);font:12px "Segoe UI","Microsoft YaHei UI",sans-serif;line-height:1.6}.recovery-dialog .recovery-load{background:var(--reading-accent,#29805a);color:white;border-color:transparent}
-.calculator-save-status{max-width:160px;margin-left:auto;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#617366;font-size:10px}.calculator-save-status.has-error{color:#a34532}.calculator-value.is-pending{color:#748478;justify-content:flex-start;font-family:"Microsoft YaHei UI",sans-serif;font-size:11px}
-.recovery-dialog .recovery-load{color:var(--reading-on-accent,#fff)}
+/* Draft recovery for the calculation sheet. */
+.recovery-dialog { width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: var(--dialog-pad); }
+.recovery-head, .recovery-tools { display: flex; align-items: center; gap: 8px; }
+.recovery-head { justify-content: space-between; }
+.recovery-head strong { font-size: var(--fs-4); font-weight: 600; }
+.recovery-dialog p { margin: 10px 0; line-height: 1.6; }
+.recovery-status { color: var(--muted); overflow-wrap: anywhere; }
+.recovery-dialog button { min-height: var(--ctl-l); padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.recovery-dialog button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--inset); }
+.recovery-dialog button:disabled { opacity: .45; cursor: default; }
+.recovery-dialog .recovery-load { border-color: var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.recovery-dialog .recovery-load:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--accent-strong); }
+.recovery-list { max-height: 220px; display: flex; flex-direction: column; gap: 4px; margin: 14px 0; padding: 2px; overflow: auto; }
+.recovery-entry { padding-block: 6px; text-align: left; font-variant-numeric: tabular-nums; }
+.recovery-preview { max-height: 160px; padding: 10px 12px; overflow: auto; border-left: 3px solid var(--accent); border-radius: 0 var(--r-2) var(--r-2) 0; background: var(--inset); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.calculator-save-status { max-width: 160px; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calculator-value.is-pending { justify-content: flex-start; font-family: var(--font-ui); }

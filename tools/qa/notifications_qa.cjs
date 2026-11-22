@@ -2,8 +2,8 @@
 // headless browser. Clipboard outcomes are simulated; no system clipboard writes.
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process'),assert=require('node:assert/strict');
 const address=process.argv[2];if(!address)throw Error('Usage: node notifications_qa.cjs SERVER_URL');
-const root=path.resolve(__dirname,'../..'),version=require('./project_config.cjs').version();
-const output=path.join(root,'validation',version,'private','notifications');fs.mkdirSync(output,{recursive:true});
+const root=path.resolve(__dirname,'../..'),config=require('./project_config.cjs'),version=config.version(),receipts=path.join(root,'validation',config.validationVersion());
+const output=path.join(receipts,'private','notifications');fs.mkdirSync(output,{recursive:true});
 const profile=fs.mkdtempSync(path.join(output,'chrome-')),file=path.join(output,'notifications.txt');
 fs.writeFileSync(file,'账号@金额\n00001@1.25\n00002@2.50\n');
 const child=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--window-size=1500,900','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
@@ -14,7 +14,9 @@ async function waitFor(expression){for(let n=0;n<200;n++){const value=await eval
 async function check(name,tone,id='toast'){
   await waitFor(`(()=>{const n=document.querySelector('#${id}');return !n.hidden&&n.dataset.tone===${JSON.stringify(tone)};})()`);
   const result=await evaluate(`(()=>{const n=document.querySelector('#${id}'),s=getComputedStyle(n),r=n.getBoundingClientRect();return {text:n.textContent,tone:n.dataset.tone,role:n.getAttribute('role'),color:s.color,background:s.backgroundColor,border:s.borderTopColor,clip:{x:r.x-3,y:r.y-3,width:r.width+6,height:r.height+6,scale:1}};})()`);
-  const colors={info:'rgb(56, 83, 107)',success:'rgb(35, 99, 71)',warning:'rgb(130, 96, 29)',error:'rgb(163, 59, 59)'};
+  // Each tone takes its text colour from the palette token of that meaning.
+  const colors=await evaluate(`(()=>{const p=document.createElement('i'),v={};document.body.append(p);for(const [tone,token]of Object.entries({info:'ink',success:'ok',warning:'warn',error:'danger'})){p.style.color='var(--'+token+')';v[tone]=getComputedStyle(p).color;}p.remove();return v;})()`);
+  assert.equal(new Set(Object.values(colors)).size,4);
   assert.equal(result.color,colors[tone]);assert.equal(result.role,tone==='error'?'alert':'status');
   const shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false,clip:result.clip});fs.writeFileSync(path.join(output,name+'.png'),Buffer.from(shot.data,'base64'));cases.push({name,...result});
 }
@@ -39,7 +41,7 @@ async function check(name,tone,id='toast'){
   for(const tone of ['info','success','warning','error','info']){await evaluate(`window.__qaAnalysisNotice('分析提示：'+${JSON.stringify(tone)},${JSON.stringify(tone)})`);await check('analysis-'+tone+'-'+cases.length,tone,'analysisToast');}
   assert.deepEqual(errors,[]);
   const report={version,result:'PASS',browser:(await cdp('Browser.getVersion')).product,desktopManualAcceptance:false,clipboard:'simulated success and refusal, no system clipboard writes',cases};
-  fs.writeFileSync(path.join(root,'validation',version,'notifications.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
+  fs.writeFileSync(path.join(receipts,'notifications.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
 }finally{
   if(socket?.readyState===1){try{await cdp('Browser.close');}catch{}socket.close();}
   if(child.exitCode===null&&child.signalCode===null)await Promise.race([new Promise(resolve=>child.once('exit',resolve)),pause(1500)]);if(child.exitCode===null&&child.signalCode===null)child.kill();

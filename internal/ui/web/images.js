@@ -34,7 +34,7 @@
       this.items=Array.isArray(data.images)?data.images:[];
       this.root.hidden=this.items.length===0;
       const btn=$('imagesBtn');btn.hidden=this.items.length===0;
-      btn.innerHTML=`<span class="tool-icon" aria-hidden="true">▧</span>图片 <span class="image-count"></span>`;
+      btn.innerHTML=`<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg>图片<span class="image-count"></span>`;
       btn.querySelector('.image-count').textContent=String(this.items.length);
       btn.setAttribute('aria-pressed',String(this.enabled));
       btn.title=`工作表共有 ${this.items.length} 张图片；单击此按钮显示或隐藏图片`;

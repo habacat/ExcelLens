@@ -234,7 +234,7 @@
     selection() {
       if (!this.active || this.draft) return;
       const cell = this.selected, raw = textOf(cell);
-      el('More').textContent = this.owner.tools.pivotAt(cell) ? '透视布局' : '更多编辑';
+      (el('MoreLabel') || el('More')).textContent = this.owner.tools.pivotAt(cell) ? '透视布局' : '更多编辑';
       this.formula.value = model.encode(raw, raw.includes('\r'));
       this.input.value = '';
       el('Kind').value = 'auto';
