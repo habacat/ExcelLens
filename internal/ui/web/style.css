@@ -709,9 +709,11 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 /* Used width of a hairline reports the layout raster even when the output
    surface is scaled again (e.g. a browser moving between displays). */
 #rangeFrames::before { content: ""; position: absolute; visibility: hidden; border-top: .01px solid transparent; }
-.range-frame, .range-corner { position: absolute; display: block; box-sizing: border-box; border: solid var(--selection-color, #109968); }
+.range-frame, .range-frames > .range-corner { position: absolute; display: block; box-sizing: border-box; border: solid var(--selection-color, #109968); }
 .range-frame > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; fill: var(--selection-color); }
-.range-corner {
+.range-frame .range-corner { fill: var(--grid-paper); }
+.range-corner-face { pointer-events: none; }
+.range-frames > .range-corner {
   background: var(--selection-color, #109968); border: 0; box-shadow: inset 0 0 0 1px var(--grid-paper);
 }
 /* Viewport-only lightweight placeholder during a cold, far-away scroll. */

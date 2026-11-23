@@ -88,7 +88,7 @@ async function switchTo(name){return evaluate(`(async()=>{const name=${JSON.stri
   })()`);
   const [cx,cy,cw,ch]=singleFrame.cell, [fx,fy,fw,fh]=singleFrame.frame;
   for (const [actual,expected] of [[fx,cx],[fy,cy],[fx+fw,cx+cw],[fy+fh,cy+ch]]) assert(Math.abs(actual-expected)<.1);
-  assert.equal(singleFrame.stroke,'3px');assert.deepEqual(singleFrame.corner,[7,7]);
+  assert.equal(singleFrame.stroke,'2px');assert.deepEqual(singleFrame.corner,[7,7]);
   assert.equal(singleFrame.cellOutline,'none');assert.equal(singleFrame.fill,'none');
   assert.equal(await evaluate('document.querySelector("#crosshairToggle").checked'),true);
   await evaluate(`document.querySelector('#crosshairColorBtn').click()`);

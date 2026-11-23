@@ -59,14 +59,14 @@ function markCellBounds(refs) {
   document.head.appendChild(style);
 }
 
-async function comparePixels(black,white,hidden,marked,hPens,vPens,geometry,ends,seams,seamRefs) {
+async function comparePixels(black,white,blackGrip,hidden,marked,hPens,vPens,geometry,ends,seams,seamRefs) {
   async function decode(data) {
     const img=new Image();img.src='data:image/png;base64,'+data;await img.decode();
     const ctx=new OffscreenCanvas(img.width,img.height).getContext('2d');
     ctx.drawImage(img,0,0);
     return ctx.getImageData(0,0,img.width,img.height);
   }
-  const [on,ink,off,mask,horizontalPens,verticalPens]=await Promise.all([black,white,hidden,marked,hPens,vPens].map(decode));
+  const [on,ink,gripInk,off,mask,horizontalPens,verticalPens]=await Promise.all([black,white,blackGrip,hidden,marked,hPens,vPens].map(decode));
   const {boxes,ratio}=geometry;
   const pixel=css=>Math.round(css*ratio);
   const a=boxes[ends[0]], b=boxes[ends.at(-1)];
@@ -99,7 +99,7 @@ async function comparePixels(black,white,hidden,marked,hPens,vPens,geometry,ends
   }
   // White/black exposures isolate fractional pixel coverage from the fill and
   // text under it. The first moment gives the physical centre of each stroke.
-  const profiles={};
+  const profiles={},terminal={};
   const signal=(a,b,i)=>((a.data[i]-b.data[i])+(a.data[i+1]-b.data[i+1])+(a.data[i+2]-b.data[i+2]))/765;
   for(const side of ['left','right','top','bottom']){
     const vertical=side==='left'||side==='right';
@@ -120,8 +120,9 @@ async function comparePixels(black,white,hidden,marked,hPens,vPens,geometry,ends
       }
       if(crossing)continue;
       widthSamples++;
-      const widthDiff=Math.abs(weight-3*ratio);
+      const widthDiff=Math.abs(weight-2*ratio);
       maxWidthError=Math.max(maxWidthError,widthDiff);
+      if(weight>0)terminal[side]=coordinate+moment/weight;
       const empty=ends.length===1&&ends[0]==='H10';
       if(!sourceWeight&&!empty)continue; // between two dashes
       const expected=sourceWeight?sourceMoment/sourceWeight:0;
@@ -132,6 +133,19 @@ async function comparePixels(black,white,hidden,marked,hPens,vPens,geometry,ends
     }
     profiles[side]={measured,widthSamples,maxCenterError,maxWidthError,first};
   }
+  // Only the handle changes colour in this exposure. Compare its painted
+  // centroid with the measured centres of the two strokes nearest the corner.
+  const grip=geometry.handle;
+  let mass=0,mx=0,my=0;
+  for(let y=Math.max(0,pixel(grip.top)-3);y<Math.min(on.height,pixel(grip.bottom)+3);y++){
+    for(let x=Math.max(0,pixel(grip.left)-3);x<Math.min(on.width,pixel(grip.right)+3);x++){
+      const weight=Math.max(0,signal(ink,gripInk,(y*on.width+x)*4));
+      mass+=weight;mx+=(x+.5)*weight;my+=(y+.5)*weight;
+    }
+  }
+  if(!mass)throw Error('No painted fill handle');
+  const handle={x:mx/mass,y:my/mass,cornerX:terminal.right,cornerY:terminal.bottom};
+  handle.error=Math.max(Math.abs(handle.x-handle.cornerX),Math.abs(handle.y-handle.cornerY));
   const lines=seams.map(([from,to,side])=>{
     const horizontal=side==='top'||side==='bottom';
     const start=cellEdge(from,horizontal?'left':'top'), end=cellEdge(to,horizontal?'right':'bottom');
@@ -150,7 +164,7 @@ async function comparePixels(black,white,hidden,marked,hPens,vPens,geometry,ends
     }
     return {from,to,side,length:end-start,missing:best};
   });
-  return {paintedBounds:{left,top,right,bottom},profiles,lines};
+  return {paintedBounds:{left,top,right,bottom},profiles,lines,handlePixels:handle};
 }
 
 async function run() {
@@ -176,11 +190,18 @@ async function run() {
     const refs=[...new Set([...ends,...seamRefs])];
     const geometry=await p.run(visibleBoxes,refs);
     const shown=await snap();
-    let black,white,hidden,marked,hPens,vPens;
+    let black,white,blackGrip,hidden,marked,hPens,vPens;
     try {
       const colourFrame=color=>{for(const key of ['--selection-color','--grid-paper'])rangeFrames.style.setProperty(key,color);};
       await p.run(colourFrame,'black');black=await snap();
       await p.run(colourFrame,'white');white=await snap();
+      await p.run(()=>{
+        const style=document.createElement('style');style.id='qaGripInk';
+        style.textContent='#rangeFrames :is(.range-corner,.range-corner-face){fill:black!important;background:black!important;box-shadow:none!important}';
+        document.head.appendChild(style);
+      });
+      blackGrip=await snap();
+      await p.run(()=>document.getElementById('qaGripInk').remove());
       await p.run(()=>{rangeFrames.style.visibility='hidden';});
       hidden=await snap();
       const sourceColours=(h,v)=>{
@@ -194,10 +215,10 @@ async function run() {
       await p.run(markCellBounds,seamRefs);
       marked=await snap();
     } finally { await p.run(()=>{
-      document.getElementById('qaCellMask')?.remove();document.getElementById('qaSourcePens')?.remove();
+      for(const id of ['qaGripInk','qaCellMask','qaSourcePens'])document.getElementById(id)?.remove();
       for(const k of ['visibility','--selection-color','--grid-paper'])rangeFrames.style.removeProperty(k);
     }); }
-    const paint=await p.run(comparePixels,black,white,hidden,marked,hPens,vPens,geometry,ends,seams,seamRefs);
+    const paint=await p.run(comparePixels,black,white,blackGrip,hidden,marked,hPens,vPens,geometry,ends,seams,seamRefs);
     checks.push({name,...geometry,...paint});
     if(name==='read-100' || Object.values(paint.profiles).some(v=>v.maxCenterError>.1||v.maxWidthError>.1) || paint.lines.some(l=>l.missing)) {
       fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(shown,'base64'));
@@ -208,6 +229,7 @@ async function run() {
       }
     }
     assert(Math.abs(geometry.ratio-scale)<.001);
+    assert(paint.handlePixels.error<=.1,name+' fill handle misses the intersection '+JSON.stringify(paint.handlePixels));
     for(const [side,profile] of Object.entries(paint.profiles)){
       assert(profile.measured>0,name+' no source samples on '+side);
       assert(profile.maxCenterError<=.1&&profile.maxWidthError<=.1,name+' '+side+' '+JSON.stringify(profile));
@@ -215,16 +237,16 @@ async function run() {
     for(const line of paint.lines)assert.equal(line.missing,0,name+' '+JSON.stringify(line));
     const cells=ends.map(ref=>geometry.boxes[ref]), epsilon=.04;
     assert(geometry.handle,name+' visible selection needs its fill handle');
-    for(const node of [...geometry.frames,geometry.handle]){
+    for(const node of geometry.frames){
       assert(node.left>=Math.min(...cells.map(r=>r.left))-epsilon && node.right<=Math.max(...cells.map(r=>r.right))+epsilon &&
-        node.top>=Math.min(...cells.map(r=>r.top))-epsilon && node.bottom<=Math.max(...cells.map(r=>r.bottom))+epsilon,name+' frame or handle outside');
+        node.top>=Math.min(...cells.map(r=>r.top))-epsilon && node.bottom<=Math.max(...cells.map(r=>r.bottom))+epsilon,name+' frame outside');
     }
   }
   async function testHandle(){
     const [start,end]=await p.run(ref=>{
       const handle=document.querySelector('#rangeFrames .range-corner');
       const center=el=>{const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};};
-      const pt=center(handle);
+      const r=handle.getBoundingClientRect(),pt={x:r.right-1,y:r.bottom-1};
       if(document.elementFromPoint(pt.x,pt.y)!==handle)throw Error('Fill handle is not reachable');
       const below=ref.replace(/\d+$/,n=>String(Number(n)+1));
       return [pt,center(document.querySelector('#rowsLayer [data-ref='+below+']'))];
@@ -237,6 +259,17 @@ async function run() {
     await p.call('Input.dispatchMouseEvent',{type:'mouseReleased',...end,button:'left',buttons:0,clickCount:1});
     await p.wait('!document.querySelector("#formulaEntryFrames .range-frame")');
     assert.equal(await p.evaluate('editCopyRevision.textContent'),revision);
+    if(!real){
+      const target='#rowsLayer [data-ref=F7]';
+      assert.equal(await p.evaluate('document.querySelector("'+target+'").textContent'),'');
+      await p.call('Input.dispatchMouseEvent',{type:'mousePressed',...start,button:'left',buttons:1,clickCount:1});
+      await p.call('Input.dispatchMouseEvent',{type:'mouseMoved',...end,button:'left',buttons:1});
+      await p.wait('!!document.querySelector("#formulaEntryFrames .range-frame")');
+      await p.call('Input.dispatchMouseEvent',{type:'mouseReleased',...end,button:'left',buttons:0,clickCount:1});
+      await p.wait('document.querySelector("'+target+'").textContent==="5.54"');
+      await p.click('#editGridUndo');
+      await p.wait('document.querySelector("'+target+'").textContent===""');
+    }
   }
   try{
     if(emulatedScale)await setViewport(1600,800);

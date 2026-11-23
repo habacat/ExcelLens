@@ -8,7 +8,7 @@
       115
     ],
     "result": "PASS",
-    "comparison": "Cross-section centre and alpha-weighted width of a fixed 3 CSS pixel selection"
+    "comparison": "Cross-section centre and alpha-weighted width of a fixed 2 CSS pixel selection"
   },
   "toolbarAndSelectionStatistics": {
     "result": "PASS",
@@ -16,58 +16,68 @@
       "Compact formula actions and worksheet tabs",
       "Five highlight colours in reading and editing",
       "Six statistics, four number displays and undo in an edit copy"
-    ]
+    ],
+    "verifiedIn": "Initial v1.13.3 release (da472c7)"
   },
   "desktopManualAcceptance": false,
   "nativeOfficeVisualComparison": false,
   "selection": {
-    "selectionWidthCSSPixels": 3,
-    "scenarios": 89,
-    "referenceProfiles": 35069,
-    "widthProfiles": 35753,
-    "maximumCenterErrorPhysicalPixels": 0.018148,
-    "maximumWidthErrorPhysicalPixels": 0.014379,
-    "unbrokenSourceRules": 232,
+    "selectionWidthCSSPixels": 2,
+    "scenarios": 56,
+    "referenceProfiles": 20927,
+    "widthProfiles": 21469,
+    "maximumCenterErrorPhysicalPixels": 0.031901,
+    "maximumWidthErrorPhysicalPixels": 0.011765,
+    "unbrokenSourceRules": 124,
     "byFixture": {
       "report": {
-        "scenarios": 48,
+        "scenarios": 16,
+        "outputs": [
+          "1.25",
+          "1.3"
+        ]
+      },
+      "fixture": {
+        "scenarios": 24,
         "outputs": [
           "1",
           "1-to-2",
+          "1.5"
+        ]
+      },
+      "pens": {
+        "scenarios": 14,
+        "outputs": [
           "1.25",
-          "1.3",
-          "1.5",
           "2"
         ]
       },
       "ledger": {
-        "scenarios": 4,
+        "scenarios": 2,
         "outputs": [
-          "1",
-          "1.25"
-        ]
-      },
-      "fixture": {
-        "scenarios": 16,
-        "outputs": [
-          "1-to-2",
-          "1.25"
-        ]
-      },
-      "pens": {
-        "scenarios": 21,
-        "outputs": [
-          "1",
-          "1.25",
-          "2"
+          "1"
         ]
       }
     },
     "result": "PASS"
   },
-  "windowsRace": {
+  "fillHandle": {
+    "sizeCSSPixels": 7,
+    "maximumIntersectionErrorPhysicalPixels": 0.002777,
+    "previousInsetAt100Percent": {
+      "x": 3,
+      "y": 3
+    },
+    "checks": [
+      "Actual painted handle centre compared with the right and bottom strokes",
+      "Drag from the outer quadrant and cancel",
+      "Fill 5.54 into an adjacent blank and undo"
+    ],
+    "result": "PASS"
+  },
+  "windowsProjectCheck": {
     "result": "PASS",
-    "steps": 7,
+    "steps": 6,
     "frontendTests": 559
   }
 }

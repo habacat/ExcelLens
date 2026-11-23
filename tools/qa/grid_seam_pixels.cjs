@@ -20,6 +20,7 @@ function fixture(varied = false) {
     const cells = Array.from('ABCDEFGHI', (col, c) => {
       const styled = r >= 2 && r <= 7 && c >= 1 && c <= 6;
       const style=(varied&&overrides[col+(r+1)])||Number(styled);
+      if(col==='F'&&r===5)return '<c r="F6" s="'+style+'"><v>5.54</v></c>';
       return '<c r="' + col + (r + 1) + '" s="' + style + '" t="inlineStr"><is><t>' + (styled ? '' : col + (r+1)) + '</t></is></c>';
     });
     return '<row r="' + (r + 1) + '" ht="25.7" customHeight="1">' + cells.join('') + '</row>';

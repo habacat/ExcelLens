@@ -16,16 +16,21 @@
   }
 
   // Trace the centre of the worksheet rules. The SVG pen is independent of
-  // their widths. Fractional coverage keeps a 3px pen centred on an even-
-  // pixel rule as well as on an odd-pixel one.
-  const selectionWidth=3;
-  function paintSeams(frame,edges,col,row) {
+  // their widths. Fractional coverage keeps the pen centred on odd- and
+  // even-pixel source rules.
+  const selectionWidth=2;
+  const handleSize=7;
+  function paintSeams(frame,edges,col,row,showHandle) {
     const half=selectionWidth/2,ns='http://www.w3.org/2000/svg';
     const svg=frame.firstElementChild||frame.appendChild(document.createElementNS(ns,'svg'));
     let count=0;
-    function rect(x,y,w,h){
+    function rect(x,y,w,h,kind=''){
       if(w<=0||h<=0)return;
       const node=svg.children[count++]||svg.appendChild(document.createElementNS(ns,'rect'));
+      if((node._kind||'')!==kind){
+        if(kind)node.setAttribute('class',kind);else node.removeAttribute('class');
+        node._kind=kind;
+      }
       const key=[x,y,w,h].join(',');
       if(node._position===key)return;
       node.setAttribute('x',x);node.setAttribute('y',y);
@@ -73,12 +78,19 @@
     side(bottom,true,h,left?left.at(-1).offset-half:0,w+(right?right.at(-1).offset+half:0));
     side(left,false,0,top?top[0].offset+half:0,h+(bottom?bottom[0].offset-half:0));
     side(right,false,w,top?top.at(-1).offset+half:0,h+(bottom?bottom.at(-1).offset-half:0));
+    if(showHandle){
+      // Use the same terminal segments and raster coordinates as the two
+      // strokes. The outer square is also the pointer target in an edit copy.
+      const x=w+right.at(-1).offset-handleSize/2,y=h+bottom.at(-1).offset-handleSize/2;
+      rect(x,y,handleSize,handleSize,'range-corner');
+      rect(x+1,y+1,handleSize-2,handleSize-2,'range-corner-face');
+    }
     while(svg.children.length>count)svg.lastElementChild.remove();
   }
 
-  function paint(layer, areas, view, stroke = 3) {
+  function paint(layer, areas, view, stroke = selectionWidth) {
     let count = 0;
-    const thickness = piece => Math.min(stroke, (piece.to-piece.from)/(piece.leading && piece.trailing ? 2 : 1))+'px';
+    const thickness = piece => Math.min(stroke,(piece.to-piece.from)/(piece.leading && piece.trailing ? 2 : 1));
     function box(className, x, y, geometry = '') {
       const node = layer.children[count++] || layer.appendChild(document.createElement('i'));
       if (node.className !== className) node.className = className;
@@ -96,14 +108,15 @@
       for (const col of x) for (const row of y) {
         if (!(row.leading || col.trailing || row.trailing || col.leading)) continue;
         const xStroke=thickness(col), yStroke=thickness(row);
-        const edges = [row.leading?yStroke:0,col.trailing?xStroke:0,row.trailing?yStroke:0,col.leading?xStroke:0].join(' ');
+        const edges = [row.leading?yStroke:0,col.trailing?xStroke:0,row.trailing?yStroke:0,col.leading?xStroke:0].map(n=>n?n+'px':'0').join(' ');
         const color = area.color ? ';--reference-color:'+area.color : '';
         const frame=box('range-frame',col.from,row.from,`width:${col.to-col.from}px;height:${row.to-row.from}px;border-width:${seams?'0':edges}${color}`);
-        if(seams)paintSeams(frame,seams,col,row);
+        const showHandle=!area.color&&areas.length===1&&col.trailing&&row.trailing;
+        if(seams)paintSeams(frame,seams,col,row,showHandle);
         else if(frame.childElementCount)frame.replaceChildren();
-        if (!area.color && areas.length === 1 && col.trailing && row.trailing) {
-          const w=Math.min(7,col.to-col.from), h=Math.min(7,row.to-row.from);
-          const corner=box('range-corner',col.to-w,row.to-h,`width:${w}px;height:${h}px`);
+        if(showHandle&&!seams){
+          const cx=col.to-xStroke/2,cy=row.to-yStroke/2;
+          const corner=box('range-corner',cx-handleSize/2,cy-handleSize/2,`width:${handleSize}px;height:${handleSize}px`);
           if(corner.childElementCount)corner.replaceChildren();
         }
       }
