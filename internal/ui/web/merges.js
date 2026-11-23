@@ -28,6 +28,36 @@
       };
       return find(this.root);
     }
+    // A merged DOM cell owns the value and selection. Only the reading
+    // crosshair follows the underlying row and column hit by the pointer.
+    pointerCell(event,colLeft,rowTop) {
+      const node=event.target.closest?.('.merged-cell'),range=node?._xlMerge;
+      if(!range || (event.type==='click' && !event.detail))return null;
+      const rect=node.getBoundingClientRect();
+      function band(first,last,offset,edge) {
+        const coordinate=edge(first)+offset;
+        while(first<last){
+          const mid=Math.floor((first+last)/2);
+          if(edge(mid+1)<=coordinate)first=mid+1;
+          else last=mid;
+        }
+        return first;
+      }
+      return {col:band(range.col,range.endCol,event.clientX-rect.left,colLeft),
+        row:band(range.row,range.endRow,event.clientY-rect.top,rowTop)};
+    }
+    paintCrosshair(node,point,colLeft,rowTop) {
+      const range=node._xlMerge;
+      const inRow=point && range.row<=point.row && point.row<=range.endRow;
+      const inCol=point && range.col<=point.col && point.col<=range.endCol;
+      node.classList.toggle('merge-crosshair',Boolean(inRow||inCol));
+      if(!inRow&&!inCol)return;
+      const x=inCol?colLeft(point.col):0,y=inRow?rowTop(point.row):0;
+      const position=`${inCol?x-colLeft(range.col):0}px 0, 0 ${inRow?y-rowTop(range.row):0}px`;
+      const size=`${inCol?colLeft(point.col+1)-x:0}px 100%, 100% ${inRow?rowTop(point.row+1)-y:0}px`;
+      if(node.style.getPropertyValue('--merge-band-position')!==position)node.style.setProperty('--merge-band-position',position);
+      if(node.style.getPropertyValue('--merge-band-size')!==size)node.style.setProperty('--merge-band-size',size);
+    }
     copyAnchor(row,col,visibility) {
       const m=this.at(row,col);
       if (!m || m.row!==row || m.col!==col) return null;
@@ -69,9 +99,10 @@
         const width=`${colLeft(range.endCol+1)-colLeft(col)}px`,height=`${rowTop(range.endRow+1)-rowTop(row)}px`;
         if(node.style.width!==width)node.style.width=width;
         if(node.style.height!==height)node.style.height=height;
-        node.style.zIndex='2';node._xlMerge=true;
+        node.style.zIndex='2';node._xlMerge=range;
       }else if(node._xlMerge){
-        node.style.width=`${colWidth(col)}px`;node.style.height='';node.style.zIndex='';node._xlMerge=false;
+        node.style.width=`${colWidth(col)}px`;node.style.height='';node.style.zIndex='';node._xlMerge=null;
+        node.classList.toggle('merge-crosshair',false);
       }
       node.classList.toggle('merged-cell',!!range&&!covered);
     }

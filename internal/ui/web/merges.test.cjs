@@ -34,6 +34,38 @@ test('merged lookup agrees with a source-range oracle and does not touch ordinar
   m.decorate(node,null,1,1,()=>0,()=>0,()=>132);
 });
 
+test('merged crosshair hit and paint use the same visible row and column edges',()=>{
+  const m=create(),range={row:2,col:2,endRow:4,endCol:5};
+  // C is hidden. B, D and E have different widths and row 3 is taller.
+  const left=c=>[0,0,50,75,75,148.5,180][c],top=r=>[0,0,17,39.5,85,110][r];
+  const props=new Map(),classes=new Set();
+  const node={_xlMerge:range,getBoundingClientRect:()=>({left:9.5,top:21}),
+    classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)},
+    style:{setProperty:(k,v)=>props.set(k,v),getPropertyValue:k=>props.get(k)}};
+  const click=(x,y,detail=1)=>m.pointerCell({type:'click',detail,target:{closest:()=>node},clientX:x,clientY:y},left,top);
+  assert.deepEqual({...click(34.49,43.49)},{row:2,col:2});
+  assert.deepEqual({...click(34.5,43.5)},{row:3,col:4});
+  assert.deepEqual({...click(138,110)},{row:4,col:5});
+  assert.equal(click(0,0,0),null);
+  for(const [point,position,size] of [
+    [{row:1,col:2},'0px 0, 0 0px','25px 100%, 100% 0px'],
+    [{row:6,col:4},'25px 0, 0 0px','73.5px 100%, 100% 0px'],
+    [{row:4,col:1},'0px 0, 0 68px','0px 100%, 100% 25px'],
+    [click(60,76),'25px 0, 0 22.5px','73.5px 100%, 100% 45.5px']
+  ]){
+    m.paintCrosshair(node,point,left,top);
+    assert.ok(classes.has('merge-crosshair'));
+    assert.equal(props.get('--merge-band-position'),position);
+    assert.equal(props.get('--merge-band-size'),size);
+  }
+  m.paintCrosshair(node,{row:7,col:6},left,top);
+  assert.ok(!classes.has('merge-crosshair'));
+  m.paintCrosshair(node,{row:2,col:2},left,top);
+  m.decorate(node,null,2,2,left,top,()=>25);
+  assert.ok(!classes.has('merge-crosshair'));
+  assert.equal(click(35,45),null);
+});
+
 test('actual grid helpers disable source merges during filtering or across a frozen boundary',()=>{
   const source=fs.readFileSync(__dirname+'/app.js','utf8');
   const start=source.indexOf('  function activeMerge('),end=source.indexOf('  // Updating the text node',start);

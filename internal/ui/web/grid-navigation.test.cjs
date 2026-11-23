@@ -18,7 +18,7 @@ test('a clickable first preview paints the same single-cell frame as the indexed
   const context={S:state,$:id=>id==='grid'?grid:id==='rangeFrames'?layer:{childElementCount:0},
     editCopy:null,colTotal:()=>260,sheetHeight:()=>180,
     window:{ExcelLensMultiSelection:{areas:()=>[]},ExcelLensRangeFrame:{paintCrosshair(){},paint:(_,areas)=>frames.push(JSON.stringify(areas))}},
-    activeMerge:()=>null,frozenPanes:{effective:()=>({rows:0,cols:0})},getVirtualScrollTop:()=>0,headerHeight:()=>20,
+    activeMerge:()=>null,crosshairCell:()=>state.selected,frozenPanes:{effective:()=>({rows:0,cols:0})},getVirtualScrollTop:()=>0,headerHeight:()=>20,
     ROW_HEAD:28,colLeft:col=>(col-1)*64,sourceRowTop:row=>(row-1)*20};
   const paint=vm.runInNewContext(section('function paintRangeFrames(', 'function decorateGridCell(')+';paintRangeFrames',context);
   paint();
@@ -170,7 +170,8 @@ test('setting the active cell updates the selection outline inside the frozen pa
   const ctx={S,selectionQuick:null,transposeCenter:null,cellExplanation:null,profileCenter:null,
     paintRangeFrames(){},
     window:{ExcelLensMultiSelection:{areas:()=>[]}},
-    document:{querySelectorAll:selector=>selector==='.grid-region .pinned-cell'?[first,second]:[]}};
+    crosshairCell:()=>S.selected.crosshair||S.selected,
+    document:{getElementsByClassName:()=>[],querySelectorAll:selector=>selector==='.grid-region .pinned-cell'?[first,second]:[]}};
   vm.runInNewContext(section('function applySelectionClasses(','function selectCell(')+
     ';this.paint=applySelectionClasses;',ctx);
   ctx.paint();
@@ -180,4 +181,10 @@ test('setting the active cell updates the selection outline inside the frozen pa
   ctx.paint();
   assert.ok(!first.classes.has('selected'));
   assert.ok(second.classes.has('selected'));
+  S.selected.crosshair={row:15,col:1};
+  ctx.paint();
+  assert.ok(second.classes.has('selected'));
+  assert.ok(first.classes.has('active-column'));
+  assert.ok(!second.classes.has('active-column'));
+  assert.ok(!second.classes.has('crosshair-row'));
 });

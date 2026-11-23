@@ -1836,8 +1836,15 @@
     if((range.row<=rows&&range.endRow>rows)||(range.col<=cols&&range.endCol>cols))return null;
     return range;
   }
-  function decorateMergedCell(node,row,col) {
+  function crosshairCell() {
+    const cell=S.selected,point=cell?.crosshair;
+    if(!point||!rowVisible(point.row)||S.hiddenColumns.has(point.col))return cell;
+    const merge=activeMerge(point.row,point.col);
+    return merge?.row===cell.row && merge.col===cell.col ? point : cell;
+  }
+  function decorateMergedCell(node,row,col,focus) {
     mergedCells.decorate(node,activeMerge(row,col),row,col,colLeft,rowTop,colWidth);
+    if(node._xlMerge)mergedCells.paintCrosshair(node,focus??crosshairCell(),colLeft,rowTop);
   }
 
   // Updating the text node only preserves AutoFilter buttons and existing
@@ -2008,16 +2015,19 @@
     let seams;
     geometry.seams=(...bounds)=>(seams ||= selectionSeams(geometry,pinned))(...bounds);
     window.ExcelLensRangeFrame.paint(layer,visible ? areas : [],geometry);
-    if (single) window.ExcelLensRangeFrame.paintCrosshair(tails,single,S.filtered ? S.selectedVisualIndex : single.row,geometry,colTotal(S.maxCol),sheetHeight(S.filtered?S.filterTotal:S.maxRow));
+    if (single) {
+      const focus=crosshairCell();
+      window.ExcelLensRangeFrame.paintCrosshair(tails,focus,S.filtered ? S.selectedVisualIndex : focus.row,geometry,colTotal(S.maxCol),sheetHeight(S.filtered?S.filterTotal:S.maxRow));
+    }
     if (references && (refs.length || references.childElementCount)) {
       const shown=window.ExcelLensEditReferenceView.visibleAreas(refs,S.filtered,pinned.rows,S.rowNumberByVisual,activeMerge);
       window.ExcelLensRangeFrame.paint(references,shown,geometry,2);
     }
   }
 
-  function decorateGridCell(cell, row, col, ref) {
+  function decorateGridCell(cell, row, col, ref, focus) {
     cell.classList.toggle("selected",S.selected?.ref === ref);
-    cell.classList.toggle("active-column",S.selected?.col === col);
+    cell.classList.toggle("active-column",focus?.col === col);
     cell.classList.toggle("precedent",S.traceRefs.length > 0 && isPrecedent(row,col));
     cell.classList.toggle("search-match",isSearchMatch(S.sheet,ref));
     paintRangeCell(cell,row,col,Number(cell.dataset.visualIndex));
@@ -2054,10 +2064,10 @@
 
     const columns=Array.isArray(data.columns)&&data.columns.length?data.columns:
       Array.from({length:data.colCount},(_,i)=>data.startCol+i);
-    const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col));
+    const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col)),focus=crosshairCell();
     const headerKey=`${visibleColumns.join(',')}|${S.zoom}|${geometry.version}|${window.devicePixelRatio}|${S.indexReady}|${S.textHeaderRevision}|${ROW_HEAD}|${S.sheetEpoch}`;
     if (S.renderedHeadersKey !== headerKey) {
-      renderColumnHeaders(visibleColumns,width);
+      renderColumnHeaders(visibleColumns,width,focus);
       S.renderedHeadersKey = headerKey;
     }
     syncTableColumnHeaders();
@@ -2139,7 +2149,7 @@
       if(row.style.top!==topPx)row.style.top=topPx;
       if(row.style.height!==heightPx){row.style.height=heightPx;row.style.setProperty('--row-height',heightPx);}
       if(row.firstElementChild.style.height!==heightPx)row.firstElementChild.style.height=heightPx;
-      row.classList.toggle("active-row",S.selected?.row === rowNumber);
+      row.classList.toggle("active-row",focus?.row === rowNumber);
       row.classList.toggle("whole-row-selected",S.wholeRowSelected && S.selected?.row === rowNumber);
       row.classList.toggle('table-header-row',window.ExcelLensTableHeaders.isTable(S.autoFilter)&&rowNumber===S.autoFilter.row);
       row.classList.toggle('table-band',window.ExcelLensTableHeaders.isTable(S.autoFilter)&&rowNumber>S.autoFilter.row&&(visual-S.autoFilter.row)%2===0);
@@ -2188,10 +2198,10 @@
         }
         // Resolve the full merged width before fitting a source number. Text
         // spilling also depends on the current row's neighboring cells.
-        decorateMergedCell(cell,rowNumber,col);
+        decorateMergedCell(cell,rowNumber,col,focus);
         if((!restoring||!savedRow||replaced)&&(cellData||cell._xlOverflowSpan||cell._xlNumericSpan))
           extendTextIntoBlanks(cell,cellData,byColumn,columnLayouts,layoutIndex);
-        if (needsDecoration) decorateGridCell(cell,rowNumber,col,ref);
+        if (needsDecoration) decorateGridCell(cell,rowNumber,col,ref,focus);
       }
       row._xlDecorVersion = S.decorVersion;
       if(newCells.childNodes.length)row.appendChild(newCells);
@@ -2219,7 +2229,7 @@
       lastMs:Math.round((performance.now()-started)*100)/100};
   }
 
-  function renderColumnHeaders(columns, width) {
+  function renderColumnHeaders(columns, width, focus) {
     const fragment = document.createDocumentFragment();
     const corner = document.createElement("div");
     corner.className = "column-head corner";
@@ -2230,7 +2240,7 @@
     for (const col of columns) {
       const head = document.createElement("div");
       const span=selectedColumnSpan();
-      head.className = "column-head" + (S.selected?.col === col ? " active" : "") + (span&&col>=span.start&&col<=span.end?" column-selected":"");
+      head.className = "column-head" + (focus?.col === col ? " active" : "") + (span&&col>=span.start&&col<=span.end?" column-selected":"");
       head.style.left = `${ROW_HEAD + colLeft(col)}px`;
       head.style.width = `${colWidth(col)}px`;
       head.style.height = `${headerHeight()}px`;
@@ -2286,7 +2296,8 @@
   function applySelectionClasses() {
     selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
     const old=S.lastHighlight;
-    const selectedRow=S.selected?.row||0, selectedCol=S.selected?.col||0;
+    const focus=crosshairCell(),selectedRow=focus?.row||0,selectedCol=focus?.col||0;
+    const anchorCol=S.selected?.col||0;
     const selectedRef=S.selected?.ref||"";
     // Selection on every Arrow/Tab key previously ran several document-wide
     // selector queries across thousands of cells. Only the old/new selected
@@ -2300,20 +2311,18 @@
       if(!cells)continue;
       if(old.col && old.col!==selectedCol)cells.get(old.col)?.classList.remove('active-column');
       if(old.ref && old.ref!==selectedRef){
-        const previous=cells.get(old.col);
+        const previous=cells.get(old.anchorCol);
         if(previous?.dataset.ref===old.ref)previous.classList.remove('selected');
       }
-      if(selectedCol){
-        const cell=cells.get(selectedCol);
-        if(cell){
-          cell.classList.add('active-column');
-          cell.classList.toggle('selected',cell.dataset.ref===selectedRef);
-        }
-      }
+      cells.get(selectedCol)?.classList.add('active-column');
+      if(rowNumber===S.selected?.row)cells.get(anchorCol)?.classList.add('selected');
     }
     // Range highlight has a bounded visible intersection; only scan its DOM
     // when entering/leaving/changing a range, never on normal arrow presses.
     const areas=window.ExcelLensMultiSelection.areas(S);
+    if(old.row!==selectedRow||old.col!==selectedCol){
+      for(const node of document.getElementsByClassName('merged-cell'))mergedCells.paintCrosshair(node,focus,colLeft,rowTop);
+    }
     paintRangeFrames(areas);
     const pinnedCells=document.querySelectorAll('.grid-region .pinned-cell');
     for(const node of pinnedCells){
@@ -2333,10 +2342,11 @@
     if(selectedCol){
       for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${selectedCol}"]`))node.classList.add('active');
     }
-    S.lastHighlight={col:selectedCol,ref:selectedRef,hadRange:Boolean(areas.length)};
+    for(const node of document.querySelectorAll('.grid-region .pinned-row-head'))node.classList.toggle('active',Number(node.dataset.row)===selectedRow);
+    S.lastHighlight={row:selectedRow,col:selectedCol,anchorCol,ref:selectedRef,hadRange:Boolean(areas.length)};
   }
 
-  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false, keepSelection = false) {
+  function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false, keepSelection = false, crosshair = null) {
     const normalizedRef = ref || cell?.ref || `${colName(colNumber)}${rowNumber}`;
     const col = colNumber || cell?.col || parseRef(normalizedRef)?.col || 1;
     const row = rowNumber || parseRef(normalizedRef)?.row || 1;
@@ -2347,7 +2357,7 @@
       S.traceRefs = [];
       document.querySelectorAll(".grid-cell.precedent").forEach(node => node.classList.remove("precedent"));
     }
-    S.selected = { ...normalized, ref: normalizedRef, row, col, sheet: S.sheet };
+    S.selected = { ...normalized, ref: normalizedRef, row, col, sheet: S.sheet, crosshair };
     if (!keepSelection) {
       if(S.columnSelection){S.columnSelection=null;S.columnAnchor=0;paintColumnSelection();}
       S.wholeRowSelected = false;
@@ -4105,7 +4115,7 @@
     if (!target) return;
     // Excel preserves an existing range when right-clicking inside it.
     if (!S.range || !inSelectedRange(target.row,target.col,Number(cell.dataset.visualIndex))) {
-      selectCell(cellAt(target.row,target.col),target.row,target.col,target.ref,Number(cell.dataset.visualIndex));
+      selectPointedCell(cellAt(target.row,target.col),{...target,visual:Number(cell.dataset.visualIndex)},event);
     }
     if (editCopy?.grid.active) {
       editCopy.grid.ranges.showMenu(event.clientX,event.clientY); return;
@@ -4119,6 +4129,10 @@
         '\u8df3\u8f6c\u5230\u94fe\u63a5\u4f4d\u7f6e' : '\u6253\u5f00\u8d85\u94fe\u63a5';
     }
     positionCellMenu($("cellMenu"),event.clientX,event.clientY);
+  }
+
+  function selectPointedCell(cell,point,event){
+    selectCell(cell,point.row,point.col,point.ref,point.visual,false,false,mergedCells.pointerCell(event,colLeft,rowTop));
   }
 
   // Ctrl-click adds an independently selected cell; Ctrl-drag adds a rectangle.
@@ -4152,7 +4166,7 @@
     if(extend && oldAnchor && editCopy?.grid.active && !additive) {
       extendRange(oldAnchor,point.row,point.col,point.visual); return;
     }
-    selectCell(dataCell,point.row,point.col,point.ref,point.visual);
+    selectPointedCell(dataCell,point,event);
     S.multiRanges=previous;
     if(extend){extendRange(oldAnchor,point.row,point.col,point.visual)}
     else if(additive){

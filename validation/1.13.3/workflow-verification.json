@@ -2,6 +2,7 @@
   "version": "1.13.3",
   "environment": "Windows x64, isolated headless Chromium and the application service",
   "currencyHeader": {
+    "verifiedIn": "Previous v1.13.3 revision (0fc681c)",
     "sourceFormat": "HTML XLS",
     "sheetZoomPercent": [
       100,
@@ -22,6 +23,7 @@
   "desktopManualAcceptance": false,
   "nativeOfficeVisualComparison": false,
   "selection": {
+    "verifiedIn": "Previous v1.13.3 revision (0fc681c)",
     "selectionWidthCSSPixels": 2,
     "scenarios": 56,
     "referenceProfiles": 20927,
@@ -62,6 +64,7 @@
     "result": "PASS"
   },
   "fillHandle": {
+    "verifiedIn": "Previous v1.13.3 revision (0fc681c)",
     "sizeCSSPixels": 7,
     "maximumIntersectionErrorPhysicalPixels": 0.002777,
     "previousInsetAt100Percent": {
@@ -75,9 +78,21 @@
     ],
     "result": "PASS"
   },
+  "mergedCrosshair": {
+    "result": "PASS",
+    "method": "Pointer clicks in the application, then screenshot differences with the crosshair enabled and disabled; row and column headers supply independent pixel bounds.",
+    "previousRevision": "0fc681c",
+    "previousMismatchingScenarios": 9,
+    "previousScenarios": 10,
+    "syntheticScenarios": 23,
+    "worksheetScenarios": 4,
+    "worksheetHeader": "J2:Q2",
+    "worksheetClicks": ["J7", "K7", "L7", "K2"],
+    "coverage": ["Anchor and interior coordinates", "External and internal clicks", "Unequal row heights and column widths", "Frozen top, left and corner panes", "Zoom and fractional pixel ratio", "Reading and edit copy", "Dark theme and highlight colour"]
+  },
   "windowsProjectCheck": {
     "result": "PASS",
     "steps": 6,
-    "frontendTests": 559
+    "frontendTests": 560
   }
 }
