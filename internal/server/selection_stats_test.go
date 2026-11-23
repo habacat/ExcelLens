@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/editdoc"
 )
 
 func writeSelectionWorkbook(t *testing.T, path string) {
@@ -75,6 +77,62 @@ func TestSelectionStatsExactDisjointAndOverlapping(t *testing.T) {
 		})
 	}
 }
+func TestSelectionStatsConfirmedRevisionAndSource(t *testing.T) {
+	isolateTestStorage(t)
+	file := filepath.Join(t.TempDir(), "统计.csv")
+	if err := os.WriteFile(file, []byte("金额,调整\n12,\n8,0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	if err := a.OpenPath(file); err != nil {
+		t.Fatal(err)
+	}
+	wb := a.currentWorkbook()
+	meta := wb.Sheets[0]
+	if _, err := wb.BuildIndex(meta, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	book := sourceBookID(wb)
+	doc := decodeResponse[editState](t, editHTTP(t, a, "start", editRequest{Book: book}, 200)).Document
+	ch := func(row, col int, raw string) editdoc.Change {
+		return editdoc.Change{Address: editdoc.Address{Sheet: meta.Name, Row: row, Col: col}, Value: editdoc.Value{Kind: "text", Raw: raw}}
+	}
+	op := editdoc.Operation{Revision: doc.Revision, Request: strings.Repeat("a", 32), Action: "change", Changes: []editdoc.Change{ch(2, 1, "0012"), ch(2, 2, "9007199254740993.25")}}
+	editHTTP(t, a, "commit", editRequest{Document: doc.Key, Operation: op}, 200)
+	req := selectionStatRequest{Sheet: meta.Name, Ranges: []selectionStatRect{{Start: "A2", End: "B3"}, {Start: "A2", End: "B2"}}}
+	call := func(status int) selectionStatResult {
+		t.Helper()
+		data, err := json.Marshal(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := localTestConnection(httptest.NewRequest(http.MethodPost, "/api/selection/stats", strings.NewReader(string(data))))
+		r.Header.Set("X-ExcelLens-Token", a.token)
+		out := httptest.NewRecorder()
+		a.Handler().ServeHTTP(out, r)
+		if out.Code != status {
+			t.Fatalf("status %d, response %s", out.Code, out.Body.String())
+		}
+		if status != 200 {
+			return selectionStatResult{}
+		}
+		return decodeResponse[selectionStatResult](t, out)
+	}
+	if got := call(200); got.Sum != "20" || got.NonEmpty != 3 || got.Number != 3 {
+		t.Fatal(got)
+	}
+	req.Edit = &selectionStatEdit{Book: book, Document: doc.Key, Revision: doc.Revision + 1}
+	if got := call(200); got.Sum != "9007199254741001.25" || got.Minimum != "0" || got.Maximum != "9007199254740993.25" || got.NonEmpty != 4 || got.Number != 3 {
+		t.Fatal(got)
+	}
+	req.Edit.Revision = doc.Revision
+	call(409)
+}
+
 func TestSelectionStatsFilteredUsesVisualOrder(t *testing.T) {
 	isolateTestStorage(t)
 	p := filepath.Join(t.TempDir(), "fixture.xlsx")

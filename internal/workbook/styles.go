@@ -317,15 +317,14 @@ func borderCSS(side styleSideXML, color string) string {
 	if side.Style == "" || strings.EqualFold(side.Style, "none") {
 		return ""
 	}
-	// Subpixel widths preserve Excel's hierarchy without making the viewing
-	// grid appear like a thick spreadsheet editor. Colors/line types remain
-	// those of the source workbook (no lossy border substitution).
-	width, kind := "0.55px", "solid"
+	// Browsers can snap fractional thin and medium rules to the same pixel.
+	// Use the same distinct screen weights as the native workbook border styles.
+	width, kind := "1px", "solid"
 	switch side.Style {
 	case "medium", "mediumDashed", "mediumDashDot", "mediumDashDotDot":
-		width = "1.15px"
+		width = "2px"
 	case "thick":
-		width = "1.75px"
+		width = "3px"
 	case "hair":
 		width = "0.35px"
 	}
@@ -337,11 +336,11 @@ func borderCSS(side styleSideXML, color string) string {
 	case "dashDot", "dashDotDot", "mediumDashDot", "mediumDashDotDot":
 		kind = "dashed"
 	case "double":
-		width = "2.25px"
+		width = "3px"
 		kind = "double"
 	}
 	if color == "" {
-		color = "#626F7A"
+		color = "#000000"
 	}
 	return width + " " + kind + " " + color
 }

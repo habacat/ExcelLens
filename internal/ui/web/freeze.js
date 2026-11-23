@@ -9,6 +9,7 @@
       this.o = o;
       this.key = '';
       this.cache = new Map();
+      this.cells = new Map();
       this.cacheSizes = new Map();this.cacheBytes=0;
       this.timer = 0;
       this.abort = null;
@@ -32,6 +33,7 @@
       return {rows,cols};
     }
     reset() {
+      this.cells.clear();
       ++this.serial;
       clearTimeout(this.timer);
       this.abort?.abort(); this.abort = null;
@@ -94,6 +96,7 @@
       const {rows: nr, cols: nc} = this.effective();
       const ids = ['freezeTop','freezeLeft','freezeCorner','freezeHeader','freezeRowHeads'];
       if (!nr && !nc) {
+        this.cells.clear();
         ++this.serial;
         this.abort?.abort();this.abort=null;this.pending=null;
         this.key = '';
@@ -157,6 +160,7 @@
       const freezeRowHeads = document.getElementById('freezeRowHeads');
       s.frozenCellMap.clear();
       // Border resolution may need a later covered cell of a merged range.
+      this.cells.clear();
       // Make every fetched model available before painting the first anchor.
       const borderRows=new Map();
       for(const part of [corner,top,left])for(const row of part?.rows||[]){
@@ -191,6 +195,7 @@
         el.style.left = `${x}px`; el.style.top = `${y}px`;
         el.style.width = `${colWidth(col)}px`;el.style.height = `${type==='left'?rowHeight(visual):sourceHeight(row)}px`;
         el.dataset.ref = ref; el.dataset.row = String(row);
+        this.cells.set(ref,el);
         el.dataset.col = String(col); el.dataset.visualIndex = String(visual);
         this.o.paintCell(el,cell,data);if(base)s.frozenCellMap.set(ref,base);
         const rightCell=cellByColumn(data)?.[nextCol];

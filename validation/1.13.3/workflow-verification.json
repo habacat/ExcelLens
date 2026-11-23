@@ -1,0 +1,73 @@
+{
+  "version": "1.13.3",
+  "environment": "Windows x64, isolated headless Chromium and the application service",
+  "currencyHeader": {
+    "sourceFormat": "HTML XLS",
+    "sheetZoomPercent": [
+      100,
+      115
+    ],
+    "result": "PASS",
+    "comparison": "Cross-section centre and alpha-weighted width of a fixed 3 CSS pixel selection"
+  },
+  "toolbarAndSelectionStatistics": {
+    "result": "PASS",
+    "coverage": [
+      "Compact formula actions and worksheet tabs",
+      "Five highlight colours in reading and editing",
+      "Six statistics, four number displays and undo in an edit copy"
+    ]
+  },
+  "desktopManualAcceptance": false,
+  "nativeOfficeVisualComparison": false,
+  "selection": {
+    "selectionWidthCSSPixels": 3,
+    "scenarios": 89,
+    "referenceProfiles": 35069,
+    "widthProfiles": 35753,
+    "maximumCenterErrorPhysicalPixels": 0.018148,
+    "maximumWidthErrorPhysicalPixels": 0.014379,
+    "unbrokenSourceRules": 232,
+    "byFixture": {
+      "report": {
+        "scenarios": 48,
+        "outputs": [
+          "1",
+          "1-to-2",
+          "1.25",
+          "1.3",
+          "1.5",
+          "2"
+        ]
+      },
+      "ledger": {
+        "scenarios": 4,
+        "outputs": [
+          "1",
+          "1.25"
+        ]
+      },
+      "fixture": {
+        "scenarios": 16,
+        "outputs": [
+          "1-to-2",
+          "1.25"
+        ]
+      },
+      "pens": {
+        "scenarios": 21,
+        "outputs": [
+          "1",
+          "1.25",
+          "2"
+        ]
+      }
+    },
+    "result": "PASS"
+  },
+  "windowsRace": {
+    "result": "PASS",
+    "steps": 7,
+    "frontendTests": 559
+  }
+}

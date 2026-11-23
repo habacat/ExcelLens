@@ -210,6 +210,25 @@ const measure = () => h.page.run(() => {
     for (let i = 0; i < 79; i++) await key('ArrowDown', 'ArrowDown', 40);
     assert.equal(await p.evaluate('document.querySelector("#commandList .active").textContent'), '打开 Sheet：工具测试80');
     await key('Enter', 'Enter', 13); await p.wait(ready + '&&document.querySelector(".sheet-tab.active").textContent==="工具测试80"');
+    await p.wait('sheetTabs.scrollLeft>0 && !sheetPrevBtn.disabled');
+    const previous = await p.evaluate('sheetTabs.scrollLeft');
+    await p.click('#sheetPrevBtn'); await p.wait('sheetTabs.scrollLeft < '+(previous-4));
+    const dividers = [];
+    for (const preset of ['off','navy']) {
+      await p.click('input[name=readingPreset][value='+preset+']'); await settled();
+      dividers.push(await p.run(()=>{
+        const tabs=document.querySelectorAll('.sheet-tab'), style=getComputedStyle(tabs[1]);
+        const line=getComputedStyle(tabs[1],'::before');
+        return {first:getComputedStyle(tabs[0],'::before').content, content:line.content,
+          width:line.width,color:line.backgroundColor,padding:style.paddingLeft,active:document.querySelector('.sheet-tab.active').textContent};
+      }));
+    }
+    for(const d of dividers) {
+      assert.equal(d.first,'none'); assert.equal(d.content,'""'); assert.equal(d.width,'1px');
+      assert(parseFloat(d.padding)<=8); assert.equal(d.active,'工具测试80');
+    }
+    assert.notEqual(dividers[0].color,dividers[1].color);
+    report.checks.push('Compact worksheet tabs page through 80 sheets, with a theme-aware divider between adjacent names');
     report.checks.push('Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet');
 
     report.sourceUnchanged = hash(source) === before; assert(report.sourceUnchanged);

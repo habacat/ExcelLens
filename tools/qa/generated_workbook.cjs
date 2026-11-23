@@ -18,7 +18,15 @@ function workbook(sheets){
     'xl/workbook.xml':`<workbook xmlns="${ns}" xmlns:r="${rels}"><sheets>${sheets.map((s,i)=>`<sheet name="${xml(s.name)}" sheetId="${i+1}" r:id="s${i+1}"/>`).join('')}</sheets></workbook>`,
     'xl/_rels/workbook.xml.rels':`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="s${i+1}" Type="${rels}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}</Relationships>`
   };
-  for(const [i,sheet]of sheets.entries())parts[`xl/worksheets/sheet${i+1}.xml`]=`<worksheet xmlns="${ns}"><sheetData>${sheet.rows.map((row,r)=>`<row r="${r+1}">${row.map((value,c)=>{const ref=column(c+1)+(r+1);return typeof value==='object'?`<c r="${ref}" t="${xml(value.type||'n')}"><v>${xml(value.raw)}</v></c>`:`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;}).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  function cellXML(value, ref) {
+    if (typeof value !== 'object') return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
+    const formula = value.formula ? `<f>${xml(value.formula)}</f>` : '';
+    return `<c r="${ref}" t="${xml(value.type || 'n')}">${formula}<v>${xml(value.raw)}</v></c>`;
+  }
+  for (const [i, sheet] of sheets.entries()) {
+    const rows = sheet.rows.map((row, r) => `<row r="${r+1}">${row.map((value, c) => cellXML(value, column(c+1)+(r+1))).join('')}</row>`);
+    parts[`xl/worksheets/sheet${i+1}.xml`] = `<worksheet xmlns="${ns}"><sheetData>${rows.join('')}</sheetData></worksheet>`;
+  }
   return zip(parts);
 }
 module.exports={workbook,zip};

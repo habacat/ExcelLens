@@ -14,7 +14,7 @@ class Client{
   async shot(file){await this.call('Page.bringToFront');await this.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');const r=await this.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(file,Buffer.from(r.data,'base64'));}
   close(){for(const item of this.pending.values()){clearTimeout(item.timer);item.reject(Error('QA browser closed'));}this.pending.clear();this.socket.close();}
 }
-async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe'),launchFile,systemClipboard=false,trayInput=false}){
+async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.resolve('artifacts/qa/uiprobe.exe'),launchFile,systemClipboard=false,trayInput=false,nativeScale}){
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'excellens-ui-qa-'));
   const profile = path.join(storage, 'chrome');
   const clients = [];
@@ -72,6 +72,7 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
     // Headless Chrome has a private clipboard. A Windows interop check needs
     // the browser's platform clipboard, shared with the separate Excel instance.
     const display=systemClipboard ? ['--incognito','--disable-background-mode','--window-position=-32000,-32000'] : ['--headless=new'];
+    if (nativeScale) display.push('--force-device-scale-factor='+nativeScale,'--window-size=1600,800');
     browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',[...display,'--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
     await new Promise((resolve, reject) => {
       browser.once('spawn', resolve);
@@ -85,14 +86,15 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
         const firstLine = fs.readFileSync(active, 'utf8').split('\n')[0];
         if (/^\d+$/.test(firstLine.trim())) port = Number(firstLine);
       } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
+        if (error.code !== 'ENOENT' && error.code !== 'EBUSY') throw error;
       }
       if (port) break;
       if (Date.now() >= deadline) throw Error('Chrome debugging port was unavailable after 45 seconds');
       await pause(100);
     }
     harness.page=await harness.connect((await harness.tabs()).find(tab=>tab.type==='page'));
-    await harness.page.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1050,deviceScaleFactor:1,mobile:false});await harness.page.call('Page.navigate',{url:harness.address});
+    if (!nativeScale) await harness.page.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1050,deviceScaleFactor:1,mobile:false});
+    await harness.page.call('Page.navigate',{url:harness.address});
     await harness.page.wait('document.readyState==="complete"&&!!window.ExcelLensSession');await harness.page.evaluate('window.ExcelLensSession.ready');return harness;
   }catch(error){await harness.close();throw error;}
 }

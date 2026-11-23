@@ -69,7 +69,7 @@ func TestVisualStylesFromActualOOXML(t *testing.T) {
 	if cell.Color != "#123456" || cell.Background != "#FFCC33" || cell.FontName != "微软雅黑" || cell.FontSize != 12 || !cell.Bold || cell.Italic || !cell.Underline || !cell.Wrap || cell.Horizontal != "center" || cell.Vertical != "top" {
 		t.Fatalf("incorrect visual style: %+v", cell)
 	}
-	if cell.BorderTop != "2.25px double #445566" || cell.BorderLeft != "0.55px solid #000000" {
+	if cell.BorderTop != "3px double #445566" || cell.BorderLeft != "1px solid #000000" {
 		t.Fatalf("borders incorrectly resolved: %+v", cell)
 	}
 	if wb.VisualStyles[2].Color == "" || wb.VisualStyles[2].Color == "#204060" {

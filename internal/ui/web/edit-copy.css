@@ -14,14 +14,14 @@
 #editGridInput {
   z-index: 22; resize: none;
   color: var(--ink); background: var(--paper);
-  border-color: var(--accent); border-radius: 0;
+  border-color: var(--selection-color); border-radius: 0;
   overflow: auto; outline: none; overscroll-behavior: contain;
 }
 #editGridInput, #editGridFormula { scrollbar-width: none; scrollbar-gutter: auto; }
 #editGridInput::-webkit-scrollbar, #editGridFormula::-webkit-scrollbar { display: none; width: 0; height: 0; }
 #editGridInput:not(.writing) { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .grid-region.sheet-switching #editGridInput { visibility:hidden; }
-.formula-entry-frames { z-index:20; --range-stroke:2px; }
+.formula-entry-frames { z-index:20; }
 .editing-copy:has(#editGridKind:not([hidden])) .range-frames .range-corner { pointer-events:auto;cursor:crosshair;touch-action:none; }
 .formula-entry-frames .range-frame { border-color:var(--reference-color); background:color-mix(in srgb,var(--reference-color) 7%,transparent); }
 .edit-formula-popup {

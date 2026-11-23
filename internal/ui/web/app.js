@@ -172,7 +172,11 @@
 
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const scale = () => S.zoom / 100;
-  const headerHeight = () => HEADER_BASE * scale();
+  const snapPixel = value => {
+    const ratio = window.devicePixelRatio || 1;
+    return Math.round(value * ratio) / ratio;
+  };
+  const headerHeight = () => snapPixel(HEADER_BASE * scale());
   function updateGeometryBase(){
     // Never shrink every row merely to fit the CSS maximum scroll height.
     // The scrollbar is virtualized independently in updateCanvasSize().
@@ -183,22 +187,24 @@
     S.virtualScrollScale = virtualScroll.scale;
     return physical;
   }
-  const rowHeight = (row=0) => ((row&&!S.filtered?geometry.rows.measure(row):geometry.rows.base)*scale());
+  // A shared rule is only continuous if both cells end and begin at the same
+  // device pixel. Derive each height from the two cumulative, snapped edges.
+  const sourceRowTop = row => geometry.rows.paintOffset(row,scale(),window.devicePixelRatio||1);
+  const sourceRowHeight = row => sourceRowTop(row+1)-sourceRowTop(row);
+  const rowTop = row => S.filtered ? snapPixel((row-1)*geometry.rows.base*scale()) : sourceRowTop(row);
+  const rowHeight = (row=0) => row ? rowTop(row+1)-rowTop(row) : geometry.rows.base*scale();
   const colWidth = (col=0) => col?geometry.cols.paintSize(col,scale(),window.devicePixelRatio||1):geometry.cols.base*scale();
-  const rowTop = (row) => S.filtered?(row-1)*rowHeight():geometry.rows.offset(row)*scale();
   const colLeft = (col) => geometry.cols.paintOffset(col,scale(),window.devicePixelRatio||1);
   const rowAtOffset = (y) => S.filtered?Math.max(1,Math.floor(y/rowHeight())+1):geometry.rows.at(Math.max(0,y)/scale());
   const colAtOffset = (x) => geometry.cols.at(Math.max(0,x)/scale());
-  const rowTotal = (count) => S.filtered?count*rowHeight():geometry.rows.total(count)*scale();
-  const sourceRowTop = row => geometry.rows.offset(row)*scale();
-  const sourceRowHeight = row => geometry.rows.measure(row)*scale();
+  const rowTotal = count => rowTop(count+1);
   const rowVisible = row => !S.rowVisibility||S.rowVisibility.visible(row);
   const nextVisibleRow = row => S.rowVisibility?S.rowVisibility.next(row):Math.max(1,row);
   const previousVisibleRow = row => S.rowVisibility?S.rowVisibility.previous(row):Math.max(0,row);
   const advanceVisibleRow = (row,delta) => S.rowVisibility?S.rowVisibility.advance(row,delta):Math.max(1,Math.min(sourceRowLimit(),row+delta));
   const visibleSourceCount = (first,last) => S.rowVisibility?S.rowVisibility.count(first,last):Math.max(0,last-first+1);
   const filteredBodyCount = () => S.rowView&&S.rowView.filterId===S.filterId?Math.max(0,S.rowView.totalRows-(S.rowView.matchedPinnedRows||[]).filter(row=>row<=frozenPanes.effective().rows).length):S.filterTotal;
-  const sheetHeight = count => S.filtered?count*rowHeight()+sourceRowTop((frozenPanes?.effective().rows||0)+1):rowTotal(count);
+  const sheetHeight = count => rowTotal(count)+(S.filtered?sourceRowTop((frozenPanes?.effective().rows||0)+1):0);
   const colTotal = (count) => colLeft(count+1);
   const fmtBytes = value => window.ExcelLensDisplayFormat.bytes(value);
 
@@ -394,9 +400,16 @@
     frozenPanes?.schedule(true);
   }
 
+  function setDisplayFontSelection(font) {
+    S.fontOverride = font;
+    const picker = $("fontSelect");
+    picker.value = font;
+    picker.title = `显示字体（${picker.selectedOptions[0]?.text || font}）`;
+  }
+
   async function changeDisplayFont(font) {
     if (!S.indexReady || !S.sheet || !(font in FONT_STACKS) && font !== "") return;
-    S.fontOverride = font;
+    setDisplayFontSelection(font);
     repaintDisplayFonts();
     const sheet = S.sheet;
     try {
@@ -413,7 +426,7 @@
     // Recycled nodes can move from a conditional/explicit property to its
     // absence or false. Reset presentation only; keep geometry and seams.
     for(const property of ['--xl-fill','--xl-color'])p.removeProperty(property);
-    for(const property of ['fontSize','fontWeight','fontStyle','textDecoration','textDecorationStyle','textUnderlinePosition','justifyContent','alignItems','whiteSpace','wordBreak'])p[property]='';
+    for(const property of ['fontSize','fontWeight','fontStyle','textDecoration','textDecorationStyle','textUnderlinePosition','justifyContent','alignItems','textAlign','whiteSpace','wordBreak'])p[property]='';
     if (!cell) { applyDisplayFont(node, ""); return; }
     const visual = cellPresenter.style(cell);
     if (!S.showStyles || !visual) { applyDisplayFont(node, ""); return; }
@@ -428,7 +441,10 @@
     const underline=cell.conditional?.style?.font?.underline||visual.underlineStyle;
     if(underline==='double'||underline==='doubleAccounting')p.textDecorationStyle='double';
     if(/Accounting$/.test(underline||''))p.textUnderlinePosition='under';
-    if (STYLE_ALIGN[visual.horizontal]) p.justifyContent = STYLE_ALIGN[visual.horizontal];
+    if (STYLE_ALIGN[visual.horizontal]) {
+      p.justifyContent = STYLE_ALIGN[visual.horizontal];
+      if (visual.wrap) p.textAlign = visual.horizontal === 'centerContinuous' ? 'center' : visual.horizontal;
+    }
     else if ((!visual.horizontal || visual.horizontal === "general") && (cell.type === "n" || (!cell.type && cell.raw && Number.isFinite(Number(cell.raw))))) p.justifyContent = "flex-end";
     if (STYLE_VERTICAL[visual.vertical]) p.alignItems = STYLE_VERTICAL[visual.vertical];
     if (visual.wrap) {p.whiteSpace = "normal"; p.wordBreak = "break-word";}
@@ -460,29 +476,33 @@
     const endRow=merge?.endRow??r,endCol=merge?.endCol??c;
     const rightCol=anchor ? (edge.columns?.find(col=>col>endCol) ?? endCol+1) : (edge.nextCol||c+1);
     const under=!anchor&&belowRow ? belowRow.number : (nextVisibleRow(endRow+1)||endRow+1);
-    const opposite=(nr,nc,side,data,direct)=>{
+    const opposite=(nr,nc,data,direct)=>{
       const range=activeMerge(nr,nc);
-      if (!range && direct!==undefined) return visualForBorder(direct,data)[side];
+      if (!range && direct!==undefined) return visualForBorder(direct,data);
       const row=range?.row??nr,col=range?.col??nc,ref=colName(col)+row;
       const record=data?.number===row ? data : edge.rows?.get(row);
       const model=(row===nr&&col===nc?direct:null)||S.cellMap.get(ref)||S.frozenCellMap.get(ref)||record?.cells?.find(cell=>cell.col===col);
       const visual=visualForBorder(model,record);
-      return (range?mergedVisualBorder(visual,range):visual)[side];
+      return range?mergedVisualBorder(visual,range):visual;
     };
     // Always paint an interior seam on the trailing edge of its predecessor.
     // Painting inside the next merge's leading edge shifts it a device pixel.
     const directRight=endCol===c&&edge.nextCol ? (rightCell??null) : undefined;
     const directBelow=endRow===r&&belowRow ? (belowCell??null) : undefined;
-    const rightAt=rr=>borders.choose(own.borderRight,opposite(rr,rightCol,'borderLeft',
-      rr===r?rightRow:null,rr===r?directRight:undefined));
-    const bottomAt=cc=>borders.choose(own.borderBottom,opposite(under,cc,'borderTop',
-      belowRow,cc===c?directBelow:undefined));
-    const right=endRow===r?rightAt(r):borders.runs(r,endRow,edge.lastRow??endRow,nextVisibleRow,rightAt,own.borderRight||'');
-    const bottom=endCol===c?bottomAt(c):borders.runs(c,endCol,edge.columns?.at(-1)??endCol,i=>i,bottomAt,own.borderBottom||'');
-    borders.paint(node,'right',right,rowTop);
-    borders.paint(node,'bottom',bottom,colLeft);
+    // A source fill hides the default gridline on either side of the seam.
+    // Explicit borders still win, including ones contributed by a merged neighbour.
+    const seam=(primary,neighbor,side)=>borders.choose(primary,neighbor[side]) || (own.background || neighbor.background ? '0px' : '');
+    const rightAt=rr=>seam(own.borderRight,opposite(rr,rightCol,
+      rr===r?rightRow:null,rr===r?directRight:undefined),'borderLeft');
+    const bottomAt=cc=>seam(own.borderBottom,opposite(under,cc,
+      belowRow,cc===c?directBelow:undefined),'borderTop');
+    const fallback=own.background?'0px':'';
+    const right=endRow===r?rightAt(r):borders.runs(r,endRow,edge.lastRow??endRow,nextVisibleRow,rightAt,own.borderRight||fallback);
+    const bottom=endCol===c?bottomAt(c):borders.runs(c,endCol,edge.columns?.at(-1)??endCol,i=>i,bottomAt,own.borderBottom||fallback);
     const left=edge.outerLeft&&colLeft(c)===0?own.borderLeft||'':'';
     const top=edge.outerTop?own.borderTop||'':'';
+    borders.paint(node,'right',right,rowTop,top||bottom);
+    borders.paint(node,'bottom',bottom,colLeft,left||right);
     if(node._xlOuterLeft!==left){node._xlOuterLeft=left;
       if(left)node.style.borderLeft=left;else node.style.removeProperty('border-left');}
     if(node._xlOuterTop!==top){node._xlOuterTop=top;
@@ -821,8 +841,11 @@
     const textBytes=cell=>2*((cell?.raw?.length||0)+(cell?.display?.length||0)+(cell?.formula?.length||0));
     for(const row of S.renderedRows.values()){
       nodes+=row._xlCells?.size||0;
-      for(const cell of row._xlCells?.values()||[])nodes+=(cell._xlRichNode?.childNodes.length||0)*2+(cell._xlRichNode?1:0);
-      for(const cell of row._xlCells?.values()||[])retainedText+=textBytes(cell._xlModel)+window.ExcelLensRichText.estimate(cell._xlModel?.richText)+(window.ExcelLensConditional?.estimate(cell._xlModel?.conditional)||0);
+      for(const cell of row._xlCells?.values()||[]) {
+        nodes+=(cell.childElementCount||0)+(cell._xlRichNode?.childNodes.length||0)*2;
+        nodes+=(cell._xlborderRightParts?.childElementCount||0)+(cell._xlborderBottomParts?.childElementCount||0);
+        retainedText+=textBytes(cell._xlModel)+window.ExcelLensRichText.estimate(cell._xlModel?.richText)+(window.ExcelLensConditional?.estimate(cell._xlModel?.conditional)||0);
+      }
     }
     const bytes=estimateViewportBytes(S.viewportData.data)+[...frozen.values()].reduce((n,data)=>n+estimateViewportBytes(data),0)+
       512+nodes*1024+retainedText+textBytes(S.selected)+window.ExcelLensRichText.estimate(S.selected?.richText)+(window.ExcelLensConditional?.estimate(S.selected?.conditional)||0)+(layout.sourceMerges?.length||0)*224+(layout.sourceRows?.length||0)*128+
@@ -895,8 +918,7 @@
     S.window = null;
     frozenPanes?.reset();
     S.freeze = {rows:0,cols:0};
-    S.fontOverride = "";
-    $("fontSelect").value = "";
+    setDisplayFontSelection("");
     S.cellMap.clear();
     S.rowNumberByVisual.clear();
     if (!preserveTrace) S.traceRefs = [];
@@ -971,13 +993,12 @@
         S.columnMode=sizes.columnMode||'original';
         S.columnOverrides=sizes.columnVisibility||{};
         applyColumnVisibility();
-        S.fontOverride = FONT_STACKS[sizes.font] ? sizes.font : "";
-        $("fontSelect").value = S.fontOverride;
+        setDisplayFontSelection(FONT_STACKS[sizes.font] ? sizes.font : "");
       } catch(error) {
         if(epoch!==S.sheetEpoch||opening.signal.aborted)return;
         mergedCells.load([]);
         S.rowSizes={};S.columnWidths={};S.columnSourceRanges=[];S.columnMode='original';S.columnOverrides={};
-        applyColumnVisibility(); S.fontOverride=""; $("fontSelect").value="";
+        applyColumnVisibility(); setDisplayFontSelection("");
         toast('读取列布局失败：'+error.message,'error');
       }
       try {
@@ -1589,7 +1610,7 @@
           ctx.fillStyle=fallbackColor('--paper',"#f8fafc");ctx.fillRect(Math.max(left,x),Math.max(top,y),
             Math.min(w,x+cellW)-Math.max(left,x),Math.min(h,y+cellH)-Math.max(top,y));
           if(!S.showStyles||S.sourceGridLines){
-            ctx.strokeStyle=fallbackColor('--grid-line-color',"#edf0f2");ctx.beginPath();
+            ctx.strokeStyle=fallbackColor('--grid-line-color',"#e6e6e6");ctx.beginPath();
             ctx.moveTo(x+cellW-0.5,Math.max(top,y));ctx.lineTo(x+cellW-0.5,Math.min(h,y+cellH));
             ctx.moveTo(Math.max(left,x),y+cellH-0.5);ctx.lineTo(Math.min(w,x+cellW),y+cellH-0.5);
             ctx.stroke();
@@ -1897,6 +1918,68 @@
     if(node._xlInRange!==inside) {node._xlInRange=inside;node.classList.toggle('range-cell',inside);}
   }
 
+  // Only the visible row/column bands along the perimeter need a pen lookup.
+  // Keep the owning cell, including a merged predecessor, as the authority.
+  let selectionRasterRatio=0,selectionRasterStep=1;
+  function selectionSeams(view,pinned) {
+    const rowBands=new Map(), columns=new Set(), styles=new WeakMap();
+    const ratio=window.devicePixelRatio||1,layer=$('rangeFrames');
+    if(ratio!==selectionRasterRatio){
+      selectionRasterStep=parseFloat(getComputedStyle(layer,'::before').borderTopWidth)||1/ratio;
+      selectionRasterRatio=ratio;
+    }
+    const raster=Math.abs(selectionRasterStep*ratio-1)>.001
+      ? {step:selectionRasterStep,origin:layer.getBoundingClientRect()} : null;
+    function addRow(row,visual){
+      const [from,to]=view.rowBounds(row,visual);
+      if(to>from)rowBands.set(from,{row,visual,from,to});
+    }
+    for(const [visual,node] of S.renderedRows)addRow(Number(node.dataset.row),visual);
+    for(let row=1;row<=pinned.rows;row++)if(rowVisible(row))addRow(row,row);
+    const first=S.renderedRows.values().next().value;
+    for(const col of first?._xlCells?.keys()||[])columns.add(col);
+    for(let col=1;col<=pinned.cols;col++)columns.add(col);
+    const rows=[...rowBands.values()].sort((a,b)=>a.from-b.from);
+    const cols=[...columns].sort((a,b)=>a-b).map(col=>({col,from:colLeft(col),to:colLeft(col+1)})).filter(c=>c.to>c.from);
+    const read=(node,side,index)=>window.ExcelLensGridBorders.usedWidth(node,side,index,styles);
+    function owner(band,col){
+      const merge=activeMerge(band.row,col),r=merge?.row??band.row,c=merge?.col??col;
+      const frozen=r<=pinned.rows||c<=pinned.cols;
+      return (frozen&&frozenPanes.cells.get(colName(c)+r)) || S.renderedRows.get(merge?r:band.visual)?._xlCells?.get(c);
+    }
+    function edge(horizontal,position,start,end){
+      const across=horizontal?rows:cols,along=horizontal?cols:rows;
+      const leading=position===0, band=across.find(b=>leading?b.from===0:b.to===position);
+      const segments=[];
+      for(const b of along){
+        if(b.to<=start||b.from>=end)continue;
+        let width=0,inside=false;
+        if(band){
+          const row=horizontal?band:b,col=horizontal?b.col:band.col;
+          const cell=owner(row,col);
+          const side=horizontal?(leading?'Top':'Bottom'):(leading?'Left':'Right');
+          width=read(cell,side,horizontal?col:row.row);
+          inside=leading&&width>0;
+          if(position>0&&position===(horizontal?view.frozenHeight:view.frozenWidth)){
+            const pane=horizontal?(col<=pinned.cols?'freezeCorner':'freezeTop'):(row.row<=pinned.rows?'freezeCorner':'freezeLeft');
+            width=read($(pane),horizontal?'Bottom':'Right',0)||width;
+          }
+          if(leading&&!width){
+            const header=horizontal?$('columnHeaders'):S.renderedRows.get(row.visual)?.firstElementChild;
+            width=read(header,horizontal?'Bottom':'Right',0);
+          }
+        }
+        const offset=(inside?width:-width)/2;
+        const from=Math.max(start,b.from),to=Math.min(end,b.to),last=segments.at(-1);
+        if(last&&last.to===from&&last.offset===offset)last.to=to;
+        else segments.push({from,to,offset});
+      }
+      return segments;
+    }
+    return (x1,x2,y1,y2)=>({raster,top:edge(true,y1,x1,x2),bottom:edge(true,y2,x1,x2),
+      left:edge(false,x1,y1,y2),right:edge(false,x2,y1,y2)});
+  }
+
   function paintRangeFrames(areas = window.ExcelLensMultiSelection.areas(S)) {
     const layer=$('rangeFrames');
     const visible=S.indexReady || S.previewOnly;
@@ -1922,11 +2005,13 @@
       rowBounds:(row,visual)=>S.filtered && row>pinned.rows
         ? [frozenHeight+rowTop(visual),frozenHeight+rowTop(visual+1)] : [sourceRowTop(row),sourceRowTop(row+1)]
     };
+    let seams;
+    geometry.seams=(...bounds)=>(seams ||= selectionSeams(geometry,pinned))(...bounds);
     window.ExcelLensRangeFrame.paint(layer,visible ? areas : [],geometry);
     if (single) window.ExcelLensRangeFrame.paintCrosshair(tails,single,S.filtered ? S.selectedVisualIndex : single.row,geometry,colTotal(S.maxCol),sheetHeight(S.filtered?S.filterTotal:S.maxRow));
     if (references && (refs.length || references.childElementCount)) {
       const shown=window.ExcelLensEditReferenceView.visibleAreas(refs,S.filtered,pinned.rows,S.rowNumberByVisual,activeMerge);
-      window.ExcelLensRangeFrame.paint(references,shown,geometry);
+      window.ExcelLensRangeFrame.paint(references,shown,geometry,2);
     }
   }
 
@@ -1970,7 +2055,7 @@
     const columns=Array.isArray(data.columns)&&data.columns.length?data.columns:
       Array.from({length:data.colCount},(_,i)=>data.startCol+i);
     const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col));
-    const headerKey=`${visibleColumns.join(',')}|${S.zoom}|${geometry.version}|${S.indexReady}|${S.textHeaderRevision}|${ROW_HEAD}|${S.sheetEpoch}`;
+    const headerKey=`${visibleColumns.join(',')}|${S.zoom}|${geometry.version}|${window.devicePixelRatio}|${S.indexReady}|${S.textHeaderRevision}|${ROW_HEAD}|${S.sheetEpoch}`;
     if (S.renderedHeadersKey !== headerKey) {
       renderColumnHeaders(visibleColumns,width);
       S.renderedHeadersKey = headerKey;
@@ -2122,6 +2207,7 @@
     for(const [visual,row] of previous) if(!next.has(visual)) row.remove();
     S.renderedRows=next;
     S.renderedScrollTop=physicalScroll;
+    if(S.selected||S.range||S.multiRanges?.length)paintRangeFrames();
     const hasVisibleRows=S.filtered ? data.rows.length>0 : visibleSourceCount(1,S.maxRow)>0;
     $("gridEmpty").hidden=hasVisibleRows;
     if(!hasVisibleRows) $("gridEmpty").textContent=S.filtered?"没有可见的筛选记录；可在「行与大纲」中显示全部":"没有可见行；可在「行与大纲」中显示全部";
@@ -3702,13 +3788,13 @@
     S.filterRequest=(S.filterRequest||0)+1;
     S.sheetViews.clear();S.sheetViewsBytes=0;
     S.rowSizes={...config.layout.rows};S.columnWidths={...config.layout.cols};S.columnMode=config.layout.columnMode||'original';S.columnOverrides={...config.layout.columnVisibility};
-    S.fontOverride=config.layout.font;S.showStyles=config.showStyles;S.showFormulas=config.showFormulas;S.zoom=config.zoom;S.freeze={...config.freeze};
+    setDisplayFontSelection(config.layout.font);S.showStyles=config.showStyles;S.showFormulas=config.showFormulas;S.zoom=config.zoom;S.freeze={...config.freeze};
     S.sheetLayout={...S.sheetLayout,rows:S.rowSizes,cols:S.columnWidths,font:S.fontOverride,columnMode:S.columnMode,columnVisibility:S.columnOverrides};
     S.autoFilter=table;S.autoFiltersBySheet.set(sheet,table);
     const keys=query.sortKeys?.length?query.sortKeys:query.sortColumn?[{column:query.sortColumn,descending:!!query.descending,mode:''}]:[];
     if(keys.length){S.sortKeysBySheet.set(sheet,keys);S.sortHeaderBySheet.set(sheet,query.headerRow);}else{S.sortKeysBySheet.delete(sheet);S.sortHeaderBySheet.delete(sheet);}
     S.lastRulesBySheet.set(sheet,query.rules||[]);S.pendingFilterSpec=null;
-    $('fontSelect').value=S.fontOverride;$('zoomValue').textContent=S.zoom+'%';$('formatBtn').classList.toggle('format-active',S.showStyles);$('formatBtn').setAttribute('aria-pressed',String(S.showStyles));$('formulaViewBtn').setAttribute('aria-pressed',String(S.showFormulas));
+    $('zoomValue').textContent=S.zoom+'%';$('formatBtn').classList.toggle('format-active',S.showStyles);$('formatBtn').setAttribute('aria-pressed',String(S.showStyles));$('formulaViewBtn').setAttribute('aria-pressed',String(S.showFormulas));
     applyColumnVisibility();updateSourceAppearance();updateFreezeUI();updateAutoFilterButton();frozenPanes.reset();
     document.documentElement.style.setProperty('--row-height',`${rowHeight()}px`);document.documentElement.style.setProperty('--col-width',`${colWidth()}px`);document.documentElement.style.setProperty('--header-height',`${headerHeight()}px`);
     S.range=null;S.multiRanges=[];S.rangeAnchor=null;S.traceRefs=[];
@@ -4648,7 +4734,26 @@
       if (file) uploadFile(file);
     });
     new ResizeObserver(() => {syncFreezeScrollGutters();paintRangeFrames();}).observe($("grid"));
-    window.addEventListener("resize", () => { if(S.previewOnly){updateCanvasSize();scheduleInitialPreview();return;} if (S.indexReady) { updateCanvasSize(); scheduleViewport(true); frozenPanes.schedule(true); } });
+    let gridPixelRatio = window.devicePixelRatio || 1;
+    function resizeWorkspace() {
+      const ratio = window.devicePixelRatio || 1, changed = ratio !== gridPixelRatio;
+      gridPixelRatio = ratio;
+      if (S.previewOnly) { updateCanvasSize(); scheduleInitialPreview(); return; }
+      if (!S.indexReady) return;
+      updateCanvasSize();
+      if (changed) {
+        renderGridFromCurrentWindow();
+        paintRangeFrames();
+      }
+      scheduleViewport(true);
+      frozenPanes.schedule(true);
+    }
+    function watchPixelRatio() {
+      if ((window.devicePixelRatio || 1) !== gridPixelRatio) resizeWorkspace();
+      window.matchMedia?.(`(resolution: ${gridPixelRatio}dppx)`).addEventListener('change', watchPixelRatio, {once:true});
+    }
+    watchPixelRatio();
+    window.addEventListener("resize", resizeWorkspace);
     // Exactly one keyboard dispatcher. Grid shortcuts bubble here, so a
     // non-modal search panel cannot trigger two actions or open a JS prompt.
     document.addEventListener('keydown',handleSpreadsheetKeydown);
@@ -4784,7 +4889,13 @@
   };
   if(window.ExcelLensRowViews)rowViews=new window.ExcelLensRowViews({state:S,api,toast,maximum:sourceRowLimit,commit:commitRowView,navigate:navigateToCell,reload:()=>selectSheet(S.sheet),openDialog});
   calculator=new window.ExcelLensCalculator({state:S,api,toast,grid:$('grid'),copy:copyText});
-  selectionStats=new window.ExcelLensSelectionStats({state:S,api,colName,toast,profile:()=>profileCenter.open(),excludeThroughRow:()=>frozenPanes?.effective().rows||0});
+  selectionStats=new window.ExcelLensSelectionStats({state:S,api,colName,toast,profile:()=>profileCenter.open(),excludeThroughRow:()=>frozenPanes?.effective().rows||0,
+    editBinding:()=>{
+      if (!editCopy?.grid.active) return undefined;
+      const {id,binding,revision}=editCopy.data.document;
+      return {document:{id,binding},revision,book:S.book};
+    }
+  });
   multiSort=new window.ExcelLensMultiSort({state:S,parseColumn,colName,toast,openDialog,
     submit:async(keys,header)=>{
       const rules=currentQueryRules();

@@ -7,16 +7,20 @@ const {launch} = require('./browser_harness.cjs');
 const {zip} = require('./generated_workbook.cjs');
 const {validationVersion} = require('./project_config.cjs');
 
-function fixture() {
+function fixture(varied = false) {
   const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
   const rel = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
   const pkg = 'http://schemas.openxmlformats.org/package/2006/relationships';
-  const border = ['left', 'right', 'top', 'bottom'].map(side =>
-    '<' + side + ' style="thin"><color rgb="FF626F7A"/></' + side + '>').join('');
+  const types=varied?['thin','thick','double','mediumDashed','dotted',null]:['thin'];
+  const borders=types.map(type=>'<border>'+(type?['left','right','top','bottom'].map(side=>
+    '<'+side+' style="'+type+'"><color rgb="FF626F7A"/></'+side+'>').join(''):'')+'</border>').join('');
+  const formats=types.map((_,i)=>'<xf fillId="2" borderId="'+(i+1)+'" applyFill="1" applyBorder="1"/>').join('');
+  const overrides={B3:2,D3:4,E3:4,F6:3,G7:5,H10:6};
   const rows = Array.from({length: 11}, (_, r) => {
     const cells = Array.from('ABCDEFGHI', (col, c) => {
       const styled = r >= 2 && r <= 7 && c >= 1 && c <= 6;
-      return '<c r="' + col + (r + 1) + '" s="' + Number(styled) + '" t="inlineStr"><is><t>' + (styled ? '' : col + (r+1)) + '</t></is></c>';
+      const style=(varied&&overrides[col+(r+1)])||Number(styled);
+      return '<c r="' + col + (r + 1) + '" s="' + style + '" t="inlineStr"><is><t>' + (styled ? '' : col + (r+1)) + '</t></is></c>';
     });
     return '<row r="' + (r + 1) + '" ht="25.7" customHeight="1">' + cells.join('') + '</row>';
   });
@@ -25,7 +29,7 @@ function fixture() {
     '_rels/.rels': '<Relationships xmlns="' + pkg + '"><Relationship Id="book" Type="' + rel + '/officeDocument" Target="xl/workbook.xml"/></Relationships>',
     'xl/workbook.xml': '<workbook xmlns="' + ns + '" xmlns:r="' + rel + '"><sheets><sheet name="明细" sheetId="1" r:id="s1"/></sheets></workbook>',
     'xl/_rels/workbook.xml.rels': '<Relationships xmlns="' + pkg + '"><Relationship Id="s1" Type="' + rel + '/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="styles" Type="' + rel + '/styles" Target="styles.xml"/></Relationships>',
-    'xl/styles.xml': '<styleSheet xmlns="' + ns + '"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDBDBDB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border>' + border + '<diagonal/></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fillId="2" borderId="1" applyFill="1" applyBorder="1"/></cellXfs></styleSheet>',
+    'xl/styles.xml': '<styleSheet xmlns="' + ns + '"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDBDBDB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="' + (types.length+1) + '"><border/>' + borders + '</borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="' + (types.length+1) + '"><xf/>' + formats + '</cellXfs></styleSheet>',
     'xl/worksheets/sheet1.xml': '<worksheet xmlns="' + ns + '"><dimension ref="A1:I11"/><cols><col min="1" max="9" width="10.7" customWidth="1"/></cols><sheetData>' + rows.join('') + '</sheetData><mergeCells count="3"><mergeCell ref="B3:B4"/><mergeCell ref="D3:E3"/><mergeCell ref="B7:C7"/></mergeCells></worksheet>'
   });
 }
@@ -53,7 +57,8 @@ async function readStrokes(encoded, pane, real) {
       const index = (py * img.width + px) * 4;
       // Compare the stroke's center, including ties for a multi-pixel line.
       // Measuring the faint antialiasing fringe also measures the adjacent fill.
-      if (data[index] >= 205 || data[index+2]-data[index] < 7) continue;
+      if (real ? Math.max(data[index],data[index+1],data[index+2]) >= 180 :
+          data[index] >= 205 || data[index+2]-data[index] < 7) continue;
       coverage.push(horizontal ? py : px);
       const darkness = data[index] + data[index+1] + data[index+2];
       if (darkness < peak) { peak = darkness; ink.length = 0; }
@@ -89,6 +94,8 @@ async function main() {
       await p.click('#freezeApplyBtn');
     }
     await p.click('#crosshairToggle');
+    await p.run(()=>{grid.scrollLeft=0;grid.scrollTop=0;});
+    await p.wait('window.ExcelLensPerformance().hasVisibleCoverage && document.querySelector("#rowsLayer .grid-cell[data-ref=A1]")');
     await p.click('.grid-cell[data-ref="A1"]');
     for (const mode of (real ? ['body'] : ['body', 'frozen'])) {
       if (mode === 'frozen') {
@@ -142,4 +149,5 @@ async function main() {
     }
   } finally { await h.close(); }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+module.exports = {fixture};
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

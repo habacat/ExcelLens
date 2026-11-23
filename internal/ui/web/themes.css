@@ -128,8 +128,8 @@
 /* The crosshair is independent from explicit cell and range selection. Its
  * state lives in CSS, so frozen and cached cells update without a repaint. */
 :root {
-  --crosshair-color: #3c7dc3;
-  --selection-color: #109968; --selection-night-fill: rgba(255, 255, 255, .12); --selection-active-fill: #3c7dc31f;
+  --crosshair-color: #109968;
+  --selection-color: var(--crosshair-color); --selection-night-fill: rgba(255, 255, 255, .12); --selection-active-fill: color-mix(in srgb, var(--crosshair-color) 12%, transparent);
   --crosshair-row-fill: color-mix(in srgb, var(--crosshair-color) 8%, transparent);
   --crosshair-column-fill: color-mix(in srgb, var(--crosshair-color) 11%, transparent);
   --crosshair-both-fill: color-mix(in srgb, var(--crosshair-color) 17%, transparent);

@@ -77,7 +77,7 @@
   --grid-head-ink: #66756f;
   --grid-head-line: #e3e8e6;
   --grid-corner: #ebefed;
-  --grid-line-color: #edf0f2;
+  --grid-line-color: #e6e6e6;
   --grid-freeze-line: #97a5a0;
   --grid-accent: #0e6f57;
   --grid-on-accent: #fff;
@@ -408,22 +408,24 @@ body.editing-copy .brand-area { flex: 1 1 auto; max-width: none; margin-right: 0
 :root[data-ribbon-layout="false"] .classic-actions {
   display: flex; flex: 1 1 0; min-width: 0; align-items: center; gap: 2px;
 }
-.classic-actions .tool-button, :is(.classic-before,.classic-after) .tool-button { padding: 0 7px; }
+.classic-actions .tool-button { padding: 0 7px; }
 .classic-actions :is([data-toolbar-overflow], [data-toolbar-when-enabled]:disabled, #historyBackBtn:disabled, #historyForwardBtn:disabled) { display: none; }
-.classic-actions .tool-button > .icon:first-child, :is(.classic-before,.classic-after) .tool-button > .icon { color: var(--muted); }
+.classic-actions .tool-button > .icon:first-child { color: var(--muted); }
 :root[data-ribbon-layout="false"] .brand-area { max-width: min(16cqi, 240px); }
 :root[data-ribbon-layout="false"] .global-status { max-width: min(12cqi, 160px); }
 :root[data-ribbon-layout="false"] .command-field { flex: 0 0 clamp(30px, calc(25cqi - 100px), 220px); }
 :root[data-ribbon-layout="false"] .classic-before,
 :root[data-ribbon-layout="false"] .classic-after { display: flex; align-items: center; gap: 2px; }
-.classic-after :is(#copyFormulaBtn,#copyValueBtn) {
-  height: var(--ctl-bar); padding: 0 7px; border: 0; border-radius: var(--r-2);
-  background: transparent; color: var(--ink); font: inherit; white-space: nowrap; cursor: pointer;
+:is(.classic-before,.classic-after) button, .classic-after .ribbon-field {
+  width: var(--field-height); height: var(--field-height); justify-content: center; gap: 0; padding: 0; color: var(--muted);
 }
-.classic-after :is(#copyFormulaBtn,#copyValueBtn):hover:not(:disabled) { background: var(--hover); }
-.classic-after :is(#copyFormulaBtn,#copyValueBtn):disabled { color: var(--faint); cursor: default; }
-.classic-after kbd { display: none; }
-.formula-toolbar :is(.classic-before,.classic-after) .tool-button { height: var(--ctl-bar); }
+:is(.classic-before,.classic-after) button { font-size: 0; }
+.classic-after kbd, #copyMenu .icon { display: none; }
+.classic-after .ribbon-field { position: relative; border-radius: var(--r-2); }
+.classic-after .ribbon-field:hover { background: var(--hover); color: var(--ink); }
+.classic-after .ribbon-field:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The native picker covers the font icon and keeps its popup and keyboard controls. */
+.classic-after .font-picker { position: absolute; inset: 0; width: 100%; opacity: 0; }
 body.editing-copy .titlebar > .classic-actions { display: none; }
 :root[data-ribbon-layout="false"] body.editing-copy .brand-area { max-width: none; }
 @container app-tools (max-width: 900px) {
@@ -452,6 +454,7 @@ body.editing-copy .titlebar > .classic-actions { display: none; }
 .fx-label { width: 24px; flex: none; color: var(--faint); font-family: Georgia, "Times New Roman", serif; font-size: 14px; font-style: italic; font-weight: 700; text-align: center; }
 .formula-input { flex: 1; padding-inline: 8px; font-family: var(--font-mono); line-height: calc(var(--field-height) - 2px); white-space: pre; }
 .formula-value { width: min(18vw, 200px); min-width: 64px; padding: 0 4px; overflow: hidden; color: var(--muted); font-family: var(--font-mono); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ribbon-layout="false"] .formula-value { width: auto; min-width: 0; max-width: min(18cqi, 200px); }
 .toolbar-select { flex: none; }
 textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 .formula-expanded textarea.formula-input { field-sizing: content; }
@@ -498,20 +501,14 @@ textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 .formula-preview-actions button { height: var(--ctl-s); padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: var(--ink); font-size: var(--fs-2); cursor: pointer; }
 .formula-preview-actions button:hover { border-color: var(--line-strong); background: var(--inset); }
 body.editing-copy .formula-toolbar > :not(.edit-toolbar-control),
-body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellTooltip) { display: none !important; }
+body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { display: none !important; }
 @media (max-width: 700px) { .formula-value, .fx-label { display: none; } .name-box { width: 76px; } }
-@container formula-tools (max-width: 1390px) {
+@container formula-tools (max-width: 820px) {
   .classic-before :is(#dataRulesOpenBtn,#recordCardOpenBtn), .classic-after :is(#copyFormulaBtn,#traceDependentsBtn) { display: none; }
 }
-@container formula-tools (max-width: 900px) {
+@container formula-tools (max-width: 520px) {
   :root[data-ribbon-layout="false"] :is(.classic-before,.formula-value) { display: none; }
   .classic-after :is(#copyValueBtn,#tracePrecedentsBtn) { display: none; }
-  .classic-after .font-picker { width: 90px; }
-}
-@container formula-tools (max-width: 520px) {
-  .classic-after .ribbon-field { padding: 0; }
-  .classic-after .ribbon-field > .icon { display: none; }
-  .classic-after .font-picker { width: 82px; }
   :root[data-ribbon-layout="false"] .name-box { width: 62px; }
 }
 
@@ -519,7 +516,7 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
 .bottom-bar { min-width: 0; display: grid; grid-template-rows: 26px 22px; border-top: 1px solid var(--line); background: var(--inset); }
 .sheet-controls { min-width: 0; display: flex; align-items: stretch; border-bottom: 1px solid var(--line-soft); }
 :is(.sheet-list-button, .sheet-edge-button) {
-  flex: none; width: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  flex: none; width: 24px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
   border: 0; background: transparent; color: var(--muted); cursor: pointer;
 }
 :is(.sheet-list-button, .sheet-edge-button):hover:not(:disabled) { background: var(--hover); color: var(--ink); }
@@ -528,19 +525,26 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
 .sheet-tabs { min-width: 0; flex: 1; display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
 .sheet-tabs::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .sheet-tab {
-  flex: 0 0 auto; min-width: 64px; max-width: 190px; padding: 0 13px; overflow: hidden;
+  position: relative; flex: 0 0 auto; min-width: 32px; max-width: 190px; padding: 0 8px; overflow: hidden;
   border: 0; border-top: 2px solid transparent; background: transparent; color: var(--muted);
   font-size: var(--fs-2); text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
 }
 .sheet-tab:hover { background: var(--hover); color: var(--ink); }
+.sheet-tab + .sheet-tab::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--line); pointer-events: none; }
 .sheet-tab.active { border-top-color: var(--accent); background: var(--surface); color: var(--accent-strong); font-weight: 600; }
 .sheet-tab.hidden-sheet { opacity: .55; }
-.sheet-tab.has-tab-color { position: relative; border-top-color: var(--sheet-tab-color); background: color-mix(in srgb, var(--sheet-tab-color) 14%, var(--surface)); color: var(--ink); }
+.sheet-tab.has-tab-color { border-top-color: var(--sheet-tab-color); background: color-mix(in srgb, var(--sheet-tab-color) 14%, var(--surface)); color: var(--ink); }
 .sheet-tab.has-tab-color:hover { background: color-mix(in srgb, var(--sheet-tab-color) 22%, var(--surface)); }
 .sheet-tab.has-tab-color.active { border-top-color: var(--sheet-tab-color); box-shadow: inset 0 -2px 0 var(--sheet-tab-color); background: color-mix(in srgb, var(--sheet-tab-color) 8%, var(--surface)); }
 .status-strip { display: flex; min-width: 0; align-items: center; gap: 12px; padding: 0 8px 0 10px; color: var(--muted); font-size: var(--fs-2); }
 .status-strip :is(#gridStatus, #selectionStatus) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-strip .quick-stats { min-width: 0; overflow: hidden; }
+.quick-stats-options { width: 22px; height: 20px; }
+.quick-stats-menu { min-width: min(248px, calc(100vw - 16px)); }
+.quick-stats-menu button::before { content: ""; width: 14px; flex: none; }
+.quick-stats-menu button[aria-checked="true"]::before { content: "✓"; color: var(--accent); }
+.quick-stats-menu .stat-result { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.quick-stats-menu .stat-status { margin: 3px 8px; color: var(--muted); font-size: var(--fs-2); }
 .filter-status { flex: none; padding: 0 6px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); line-height: 1.5; }
 .freeze-status, .large-data-status { flex: none; white-space: nowrap; }
 .large-data-status { color: var(--accent); }
@@ -596,7 +600,8 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
 .reading-texture-option input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: currentColor; transition: translate var(--motion-fast, 110ms); }
 .reading-texture-option input:checked { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .reading-texture-option input:checked::before { translate: 12px 0; }
-.crosshair-panel { right: 96px; }
+.crosshair-controls, .crosshair-panel { --accent: var(--crosshair-color); }
+.crosshair-panel { right: 96px; --active: color-mix(in srgb, var(--crosshair-color) 12%, var(--surface)); }
 .crosshair-controls { flex: none; display: flex; align-items: center; gap: 2px; }
 .crosshair-toggle { display: flex; align-items: center; gap: 5px; min-height: 20px; white-space: nowrap; cursor: pointer; }
 .crosshair-toggle input { width: 13px; height: 13px; margin: 0; cursor: inherit; }
@@ -635,10 +640,10 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
 .column-filter { position: absolute; right: 2px; top: 3px; width: 17px; height: 19px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--faint); font-size: 10px; line-height: 1; cursor: pointer; opacity: 0; }
 .column-head:hover .column-filter, .column-filter.active { opacity: 1; }
 .column-filter:hover { background: var(--active); color: var(--accent-strong); }
-.rows-layer { position: absolute; top: var(--header-height); bottom: 0; left: 0; width: var(--canvas-width); overflow: clip; overflow-anchor: none; }
-/* Row containment creates separate stacking contexts. Selection is painted on
-   the cells, so a row cannot cover a merged anchor from an earlier row. */
-.grid-row { position: absolute; left: 0; width: var(--canvas-width); height: var(--row-height); border-bottom: 0 !important; pointer-events: none; contain: layout style; }
+/* Snap adjoining rows in the same painting context. Isolating each row lets
+   the browser round its origin separately and bury its border under the next fill. */
+.rows-layer { position: absolute; top: var(--header-height); bottom: 0; left: 0; width: var(--canvas-width); overflow: clip; overflow-anchor: none; contain: layout style; }
+.grid-row { position: absolute; left: 0; width: var(--canvas-width); height: var(--row-height); border-bottom: 0 !important; pointer-events: none; }
 .row-head { position: sticky; left: 0; z-index: 8; width: var(--row-header-width); height: var(--row-height); display: flex; align-items: center; justify-content: flex-end; padding: 0 7px 0 3px; border-right: .4px solid var(--grid-head-line); background: var(--grid-head); color: var(--grid-head-ink); font-family: Consolas, monospace; font-size: 10px; user-select: none; pointer-events: auto; }
 /* Fractional row heights can leave a subpixel seam between sticky headers. */
 .row-head::before { content: ""; position: absolute; inset: -1px -.5px -1px 0; z-index: -1; background: inherit; border-right: inherit; pointer-events: none; }
@@ -700,13 +705,14 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
   --grid-line-color: var(--range-grid-line, #d0d0d0);
   background-image: linear-gradient(var(--range-fill, #00000019), var(--range-fill, #00000019)) !important;
 }
-.range-frames { position: absolute; inset: 0; overflow: hidden; z-index: 19; pointer-events: none; --range-stroke: 3px; }
+.range-frames { position: absolute; inset: 0; overflow: hidden; z-index: 19; pointer-events: none; }
+/* Used width of a hairline reports the layout raster even when the output
+   surface is scaled again (e.g. a browser moving between displays). */
+#rangeFrames::before { content: ""; position: absolute; visibility: hidden; border-top: .01px solid transparent; }
 .range-frame, .range-corner { position: absolute; display: block; box-sizing: border-box; border: solid var(--selection-color, #109968); }
+.range-frame > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; fill: var(--selection-color); }
 .range-corner {
-  /* Centre the five-pixel mark on the intersection of the two inset strokes. */
-  --corner-offset: calc(-50% - var(--range-stroke) / 2);
-  width: 7px; height: 7px; transform: translate(var(--corner-offset), var(--corner-offset));
-  background: var(--selection-color, #109968); border: 1px solid var(--grid-paper);
+  background: var(--selection-color, #109968); border: 0; box-shadow: inset 0 0 0 1px var(--grid-paper);
 }
 /* Viewport-only lightweight placeholder during a cold, far-away scroll. */
 .viewport-fallback { position: absolute; inset: 0; z-index: 9; pointer-events: none; contain: strict; }
@@ -751,11 +757,13 @@ body.editing-copy :is(#quickStats, #selectionStatus, .auto-filter-button, #cellT
 .grid-cell.rich-text-notice, .grid-cell.cell-presentation-notice { text-decoration: underline dotted var(--mark); text-underline-offset: 3px; }
 /* One owner per grid seam. Fractional CSS borders stay one device pixel on
    common panels; source borders override these defaults. */
-.grid-region { --grid-default-seam: .4px solid var(--grid-line-color); }
-.source-no-gridlines .grid-region { --grid-default-seam: 0px; }
-.grid-border-segments { position: absolute; inset: 0; pointer-events: none; }
+.grid-cell { --grid-default-seam: .4px solid var(--grid-line-color); }
+.grid-border-segments, .grid-default-right, .grid-default-bottom { position: absolute; inset: 0; pointer-events: none; }
+.grid-border-segments { z-index: 1; }
+.grid-default-right { border-right: var(--grid-default-seam); }
+.grid-default-bottom { border-bottom: var(--grid-default-seam); }
 .grid-border-segments > i { position: absolute; pointer-events: none; }
-.source-no-gridlines .grid-cell { border-right: 0; border-bottom: 0; }
+.source-no-gridlines .grid-cell { --grid-default-seam: 0px; border-right: 0; border-bottom: 0; }
 .source-html-view .grid-cell { line-height: 1.2; padding: 1px 3px; }
 /* Source column widths include Excel's five-pixel text margin. The generic
    padding must not consume the source content width. */

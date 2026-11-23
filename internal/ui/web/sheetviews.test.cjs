@@ -4,6 +4,7 @@ function harness(override){
   const nodes=new Map(),calls=[],notices=[],cardResets=[],quickResets=[],detailResets=[];let timer=0;
   const node=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{hidden:true,disabled:false,inert:false,scrollTop:0,scrollLeft:0,clientHeight:625,clientWidth:1200,style:{},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)},focus(){}});}return nodes.get(id);};
   node('grid').parentElement=node('region');
+  node('fontSelect').selectedOptions=[{text:'原表字体'}];
   const ctx={paintRangeFrames(){},transposeCenter:{resetBook(){},changed(){}},profileCenter:{resetBook(){},changed(){}},window:{ExcelLensTableHeaders:{fromHeader:()=>null}},traceUI:null,rowViews:null,cellExplanation:{resetBook:()=>detailResets.push(ctx.S.sheet),changed(){}},selectionQuick:{resetBook:()=>quickResets.push(ctx.S.sheet),changed(){}},recordCardCenter:{resetBook:()=>cardResets.push(ctx.S.sheet),controls(){}},geometry:{rows:{setHidden(){}}},Map,Set,Math,AbortController,URLSearchParams,encodeURIComponent,
     $:node,editCopy:null,setTimeout:()=>++timer,clearTimeout(){},cancelAnimationFrame(){},FONT_STACKS:{},
     sourceRowLimit:()=>50000000,rowVisible:()=>true,colName:n=>String.fromCharCode(64+n),getVirtualScrollTop:()=>node('grid').scrollTop,setVirtualScrollTop:v=>node('grid').scrollTop=v,
@@ -24,6 +25,7 @@ function harness(override){
   vm.runInNewContext(fs.readFileSync(__dirname+'/richtext.js','utf8'),ctx);
   const stateBegin=source.indexOf('  const S = {'),stateEnd=source.indexOf('\n  const cellPresenter',stateBegin);
   vm.runInNewContext(source.slice(stateBegin,stateEnd)+';this.S=S;',ctx);ctx.S.opened=true;ctx.S.source={format:'xlsx'};ctx.S.workbookKey='qa-book';
+  vm.runInNewContext(source.slice(source.indexOf('  function setDisplayFontSelection('),source.indexOf('  async function changeDisplayFont(')),ctx);
   vm.runInNewContext(fs.readFileSync(__dirname+'/viewport-cache.js','utf8'),ctx);
   ctx.estimateViewportBytes=ctx.window.ExcelLensViewport.estimateViewportBytes;
   ctx.tiles=new ctx.window.ExcelLensViewport.TileCache(24*1024*1024);

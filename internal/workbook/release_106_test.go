@@ -135,9 +135,9 @@ func TestReadTabColorsFromWorksheetMetadata(t *testing.T) {
 
 func TestBorderWidthsRefinedButStillDistinct(t *testing.T) {
 	cases := []struct{ style, want string }{
-		{"hair", "0.35px dotted #000000"}, {"thin", "0.55px solid #000000"},
-		{"dashed", "0.55px dashed #000000"}, {"medium", "1.15px solid #000000"},
-		{"thick", "1.75px solid #000000"}, {"double", "2.25px double #000000"},
+		{"hair", "0.35px dotted #000000"}, {"thin", "1px solid #000000"},
+		{"dashed", "1px dashed #000000"}, {"medium", "2px solid #000000"},
+		{"thick", "3px solid #000000"}, {"double", "3px double #000000"},
 	}
 	for _, tc := range cases {
 		if got := borderCSS(styleSideXML{Style: tc.style}, "#000000"); got != tc.want {

@@ -79,6 +79,7 @@
       for (const {node, marker, group, menuItem} of this.positions) {
         node.removeAttribute('data-toolbar-overflow');
         if (menuItem) {
+          node.classList.toggle('icon-button', !ribbon);
           if (ribbon) node.setAttribute('role','menuitem');
           else node.removeAttribute('role');
         }

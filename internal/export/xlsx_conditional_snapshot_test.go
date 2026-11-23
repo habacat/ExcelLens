@@ -154,7 +154,7 @@ func TestConditionalXLSXSnapshotReopensSortedSparseMultiSheetValuesTypesDatesAnd
 						}
 						if sourceCol == 2 && sourceRow == 3 {
 							want := "9007199254740993.31"
-							if c.Raw != want || c.Display != want || v.BorderRight != "0.55px solid #000000" || !strings.Contains(v.BorderTop, "double") || v.FontVertical != "superscript" || v.UnderlineStyle != "double" {
+							if c.Raw != want || c.Display != want || v.BorderRight != "1px solid #000000" || !strings.Contains(v.BorderTop, "double") || v.FontVertical != "superscript" || v.UnderlineStyle != "double" {
 								t.Fatal("source-coordinate condition or untouched font was lost", mode, c, v)
 							}
 						}

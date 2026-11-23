@@ -11,6 +11,39 @@ const screenshots = path.join(out, 'private', 'edit-toolbar');
 const report = {result: 'FAIL', layouts: 0, errors: []};
 const frames = 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))';
 
+async function checkEditingColors(p) {
+  const colors = await p.evaluate('[...document.querySelectorAll("input[name=crosshairColor]")].map(n=>n.value)');
+  const cases = [];
+  for (const preset of ['off', 'navy']) {
+    await p.click('input[name=readingPreset][value='+preset+']');
+    for (const color of colors) {
+      await p.click('#crosshairColorBtn');
+      await p.click('input[name=crosshairColor][value='+color+']');
+      const colorsInView = await p.run(() => {
+        const selected = document.querySelector('#crosshairPanel input:checked').closest('label');
+        return {palette: getComputedStyle(selected.querySelector('.reading-swatch')).backgroundColor,
+          checkbox: getComputedStyle(crosshairToggle).accentColor, dot: getComputedStyle(document.querySelector('.crosshair-current-color')).backgroundColor,
+          option: getComputedStyle(selected).borderColor, selection: getComputedStyle(document.querySelector('#rangeFrames rect')).fill};
+      });
+      await p.click('[data-highlight-close]');
+      const point = await p.run(() => {
+        const r = document.querySelector('.grid-cell[data-ref="A2"]').getBoundingClientRect();
+        return {x:r.x+r.width/2, y:r.y+r.height/2};
+      });
+      for (const clickCount of [1,2]) for (const type of ['mousePressed','mouseReleased']) {
+        await p.call('Input.dispatchMouseEvent',{type,button:'left',clickCount,...point});
+      }
+      await p.wait('editGridInput.classList.contains("writing") && document.activeElement===editGridInput');
+      colorsInView.editor = await p.evaluate('getComputedStyle(editGridInput).borderColor');
+      assert.equal(new Set(Object.values(colorsInView)).size,1,JSON.stringify({preset,color,colorsInView}));
+      cases.push({preset,color,paint:colorsInView.editor});
+      for (const type of ['keyDown','keyUp']) await p.call('Input.dispatchKeyEvent',{type,key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+      await p.wait('!editGridInput.classList.contains("writing")');
+    }
+  }
+  return cases;
+}
+
 function geometry() {
   const rect = node => {
     const {x, y, width, height, right, bottom} = node.getBoundingClientRect();
@@ -67,6 +100,7 @@ async function main() {
     await p.wait('document.body.classList.contains("editing-copy") && !editGridSave.disabled');
     await p.click('.grid-cell[data-ref="A2"]');
     await p.wait('nameBox.value === "A2" && editGridFormula.value === "四川分公司"');
+    report.editingColors = await checkEditingColors(p);
     for (const preset of presets) {
       await palette(preset);
       for (const size of sizes) {

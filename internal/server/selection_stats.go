@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
-	"excellens/internal/analysis"
+	"excellens/internal/checkpoint"
+	"excellens/internal/editdoc"
+	"excellens/internal/editfile"
 	"excellens/internal/workbook"
 )
 
@@ -29,11 +32,17 @@ type selectionStatRect struct {
 	VisualEnd   int    `json:"visualEnd,omitempty"`
 }
 type selectionStatRequest struct {
+	Edit              *selectionStatEdit  `json:"edit,omitempty"`
 	Sheet             string              `json:"sheet"`
 	FilterID          string              `json:"filterId,omitempty"`
 	ViewID            string              `json:"viewId,omitempty"`
 	ExcludeThroughRow int                 `json:"excludeThroughRow,omitempty"`
 	Ranges            []selectionStatRect `json:"ranges"`
+}
+type selectionStatEdit struct {
+	Document editdoc.Key `json:"document"`
+	Revision uint64      `json:"revision,string"`
+	Book     string      `json:"book"`
 }
 type selectionStatResult struct {
 	Total    int64  `json:"total"`
@@ -242,6 +251,14 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := selectionStatResult{Total: total, Ranges: len(req.Ranges), Filtered: req.FilterID != "", Sum: "0", Average: "0"}
+	var projection *editGridProjection
+	if req.Edit != nil {
+		projection, err = a.selectionProjection(r.Context(), wb, req, selected)
+		if err != nil {
+			editError(w, err)
+			return
+		}
+	}
 	// Only non-empty source rows need I/O. Group same column spans so two
 	// distant Ctrl-selections never force reading every intervening column.
 	groups := make(map[statColInterval][]int)
@@ -266,35 +283,64 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 	})
 	sum := new(big.Rat)
 	min, max := new(big.Rat), new(big.Rat)
+	add := func(cell workbook.CellData) {
+		if cell.Raw == "" && !cell.HasFormula {
+			return
+		}
+		res.NonEmpty++
+		numeric := sourceCellNumber(wb, cell)
+		if numeric == nil {
+			return
+		}
+		if res.Number == 0 || numeric.Cmp(min) < 0 {
+			min.Set(numeric)
+		}
+		if res.Number == 0 || numeric.Cmp(max) > 0 {
+			max.Set(numeric)
+		}
+		res.Number++
+		sum.Add(sum, numeric)
+	}
+	// Revision patches also include formerly empty cells and rows. Count each
+	// overlay once below and skip the underlying source coordinate during the scan.
+	var patched, calculated map[string]*workbook.CellData
+	var generated editfile.Calculation
+	if projection != nil {
+		patched, calculated = projection.Cells[req.Sheet], projection.Calculated[req.Sheet]
+		for _, area := range projection.Generated {
+			if area.Start.Sheet == req.Sheet {
+				generated.Generated = append(generated.Generated, area)
+			}
+		}
+	}
+	addBase := func(cell workbook.CellData, row int) {
+		if projection != nil {
+			address := editdoc.Address{Sheet: req.Sheet, Row: row, Col: cell.Col}
+			if (cell.HasFormula && projection.Affected[req.Sheet]) || generated.GeneratedStatus(address) != "" {
+				cell.Raw = ""
+			}
+		}
+		add(cell)
+	}
 	for _, span := range keys {
 		positions := groups[span]
 		sort.Ints(positions)
 		readErr := wb.VisitRowsContext(r.Context(), idx, slices.Values(positions), span.lo, span.hi, func(row workbook.RowData) error {
 			for _, cell := range row.Cells {
-				if cell.Col < span.lo || cell.Col > span.hi || (cell.Raw == "" && !cell.HasFormula) {
+				if cell.Col < span.lo || cell.Col > span.hi {
 					continue
 				}
-				res.NonEmpty++
-				if !sourceCellNumeric(wb, cell) {
-					continue
-				}
-				numeric, ok := analysis.AccountingDecimal(cell.Raw)
-				if !ok {
-					continue
-				}
-				if res.Number == 0 {
-					min.Set(numeric)
-					max.Set(numeric)
+				if projection == nil {
+					add(cell)
 				} else {
-					if numeric.Cmp(min) < 0 {
-						min.Set(numeric)
+					ref := cell.Ref
+					if ref == "" {
+						ref = workbook.ColumnName(cell.Col) + strconv.Itoa(row.Number)
 					}
-					if numeric.Cmp(max) > 0 {
-						max.Set(numeric)
+					if patched[ref] == nil && calculated[ref] == nil {
+						addBase(cell, row.Number)
 					}
 				}
-				res.Number++
-				sum.Add(sum, numeric)
 			}
 			return nil
 		})
@@ -305,6 +351,15 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	for ref, cell := range patched {
+		if cell != nil && calculated[ref] == nil {
+			_, row, _ := workbook.ParseCellRef(ref)
+			addBase(*cell, row)
+		}
+	}
+	for _, cell := range calculated {
+		add(*cell)
+	}
 	if res.Number > 0 {
 		res.Sum = selectionRatText(sum)
 		res.Average = selectionRatText(new(big.Rat).Quo(sum, new(big.Rat).SetInt64(res.Number)))
@@ -312,4 +367,44 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		res.Maximum = selectionRatText(max)
 	}
 	writeJSON(w, res)
+}
+
+func (a *App) selectionProjection(ctx context.Context, wb *workbook.Workbook, req selectionStatRequest, rows map[int][]statColInterval) (*editGridProjection, error) {
+	edit := req.Edit
+	if edit.Book != sourceBookID(wb) {
+		return nil, checkpoint.ErrConflict
+	}
+	store, err := openEditDocuments()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+	doc, err := retryCheckpointBusy(ctx, func() (*editdoc.Document, error) { return editdoc.Load(ctx, store, edit.Document) })
+	if err != nil {
+		return nil, err
+	}
+	defer doc.Close()
+	if doc.Revision != edit.Revision || doc.Base.Source.Book != edit.Book {
+		return nil, checkpoint.ErrConflict
+	}
+	layout, err := editfile.ParseLayout(doc.Base.Layout, doc.Base.Source.Format)
+	if err != nil {
+		return nil, err
+	}
+	layout, err = a.edits.documentEditLayout(ctx, doc, layout, nil)
+	if err != nil {
+		return nil, err
+	}
+	include := func(addr editdoc.Address) bool {
+		if addr.Sheet != req.Sheet {
+			return false
+		}
+		for _, span := range rows[addr.Row] {
+			if span.lo <= addr.Col && addr.Col <= span.hi {
+				return true
+			}
+		}
+		return false
+	}
+	return a.readEditGrid(ctx, doc, a.edits.withSourceCells(layout, doc), editRequest{Book: edit.Book, Revision: edit.Revision, Mode: "projection"}, include)
 }

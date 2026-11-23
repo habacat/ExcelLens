@@ -44,6 +44,7 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/></symbol>
     <symbol id="i-edit" viewBox="0.1 -0.15 24 24"><path d="m4.5 19.5.7-3.7L16.2 4.8a2.05 2.05 0 0 1 2.9 2.9L8.1 18.8ZM14.6 6.4l3 3"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+    <symbol id="i-copy-formula" viewBox="0 0 24 24"><path d="M15 5V4.5A1.5 1.5 0 0 0 13.5 3h-9A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H5"/><rect x="7" y="7" width="14" height="14" rx="2"/><path d="M17 10h-1a1.8 1.8 0 0 0-1.8 1.5l-.9 5a1.8 1.8 0 0 1-1.8 1.5H11m.5-4.5h5"/></symbol>
     <symbol id="i-search" viewBox="0.5 0.5 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
     <symbol id="i-filter" viewBox="0 0.75 24 24"><path d="M4 5.5h16l-6.2 7.4v5.3l-3.6 1.8v-7.1Z"/></symbol>
     <symbol id="i-filter-off" viewBox="0 1.25 24 24"><path d="M10.2 12.9 4 5.5h16l-6.2 7.4M10.2 12.9V20l2.4-1.2M15.5 16.5l4.5 4.5m0-4.5-4.5 4.5"/></symbol>
@@ -158,8 +159,8 @@
         <button id="duplicateOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="查找重复值（Ctrl+Shift+D）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-duplicate"/></svg>查重</button>
         <button id="inspectOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="定位公式、常量、错误和空白（Ctrl+Alt+G）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target"/></svg>定位条件</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
-        <button id="dataRulesOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="数据验证规则"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rules"/></svg>数据规则</button>
-        <button id="recordCardOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="按字段查看当前行"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-card"/></svg>记录卡片</button>
+        <button id="dataRulesOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" aria-label="数据规则" title="数据规则"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rules"/></svg>数据规则</button>
+        <button id="recordCardOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" aria-label="记录卡片" title="记录卡片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-card"/></svg>记录卡片</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
         <button id="selectionQuickBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="快速分析选区（Ctrl+Q）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-spark"/></svg>快速分析</button>
         <button id="transposeOpenBtn" data-toolbar-priority="2" class="tool-button" type="button" disabled aria-haspopup="dialog" title="行列互换查看选区"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-transpose"/></svg>转置</button>
@@ -167,10 +168,10 @@
       <div id="ribbonFormula" class="ribbon-panel" role="tabpanel" data-ribbon-panel="formula" aria-labelledby="ribbonTabFormula" hidden>
         <button id="formulaViewBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-pressed="false" title="显示公式（Ctrl+`）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-fx"/></svg>显示公式</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
-        <button id="tracePrecedentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="当前公式引用了哪些单元格"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-in"/></svg>追踪引用</button>
-        <button id="traceDependentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="哪些公式引用了当前单元格"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-out"/></svg>追踪从属</button>
+        <button id="tracePrecedentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-label="追踪引用" title="追踪引用"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-in"/></svg>追踪引用</button>
+        <button id="traceDependentsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-label="追踪从属" title="追踪从属"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trace-out"/></svg>追踪从属</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
-        <button id="catalogueOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" title="名称与表（Ctrl+F3）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tag"/></svg>名称与表</button>
+        <button id="catalogueOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" disabled aria-haspopup="dialog" aria-label="名称与表" title="名称与表（Ctrl+F3）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tag"/></svg>名称与表</button>
       </div>
       <div id="ribbonView" class="ribbon-panel" role="tabpanel" data-ribbon-panel="view" aria-labelledby="ribbonTabView" hidden>
         <button id="columnsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-haspopup="menu" aria-expanded="false" aria-controls="columnsMenu" data-menu="columnsMenu" title="显示或隐藏列"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-columns"/></svg>列<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
@@ -235,8 +236,8 @@
     <button id="copyPlainBtn" type="button" role="menuitem">复制为纯文本</button>
     <button id="copySpecialBtn" type="button" role="menuitem">选择性复制…<kbd>Ctrl+Alt+Shift+C</kbd></button>
     <div class="menu-divider" role="separator"></div>
-    <button id="copyValueBtn" type="button" role="menuitem" disabled>复制当前值</button>
-    <button id="copyFormulaBtn" type="button" role="menuitem" disabled>复制公式<kbd>Ctrl+Shift+C</kbd></button>
+    <button id="copyValueBtn" type="button" role="menuitem" disabled aria-label="复制当前值" title="复制当前值"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg>复制当前值</button>
+    <button id="copyFormulaBtn" type="button" role="menuitem" disabled aria-label="复制公式" title="复制公式（Ctrl+Shift+C）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy-formula"/></svg>复制公式<kbd>Ctrl+Shift+C</kbd></button>
     <button id="copyAddressBtn" type="button" role="menuitem">复制地址</button>
     <button id="copyEvidenceBtn" type="button" role="menuitem">复制证据摘要</button>
   </div>
@@ -421,6 +422,7 @@
         <span id="freezeStatus" class="freeze-status" hidden></span>
         <span id="filterStatus" class="filter-status" hidden>已筛选</span>
         <button id="selectionStatus" class="selection-status selection-link" type="button" title="统计选区"></button>
+        <button id="quickStatsOptions" class="icon-button quick-stats-options" type="button" title="选区统计设置" aria-label="选区统计设置" aria-haspopup="menu" aria-expanded="false" aria-controls="quickStatsMenu" data-menu="quickStatsMenu"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-rules"/></svg></button>
         <span id="quickStats" class="quick-stats"></span>
         <span class="status-spacer"></span>
         <div id="traceDock" class="trace-dock" hidden><button id="traceRestoreBtn" type="button" title="展开追踪结果">追踪</button><button id="traceOriginBtn" type="button" title="回到追踪起点" aria-label="回到追踪起点"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg></button><button id="traceEndBtn" type="button" title="结束追踪" aria-label="结束追踪"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
@@ -434,6 +436,7 @@
         </div>
       </div>
     </footer>
+    <div id="quickStatsMenu" class="menu quick-stats-menu" role="menu" aria-label="选区统计设置" hidden></div>
     <div id="readingModePanel" class="reading-mode-panel" role="dialog" aria-label="护眼模式" hidden>
       <div class="reading-mode-heading"><strong>护眼模式</strong><button type="button" data-reading-close aria-label="关闭护眼设置">×</button></div>
       <fieldset><legend class="sr-only">阅读颜色</legend>

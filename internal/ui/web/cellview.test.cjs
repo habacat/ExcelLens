@@ -155,8 +155,10 @@ test('the actual main and frozen cell factories share text, styles, filters and 
   const frozen=read('freeze.js'),start=frozen.indexOf('      const make = (data,'),end=frozen.indexOf('      const head =',start);
   Object.assign(sandbox,{s:h.state,cellByColumn:data=>data?Object.fromEntries(data.cells.map(c=>[c.col,c])):null,colWidth:()=>100,rowHeight:()=>25,topLayouts:h.layouts,pinnedLayouts:h.layouts,topPositions:new Map([[1,0]]),pinnedPositions:new Map([[1,0]]),renderer:{o:{paintCell:h.presenter.paint.bind(h.presenter),extendTextIntoBlanks:h.presenter.overflow.bind(h.presenter),colName:c=>String.fromCharCode(64+c),updateSharedBorders(){},isPrecedent:()=>false,isSearchMatch:()=>false}},fixture:row});
   sandbox.sourceHeight=()=>25;
+  sandbox.renderer.cells=new Map();
   Object.assign(sandbox,{borderRows:new Map([[2,row]]),borderColumns:h.layouts.map(c=>c.col),nr:2,sourceTop:r=>(r-1)*25});
   const pinned=vm.runInNewContext('(function(){'+frozen.slice(start,end)+'return make(fixture,1,2,2,0,0);}).call(renderer)',sandbox);
+  assert.equal(sandbox.renderer.cells.get('A2'),pinned);
   assert.equal(main._xlOverflowSpan.textContent,pinned._xlOverflowSpan.textContent);assert.equal(main.style.getPropertyValue('--overflow-width'),pinned.style.getPropertyValue('--overflow-width'));assert.equal(main.appliedStyle,pinned.appliedStyle);
 });
 test('row style inheritance and merged destinations do not diverge by source format',()=>{

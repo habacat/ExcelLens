@@ -10,7 +10,10 @@ const config = require('./project_config.cjs');
 const out = path.resolve('validation', config.validationVersion(), 'private', 'toolbar-layouts');
 fs.mkdirSync(out, {recursive:true});
 const source = path.join(out, '月度费用台账.xlsx');
-fs.writeFileSync(source, workbook([{name:'费用',rows:[['编号','项目','金额'],['001','差旅费',{raw:'160.25'}],['002','交通费',{raw:'28.50'}]]}]));
+const formula = 'SUMIFS(月度费用明细!$C$2:$C$3,月度费用明细!$A$2:$A$3,A2,月度费用明细!$B$2:$B$3,B2)';
+fs.writeFileSync(source, workbook([{name:'月度费用明细',rows:[
+  ['编号','项目','金额','汇总'], ['001','差旅费',{raw:'160.25'},{formula,raw:'160.25'}], ['002','交通费',{raw:'28.50'}]
+]}]));
 const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const original = hash(source), errors = [];
 const ready = 'window.ExcelLensPerformance?.().hasVisibleCoverage && !window.ExcelLensPerformance().sheetLoading';
@@ -30,6 +33,8 @@ async function main() {
   try {
     const p = h.page;
     await p.file('#fileInput',source); await p.wait(ready);
+    await p.click('.grid-cell[data-ref="D2"]');
+    await p.wait('formulaText.textContent === '+JSON.stringify('='+formula));
     const folder = path.join(h.storage,'ExcelLens','cache');
     assert(fs.readdirSync(folder).length>0);
     await p.run(()=>{
@@ -40,7 +45,7 @@ async function main() {
         return original.call(this,url,...args);
       };
     });
-    for(const [width,dpr] of [[1920,1],[1600,1],[1391,1],[1280,1.25],[1024,1.5],[901,1],[760,1],[671,1],[640,1.25],[420,2],[320,1]]) {
+    for(const [width,dpr] of [[1920,1],[1600,1],[1536,1.25],[1391,1],[1280,1.25],[1024,1.5],[901,1],[837,1],[836,1],[760,1],[671,1],[640,1.25],[537,1],[536,1],[420,2],[320,1]]) {
       await p.call('Emulation.setDeviceMetricsOverride',{width,height:840,deviceScaleFactor:dpr,mobile:false});
       await settle(p); await settle(p);
       const sample = await p.run(()=>{
@@ -49,7 +54,13 @@ async function main() {
         const bad=[...document.querySelectorAll('.appbar button,.formula-toolbar button,.formula-toolbar select,#nameBox,#formulaText')].filter(visible).filter(el=>{
           const r=box(el); return r.left<-.5||r.right>innerWidth+.5||!el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
         }).map(el=>el.id);
+        const tools=[...formula.querySelectorAll('.classic-before button,.classic-after button,.classic-after select')].filter(visible).map(el=>{
+          const r=box(el), icon=box((el.closest('label') || el).querySelector('.icon'));
+          return {id:el.id,width:r.width,height:r.height,icon:icon.width,dx:icon.x+icon.width/2-r.x-r.width/2,
+            name:el.getAttribute('aria-label'),title:el.title};
+        });
         return {width:innerWidth,top:box(header).height,formula:box(formula).height,gridTop:box(document.querySelector('.grid-region')).top,
+          tools,formulaFits:formulaText.scrollWidth<=formulaText.clientWidth,
           searchWidth:box(document.getElementById('commandOpenBtn')).width,fontWidth:box(document.getElementById('fontSelect')).width,
           formulaWidth:box(document.getElementById('formulaText')).width,bad,
           topButtons:[...document.querySelectorAll('.classic-actions button')].filter(visible).map(el=>el.id),
@@ -60,7 +71,14 @@ async function main() {
       assert(sample.top<=40 && sample.formula<=39 && sample.tabWidth===0,JSON.stringify(sample));
       assert.deepEqual(sample.bad,[],JSON.stringify(sample));
       for(const id of ['openBtn','searchOpenBtn','filterOpenBtn','multiSortBtn','exportOpenBtn','analysisOpenBtn'])assert(sample.topButtons.includes(id),JSON.stringify(sample));
-      assert(sample.formulaWidth>=56 && sample.fontWidth>=72 && sample.searchWidth>=28,JSON.stringify(sample));
+      assert(sample.formulaWidth>=width*(width>=1024?.5:.4) && sample.searchWidth>=28,JSON.stringify(sample));
+      for(const tool of sample.tools) {
+        assert(tool.width>=24 && tool.width<=28 && tool.height===tool.width && tool.icon>=14 && Math.abs(tool.dx)<.5,JSON.stringify(tool));
+        assert(tool.name && tool.title.startsWith(tool.name),tool.id);
+      }
+      assert(sample.tools.some(tool=>tool.id==='fontSelect'));
+      if(width>=901) assert.equal(sample.tools.length,8);
+      if(width>=1280) assert(sample.formulaFits,'Long SUMIFS is clipped at '+width);
       if(width===1920) {
         for (const id of ['catalogueOpenBtn','dataRulesOpenBtn','recordCardOpenBtn','copyFormulaBtn','copyValueBtn','tracePrecedentsBtn','traceDependentsBtn','cellDetailBtn']) assert(sample.formulaButtons.includes(id),id);
         assert(sample.searchWidth>=200);
@@ -70,7 +88,16 @@ async function main() {
     }
     assert(report.widths.at(-1).searchWidth < report.widths[0].searchWidth);
     report.checks.push('Classic is the default; desktop, narrow and breakpoint widths preserve one top row, working font and search controls, hit targets and formula space');
+    await pointer(p,'#fontSelect');
+    for(const [key,code] of [['End',35],['Enter',13]]) {
+      for(const type of ['keyDown','keyUp']) await p.call('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:code});
+    }
+    await p.wait('fontSelect.value==="Consolas" && fontSelect.title.includes("Consolas") && getComputedStyle(document.querySelector("#rowsLayer .grid-cell")).fontFamily.includes("Consolas")');
     await p.call('Emulation.setDeviceMetricsOverride',{width:1280,height:840,deviceScaleFactor:1,mobile:false}); await settle(p);
+    await p.run(()=>{window.__copied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.__copied.push(text)}});});
+    await pointer(p,'#copyFormulaBtn'); await pointer(p,'#copyValueBtn');
+    assert.deepEqual(await p.evaluate('window.__copied'),['='+formula,'160.25']);
+    report.checks.push('Icon hit targets, hover names, native font selection and separate formula/value clipboard commands work');
     await pointer(p,'#openBtn','right'); await p.wait('!toolbarLayoutMenu.hidden');
     await pointer(p,'#toolbarLayoutToggle'); await p.wait('window.ExcelLensRibbon.ribbon === true');
     const tabbedTop=await p.evaluate('document.querySelector(".appbar").getBoundingClientRect().height');

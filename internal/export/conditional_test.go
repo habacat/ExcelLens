@@ -58,7 +58,7 @@ func TestConditionalHTMLStreamsSparseRowsAndOverlaysFontsWithoutChangingValues(t
 		t.Fatal(err)
 	}
 	text := output.String()
-	for _, want := range []string{"font-weight:400", "color:#FF0033", "background:#FFFF00", "border-bottom:0.55px solid #0000FF", "中😀", "&lt;&amp;尾", "9007199254740993.31", "<tr><th>2</th>"} {
+	for _, want := range []string{"font-weight:400", "color:#FF0033", "background:#FFFF00", "border-bottom:1px solid #0000FF", "中😀", "&lt;&amp;尾", "9007199254740993.31", "<tr><th>2</th>"} {
 		if !strings.Contains(text, want) {
 			t.Fatal("HTML lost conditional source presentation", want, text)
 		}
@@ -102,7 +102,7 @@ func TestConditionalHTMLStreamsSparseRowsAndOverlaysFontsWithoutChangingValues(t
 	for _, row := range rows {
 		for _, cell := range row.Cells {
 			v := reopened.VisualStyles[cell.Style]
-			if cell.Style != 1 || v.Color != "#FF0033" || v.Background != "#FFFF00" || v.Bold || v.Underline || v.BorderBottom != "0.55px solid #0000FF" || cell.Conditional != nil {
+			if cell.Style != 1 || v.Color != "#FF0033" || v.Background != "#FFFF00" || v.Bold || v.Underline || v.BorderBottom != "1px solid #0000FF" || cell.Conditional != nil {
 				t.Fatal("frozen style did not reopen as an ordinary source style", cell, v)
 			}
 		}

@@ -1,13 +1,19 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const read=name=>fs.readFileSync(__dirname+'/'+name,'utf8');
+const element=()=>({
+  style:{removeProperty(key){delete this[key.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];}},
+  children:[],setAttribute(){},appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+  remove(){this.parentNode.children.splice(this.parentNode.children.indexOf(this),1);},
+  replaceChildren(){this.children.length=0;},get lastChild(){return this.children.at(-1);}
+});
 function setup(){
-  const context={window:{}};for(const name of ['conditional.js','grid-borders.js','merges.js'])vm.runInNewContext(read(name),context);
+  const context={window:{},document:{createElement:element}};for(const name of ['conditional.js','grid-borders.js','merges.js'])vm.runInNewContext(read(name),context);
   const merge=new context.window.ExcelLensMergedCells();merge.load([{row:8,col:5,endRow:9,endCol:5},{row:8,col:6,endRow:8,endCol:7},{row:8,col:8,endRow:8,endCol:9},{row:8,col:10,endRow:9,endCol:10},{row:8,col:11,endRow:8,endCol:12}]);
   const black='0.667px solid #000000',style={borderTop:black,borderBottom:black,borderLeft:black,borderRight:black};
   const S={showStyles:true,styles:[{},style],cellMap:new Map(),frozenCellMap:new Map()},colName=c=>String.fromCharCode(64+c);
   const source=read('app.js'),a=source.indexOf('  const visualForBorder='),b=source.indexOf('  function toggleOriginalFormat(',a);
   Object.assign(context,{S,activeMerge:(r,c)=>merge.at(r,c),colName,nextVisibleRow:r=>r,rowTop:r=>(r-1)*25,colLeft:c=>(c-1)*80});vm.runInNewContext(source.slice(a,b)+';this.paint=updateSharedBorders;',context);
-  const node=(row,col)=>({dataset:{row:String(row),col:String(col)},style:{removeProperty(k){delete this[k];delete this[k.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];}}});
+  const node=(row,col)=>Object.assign(element(),{dataset:{row:String(row),col:String(col)}});
   const row={number:8,cells:[{col:6,style:1},{col:8,style:1},{col:10,style:1},{col:5,style:1},{col:11,style:1}]};
   return {context,S,node,row,black};
 }
@@ -47,14 +53,20 @@ test('conditional borders use the same seam and merged-perimeter model and clear
   S.showStyles=false;context.paint(anchor,{col:5,style:2},row,null,null,null,null);assert.equal(anchor.style.borderRight,undefined);assert.equal(anchor.style.borderBottom,undefined);
 });
 
+test('a fill hides the default seam from either side and keeps explicit neighboring borders',()=>{
+  const {context,S,node,black}=setup();
+  S.styles.push({background:'#DBDBDB'});
+  const edge=node(2,2), row={number:2}, below={number:3}, next={nextCol:3};
+  context.paint(edge,{style:2},row,null,row,null,below,next);
+  assert.equal(edge.style.borderRight,'0px');assert.equal(edge.style.borderBottom,'0px');
+  context.paint(edge,{},row,{style:2},row,{style:1},below,next);
+  assert.equal(edge.style.borderRight,'0px');assert.equal(edge.style.borderBottom,black);
+  context.paint(edge,{},row,null,row,null,below,next);
+  assert.equal(edge.style.borderRight,undefined);assert.equal(edge.style.borderBottom,undefined);
+});
+
 test('a long shared edge preserves partial neighbor styles and removes segments when its node is reused',()=>{
   const {context,black}=setup(),borders=context.window.ExcelLensGridBorders;
-  const element=()=>({
-    style:{removeProperty(key){delete this[key.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];}},
-    children:[],setAttribute(){},appendChild(child){child.parentNode=this;this.children.push(child);return child;},
-    remove(){this.parentNode.children.splice(this.parentNode.children.indexOf(this),1);},get lastChild(){return this.children.at(-1);}
-  });
-  context.document={createElement:element};
   const red='2px dashed #FF0000';
   const runs=borders.runs(2,6,5,n=>n,n=>n<4?black:n===4?red:'','');
   assert.deepEqual(Array.from(runs,part=>[part.start,part.end,part.style]),[[2,4,black],[4,5,red],[5,7,'']]);
@@ -63,6 +75,9 @@ test('a long shared edge preserves partial neighbor styles and removes segments 
   assert.equal(cell.style.borderBottom,'0px');
   assert.deepEqual(cell.children[0].children.map(line=>[line.style.left,line.style.width,line.style.borderBottom]),
     [['0px','62px',black],['62px','31px',red],['93px','62px','var(--grid-default-seam)']]);
+  borders.paint(cell,'bottom','',offset,black);
+  assert.equal(cell.children[0].className,'grid-default-bottom');
+  assert.equal(cell.children[0].children.length,0);
   borders.paint(cell,'bottom',black,offset);
   assert.equal(cell.children.length,0);assert.equal(cell.style.borderBottom,black);
 });

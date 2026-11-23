@@ -17,10 +17,26 @@ type editGridRuleArea struct {
 	List bool `json:"list,omitempty"`
 }
 
+type editGridProjection struct {
+	Cells      map[string]map[string]*workbook.CellData `json:"cells"`
+	Calculated map[string]map[string]*workbook.CellData `json:"calculated,omitempty"`
+	Affected   map[string]bool                          `json:"affected,omitempty"`
+	Generated  []editfile.GeneratedArea                 `json:"generated,omitempty"`
+	Rules      []editGridRuleArea                       `json:"rules,omitempty"`
+}
+
 // The grid keeps the immutable reader tiles. On entry, undo or recovery it
 // loads the bounded sparse revision. An ordinary change needs only its delta.
 // A null cell means that coordinate has returned to its original source value.
 func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest) (any, error) {
+	p, err := a.readEditGrid(ctx, doc, layout, req, nil)
+	if err != nil || req.Mode == "projection" {
+		return p, err
+	}
+	return p.Cells, nil
+}
+
+func (a *App) readEditGrid(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest, include func(editdoc.Address) bool) (*editGridProjection, error) {
 	wb := a.currentWorkbook()
 	if doc.Revision != req.Revision || wb == nil || req.Book != doc.Base.Source.Book || sourceBookID(wb) != req.Book {
 		return nil, checkpoint.ErrConflict
@@ -43,7 +59,9 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 	if addresses == nil {
 		addresses = make([]editdoc.Address, 0, len(changes))
 		for address := range changes {
-			addresses = append(addresses, address)
+			if include == nil || include(address) {
+				addresses = append(addresses, address)
+			}
 		}
 	}
 	var modified []editdoc.Address
@@ -97,6 +115,9 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 	}
 	calculated := make(map[string]map[string]*workbook.CellData)
 	for addr, derived := range calc.Cells {
+		if include != nil && !include(addr) {
+			continue
+		}
 		ref := workbook.ColumnName(addr.Col) + strconv.Itoa(addr.Row)
 		if req.Mode != "projection" && req.Cells != nil {
 			if _, asked := result[addr.Sheet][ref]; !asked {
@@ -119,6 +140,9 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 		dest[addr.Sheet][ref] = editGridFormula(wb, addr, ref, formula, derived.State, &derived.Value)
 	}
 	for addr, v := range calc.ArrayMembers {
+		if include != nil && !include(addr) {
+			continue
+		}
 		ref := workbook.ColumnName(addr.Col) + strconv.Itoa(addr.Row)
 		dest := calculated
 		if req.Mode != "projection" {
@@ -133,19 +157,13 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 		dest[addr.Sheet][ref] = editGridValue(wb, addr, ref, v)
 	}
 	if req.Mode != "projection" {
-		return result, nil
+		return &editGridProjection{Cells: result}, nil
 	}
 	var rules []editGridRuleArea
 	for _, r := range doc.RuleChanges() {
 		rules = append(rules, editGridRuleArea{r.Area, r.Type == "list"})
 	}
-	return struct {
-		Cells      map[string]map[string]*workbook.CellData `json:"cells"`
-		Calculated map[string]map[string]*workbook.CellData `json:"calculated,omitempty"`
-		Affected   map[string]bool                          `json:"affected,omitempty"`
-		Generated  []editfile.GeneratedArea                 `json:"generated,omitempty"`
-		Rules      []editGridRuleArea                       `json:"rules,omitempty"`
-	}{result, calculated, calc.Affected, calc.Generated, rules}, nil
+	return &editGridProjection{result, calculated, calc.Affected, calc.Generated, rules}, nil
 }
 
 func editGridFormula(wb *workbook.Workbook, addr editdoc.Address, ref string, formula editdoc.Value, state string, value *editdoc.Value) *workbook.CellData {

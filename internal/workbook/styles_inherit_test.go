@@ -17,7 +17,7 @@ func TestSourceStylesKeepExplicitNoneRaisedFontAndExplicitCellStyleInheritance(t
 		t.Fatal(err)
 	}
 	inherited := w.VisualStyles[0]
-	if inherited.FontName != "宋体" || inherited.FontSize != 12 || inherited.FontVertical != "subscript" || inherited.UnderlineStyle != "doubleAccounting" || !inherited.Underline || !inherited.Bold || inherited.Color != "#1255AA" || inherited.Background != "#FFFF00" || inherited.BorderBottom != "0.55px solid #0000FF" || inherited.Horizontal != "left" || !inherited.Wrap {
+	if inherited.FontName != "宋体" || inherited.FontSize != 12 || inherited.FontVertical != "subscript" || inherited.UnderlineStyle != "doubleAccounting" || !inherited.Underline || !inherited.Bold || inherited.Color != "#1255AA" || inherited.Background != "#FFFF00" || inherited.BorderBottom != "1px solid #0000FF" || inherited.Horizontal != "left" || !inherited.Wrap {
 		t.Fatal("explicit inheritance was lost", inherited)
 	}
 	if w.VisualStyles[1].Underline || w.VisualStyles[1].UnderlineStyle != "none" || w.VisualStyles[1].FontSize != 90 {
