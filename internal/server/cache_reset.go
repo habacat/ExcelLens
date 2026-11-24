@@ -22,7 +22,7 @@ func (a *App) ClearAllCaches() (string, error) {
 	root := a.rootApp()
 	root.cacheResetMu.Lock()
 	defer root.cacheResetMu.Unlock()
-	if root.restorePending.Load() {
+	if root.restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
 	dir := workbook.CacheRoot()
@@ -37,6 +37,7 @@ func (a *App) ClearAllCaches() (string, error) {
 	root.replaceWorkbook(nil)
 	root.edits.revision.Store(nil)
 	root.cacheEpoch.Add(1)
+	root.toolbar.notify()
 	unlock := archives.LockCacheMaintenance()
 	defer unlock()
 	root.cacheMu.Lock()

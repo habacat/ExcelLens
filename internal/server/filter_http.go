@@ -229,7 +229,7 @@ func (a *App) handleFilterStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.filterJobs[job.ID] = job
 	a.mu.Unlock()
-	a.retainSubmitted(job.done)
+	a.retainSubmitted(job.ID, job.done)
 	go a.runFilter(wb, meta, idx, req.Rules, workbook.FilterOptions{HeaderRow: req.HeaderRow, SortColumn: req.SortColumn, Descending: req.Descending, SortKeys: req.SortKeys}, job)
 	writeJSON(w, map[string]any{"jobId": job.ID})
 }

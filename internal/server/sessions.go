@@ -22,6 +22,8 @@ type browserSession struct {
 	app    *App
 	routes http.Handler
 	lease  browserlease.Lease
+	work   *browserlease.Work
+	saved  *backgroundResults
 }
 
 func validSessionID(id string) bool {
@@ -54,18 +56,37 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 	if !validSessionID(id) {
 		return nil, errors.New("无效的页面会话标识")
 	}
+	a.sessionGate.RLock()
+	defer a.sessionGate.RUnlock()
 	a.sessionsMu.Lock()
-	var expired []*App
+	var expired []*browserSession
 	defer func() { a.sessionsMu.Unlock(); a.finishRetirement(expired) }()
 	now := time.Now()
 	s := a.sessions[id]
-	if s == nil || s.lease.Expired(now) && !s.app.submitted.Retained(now) {
+	if s == nil || s.lease.Expired(now) && !s.retained(now) {
 		expired = a.takeExpiredLocked(now)
 		if access.existingOnly {
 			return nil, errSessionExpired
 		}
-		if len(a.sessions) >= maxBrowserSessions {
+		if a.pageCountLocked(now) >= maxBrowserSessions {
 			return nil, fmt.Errorf("同时打开的页面已达 %d 个，请关闭旧页面并稍后重试", maxBrowserSessions)
+		}
+		if len(a.sessions) >= 2*maxBrowserSessions {
+			var oldest *browserSession
+			var oldestID string
+			for key, other := range a.sessions {
+				running, _ := other.work.State(now)
+				if !running && other.lease.Idle(now) && (oldest == nil || other.lease.Deadline().Before(oldest.lease.Deadline())) {
+					oldest, oldestID = other, key
+				}
+			}
+			if oldest != nil {
+				delete(a.sessions, oldestID)
+				if oldest.app != nil {
+					a.retiring[oldest.app] = struct{}{}
+				}
+				expired = append(expired, oldest)
+			}
 		}
 		var err error
 		s, err = a.newBrowserSession(launchPath)
@@ -73,6 +94,12 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 			return nil, err
 		}
 		a.sessions[id] = s
+	}
+	if s.lease.Idle(now) && s.retained(now) && access.generation != 0 && a.pageCountLocked(now) >= maxBrowserSessions {
+		return nil, fmt.Errorf("同时打开的页面已达 %d 个", maxBrowserSessions)
+	}
+	if s.saved != nil && a.restoreActive.Load() {
+		return nil, errors.New("迁入备份进行中，请稍后查看结果")
 	}
 	if access.background && !s.lease.Unattended(now) {
 		return nil, errPageReplaced
@@ -83,6 +110,15 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 		}
 	} else if access.page != "" && !s.lease.Owns(access.page) {
 		return nil, errPageReplaced
+	}
+	if s.saved != nil {
+		fresh, err := a.newBrowserSession("")
+		if err != nil {
+			return nil, err
+		}
+		s.saved.attach(fresh.app)
+		fresh.app.submitted = s.work
+		s.saved, s.app, s.routes = nil, fresh.app, fresh.routes
 	}
 	s.lease.Begin(now)
 	return s, nil
@@ -118,26 +154,43 @@ func (a *App) newBrowserSession(launchPath string) (*browserSession, error) {
 			next.ServeHTTP(w, r)
 		})
 	}
-	return &browserSession{app: child, routes: routes}, nil
+	return &browserSession{app: child, routes: routes, work: child.submitted}, nil
 }
 
-func (a *App) takeExpiredLocked(now time.Time) []*App {
-	var expired []*App
+func (s *browserSession) retained(now time.Time) bool {
+	_, retained := s.work.State(now)
+	return retained
+}
+
+func (a *App) pageCountLocked(now time.Time) int {
+	count := 0
+	for _, s := range a.sessions {
+		if s.saved == nil && !(s.lease.Idle(now) && s.retained(now)) {
+			count++
+		}
+	}
+	return count
+}
+
+func (a *App) takeExpiredLocked(now time.Time) []*browserSession {
+	var expired []*browserSession
 	for id, s := range a.sessions {
-		if s.lease.Expired(now) && !s.app.submitted.Retained(now) {
-			expired = append(expired, s.app)
-			a.retiring[s.app] = struct{}{}
+		if s.lease.Expired(now) && !s.retained(now) {
+			expired = append(expired, s)
+			if s.app != nil {
+				a.retiring[s.app] = struct{}{}
+			}
 			delete(a.sessions, id)
 		}
 	}
 	return expired
 }
 
-func (a *App) finishRetirement(expired []*App) {
+func (a *App) finishRetirement(expired []*browserSession) {
 	for _, child := range expired {
-		child.Close()
+		child.close()
 		a.sessionsMu.Lock()
-		delete(a.retiring, child)
+		delete(a.retiring, child.app)
 		a.sessionsMu.Unlock()
 	}
 }
@@ -149,10 +202,9 @@ func (a *App) runSessionReaper(stop <-chan struct{}, ticks <-chan time.Time) {
 			return
 		case <-ticks:
 			a.cacheResetMu.RLock()
-			a.sessionsMu.Lock()
-			expired := a.takeExpiredLocked(time.Now())
-			a.sessionsMu.Unlock()
-			a.finishRetirement(expired)
+			a.sessionGate.Lock()
+			a.parkUnattended(false, "")
+			a.sessionGate.Unlock()
 			a.cacheResetMu.RUnlock()
 		}
 	}
@@ -163,7 +215,7 @@ func (a *App) runSessionReaper(stop <-chan struct{}, ticks <-chan time.Time) {
 func (a *App) PreparePathForLaunch(path string) (string, error) {
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
-	if a.restorePending.Load() {
+	if a.restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
 	id := randomID()
@@ -181,7 +233,7 @@ func (a *App) PreparePathForLaunch(path string) (string, error) {
 func (a *App) OpenPathForLaunch(path string) (string, error) {
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
-	if a.restorePending.Load() {
+	if a.restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
 	id := randomID()
@@ -208,6 +260,23 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 			defaultRoutes.ServeHTTP(w, r)
 			return
 		}
+		if r.URL.Path == "/api/storage/recovery" {
+			a.handleRecoveryMode(w, r)
+			return
+		}
+		if a.restoreState.pending() {
+			if r.URL.Path == "/api/storage" && r.Method == http.MethodGet {
+				a.handleStorage(w, r)
+				return
+			}
+			w.Header().Set("X-ExcelLens-Recovery", "required")
+			if r.URL.Path == "/api/exit" {
+				a.handleExit(w, r)
+				return
+			}
+			writeError(w, 503, "恢复事务尚未完成，请打开本地数据")
+			return
+		}
 		if r.URL.Path == "/api/background" {
 			a.handleBackground(w, r)
 			return
@@ -224,18 +293,20 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 			a.handleStorage(w, r)
 			return
 		}
+		// Interface watch and lease control must not hold cacheResetMu while waiting.
+		if r.URL.Path == "/api/interface" {
+			defaultRoutes.ServeHTTP(w, r)
+			return
+		}
 		// Lease control stays responsive while restore has exclusive data access.
 		if !strings.HasPrefix(r.URL.Path, "/api/session/") {
 			a.cacheResetMu.RLock()
 			defer a.cacheResetMu.RUnlock()
-			if a.restorePending.Load() {
-				writeError(w, 503, "恢复事务尚未完成，请从本地数据重试迁入")
+			if a.restoreState.pending() {
+				w.Header().Set("X-ExcelLens-Recovery", "required")
+				writeError(w, 503, "恢复事务尚未完成，请打开本地数据")
 				return
 			}
-		}
-		if r.URL.Path == "/api/interface" {
-			defaultRoutes.ServeHTTP(w, r)
-			return
 		}
 		if epoch := r.Header.Get("X-ExcelLens-Cache-Epoch"); epoch != "" && epoch != strconv.FormatUint(a.cacheEpoch.Load(), 10) {
 			writeError(w, http.StatusConflict, "全部缓存已清理，请返回首页重新打开文件")
@@ -308,15 +379,17 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 }
 
 func (a *App) closeBrowserSessions() {
+	a.sessionGate.Lock()
+	defer a.sessionGate.Unlock()
 	a.sessionsMu.Lock()
-	children := make([]*App, 0, len(a.sessions))
+	children := make([]*browserSession, 0, len(a.sessions))
 	for id, session := range a.sessions {
-		children = append(children, session.app)
+		children = append(children, session)
 		delete(a.sessions, id)
 	}
 	a.sessionsMu.Unlock()
 	for _, child := range children {
-		child.Close()
+		child.close()
 	}
 }
 
@@ -330,7 +403,9 @@ func (a *App) activeBrowserWorkbooks() []*App {
 		apps = append(apps, child)
 	}
 	for _, s := range a.sessions {
-		apps = append(apps, s.app)
+		if s.app != nil {
+			apps = append(apps, s.app)
+		}
 	}
 	return apps
 }

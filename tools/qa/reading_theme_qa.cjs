@@ -85,6 +85,7 @@ async function matrix(name,selectors,{surface=[],inset=[],paper=[],active=[],can
   phases.push({name,controls:selectors.length,cases});console.log(name+': '+selectors.length+' controls × 12 presets; findings '+failures.length);
 }
 async function closeDialog(id){await evaluate(`document.querySelector('#${id}').close()`);await settle();}
+let backgroundRequests=[];
 async function run(){
   try{
     let port;for(let i=0;i<150;i++){try{port=Number(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);break;}catch{}await pause(100);}assert(port,'Chrome did not start');
@@ -93,7 +94,7 @@ async function run(){
     await cdp('Page.enable');await cdp('Runtime.enable');await cdp('DOM.enable');await cdp('CSS.enable');await cdp('Emulation.setDeviceMetricsOverride',{width:1900,height:1000,deviceScaleFactor:1,mobile:false});
     await cdp('Page.navigate',{url:address});await waitFor('document.readyState==="complete"&&!!window.ExcelLensSession');await evaluate('window.ExcelLensSession.ready');browser=(await cdp('Browser.getVersion')).product;
     for(const asset of ['style.css','themes.css','calculator.css','analytics.css','analytics.js','analytics-charts.js','readingmode.js','home.css','home-texture.svg']){const data=Buffer.from(await(await fetch(new URL('/assets/'+asset,address))).arrayBuffer());assert.equal(digest(data),digest(fs.readFileSync(path.join(root,'internal/ui/web',asset))),asset+' differs from production assets');assetDigests[asset]=digest(data);}
-    if(baseline)await evaluate(`(()=>{document.querySelector('link[href="/assets/themes.css"]').disabled=true;const n=document.createElement('style');n.textContent=${JSON.stringify(fs.readFileSync(baseline,'utf8'))};document.head.append(n);})()`);
+    if(baseline)await evaluate(`(()=>{document.querySelector('link[href^="/assets/themes.css"]').disabled=true;const n=document.createElement('style');n.textContent=${JSON.stringify(fs.readFileSync(baseline,'utf8'))};document.head.append(n);})()`);
     if(homeOnly){
       presets=await evaluate('Array.from(document.querySelectorAll("input[name=readingPreset]"),n=>n.value)');
       for(const width of [1900,1000,760]){
@@ -108,7 +109,7 @@ async function run(){
     }
     const input=await cdp('Runtime.evaluate',{expression:'document.querySelector("#fileInput")'});await cdp('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});await waitFor('document.querySelector("#indexOverlay").hidden&&window.ExcelLensPerformance().hasVisibleCoverage&&document.querySelector(".grid-cell[data-ref=C2]")');
     presets=await evaluate('Array.from(document.querySelectorAll("input[name=readingPreset]"),n=>n.value)');assert.equal(presets.length,13);
-    await evaluate(`(()=>{const actual=window.fetch;window.__themeReads=[];window.__themePending=0;window.fetch=(url,options)=>{const route=new URL(url,location.href).pathname;if(route.startsWith('/api/'))window.__themeReads.push(route);window.__themePending++;return actual(url,options).finally(()=>window.__themePending--);};})()`);
+    await evaluate(`(()=>{const actual=window.fetch;window.__themeReads=[];window.__themePending=0;window.__themeBackground=[];window.fetch=(url,options)=>{const request=new URL(url,location.href),route=request.pathname;if((route==='/api/interface'&&request.searchParams.get('wait')==='1')||route==='/api/session/heartbeat'){window.__themeBackground.push(request.pathname+request.search);return actual(url,options);}if(route.startsWith('/api/'))window.__themeReads.push(route);window.__themePending++;return actual(url,options).finally(()=>window.__themePending--);};})()`);
     const bottom=['.bottom-bar','.sheet-controls','.status-strip','#sheetPrevBtn','#sheetNextBtn','#sheetListBtn','.sheet-tab','.sheet-tab.has-tab-color','#calculatorDock','#calculatorHomeDock','#zoomOutBtn','#zoomInBtn','#readingModeBtn','#crosshairColorBtn','#zoomValue'];
     await evaluate(`(()=>{const n=document.querySelector('#sheetTabs');n.scrollTo({left:0,behavior:'instant'});n.dispatchEvent(new Event('scroll'));})()`);
     const pager=await evaluate('({prev:document.querySelector("#sheetPrevBtn").disabled,next:document.querySelector("#sheetNextBtn").disabled,left:document.querySelector("#sheetTabs").scrollLeft,width:document.querySelector("#sheetTabs").clientWidth,total:document.querySelector("#sheetTabs").scrollWidth})');
@@ -135,13 +136,13 @@ async function run(){
     await matrix('calculator-dock',['#calculatorDock','#zoomOutBtn','#zoomInBtn'],{active:['#calculatorDock']});
     await evaluate(`document.querySelector('#analysisOpenBtn').click()`);await waitFor('!document.querySelector("#analysisRoot").hidden&&!!document.querySelector(".analysis-field-chip")');await evaluate(`document.querySelector('.analysis-field-chip[data-field="C1"]').click();document.querySelector('#analysisRun').click()`);await waitFor('!!document.querySelector("#analysisPivotTable td")');
     await matrix('analysis-chart',['.analysis-topbar','.analysis-builder','.analysis-chart-card','.analysis-data-table th','.analysis-data-table td','.analysis-symbol-button','.analysis-quiet-button'],{surface:['.analysis-topbar','.analysis-builder','.analysis-chart-card','.analysis-symbol-button'],inset:['.analysis-data-table th'],canvas:'#analysisChart'});
-    await evaluate(`document.querySelector('#analysisSaveReport').click()`);await waitFor('!!document.querySelector(".analysis-modal")');
-    await matrix('analysis-dialog',['.analysis-modal','.analysis-modal h3','.analysis-modal input','.analysis-modal .analysis-outline-button'],{surface:['.analysis-modal','.analysis-modal input','.analysis-modal .analysis-outline-button']});
-    await evaluate(`document.querySelector('.analysis-modal input').value='主题核查报表';document.querySelector('.analysis-modal [data-yes]').click()`);await waitFor('!document.querySelector(".analysis-modal")&&document.querySelector("#analysisSaveReport").textContent==="更新报表"&&window.__themePending===0');await evaluate(`document.querySelector('[data-analysis-tab="dashboard"]').click()`);await waitFor('!!document.querySelector(".analysis-dashboard-card canvas")&&!document.querySelector(".analysis-card-loading")');
+    await evaluate(`document.querySelector('#analysisSaveReport').click()`);await waitFor('!!document.querySelector(".ask-dialog[open]")');
+    await matrix('analysis-dialog',['.ask-dialog','.ask-dialog .dialog-title','.ask-dialog input','.ask-dialog .mini-button'],{surface:['.ask-dialog','.ask-dialog input','.ask-dialog .mini-button']});
+    await evaluate(`document.querySelector('.ask-dialog[open] input').value='主题核查报表';document.querySelector('.ask-dialog[open] [data-yes]').click()`);await waitFor('!document.querySelector(".ask-dialog")&&document.querySelector("#analysisSaveReport").textContent==="更新报表"&&window.__themePending===0');await evaluate(`document.querySelector('[data-analysis-tab="dashboard"]').click()`);await waitFor('!!document.querySelector(".analysis-dashboard-card canvas")&&!document.querySelector(".analysis-card-loading")');
     await matrix('dashboard',['.analysis-dashboard-card','.analysis-dashboard-card-head','.analysis-dashboard-card-head button'],{surface:['.analysis-dashboard-card'],canvas:'.analysis-dashboard-card canvas'});
     await evaluate(`document.querySelector('[data-analysis-tab="pivot"]').click();document.querySelector('#analysisAddFilter').click();document.querySelector('#analysisAddConversion').click();document.querySelector('#analysisAddMetric').click()`);
     await matrix('analysis-rules',['.analysis-rule','.analysis-rule-remove','.analysis-metric-row button','.analysis-field-chip','.analysis-field-info-btn','.analysis-rule input','.analysis-rule select'],{inset:['.analysis-rule','.analysis-field-info-btn']});
-    await evaluate(`document.querySelector('[data-analysis-tab="sheets"]').click();document.querySelector('#analysisCreateSheet').click()`);await waitFor('!!document.querySelector(".analysis-modal")');await evaluate(`document.querySelector('.analysis-modal input').value='主题核查编辑表';document.querySelector('.analysis-modal [data-yes]').click()`);await waitFor('!!document.querySelector(".analysis-edit-grid textarea")');await evaluate(`document.querySelector('.analysis-edit-grid textarea').focus()`);
+    await evaluate(`document.querySelector('[data-analysis-tab="sheets"]').click();document.querySelector('#analysisCreateSheet').click()`);await waitFor('!!document.querySelector(".ask-dialog[open]")');await evaluate(`document.querySelector('.ask-dialog[open] input').value='主题核查编辑表';document.querySelector('.ask-dialog[open] [data-yes]').click()`);await waitFor('!!document.querySelector(".analysis-edit-grid textarea")');await evaluate(`document.querySelector('.analysis-edit-grid textarea').focus()`);
     await matrix('analysis-sheet',['.analysis-sheet-list','.analysis-sheet-list button','.analysis-sheet-tools strong','.analysis-edit-grid th','.analysis-edit-grid td textarea','.analysis-pagination'],{inset:['.analysis-sheet-list','.analysis-edit-grid th']});
     await evaluate(`document.querySelector('[data-analysis-tab="templates"]').click()`);await waitFor('!!document.querySelector(".analysis-template-card")');
     await matrix('templates',['.analysis-template-card','.analysis-template-card strong','.analysis-template-card small','.analysis-category-list button'],{surface:['.analysis-template-card']});
@@ -149,7 +150,7 @@ async function run(){
     await matrix('home',['.appbar','.landing-shell','.landing-open-zone','.landing-content h1','.landing-subline','.landing-open-button','.recent-item','.recent-name','.recent-meta','.recent-file-icon','.landing-footer','#calculatorHomeDock'],{surface:['.appbar','.landing-shell'],inset:['.landing-open-zone','.landing-footer'],active:['#calculatorHomeDock']});
     for(const preset of ['off','warm','green','graphite','navy']){await apply(preset);await capture('home-texture-'+preset);}
     await apply('off');
-    assert.equal(digest(fs.readFileSync(file)),sourceSHA256,'source XLSX changed');assert.deepEqual(errors,[]);
+    backgroundRequests=await evaluate('window.__themeBackground');assert.equal(digest(fs.readFileSync(file)),sourceSHA256,'source XLSX changed');assert.deepEqual(errors,[]);
   }catch(error){failures.push({error:error.stack||String(error)});
   }finally{
     if(socket?.readyState===1){try{await cdp('Browser.close');}catch{}socket.close();}
@@ -159,7 +160,7 @@ async function run(){
   }
 }
 run().catch(error=>{failures.push({error:error.stack||String(error)});}).then(()=>{
-  const report={version,result:failures.length?'FAIL':'PASS',browser,baseline:Boolean(baseline),desktopManualAcceptance:false,presets:presets?.filter(x=>x!=='off'),sourceSHA256,sourceUnchanged:digest(fs.readFileSync(file))===sourceSHA256,assetDigests,profileRemoved,profileRetention:'Private profile retained with diagnostic files',errors,failures,phases,homePreview};
+  const report={version,result:failures.length?'FAIL':'PASS',browser,baseline:Boolean(baseline),desktopManualAcceptance:false,presets:presets?.filter(x=>x!=='off'),sourceSHA256,backgroundRequests:backgroundRequests,sourceUnchanged:digest(fs.readFileSync(file))===sourceSHA256,assetDigests,profileRemoved,profileRetention:'Private profile retained with diagnostic files',errors,failures,phases,homePreview};
   fs.writeFileSync(path.join(output,baseline?'baseline.json':homeOnly?'home-preview.json':'result.json'),JSON.stringify(report,null,2)+'\n');
   if(!baseline)fs.writeFileSync(path.join(receipts,homeOnly?'home-texture.json':'reading-themes.json'),JSON.stringify({...report,phases:phases.map(({name,controls,cases})=>({name,controls,presets:cases.length})),failures:failures.slice(0,30)},null,2)+'\n');
   console.log(JSON.stringify({result:report.result,phases:phases.length,failures:failures.slice(0,8),profileRemoved},null,2));if(failures.length)process.exitCode=1;

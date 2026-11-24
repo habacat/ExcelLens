@@ -1,21 +1,19 @@
 package server
 
 import (
-	"excellens/internal/workbook"
-	"maps"
+	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
+
+	"excellens/internal/workbook"
 )
 
-// Keep only the originating session. Task registries, source pins and existing
-// result/download handlers continue to own all data and cancellation.
-func (a *App) retainSubmitted(done <-chan struct{}) {
-	if a.owner == nil {
-		return
+func (a *App) retainSubmitted(id string, done <-chan struct{}) {
+	if a.owner != nil {
+		a.submitted.Track(id, done)
 	}
-	finish := a.submitted.Begin()
-	go func() { <-done; finish() }()
 }
 
 type backgroundItem struct {
@@ -30,69 +28,159 @@ type backgroundItem struct {
 	CanAttach bool      `json:"canAttach"`
 }
 
-func (a *App) submittedItems(sid string, canAttach bool) []backgroundItem {
+func (set backgroundResults) items(sid string, canAttach bool) []backgroundItem {
 	items := []backgroundItem{}
 	add := func(id, kind, state, stage, msg string, t time.Time, wb *workbook.Workbook) {
 		if wb != nil {
 			items = append(items, backgroundItem{id, kind, workbookDisplayName(wb), state, stage, msg, t, sid, canAttach})
 		}
 	}
-	a.mu.RLock()
-	exports, searches, filters, wb := maps.Clone(a.exports), maps.Clone(a.searchJobs), maps.Clone(a.filterJobs), a.wb
-	a.mu.RUnlock()
-	for _, j := range exports {
+	for _, j := range set.exports {
 		j.mu.RLock()
 		add(j.ID, "export", j.Status, j.Stage, j.Error, j.Started, j.wb)
 		j.mu.RUnlock()
 	}
-	for _, j := range searches {
+	for _, j := range set.searches {
 		j.mu.RLock()
-		add(j.ID, "search", j.Status, j.Stage, j.Error, j.Started, wb)
+		add(j.ID, "search", j.Status, j.Stage, j.Error, j.Started, set.book)
 		j.mu.RUnlock()
 	}
-	for _, j := range filters {
+	for _, j := range set.filters {
 		j.mu.RLock()
-		add(j.ID, "filter", j.Status, j.Stage, j.Error, j.Started, wb)
+		add(j.ID, "filter", j.Status, j.Stage, j.Error, j.Started, set.book)
 		j.mu.RUnlock()
 	}
-	a.analysisMu.Lock()
-	analyses := maps.Clone(a.analysisJobs)
-	a.analysisMu.Unlock()
-	for _, j := range analyses {
+	for _, j := range set.analyses {
 		j.mu.RLock()
 		add(j.ID, "analysis", j.Status, j.Stage, j.Error, j.Created, j.Workbook)
 		j.mu.RUnlock()
 	}
-	a.reconcileMu.Lock()
-	comparisons := maps.Clone(a.reconcileJobs)
-	a.reconcileMu.Unlock()
-	for _, j := range comparisons {
+	for _, j := range set.comparisons {
 		j.mu.RLock()
 		add(j.ID, "reconcile", j.Status, j.Stage, j.Error, j.Created, j.Workbook)
 		j.mu.RUnlock()
 	}
 	return items
 }
+
+type backgroundOwner struct {
+	id           string
+	session      *browserSession
+	attach, idle bool
+}
+
 func (a *App) handleBackground(w http.ResponseWriter, r *http.Request) {
+	// Workbook requests and background management use the same maintenance lock.
+	if r.Method == http.MethodGet {
+		a.cacheResetMu.RLock()
+		defer a.cacheResetMu.RUnlock()
+	} else {
+		a.cacheResetMu.Lock()
+		defer a.cacheResetMu.Unlock()
+	}
+	a.sessionGate.Lock()
+	defer a.sessionGate.Unlock()
+	if a.restoreState.pending() {
+		writeError(w, 503, "请先完成恢复事务")
+		return
+	}
+	if r.Method == http.MethodPost {
+		var cmd struct{ Action, Session, ID, Kind string }
+		if err := decodeAnalysis(r, &cmd); err != nil {
+			writeError(w, 400, "后台任务参数无效")
+			return
+		}
+		if err := a.manageBackground(cmd.Action, cmd.Session, cmd.Kind, cmd.ID); err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": true})
+		return
+	}
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
 		return
 	}
-	type owner struct {
-		id     string
-		s      *browserSession
-		attach bool
-	}
-	var owners []owner
-	a.sessionsMu.Lock()
-	for id, s := range a.sessions {
-		owners = append(owners, owner{id, s, id == r.Header.Get("X-ExcelLens-Session") || s.lease.Unattended(time.Now())})
-	}
-	a.sessionsMu.Unlock()
 	var items []backgroundItem
-	for _, o := range owners {
-		items = append(items, o.s.app.submittedItems(o.id, o.attach)...)
+	var sessions []map[string]string
+	for _, o := range a.backgroundOwners(r.Header.Get("X-ExcelLens-Session")) {
+		set := o.session.results()
+		items = append(items, set.items(o.id, o.attach)...)
+		if name := o.session.fileName(); name != "" && o.idle {
+			sessions = append(sessions, map[string]string{"session": o.id, "file": name})
+		}
 	}
 	slices.SortFunc(items, func(a, b backgroundItem) int { return b.Created.Compare(a.Created) })
-	writeJSON(w, map[string]any{"items": items})
+	writeJSON(w, map[string]any{"items": items, "sessions": sessions})
+}
+
+func (a *App) backgroundOwners(requester string) []backgroundOwner {
+	a.sessionsMu.Lock()
+	defer a.sessionsMu.Unlock()
+	owners := make([]backgroundOwner, 0, len(a.sessions))
+	for id, s := range a.sessions {
+		owners = append(owners, backgroundOwner{id, s, id == requester || s.lease.Unattended(time.Now()), s.lease.Idle(time.Now())})
+	}
+	return owners
+}
+
+func (a *App) manageBackground(action, sid, kind, id string) error {
+	a.sessionsMu.Lock()
+	s := a.sessions[sid]
+	if s == nil {
+		a.sessionsMu.Unlock()
+		return errors.New("任务会话已释放")
+	}
+	if action == "release" {
+		running, _ := s.work.State(time.Now())
+		if !s.lease.Idle(time.Now()) || running {
+			a.sessionsMu.Unlock()
+			return errors.New("请先关闭标签页并取消或等待运行中的任务")
+		}
+		delete(a.sessions, sid)
+		a.sessionsMu.Unlock()
+		s.close()
+		return nil
+	}
+	a.sessionsMu.Unlock()
+	if err := s.manageResult(action, kind, id); err != nil {
+		return err
+	}
+	if action == "discard" {
+		s.work.Forget(id)
+		a.parkUnattended(true, sid)
+	}
+	return nil
+}
+
+// Only live pages and unfinished workers can write workbook data. Sealed
+// results have their own source pins and remain available after a restore.
+func (a *App) restoreBlockers() error {
+	a.sessionGate.Lock()
+	defer a.sessionGate.Unlock()
+	a.parkUnattended(true, "")
+	var names []string
+	if name := (&browserSession{app: a}).fileName(); name != "" {
+		names = append(names, name)
+	}
+	kinds := map[string]string{"search": "搜索", "filter": "筛选", "analysis": "分析", "reconcile": "对账", "export": "导出"}
+	for _, o := range a.backgroundOwners("") {
+		if o.session.saved != nil {
+			continue
+		}
+		name := o.session.fileName()
+		for _, j := range o.session.results().items(o.id, o.attach) {
+			if j.State == "running" || j.State == "queued" {
+				names = append(names, j.File+"（"+kinds[j.Kind]+"）")
+			}
+		}
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	slices.Sort(names)
+	return errors.New("迁入受阻：" + strings.Join(slices.Compact(names), "、") + "。请关闭对应工作簿或在后台任务中取消运行中的任务")
 }

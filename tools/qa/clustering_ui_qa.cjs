@@ -48,7 +48,7 @@ async function representative(p,raw){
 }
 async function assign(p,id,zone){await p.run((id,zone)=>{const data=new DataTransfer();data.setData('text/plain',id);document.querySelector('[data-analysis-zone="'+zone+'"]').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:data}));},id,zone);}
 async function run(p){const previous=await p.evaluate('window.ExcelLensAnalytics.diagnostics().resultJob');await p.click('#analysisRun');await p.wait(ready+'&&window.ExcelLensAnalytics.diagnostics().resultJob!=='+JSON.stringify(previous));return await p.api('/api/analysis/query/status?id='+await p.evaluate('window.ExcelLensAnalytics.diagnostics().resultJob'));}
-async function save(p,title){await p.click('#analysisSaveReport');await p.wait('!!document.querySelector("#analysisRoot .analysis-modal input")');await p.run(title=>document.querySelector('#analysisRoot .analysis-modal input').value=title,title);await p.click('#analysisRoot .analysis-modal [data-yes]');for(let i=0;i<80;i++){const ws=await p.api('/api/analysis/workspace'),item=ws.reports.find(r=>r.name===title);if(item)return item;await pause(50);}throw Error('Saved report did not appear');}
+async function save(p,title){await p.click('#analysisSaveReport');await p.wait('!!document.querySelector(".ask-dialog[open] input")');await p.run(title=>document.querySelector('.ask-dialog[open] input').value=title,title);await p.click('.ask-dialog[open] [data-yes]');for(let i=0;i<80;i++){const ws=await p.api('/api/analysis/workspace'),item=ws.reports.find(r=>r.name===title);if(item)return item;await pause(50);}throw Error('Saved report did not appear');}
 (async()=>{try{
   h=await launch({out,errors:report.errors,duration:'18m'});const p=h.page;
   report.assetSHA256={};

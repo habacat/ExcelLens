@@ -95,9 +95,9 @@ func TestQuickSelectionControllerLoadsBeforeAppBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := strings.Index(string(page), `src="/assets/selection-quick-model.js"`)
-	controller := strings.Index(string(page), `src="/assets/selection-quick.js"`)
-	app := strings.Index(string(page), `src="/assets/app.js"`)
+	model := strings.Index(string(page), `src="/assets/selection-quick-model.js?v=`)
+	controller := strings.Index(string(page), `src="/assets/selection-quick.js?v=`)
+	app := strings.Index(string(page), `src="/assets/app.js?v=`)
 	if model < 0 || controller <= model || app <= controller {
 		t.Fatal("quick selection constructor must exist when app initializes")
 	}
@@ -108,9 +108,9 @@ func TestChartExportModulesLoadBeforeAnalytics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	previous := strings.Index(string(page), `src="/assets/analysis-results.js"`)
+	previous := strings.Index(string(page), `src="/assets/analysis-results.js?v=`)
 	for _, name := range []string{"chart-export-model.js", "chart-export-surface.js", "chart-export.js", "analytics.js"} {
-		at := strings.Index(string(page), `src="/assets/`+name+`"`)
+		at := strings.Index(string(page), `src="/assets/`+name+`?v=`)
 		if previous < 0 || at <= previous {
 			t.Fatal("image export module load order", name)
 		}

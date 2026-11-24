@@ -181,7 +181,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	a.analysisJobs[job.ID] = job
 	a.analysisMu.Unlock()
 	accepted = true
-	a.retainSubmitted(job.done)
+	a.retainSubmitted(job.ID, job.done)
 	go a.runAnalysisQuery(job, q)
 	return job, nil
 }

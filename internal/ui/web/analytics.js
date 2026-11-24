@@ -6,25 +6,27 @@
   const templates=window.ExcelLensAnalysisTemplates||[];
   const charts=window.ExcelLensAnalyticsCharts;
   const numbers=window.ExcelLensAnalysisNumbers;
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const formatsConfig=window.ExcelLensFileFormats?.current?.()||{raw:JSON.parse($('fileFormats').textContent)};
+  const rawFormats=formatsConfig.raw||formatsConfig;
+  const esc=window.ExcelLensDisplayFormat?.escapeHtml||(s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const post=(path,data)=>api(path,{method:'POST',body:JSON.stringify(data)});
   const state={fingerprint:'',opened:false,tab:'pivot',workspace:null,source:'',headerRow:1,fields:[],preview:[],query:null,jobID:'',jobSeq:0,activeResult:null,activeResultQuery:null,loadedSheet:null,sheetPage:0,reportCache:new window.ExcelLensAnalysisResults(),reportOpenSerial:0,templateCategory:'全部',templateText:'',drillQuery:null,drillKeys:[],drillColumn:'',drillOffset:0,drillAbort:null,abortIndex:0,activeReportID:'',sheetRevisions:new Map(),undoHistory:new Map(),gridData:null,profileController:null,sheetLoadSeq:0,sheetAbortController:null};
   const drafts=new window.ExcelLensAnalysisDrafts();
   const compositionTasks=new window.ExcelLensCompositionTasks({api,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened})});
   const sourceRows=new window.ExcelLensAnalysisSources({api,tasks:compositionTasks,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened}),grid:mode=>window.ExcelLensAnalysisSourceContext(mode)});
-  const compositionPanel=new window.ExcelLensComposition({api,toast,onUse:adoptComposition,limits:JSON.parse($('fileFormats').textContent).composition,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened,source:state.source,sourceScope:state.query?.sourceScope,composition:state.query?.composition,keepId:sourceRows.binding?.composition?sourceRows.binding.id:''})});
+  const compositionPanel=new window.ExcelLensComposition({api,toast,onUse:adoptComposition,limits:rawFormats.composition,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened,source:state.source,sourceScope:state.query?.sourceScope,composition:state.query?.composition,keepId:sourceRows.binding?.composition?sourceRows.binding.id:''})});
   window.ExcelLensCompositionUI=compositionPanel;
   const sourceModel=window.ExcelLensAnalysisSourceModel;
   const displaySettings=new window.ExcelLensAnalysisSettings({api,toast});
-  const snapshots=window.ExcelLensSnapshotsController?new window.ExcelLensSnapshotsController({api,toast,limits:JSON.parse($('fileFormats').textContent).snapshots}):null;
+  const snapshots=window.ExcelLensSnapshotsController?new window.ExcelLensSnapshotsController({api,toast,limits:rawFormats.snapshots}):null;
   window.ExcelLensSnapshots=snapshots;
   const pasteSpecial=new window.ExcelLensPasteSpecial({capture:capturePasteTarget,toast,refresh:refreshPasteTarget,
     commit:(context,changes)=>commitBatch(context.id,changes,{refresh:true,guard:context.current})});
   const analysisJobs=new window.ExcelLensAnalysisJobs({api,maxPolls:0,slot:'analysisActivity',identity:()=>JSON.stringify([state.fingerprint,state.book,state.opened]),requestIdentity:()=>state.fingerprint,sleep,
     onBusy:setAnalysisBusy,onProgress:showAnalysisProgress});
   const treeRenderer=new window.ExcelLensAnalysisTreeRenderer();
-  const tree=new window.ExcelLensAnalysisTree({api,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened}),limits:JSON.parse($('fileFormats').textContent).analysisTree,
+  const tree=new window.ExcelLensAnalysisTree({api,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened}),limits:rawFormats.analysisTree,
     onMessage:message=>toast(message,'warning'),onChange:event=>{if(state.opened&&state.activeResult?.tree&&tree.root?.job===state.jobID){if(event.type==='progress')treeRenderer.progress(event.node);else renderPivot();}}});
   const plans=window.ExcelLensRecipes?new window.ExcelLensRecipes({api,toast,adopt:adoptAnalysisPlan,
     context:()=>({bookKey:state.fingerprint,opened:state.opened,intent:state.reportOpenSerial,source:state.source,headerRow:state.headerRow,sourceId:sourceRows.binding?.id||'',sourceScope:state.query?.sourceScope,resultJob:analysisJobs.main||state.activeResultQuery?.composition?'':state.jobID,
@@ -40,7 +42,7 @@
       else if(q.source.startsWith('wb:')){close();window.dispatchEvent(new CustomEvent('excellens:analysis-navigate',{detail:{sheet:q.source.slice(3),ref}}));}
       else{const id=q.source.slice(8);state.loadedSheet=id;state.sheetPage=Math.floor((issue.row-1)/sheetPageSize(id));setTab('sheets');await loadSheet(id,state.sheetPage);$('analysisEditableGrid').querySelector(`textarea[data-row="${issue.row-1}"][data-col="${Math.max(0,issue.sourceColumn-1)}"]`)?.focus();}
     }}):null;
-  const clusters=window.ExcelLensAnalysisClusters?new window.ExcelLensAnalysisClusters({api,toast,scopeKey:sourceModel.key,limits:JSON.parse($('fileFormats').textContent).clustering,
+  const clusters=window.ExcelLensAnalysisClusters?new window.ExcelLensAnalysisClusters({api,toast,scopeKey:sourceModel.key,limits:rawFormats.clustering,
     context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened,ready:state.fieldsReady&&!state.fieldsLoading,source:state.source,headerRow:state.headerRow,sourceScope:state.query?.sourceScope,sourceId:sourceRows.binding?.id||''}),
     onTransform:(step,guard)=>{if(!guard())throw Error('分析来源已变化，请重新核对');if(state.query.transforms.length>=8)throw Error('最多8个计算列，请先移除部分计算列');state.query.transforms.push(JSON.parse(JSON.stringify(step)));renderFields();renderTransforms();},
     startExport:(jobId,protectCSV)=>window.ExcelLensExportClusters(jobId,protectCSV),
@@ -53,13 +55,16 @@
     window.ExcelLensAnalysisRecovery=recovery;drafts.onChange=(key,data)=>recovery.set(key,data);
     $('analysisDraftRecovery').addEventListener('click',()=>window.ExcelLensRecovery.show(recovery,{title:'恢复分析草稿',explanation:'草稿按原文件和编辑表匹配。载入后核对当前已保存值，再点击“重试保存”；本页同格草稿优先保留。'}));
   }
-  async function api(path,opts={}){
+  async function api(path,opts={},responseType='json'){
+    if(window.ExcelLensTransport?.api)return window.ExcelLensTransport.api(path,opts,responseType);
     const activity = window.ExcelLensActivity?.request(path, opts);
     try {
       await window.ExcelLensSession?.ready;
       const headers=new Headers(opts.headers||{});headers.set('X-ExcelLens-Token',TOKEN);window.ExcelLensSession?.apply(headers);
       if(opts.body&&!(opts.body instanceof FormData))headers.set('Content-Type','application/json');
       const response=await fetch(path,{...opts,headers,cache:'no-store'});
+      if(responseType==='response')return response;
+      if(response.ok&&responseType==='blob')return response.blob();
       const data=await response.json().catch(()=>({}));
       if(!response.ok){const error=new Error(data.error||`请求失败 HTTP ${response.status}`);error.status=response.status;throw error}
       return data;
@@ -120,7 +125,7 @@
       for(const [value,label] of aggregations)agg.append(new Option(label,value));
       agg.value=metric.aggregate;
       agg.onchange=()=>{adopt();metric.aggregate=agg.value;if(i===0)syncFirstMetric();renderBuilder()};
-      const remove=document.createElement('button');remove.textContent='×';remove.title='移除指标';remove.onclick=()=>{
+      const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='移除指标';remove.onclick=()=>{
         adopt();state.query.metrics.splice(i,1);
         if(!state.query.metrics.length){state.query.value='';state.query.aggregate='count'}else syncFirstMetric();renderBuilder()
       };
@@ -147,6 +152,7 @@
     if(tab==='sheets')return renderSheets();
     else {state.sheetLoadSeq++;state.sheetAbortController?.abort();state.sheetAbortController=null;}
     if(tab==='dashboard')renderDashboard();
+    else {state.dashboardObserver?.disconnect();state.dashboardObserver=null;}
   }
   async function open(){
     const ticket=state.openSerial=(state.openSerial||0)+1;
@@ -185,7 +191,7 @@
     }catch(err){if(ticket===state.openSerial)toast(err.message,'error')}finally{activity?.end();}
   }
   function invalidateSourceRequests(){++state.abortIndex;state.fieldsController?.abort();state.profileController?.abort();state.drillAbort?.abort();clusters?.reset();sourceRows.cancel();state.fieldsLoading=false;}
-  function close(){state.openActivity?.end();state.openSerial=(state.openSerial||0)+1;++state.reportOpenSerial;invalidateSourceRequests();window.ExcelLensCompositionUI?.reset();sourceRows.reset();tree.reset();plans?.close();issuePanel?.close();if(pasteSpecial.dialog.open)pasteSpecial.dialog.close();analysisJobs.reset();state.sheetLoadSeq++;state.sheetAbortController?.abort();state.sheetAbortController=null;root.hidden=true;document.body.classList.remove('analysis-mode');$('analysisDrill').hidden=true;state.opened=false;window.ExcelLensChartExport?.revalidate();}
+  function close(){state.dashboardObserver?.disconnect();state.dashboardObserver=null;state.openActivity?.end();state.openSerial=(state.openSerial||0)+1;++state.reportOpenSerial;invalidateSourceRequests();window.ExcelLensCompositionUI?.reset();sourceRows.reset();tree.reset();plans?.close();issuePanel?.close();if(pasteSpecial.dialog.open)pasteSpecial.dialog.close();analysisJobs.reset();state.sheetLoadSeq++;state.sheetAbortController?.abort();state.sheetAbortController=null;root.hidden=true;document.body.classList.remove('analysis-mode');$('analysisDrill').hidden=true;state.opened=false;window.ExcelLensChartExport?.revalidate();}
   function clearResultDisplay(){
     snapshots?.changed();if($('analysisSnapshotSave'))$('analysisSnapshotSave').disabled=true;
     state.chartCapture=null;window.ExcelLensChartExport?.revalidate();$('analysisChartImage').disabled=true;
@@ -290,7 +296,8 @@
       chip.addEventListener('click',()=>addField(field.id,field.numeric?'values':'rows'));
       wrapper.append(chip);
       if(!field.id.startsWith('D_')){
-        const info=document.createElement('button');info.type='button';info.className='analysis-field-info-btn';info.title='查看字段画像与常见值';info.textContent='ⓘ';
+        const info=document.createElement('button');info.type='button';info.className='analysis-field-info-btn';info.title='查看字段画像与常见值';info.setAttribute('aria-label','查看字段画像：'+field.name);
+        info.innerHTML=window.ExcelLensDisplayFormat.icon('info','icon icon-small');
         info.onclick=()=>loadFieldProfile(field);wrapper.append(info);
       }
       fragment.append(wrapper);
@@ -308,8 +315,8 @@
       if(!current())return;
       host.replaceChildren();
       const head=document.createElement('div');head.className='analysis-profile-head';const title=document.createElement('strong');title.textContent=field.name;
-      const close=document.createElement('button');close.textContent='×';close.title='收起字段画像';close.onclick=()=>{controller.abort();host.hidden=true;};head.append(title,close);host.append(head);
-      if(clusters&&!state.query?.composition&&(state.source.startsWith('scratch:')||JSON.parse($('fileFormats').textContent).sources[state.sourceFormat]?.textClustering)){
+      const close=document.createElement('button');close.type='button';close.textContent='×';close.title='收起字段画像';close.setAttribute('aria-label','收起字段画像');close.onclick=()=>{controller.abort();host.hidden=true;};head.append(title,close);host.append(head);
+      if(clusters&&!state.query?.composition&&(state.source.startsWith('scratch:')||rawFormats.sources?.[state.sourceFormat]?.textClustering)){
         const candidates=document.createElement('button');candidates.type='button';candidates.className='analysis-quiet-button';candidates.textContent='疑似重复';candidates.dataset.clusterField=field.id;candidates.addEventListener('click',()=>{if(current())clusters.open(field);});host.append(candidates);
       }
       const stats=document.createElement('div');stats.className='analysis-profile-stat';
@@ -334,10 +341,8 @@
     if(hasUnsaved()){toast('仍有未保存的分析内容，请先重试保存','warning');return;}
     const activity=globalThis.ExcelLensActivity?.begin('正在导出分析备份');
     try{
-      await window.ExcelLensSession?.ready;
-      const res=await fetch('/api/analysis/backup',{headers:window.ExcelLensSession?.apply(new Headers({'X-ExcelLens-Token':TOKEN}))||{'X-ExcelLens-Token':TOKEN}});
-      if(!res.ok)throw new Error('获取备份失败');
-      downloadBlob(await res.blob(),'ExcelLens-Analysis-Backup-'+new Date().toISOString().slice(0,10)+'.json');toast('已导出分析工作区备份','success');
+      const blob=window.ExcelLensTransport?.api?await window.ExcelLensTransport.api('/api/analysis/backup',{activity:false},'blob'):await (async()=>{await window.ExcelLensSession?.ready;const res=await fetch('/api/analysis/backup',{headers:window.ExcelLensSession?.apply(new Headers({'X-ExcelLens-Token':TOKEN}))||{'X-ExcelLens-Token':TOKEN}});if(!res.ok)throw new Error('获取备份失败');return res.blob();})();
+      downloadBlob(blob,'ExcelLens-Analysis-Backup-'+new Date().toISOString().slice(0,10)+'.json');toast('已导出分析工作区备份','success');
     }catch(err){toast(err.message,'error')}finally{activity?.end();}
   }
   async function backupImport(file){
@@ -421,7 +426,7 @@
     state.query.transforms.forEach((t,i)=>{
       const box=document.createElement('div');box.className='analysis-rule';
       const row=document.createElement('div');row.className='analysis-rule-header';const name=document.createElement('input');name.className='analysis-control';name.placeholder='新列名';name.value=t.name;name.oninput=()=>{t.name=name.value||'新列';renderFields()};row.append(name);
-      const remove=document.createElement('button');remove.className='analysis-rule-remove';remove.textContent='×';remove.onclick=()=>removeTransform(t.id);row.append(remove);
+      const remove=document.createElement('button');remove.type='button';remove.className='analysis-rule-remove';remove.textContent='×';remove.title='移除计算列';remove.onclick=()=>removeTransform(t.id);row.append(remove);
       const temporal=['date','time','datetime'].includes(t.op);
       const operations=[['date','转日期'],['time','转时间'],['datetime','转日期时间'],['text','转文本'],['number','转数值'],['trim','去空格'],['upper','大写'],['lower','小写'],['year','提取年份'],['month','提取月份'],['yearmonth','提取年月'],['abs','绝对值'],['multiply','乘常数'],['divide','除常数'],['prefix','添加前缀'],['suffix','添加后缀'],['replace','替换文本'],['length','文本长度']];
       if(t.op==='map_text')operations.push(['map_text','文本映射']);
@@ -639,8 +644,8 @@
         position.onclick=()=>{if(q.composition)navigateComposition(row,row.origin?.columns.find(column=>column>0),jobId);else if(q.source.startsWith('wb:')){close();window.dispatchEvent(new CustomEvent('excellens:analysis-navigate',{detail:{sheet:q.source.slice(3),ref:'A'+row.row}}))}else navigateSheet(q.source.slice(8),row.row,1).catch(error=>toast(error.message,'error'));};tr.append(pos);
         row.cells.forEach((v,i)=>{const td=document.createElement('td');td.title=v;if(q.composition&&row.origin?.columns[data.fields[i].column-1]>0){const jump=document.createElement('button');jump.type='button';jump.className='analysis-source-row analysis-drill-link';jump.textContent=v;jump.onclick=()=>navigateComposition(row,row.origin.columns[data.fields[i].column-1],jobId);td.append(jump);}else td.textContent=v;tr.append(td);});body.append(tr)
       });table.append(body);wrap.replaceChildren(table);
-      const paging=$('analysisDrillPaging');const prev=document.createElement('button');prev.textContent='上一页';prev.disabled=offset===0;prev.onclick=()=>drill(keys,colKey,Math.max(0,offset-100),columnSelected);paging.append(prev);
-      const next=document.createElement('button');next.textContent='下一页';next.disabled=!data.hasMore;next.onclick=()=>drill(keys,colKey,offset+100,columnSelected);paging.append(next);
+      const paging=$('analysisDrillPaging');const prev=document.createElement('button');prev.type='button';prev.textContent='上一页';prev.disabled=offset===0;prev.onclick=()=>drill(keys,colKey,Math.max(0,offset-100),columnSelected);paging.append(prev);
+      const next=document.createElement('button');next.type='button';next.textContent='下一页';next.disabled=!data.hasMore;next.onclick=()=>drill(keys,colKey,offset+100,columnSelected);paging.append(next);
     }catch(err){if(current()&&!drawer.hidden&&err.name!=='AbortError'){setText('analysisDrillInfo',err.message);toast('下钻失败：'+err.message,'error')}}
   }
   async function navigateComposition(record,column,job=state.jobID){
@@ -655,12 +660,10 @@
     finally{if(popup&&!handled)popup.close();}
   }
   function askText(title,initial='',hint='请输入名称'){
-    return new Promise(resolve=>{
-      const shade=document.createElement('div');shade.className='analysis-modal-shade';shade.innerHTML=`<div class="analysis-modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><input class="analysis-control" maxlength="80" placeholder="${esc(hint)}"><div class="analysis-modal-actions"><button data-no type="button" class="analysis-outline-button">取消</button><button data-yes type="button" class="analysis-primary-button">确定</button></div></div>`;
-      const input=shade.querySelector('input');input.value=initial;
-      const done=v=>{shade.remove();resolve(v)};shade.querySelector('[data-no]').onclick=()=>done(null);shade.querySelector('[data-yes]').onclick=()=>done(input.value.trim());
-      shade.addEventListener('keydown',e=>{if(e.key==='Escape')done(null);if(e.key==='Enter')done(input.value.trim())});root.append(shade);input.focus();input.select();
-    });
+    if(window.ExcelLensOverlays?.ask){
+      return window.ExcelLensOverlays.ask({title,value:initial,placeholder:hint,maxLength:80}).then(res=>res?res.value:null);
+    }
+    return Promise.resolve(null);
   }
   async function saveReport(){
     if(!state.activeResultQuery||!state.activeResult)return;
@@ -716,9 +719,9 @@
     const format=$('analysisExportFormat').value==='csv'?'csv':'xlsx';
     const activity=globalThis.ExcelLensActivity?.begin('正在导出分析结果');
     try{
-      await window.ExcelLensSession?.ready;
+      const url='/api/analysis/export?id='+encodeURIComponent(job)+'&format='+format;
+      const res=window.ExcelLensTransport?.api?await window.ExcelLensTransport.api(url,{activity:false},'response'):await (async()=>{await window.ExcelLensSession?.ready;return fetch(url,{headers:window.ExcelLensSession?.apply(new Headers({'X-ExcelLens-Token':TOKEN}))||{'X-ExcelLens-Token':TOKEN}});})();
       if(book!==state.fingerprint)return;
-      const res=await fetch('/api/analysis/export?id='+encodeURIComponent(job)+'&format='+format,{headers:window.ExcelLensSession?.apply(new Headers({'X-ExcelLens-Token':TOKEN}))||{'X-ExcelLens-Token':TOKEN}});
       if(res.status===404)throw new Error('结果任务已过期，请重新运行分析后导出');
       if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(data.error||'导出失败')}
       const blob=await res.blob();if(book!==state.fingerprint)return;
@@ -756,16 +759,19 @@
     }
     // Render all report shells, but only query charts as they approach the
     // viewport. A large dashboard must not sequentially rescan 80 workbooks.
+    state.dashboardObserver?.disconnect();
+    state.dashboardObserver=null;
     if(!reports.length){const el=document.createElement('div');el.className='analysis-empty';el.textContent='还没有报表。在“透视分析”里点“保存报表”，报表会出现在这里。';host.append(el);return}
     const contentScroll=root.querySelector('.analysis-main');
     const lazyObserver=('IntersectionObserver' in window)?new IntersectionObserver(entries=>{
       for(const entry of entries){if(entry.isIntersecting){lazyObserver.unobserve(entry.target);entry.target.__loadAnalysisCard?.()}}
     },{root:contentScroll,rootMargin:'200px'}):null;
+    state.dashboardObserver=lazyObserver;
     for(const report of reports){
       if(!state.opened||state.tab!=='dashboard')return;
       const card=document.createElement('div');card.className='analysis-dashboard-card';
       card.dataset.reportId=report.id;card.draggable=true;card.title='拖动调整仪表盘顺序';
-      card.innerHTML=`<div class="analysis-dashboard-card-head"><h3><span class="analysis-dashboard-grip" aria-hidden="true">⠿</span>${esc(report.name)}</h3><div class="analysis-dashboard-actions"><button type="button" data-report-image disabled title="导出已加载图表及精确附件">图片</button><button type="button" data-report-open>打开 ↗</button><button type="button" class="analysis-dashboard-remove" data-report-remove title="删除该报表" aria-label="删除报表">×</button></div></div><div class="analysis-dashboard-plot"><canvas></canvas><div class="analysis-chart-tooltip" hidden></div></div>`;
+      card.innerHTML=`<div class="analysis-dashboard-card-head"><h3><span class="analysis-dashboard-grip" aria-hidden="true"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-grip"/></svg></span><span>${esc(report.name)}</span></h3><div class="analysis-dashboard-actions"><button type="button" data-report-image disabled title="导出已加载图表及精确附件">图片</button><button type="button" data-report-open>打开 ↗</button><button type="button" class="analysis-dashboard-remove" data-report-remove title="删除该报表" aria-label="删除报表">×</button></div></div><div class="analysis-dashboard-plot"><canvas></canvas><div class="analysis-chart-tooltip" hidden></div></div>`;
       host.append(card);
       card.addEventListener('dragstart',event=>{
         if(event.target.closest('button')){event.preventDefault();return}
@@ -820,7 +826,7 @@
   }
   function renderTemplates(){
     const categories=['全部',...new Set(templates.map(t=>t.category))];const cats=$('analysisTemplateCategories');cats.replaceChildren();
-    categories.forEach(name=>{const btn=document.createElement('button');btn.textContent=name;btn.className=name===state.templateCategory?'is-active':'';btn.onclick=()=>{state.templateCategory=name;renderTemplates()};cats.append(btn)});
+    categories.forEach(name=>{const btn=document.createElement('button');btn.type='button';btn.textContent=name;btn.className=name===state.templateCategory?'is-active':'';btn.onclick=()=>{state.templateCategory=name;renderTemplates()};cats.append(btn)});
     const container=$('analysisTemplateGrid');container.replaceChildren();
     const search=state.templateText.toLocaleLowerCase();
     templates.filter(t=>(state.templateCategory==='全部'||t.category===state.templateCategory)&&(!search||(t.title+' '+t.description).toLocaleLowerCase().includes(search))).forEach(t=>{
@@ -885,10 +891,10 @@
       for(const id of ['analysisPasteSpecial','analysisUndo','analysisRedo','analysisAddColumn','analysisAddRows','analysisDeleteSheet'])$(id).disabled=true;
       $('analysisSheetPagination').replaceChildren();
       const empty=document.createElement('div');empty.className='analysis-sheet-empty';
-      const glyph=document.createElement('div');glyph.className='analysis-sheet-empty-icon';glyph.textContent='▦';glyph.setAttribute('aria-hidden','true');
+      const glyph=document.createElement('div');glyph.className='analysis-sheet-empty-icon';glyph.setAttribute('aria-hidden','true');glyph.innerHTML=window.ExcelLensDisplayFormat.icon('header');
       const title=document.createElement('h3');title.textContent='暂无工作表';
       const actions=document.createElement('div');actions.className='analysis-sheet-empty-actions';
-      const create=document.createElement('button');create.type='button';create.className='analysis-primary-button';create.textContent='＋ 新建工作表';create.addEventListener('click',createSheet);
+      const create=document.createElement('button');create.type='button';create.className='analysis-primary-button';create.innerHTML=window.ExcelLensDisplayFormat.icon('plus');create.append('新建工作表');create.addEventListener('click',createSheet);
       const pivot=document.createElement('button');pivot.type='button';pivot.className='analysis-outline-button';pivot.textContent='转到透视分析';pivot.addEventListener('click',()=>setTab('pivot'));
       actions.append(create,pivot);empty.append(glyph,title,actions);
       $('analysisEditableGrid').replaceChildren(empty);
@@ -1023,9 +1029,9 @@
       }
       body.append(fragment);table.append(body);area.append(table);
       const pagination=$('analysisSheetPagination');pagination.replaceChildren();
-      const prev=document.createElement('button');prev.textContent='‹ 上一页';prev.disabled=page===0;prev.onclick=async()=>{await saveChain.catch(()=>{});state.sheetPage=page-1;loadSheet(id,state.sheetPage)};pagination.append(prev);
+      const prev=document.createElement('button');prev.type='button';prev.textContent='‹ 上一页';prev.disabled=page===0;prev.onclick=async()=>{await saveChain.catch(()=>{});state.sheetPage=page-1;loadSheet(id,state.sheetPage)};pagination.append(prev);
       const span=document.createElement('span');span.textContent=`第 ${page+1} 页 · 已保存 ${fmtNum(data.total)} 行 · 每页 ${pageSize} 行`;pagination.append(span);
-      const next=document.createElement('button');next.textContent='下一页 ›';
+      const next=document.createElement('button');next.type='button';next.textContent='下一页 ›';
       const lastAllowed=Math.min(9999,Math.max(data.total,1)+pageSize-1);
       next.disabled=(page+1)*pageSize>lastAllowed;
       next.onclick=async()=>{await saveChain.catch(()=>{});state.sheetPage=page+1;loadSheet(id,state.sheetPage)};pagination.append(next);
@@ -1189,7 +1195,7 @@
     bindSheetGrid();$('analysisUndo').addEventListener('click',()=>changeSheetHistory('undo'));$('analysisRedo').addEventListener('click',()=>changeSheetHistory('redo'));
     $('analysisRetrySave').addEventListener('click',retryDrafts);
     $('analysisCreateSheet').addEventListener('click',createSheet);$('analysisAddColumn').addEventListener('click',addColumn);$('analysisAddRows').addEventListener('click',addRows);$('analysisDeleteSheet').addEventListener('click',deleteSheet);
-    root.addEventListener('keydown',e=>{if(e.key==='Escape'){$('analysisDrill').hidden=true;const shade=root.querySelector('.analysis-modal-shade');if(!shade)close();e.stopPropagation()}});
+    root.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('dialog:modal'))return;if(!$('analysisDrill').hidden){state.drillAbort?.abort();$('analysisDrill').hidden=true;e.stopPropagation();return;}close();e.stopPropagation()}});
     window.addEventListener('resize',()=>{if(state.opened)charts?.resize();});
     window.addEventListener('beforeunload',event=>{if(hasUnsaved()&&!window.ExcelLensSession?.cacheCleared){event.preventDefault();event.returnValue='';}});
   }

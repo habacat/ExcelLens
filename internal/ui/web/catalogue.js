@@ -141,7 +141,7 @@
       if(columns.length>size){const paging=element('div','catalogue-paging'),prev=element('button','mini-button','上一页列'),next=element('button','mini-button','下一页列');prev.type=next.type='button';prev.disabled=this.columnOffset===0;next.disabled=this.columnOffset+size>=columns.length;prev.onclick=()=>{this.columnOffset=Math.max(0,this.columnOffset-size);this.renderDetail();};next.onclick=()=>{this.columnOffset+=size;this.renderDetail();};paging.append(prev,element('span','',`${this.columnOffset+1}–${Math.min(columns.length,this.columnOffset+size)} / ${columns.length}`),next);body.append(paging);}
     }
     key(event){
-      if(!this.page?.items.length)return;const at=Math.max(0,this.page.items.findIndex(item=>item.id===this.selected));
+      if(!this.page?.items.length||event.isComposing||event.keyCode===229)return;const at=Math.max(0,this.page.items.findIndex(item=>item.id===this.selected));
       if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();this.select(this.page.items[Math.max(0,Math.min(this.page.items.length-1,at+(event.key==='ArrowDown'?1:-1)))].id,true);}
       if(event.key==='Enter'){event.preventDefault();this.locate();}
     }

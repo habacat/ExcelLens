@@ -143,8 +143,8 @@ async function upload(file){const result=await cdp('Runtime.evaluate',{expressio
     const exported=await evaluate('window.qaAnalysisExports[0]');assert.equal(exported.status,200);assert(exported.url.includes('id='+encodeURIComponent(taskA)+'&'));assert(exported.body.includes('乙')&&exported.body.includes('丙')&&/总计,9(?:\r?\n|$)/.test(exported.body),exported.body);
     assert.equal(await evaluate('window.qaAnalysisStarts.length'),startsBefore,'cached report must preserve the existing snapshot');
     await shot('cached-report-export');
-    await click('#analysisMaterialize');await waitFor('!!document.querySelector(".analysis-modal-shade input")');
-    await run(()=>{document.querySelector('.analysis-modal-shade input').value='缓存报表A结果';});await click('.analysis-modal-shade [data-yes]');
+    await click('#analysisMaterialize');await waitFor('!!document.querySelector(".ask-dialog[open] input")');
+    await run(()=>{document.querySelector('.ask-dialog[open] input').value='缓存报表A结果';});await click('.ask-dialog[open] [data-yes]');
     await waitFor('window.ExcelLensAnalytics.diagnostics().tab==="sheets"');
     const materialized=(await api('/api/analysis/workspace')).sheets.find(x=>x.name==='缓存报表A结果');assert(materialized);
     const resultSheet=await api('/api/analysis/sheet?id='+materialized.id);assert(resultSheet.rows.some(row=>row[0]==='总计'&&row.at(-1)==='9'));assert(resultSheet.rows.some(row=>row.includes('乙')));

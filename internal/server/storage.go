@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-
 	"io"
 	"net/http"
 	"path/filepath"
@@ -46,11 +45,11 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		if !a.storageMu.TryLock() {
+		if !a.storageView.TryRLock() {
 			writeError(w, 409, "数据传输进行中，可查看任务进度")
 			return
 		}
-		defer a.storageMu.Unlock()
+		defer a.storageView.RUnlock()
 		writeJSON(w, map[string]any{"roots": roots, "groups": roots.Inventory(r.Context())})
 		return
 	}
@@ -58,6 +57,7 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		Action    string `json:"action"`
 		Directory string `json:"directory"`
 		Password  string `json:"password,omitempty"`
+		Stage     string `json:"stage,omitempty"`
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<10))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
@@ -79,12 +79,25 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.storageMu.Unlock()
-	if a.restorePending.Load() {
+	a.storageView.Lock()
+	defer a.storageView.Unlock()
+	if a.restoreState.pending() {
 		writeError(w, 409, "请先完成恢复事务")
 		return
 	}
 	var message string
 	switch req.Action {
+	case "list-stages":
+		stages, e := roots.BackupStages(req.Directory)
+		if e != nil {
+			writeError(w, 409, e.Error())
+			return
+		}
+		writeJSON(w, map[string]any{"stages": stages})
+		return
+	case "clean-stage":
+		err = roots.CleanBackupStage(req.Directory, req.Stage)
+		message = "已清理未完成备份"
 	case "clear-cache":
 		message, err = a.ClearUnusedCaches()
 	case "clear-uploads":
@@ -106,18 +119,18 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 func (a *App) restoreStorage(ctx context.Context, roots localstore.Roots, folder string, options localstore.TransferOptions) error {
 	a.cacheResetMu.Lock()
 	defer a.cacheResetMu.Unlock()
-	for _, app := range a.activeBrowserWorkbooks() {
-		app.archiveMu.Lock()
-		open := app.archiveView != nil || app.archiveTask != nil
-		app.archiveMu.Unlock()
-		if open || app.currentWorkbook() != nil {
-			return errors.New("有工作簿正在使用。请关闭工作簿标签页，稍后从首页迁入")
-		}
+	a.restoreActive.Store(true)
+	defer a.restoreActive.Store(false)
+	if err := a.restoreBlockers(); err != nil {
+		return err
 	}
 	a.toolbar.mu.Lock()
+	defer a.toolbar.notify()
 	defer a.toolbar.mu.Unlock()
 	defer func() { a.toolbar.loaded = false }()
 	err := roots.RestoreWith(ctx, folder, options)
-	a.restorePending.Store(err != nil && roots.Pending())
+	if err != nil && roots.Pending() {
+		a.restoreState.set(err)
+	}
 	return err
 }

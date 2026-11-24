@@ -78,7 +78,7 @@ async function drag(axis,track,run){
   const input=await cdp('Runtime.evaluate',{expression:'document.querySelector("#fileInput")'});await cdp('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});
   await waitFor('document.querySelector("#indexOverlay").hidden&&!!document.querySelector(".table-column-head")&&window.ExcelLensPerformance().hasVisibleCoverage');
   if(theme!=='off'){await evaluate(`document.querySelector('input[name="readingPreset"][value=${JSON.stringify(theme)}]').click()`);await settle();}
-  if(legacy){const css=fs.readFileSync(path.join(root,'validation/1.8.4/private/before/style.css'),'utf8');await evaluate(`document.querySelector('link[href="/assets/style.css"]').disabled=true;const legacyStyle=document.createElement('style');legacyStyle.textContent=${JSON.stringify(css)};document.head.append(legacyStyle);window.ExcelLensTableHeaders.useStickyLabels=()=>true;`);}
+  if(legacy){const css=fs.readFileSync(path.join(root,'validation/1.8.4/private/before/style.css'),'utf8');await evaluate(`document.querySelector('link[href^="/assets/style.css"]').disabled=true;const legacyStyle=document.createElement('style');legacyStyle.textContent=${JSON.stringify(css)};document.head.append(legacyStyle);window.ExcelLensTableHeaders.useStickyLabels=()=>true;`);}
   await freeze(0,0);await scroll(0);
   const atTop=await labels();assert.equal(atTop.labelVisible,legacy,'source and sticky field labels must not duplicate');assert.equal(atTop.source,'凭证来源▾');await capture('top.png');
   scenarios.push({name:'top',...atTop});

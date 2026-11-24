@@ -116,7 +116,7 @@ async function loadRecovery(button){
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesClose")).backgroundColor'),'rgb(46, 51, 58)');
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesTable td")).borderBottomColor'),'rgb(57, 66, 76)');
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#analysisIssuesTable button")).color'),'rgb(161, 201, 234)');
-    await click('#analysisIssuesExtract');await waitFor('!!document.querySelector(".analysis-modal-shade input")');await run(()=>{document.querySelector('.analysis-modal-shade input').value='完整核对编辑表';});await click('.analysis-modal-shade [data-yes]');
+    await click('#analysisIssuesExtract');await waitFor('!!document.querySelector(".ask-dialog[open] input")');await run(()=>{document.querySelector('.ask-dialog[open] input').value='完整核对编辑表';});await click('.ask-dialog[open] [data-yes]');
     await waitFor('window.ExcelLensAnalytics.diagnostics().tab==="sheets"');const materialized=(await api('/api/analysis/workspace')).sheets.find(item=>item.name==='完整核对编辑表');assert(materialized);
     const materializedRows=await api('/api/analysis/sheet?id='+materialized.id+'&limit=200');assert.equal(materializedRows.total,121);assert.equal(materializedRows.rows[2][9],values[2]);
     report.checks.push('issue dialog shows exactly 100 samples with correct source positions; full editable extraction preserves 121 original items and dark/narrow layout');

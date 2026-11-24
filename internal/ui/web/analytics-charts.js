@@ -146,7 +146,9 @@
   function draw(canvas,result,mode='bar',onPick){
     if(!canvas)return()=>null;
     const theme=themeFor(canvas),numberSettings=window.ExcelLensAnalysisNumbers.get();
-    rendered.set(canvas,{result,mode,onPick,theme,numberSettings});
+    const prevHover=rendered.get(canvas)?.hoverFrame;if(prevHover&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(prevHover);
+    const entry={result,mode,onPick,theme,numberSettings,hoverFrame:0};
+    rendered.set(canvas,entry);
     const dpr=Math.min(window.devicePixelRatio||1,2),bounds=canvas.getBoundingClientRect();
     const w=Math.max(140,Math.floor(bounds.width)),h=Math.max(140,Math.floor(bounds.height));
     canvas.width=w*dpr;canvas.height=h*dpr;
@@ -161,16 +163,40 @@
       for(let i=hit.length-1;i>=0;i--){const box=hit[i];if(box.pie){const dx=x-box.cx,dy=y-box.cy,rad=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);const aa=angle<box.from?angle+Math.PI*2:angle;if(rad>=box.inner&&rad<=box.r&&aa>=box.from&&aa<=box.to)return box}else if(x>=box.x&&x<=box.x+box.w&&y>=box.y&&y<=box.y+box.h)return box}
       return null;
     }
+    let lastKey='',lastEvent=null,tipWidth=0,pending=false;
+    const applyHover=e=>{
+      const p=pick(e);
+      const cursor=p?'pointer':'crosshair';if(canvas.style.cursor!==cursor)canvas.style.cursor=cursor;
+      if(!tip)return;
+      if(!p){if(!tip.hidden)tip.hidden=true;lastKey='';return;}
+      const key=p.row+':'+p.col;
+      if(key!==lastKey||tip.hidden){
+        lastKey=key;
+        const cell=points[p.row].values[p.col]||{};
+        const display=window.ExcelLensAnalysisNumbers.format(cell);
+        tip.textContent=label(points[p.row])+' · '+seriesLabel(series[p.col])+'：'+display+(cell.comparison&&window.ExcelLensAnalysisComparisons?'（'+window.ExcelLensAnalysisComparisons.title(cell)+'）':cell.exact&&cell.exact!==display?'（精确值 '+cell.exact+'）':'');
+        tip.hidden=false;
+        tipWidth=tip.offsetWidth||tip.getBoundingClientRect().width||0;
+      }
+      const rect=canvas.parentElement.getBoundingClientRect();
+      tip.style.left=Math.max(6,Math.min(rect.width-tipWidth-6,e.clientX-rect.left+12))+'px';
+      tip.style.top=Math.max(6,e.clientY-rect.top-28)+'px';
+    };
     canvas.onclick=e=>{const p=pick(e);if(p&&onPick)onPick(points[p.row].keys,series[p.col])};
     canvas.onmousemove=e=>{
-      const p=pick(e);canvas.style.cursor=p?'pointer':'crosshair';const tip=canvas.parentElement.querySelector('.analysis-chart-tooltip');if(!tip)return;
-      if(!p){tip.hidden=true;return}
-      const cell=points[p.row].values[p.col]||{};
-      const display=window.ExcelLensAnalysisNumbers.format(cell);
-      tip.hidden=false;tip.textContent=label(points[p.row])+' · '+seriesLabel(series[p.col])+'：'+display+(cell.comparison&&window.ExcelLensAnalysisComparisons?'（'+window.ExcelLensAnalysisComparisons.title(cell)+'）':cell.exact&&cell.exact!==display?'（精确值 '+cell.exact+'）':'');
-      const rect=canvas.parentElement.getBoundingClientRect();tip.style.left=Math.max(6,Math.min(rect.width-tip.getBoundingClientRect().width-6,e.clientX-rect.left+12))+'px';tip.style.top=Math.max(6,e.clientY-rect.top-28)+'px';
+      lastEvent=e;
+      if(!entry.hoverFrame){
+        applyHover(e);
+        pending=false;
+        entry.hoverFrame=requestAnimationFrame(()=>{
+          entry.hoverFrame=0;
+          if(pending&&lastEvent){pending=false;applyHover(lastEvent);}
+        });
+      }else{
+        pending=true;
+      }
     };
-    canvas.onmouseleave=()=>{const tip=canvas.parentElement.querySelector('.analysis-chart-tooltip');if(tip)tip.hidden=true};
+    canvas.onmouseleave=()=>{if(entry.hoverFrame&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(entry.hoverFrame);entry.hoverFrame=0;pending=false;lastEvent=null;lastKey='';if(tip)tip.hidden=true;};
     return pick;
   }
   // Bounded snapshot trends use the same exact-to-plot conversion. Missing

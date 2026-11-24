@@ -51,8 +51,11 @@
   }
   function viewportHasHeadroom(bounds,request,maxRow,maxCol){
     if(!viewportCoversVisible(bounds,request))return false;
-    const rowMin=Math.max(1,request.visibleStart-3),rowMax=Math.min(
-      maxRow,request.visibleEnd+3);
+    // Prefetch with enough vertical lead time inside the 18-row overscan band so
+    // continuous wheel/touchpad scrolling rarely reaches unbuffered rows.
+    const rowLead=6;
+    const rowMin=Math.max(1,request.visibleStart-rowLead),rowMax=Math.min(
+      maxRow,request.visibleEnd+rowLead);
     if(request.selectedCols)return bounds.displayStart<=rowMin&&bounds.displayEnd>=rowMax&&
       hasRequestedColumns(bounds,request,false);
     const colMin=Math.max(1,request.visibleColStart-1),colMax=Math.min(maxCol,request.visibleColEnd+1);

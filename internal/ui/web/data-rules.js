@@ -147,7 +147,7 @@
     }
     areaText(area){const column=window.ExcelLensAddress.columnName;const first=column(area.col)+area.row,last=column(area.endCol)+area.endRow;return first===last?first:first+':'+last;}
     key(event){
-      const items=this.page?.page.items;if(!items?.length)return;let at=Math.max(0,items.findIndex(item=>item.id===this.selected));
+      const items=this.page?.page.items;if(!items?.length||event.isComposing||event.keyCode===229)return;let at=Math.max(0,items.findIndex(item=>item.id===this.selected));
       if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();at=event.key==='Home'?0:event.key==='End'?items.length-1:Math.max(0,Math.min(items.length-1,at+(event.key==='ArrowDown'?1:-1)));this.select(items[at].id,true);}
       if(event.key==='Enter'){event.preventDefault();this.locate();}
     }

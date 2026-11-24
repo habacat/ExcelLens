@@ -63,7 +63,7 @@
         this.renderOptions();
       });
       document.addEventListener('keydown',e=>{
-        if(this.panel.hidden) return;
+        if(this.panel.hidden||e.isComposing||e.keyCode===229) return;
         if(e.key==='Escape') {e.preventDefault();this.hide();}
         if(e.key==='Enter'&&this.panel.contains(document.activeElement)) {e.preventDefault();this.apply();}
       },true);

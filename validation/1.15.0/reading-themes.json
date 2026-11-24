@@ -1,0 +1,130 @@
+{
+  "version": "1.15.0",
+  "result": "PASS",
+  "browser": "Chrome/158.0.8127.88",
+  "baseline": false,
+  "desktopManualAcceptance": false,
+  "presets": [
+    "warm",
+    "green",
+    "mist",
+    "blush",
+    "ice",
+    "lavender",
+    "graphite",
+    "navy",
+    "forest",
+    "warmdark",
+    "plum",
+    "brown"
+  ],
+  "sourceSHA256": "2faa16caa7d40ee2bf20743b78ab05e2d40c308d35eb110d1292763ab2af6d58",
+  "backgroundRequests": [
+    "/api/interface?wait=1&ribbon=false&epoch=0",
+    "/api/session/heartbeat",
+    "/api/interface?wait=1&ribbon=false&epoch=0",
+    "/api/session/heartbeat",
+    "/api/interface?wait=1&ribbon=false&epoch=0",
+    "/api/session/heartbeat",
+    "/api/interface?wait=1&ribbon=false&epoch=0"
+  ],
+  "sourceUnchanged": true,
+  "assetDigests": {
+    "style.css": "a253247c0eca7c7294a3860be7ef41f5e07b1af7ccfe887b488e27eabdef178e",
+    "themes.css": "2bc27a073bc298bd2942b29ffb07e256c121f866f074d472151f39c66fe4c33f",
+    "calculator.css": "5b5b9bab51ef6794042dce2d71ca2ffca50f5183416f1aa12fad6da0526d0ac7",
+    "analytics.css": "fbf9f1cd18d5e1fd0b1ea682fdb746247b61a3f7646b329872cdd80c5423563a",
+    "analytics.js": "4ec2563285e0c278d32118371ec862e7956bb1e04049a212a1bca7b36ef90e96",
+    "analytics-charts.js": "119e18b62691c36fae5cbb1f99b45fc483d876fee6db8373e0dab6885f19fdef",
+    "readingmode.js": "973ba1632ec9da609bec0dd41017de173c7f471f1d0116df0368648126573aea",
+    "home.css": "385073d3cb73f85571050787b30340402391bc2432bc9f032850764502a33ea2",
+    "home-texture.svg": "4669165a84e716695324e300881e2fc218490561d3197b1d035ae0707bfdb6ab"
+  },
+  "profileRemoved": false,
+  "profileRetention": "Private profile retained with diagnostic files",
+  "errors": [],
+  "failures": [],
+  "phases": [
+    {
+      "name": "bottom",
+      "controls": 15,
+      "presets": 12
+    },
+    {
+      "name": "search",
+      "controls": 10,
+      "presets": 12
+    },
+    {
+      "name": "inspector",
+      "controls": 8,
+      "presets": 12
+    },
+    {
+      "name": "export",
+      "controls": 7,
+      "presets": 12
+    },
+    {
+      "name": "statistics",
+      "controls": 8,
+      "presets": 12
+    },
+    {
+      "name": "bookmarks",
+      "controls": 5,
+      "presets": 12
+    },
+    {
+      "name": "commands",
+      "controls": 4,
+      "presets": 12
+    },
+    {
+      "name": "calculator",
+      "controls": 8,
+      "presets": 12
+    },
+    {
+      "name": "calculator-dock",
+      "controls": 3,
+      "presets": 12
+    },
+    {
+      "name": "analysis-chart",
+      "controls": 7,
+      "presets": 12
+    },
+    {
+      "name": "analysis-dialog",
+      "controls": 4,
+      "presets": 12
+    },
+    {
+      "name": "dashboard",
+      "controls": 3,
+      "presets": 12
+    },
+    {
+      "name": "analysis-rules",
+      "controls": 7,
+      "presets": 12
+    },
+    {
+      "name": "analysis-sheet",
+      "controls": 6,
+      "presets": 12
+    },
+    {
+      "name": "templates",
+      "controls": 4,
+      "presets": 12
+    },
+    {
+      "name": "home",
+      "controls": 12,
+      "presets": 12
+    }
+  ],
+  "homePreview": []
+}

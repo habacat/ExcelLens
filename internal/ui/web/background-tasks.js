@@ -23,11 +23,22 @@
         {...status,mode:status.mode||status.format,book:state.book,workbookKey:state.workbookKey,file:item.file});
       if(!ok)throw Error('当前视图正在使用，请结束当前操作后再打开结果');
     }
+    function addAction(row,label,payload){
+      const button=document.createElement('button');
+      button.type='button';button.className='mini-button';button.textContent=label;
+      button.onclick=async()=>{
+        if(payload.action==='release' && !await window.ExcelLensOverlays.confirm({title:'释放会话',message:'释放此工作簿的后台结果？已保存的文件仍可使用。',confirmLabel:label}))return;
+        button.disabled=true;
+        try{await api('/api/background',{method:'POST',body:JSON.stringify(payload)});await refresh();}
+        catch(error){button.disabled=false;toast(error.message,'error');}
+      };
+      row.append(button);
+    }
     async function refresh(){
       clearTimeout(timer);
       const ticket=++serial;
       try{
-        const {items}=await api('/api/background');
+        const {items,sessions}=await api('/api/background');
         if(ticket!==serial||!box.open||!$('storageDialog').open)return;
         holder.replaceChildren();
         for(const item of items||[]){
@@ -37,9 +48,17 @@
             const button=document.createElement('button');button.type='button';button.className='mini-button';button.textContent='查看结果';
             button.onclick=()=>openResult(item).catch(e=>toast(e.message,'error'));row.append(button);
           }
+          const live=item.state==='running'||item.state==='queued';
+          addAction(row,live?'取消任务':'丢弃结果',{action:live?'cancel':'discard',session:item.session,kind:item.kind,id:item.id});
           holder.append(row);
         }
-        if(!items?.length)holder.textContent='没有后台任务';
+        for(const session of sessions||[]){
+          const row=document.createElement('div');
+          row.append(session.file);
+          addAction(row,'释放会话',{action:'release',session:session.session});
+          holder.append(row);
+        }
+        if(!items?.length&&!sessions?.length)holder.textContent='没有后台任务';
         timer=setTimeout(refresh,1500);
       }catch(e){if(ticket===serial)holder.textContent=e.message;}
     }

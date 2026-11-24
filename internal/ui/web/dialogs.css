@@ -26,7 +26,7 @@
 
 /* ---------- Search: modeless, results survive jumps across sheets ---------- */
 .search-dialog[open] {
-  position: fixed; inset: calc(var(--appbar-height, 73px) + 44px) 12px auto auto; z-index: 40; margin: 0;
+  position: fixed; inset: calc(var(--appbar-height, 73px) + 44px) 12px auto auto; z-index: var(--z-modeless); margin: 0;
   width: min(500px, calc(100vw - 24px)); max-height: calc(100vh - var(--appbar-height, 73px) - 112px);
   box-shadow: var(--shadow-pop);
 }
@@ -114,7 +114,7 @@
 
 /* ---------- Column filter popover ---------- */
 .auto-filter-popover {
-  position: fixed; z-index: 250; width: 300px; max-height: min(460px, 92vh); display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  position: fixed; z-index: var(--z-popover); width: 300px; max-height: min(460px, 92vh); display: flex; flex-direction: column; gap: 8px; padding: 12px;
   border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop); font-size: var(--fs-3);
 }
 .auto-filter-titlebar, .auto-filter-selectbar, .auto-filter-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -317,7 +317,7 @@
 
 /* ---------- Inspector: stays beside the sheet and never covers its scrollbar ---------- */
 .inspect-panel {
-  position: fixed; z-index: 175; right: 12px; top: calc(var(--appbar-height, 73px) + 44px); bottom: 64px;
+  position: fixed; z-index: var(--z-inspector); right: 12px; top: calc(var(--appbar-height, 73px) + 44px); bottom: 64px;
   width: min(360px, calc(100vw - 24px)); display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--line); border-radius: var(--r-4); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop);
 }
@@ -337,11 +337,8 @@
 .inspect-hint { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-2); line-height: 1.5; }
 .inspect-hint:empty { display: none; }
 .inspect-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
-.inspect-actions button { height: var(--ctl-l); padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: var(--ink); font-size: var(--fs-3); cursor: pointer; }
-.inspect-actions button:hover:not(:disabled) { border-color: var(--line-strong); background: var(--inset); }
-.inspect-actions .inspect-run { flex: 1; border-color: var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 600; }
-.inspect-actions .inspect-run:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--accent-strong); }
-.inspect-actions button:disabled { opacity: .5; cursor: default; }
+.inspect-actions :is(.mini-button, .primary-button) { height: var(--ctl-l); padding: 0 12px; }
+.inspect-actions .inspect-run { flex: 1; }
 .inspect-progress { grid-column: 1 / -1; min-height: 18px; color: var(--muted); font-size: var(--fs-2); line-height: 1.5; }
 .inspect-list-header { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 6px var(--dialog-pad); border-block: 1px solid var(--line-soft); background: var(--inset); color: var(--muted); font-size: var(--fs-2); }
 .inspect-list-header div { display: flex; gap: 4px; }
@@ -362,7 +359,7 @@
   --paper: #141a18; --surface: #1c2421; --inset: #121715; --ink: #eef2f0; --muted: #a8b4af; --faint: #7f8b86; --line: #323d39;
   --hover: rgb(255 255 255 / .1); --accent: #7fd0b3;
 }
-.picture-viewer { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; overflow: hidden; background: var(--inset); color: var(--ink); outline: none; }
+.picture-viewer { position: fixed; inset: 0; z-index: var(--z-viewer); display: flex; flex-direction: column; overflow: hidden; background: var(--inset); color: var(--ink); outline: none; }
 .picture-viewer-bar { height: 52px; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .picture-caption { flex: 1; min-width: 0; overflow: hidden; font-size: var(--fs-3); text-overflow: ellipsis; white-space: nowrap; }
 .picture-index { color: var(--muted); font-size: var(--fs-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -398,3 +395,6 @@
 .ask-problem { margin-top: 6px; color: var(--danger); font-size: var(--fs-2); line-height: 1.5; }
 .ask-message { color: var(--ink); line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
 .ask-alternative { margin-right: auto; }
+
+.storage-recovery { max-width: 46rem; max-height: 90vh; overflow: auto; margin: 6vh auto; padding: 1.5rem; overflow-wrap: anywhere; }
+.storage-recovery .storage-paths { white-space: pre-wrap; }

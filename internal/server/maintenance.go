@@ -32,7 +32,7 @@ func LogDir() string {
 func (a *App) ClearUnusedCaches() (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
-	if a.rootApp().restorePending.Load() {
+	if a.rootApp().restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
 	releaseArchiveMaintenance := archives.LockCacheMaintenance()
@@ -95,7 +95,7 @@ func (a *App) ClearUnusedCaches() (string, error) {
 func (a *App) ClearUnusedUploads() (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
-	if a.rootApp().restorePending.Load() {
+	if a.rootApp().restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
 	rootApp := a.rootApp()

@@ -66,6 +66,24 @@
   --dialog-control-height: var(--ctl-l);
   --dialog-control-size: var(--fs-3);
   --dialog-control-radius: var(--r-2);
+  /* Global viewport stacking layers (grid-region is an isolated stacking context) */
+  --z-appbar: 30;
+  --z-modeless: 40;
+  --z-tooltip: 50;
+  --z-trace-panel: 65;
+  --z-context-menu: 70;
+  --z-menu: 80;
+  --z-analysis: 82;
+  --z-reading-panel: 85;
+  --z-formula-popup: 90;
+  --z-toast: 100;
+  --z-activity: 120;
+  --z-calculator: 140;
+  --z-inspector: 175;
+  --z-viewer: 200;
+  --z-popover: 250;
+  --z-ref-tooltip: 270;
+  --z-completion: 280;
   /* Worksheet. Geometry is owned by app.js; light presets tint the sheet
      with a veil, so its own colors stay neutral unless the tone is dark. */
   --row-height: 25px;
@@ -200,11 +218,11 @@ dialog :is(.icon-button, .mini-button.icon-mini, .search-tool-button) { width: v
 
 /* ---------- Menus ---------- */
 :is(.menu, .cell-context-menu, .columns-menu) {
-  position: fixed; z-index: 80; min-width: 184px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100vh - 16px);
+  position: fixed; z-index: var(--z-menu); min-width: 184px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100vh - 16px);
   padding: 4px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-3);
   background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop); font-size: var(--fs-3);
 }
-.cell-context-menu { z-index: 70; }
+.cell-context-menu { z-index: var(--z-context-menu); }
 :is(.menu, .cell-context-menu, .columns-menu) button {
   width: 100%; min-height: 28px; padding: 0 10px; display: flex; align-items: center; gap: 8px;
   border: 0; border-radius: var(--r-1); background: transparent; color: inherit;
@@ -265,7 +283,7 @@ dialog [hidden] { display: none; }
 :is(.toast, .analysis-toast)[data-tone="warning"] { --toast-bg: var(--warn-soft); --toast-color: var(--warn); --toast-border: var(--warn-line); }
 :is(.toast, .analysis-toast)[data-tone="error"] { --toast-bg: var(--danger-soft); --toast-color: var(--danger); --toast-border: var(--danger-line); }
 .toast {
-  position: fixed; right: 16px; bottom: 68px; z-index: 100; max-width: min(520px, 80vw); padding: 10px 14px;
+  position: fixed; right: 16px; bottom: 68px; z-index: var(--z-toast); max-width: min(520px, 80vw); padding: 10px 14px;
   border: 1px solid var(--toast-border); border-radius: var(--r-3); background: var(--toast-bg); color: var(--toast-color);
   box-shadow: var(--shadow-pop); font-size: var(--fs-3); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
   /* A notice reports; it never takes a click meant for what lies under it. */
@@ -290,7 +308,7 @@ dialog [hidden] { display: none; }
 .source-integrity-notice { flex: none; max-height: 104px; overflow: auto; border-width: 0 0 1px; }
 
 /* ---------- Application bar ---------- */
-.appbar { position: relative; z-index: 30; flex: none; background: var(--surface); border-bottom: 1px solid var(--line); user-select: none; }
+.appbar { position: relative; z-index: var(--z-appbar); flex: none; background: var(--surface); border-bottom: 1px solid var(--line); user-select: none; }
 body.home-view .appbar { display: none; }
 .titlebar { height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 6px; }
 .brand-button {
@@ -490,7 +508,7 @@ textarea.formula-input { margin: 0; resize: none; overflow: hidden; }
 }
 .formula-token-external { color: var(--faint); text-decoration-style: dotted; }
 .formula-ref-tooltip {
-  position: fixed; z-index: 270; width: min(390px, calc(100vw - 16px)); max-height: min(280px, 75vh); overflow: auto; padding: 10px 12px;
+  position: fixed; z-index: var(--z-ref-tooltip); width: min(390px, calc(100vw - 16px)); max-height: min(280px, 75vh); overflow: auto; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop);
   font-size: var(--fs-2); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -570,7 +588,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 
 /* Reading and highlight settings open above the status bar. */
 .reading-mode-panel {
-  position: fixed; right: 12px; bottom: 60px; z-index: 85; width: min(272px, calc(100vw - 24px)); max-height: min(75vh, 460px); padding: 12px; overflow-y: auto;
+  position: fixed; right: 12px; bottom: 60px; z-index: var(--z-reading-panel); width: min(272px, calc(100vw - 24px)); max-height: min(75vh, 460px); padding: 12px; overflow-y: auto;
   border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop); font-size: var(--fs-2);
 }
 .reading-mode-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -677,7 +695,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .index-title { margin-bottom: 8px; color: var(--ink); font-size: var(--fs-3); font-weight: 600; }
 .index-detail { overflow-wrap: anywhere; }
 .index-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
-.cell-tooltip { position: fixed; z-index: 50; max-width: 420px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); box-shadow: var(--shadow-pop); color: var(--ink); font-size: var(--fs-2); line-height: 1.5; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cell-tooltip { position: fixed; z-index: var(--z-tooltip); max-width: 420px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); box-shadow: var(--shadow-pop); color: var(--ink); font-size: var(--fs-2); line-height: 1.5; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cell-tooltip b { color: var(--ref); font-family: var(--font-mono); }
 .cell-tooltip .tooltip-formula { display: block; max-width: 390px; margin-top: 3px; color: var(--muted); font-family: var(--font-mono); }
 .cell-tooltip .tooltip-hyperlink { max-width: 400px; color: var(--ref); overflow-wrap: anywhere; }
@@ -778,7 +796,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .storage-usage {width: 100%; border-collapse: collapse;}
 .storage-usage th, .storage-usage td {padding: .28rem .36rem; text-align: left;}
 .storage-usage th:last-child, .storage-usage td:last-child {text-align: right; font-variant-numeric: tabular-nums;}
-.storage-usage th {border-bottom: 1px solid var(--border);}
+.storage-usage th {border-bottom: 1px solid var(--line);}
 .storage-actions {display: flex; flex-wrap: wrap; gap: .35rem;}
 #storageDirectory {flex: 1; min-width: 10rem;}
 .storage-paths, #storageRoots, #storageStatus {white-space: pre-line; overflow-wrap: anywhere;}

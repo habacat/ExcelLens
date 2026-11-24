@@ -3,7 +3,7 @@
  * and never assumes a missing file is safe to delete automatically. */
 (() => {
   'use strict';
-  const glyph=name=>`<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
+  const glyph=name=>window.ExcelLensDisplayFormat?.icon?window.ExcelLensDisplayFormat.icon(name):`<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
   class RecentWorkbooks {
     constructor({api, open, toast}) {
       this.api=api; this.open=open; this.toast=toast;

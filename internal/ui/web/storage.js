@@ -42,9 +42,10 @@
       }
       body.replaceChildren(fragment);
     }
+    const askConfirm = options => window.ExcelLensOverlays?.confirm ? window.ExcelLensOverlays.confirm(options) : Promise.resolve(window.confirm(options.message));
     const confirmations = {
-      'clear-cache':'清理未使用的工作簿索引？',
-      'clear-uploads':'删除未使用的上传副本？仅存于此处的文件将无法从这里找回。'
+      'clear-cache': {title:'清理历史索引', message:'清理未使用的工作簿索引？', confirmLabel:'清理', danger:true},
+      'clear-uploads': {title:'清理闲置上传副本', message:'删除未使用的上传副本？仅存于此处的文件将无法从这里找回。', confirmLabel:'删除', danger:true}
     };
     const commands={backup:'备份',restore:'迁入备份',migrate:'迁入旧设置','verify-source':'核验来源','relocate-source':'更新来源'};
     const post=(url,payload)=>api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -68,25 +69,47 @@
         renderHistory(jobs);
         const item=jobs.find(x=>x.id===job)||jobs[0];
         if(item?.state==='running'){
-          job=item.id;working(true);show(describe(item));$('storageCancel').hidden=item.progress.phase==='提交恢复事务';schedule(ticket);return;
+          job=item.id;working(true);show(describe(item));$('storageCancel').hidden=item.transaction==='committing'||item.transaction==='cancelling';schedule(ticket);return;
         }
         job=null;$('storageCancel').hidden=true;
         if(dialog.open)await refresh();
         if(ticket!==serial)return;
-        working(false);show(item?describe(item):'',!!item?.error);
+        show(item?describe(item):'',!!item?.error);
         if($('storageSources').open)await loadSources();
+        if(ticket===serial)working(false);
       }catch(e){if(ticket===serial){show(e.message,true);if(job)schedule(ticket);else working(false);}}
     }
     async function run(action){
       if(busy)return;
-      if(confirmations[action]&&!window.confirm(confirmations[action]))return;
+      if(confirmations[action]&&!(await askConfirm(confirmations[action])))return;
+      if(busy||!dialog.open)return;
       const directory=$('storageDirectory').value.trim();
       if((action==='backup'||action==='restore')&&!directory){show('请输入目录的完整路径',true);$('storageDirectory').focus();return;}
+      const password=$('storagePassword').value;
+      if(action==='backup'&&password&&!(await askConfirm({title:'加密备份',message:'使用此口令加密备份？恢复时需要同一口令。',confirmLabel:'开始备份'})))return;
+      if(busy||!dialog.open)return;
       const ticket=++serial;working(true);show('正在处理…');
       try{
         if(action==='refresh'){await observe(ticket);return;}
-        const password=$('storagePassword').value;
-        if(action==='backup'&&password&&!window.confirm('使用此口令加密备份？恢复时需要同一口令。')){working(false);show('');return;}
+        if(action==='list-stages'){
+          const {stages}=await post('/api/storage',{action,directory});
+          const holder=$('storageStageList');holder.replaceChildren();
+          for(const stage of stages){
+            const row=document.createElement('div');
+            row.textContent=stage.name+'　'+({active:'正在使用',orphan:'未完成',unknown:'缺少标记，请在目录中核对'}[stage.state]);
+            if(stage.state==='orphan'){
+              const remove=document.createElement('button');remove.type='button';remove.className='mini-button';remove.textContent='清理';
+              remove.onclick=async()=>{
+                if(!await askConfirm({title:'清理未完成备份',message:stage.name,confirmLabel:'清理',danger:true}))return;
+                try{await post('/api/storage',{action:'clean-stage',directory,stage:stage.name});row.remove();show('已清理未完成备份');}catch(error){show(error.message,true);}
+              };
+              row.append(remove);
+            }
+            holder.append(row);
+          }
+          if(!stages.length)holder.textContent='没有未完成的备份';
+          working(false);show('');return;
+        }
         $('storagePassword').value='';
         const item=await post('/api/storage',{action,directory,password:(action==='backup'||action==='restore')?password:''});
         if(commands[action]){job=item.id;await observe(ticket);return;}
@@ -121,7 +144,7 @@
         const item=await api('/api/storage/jobs?id='+encodeURIComponent(started.id));
         if(ticket!==serial||!dialog.open)return null;
         show(describe(item),!!item.error);
-        $('storageCancel').hidden=item.state!=='running';
+        $('storageCancel').hidden=item.state!=='running'||item.transaction==='committing'||item.transaction==='cancelling';
         if(item.state==='done'){job=null;return item;}
         if(item.state!=='running'){job=null;throw Error(item.error||'来源核验失败');}
         await new Promise(resolve=>setTimeout(resolve,350));
@@ -135,14 +158,16 @@
       const ticket=++serial;working(true);
       try{
         const checked=await locate(request,ticket);
-        if(!checked||!window.confirm('内容指纹相符。确认更新来源位置？\n'+item.path+'\n→ '+checked.candidate))return;
+        if(!checked||ticket!==serial||!dialog.open)return;
+        const accepted=await askConfirm({title:'确认更新来源位置',message:'内容指纹相符。确认更新来源位置？\n'+item.path+'\n→ '+checked.candidate,confirmLabel:'确认更新'});
+        if(!accepted||ticket!==serial||!dialog.open)return;
         if(await locate({...request,path:checked.candidate,confirm:true},ticket))await loadSources();
       }catch(e){if(ticket===serial)show(e.message,true);}finally{if(ticket===serial){$('storageCancel').hidden=true;working(false);}}
     });
     for(const button of buttons)button.addEventListener('click',()=>run(button.dataset.storage));
     dialog.addEventListener('close',()=>{++serial;clearTimeout(timer);$('storagePassword').value='';});
     for(const id of ['storageHome','storageOpenBtn'])$(id).addEventListener('click',()=>{
-      openDialog('storageDialog');void observe(++serial);if($('storageBackground').open)background();
+      working(true);openDialog('storageDialog');void observe(++serial);if($('storageBackground').open)background();
     });
   };
 })();

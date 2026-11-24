@@ -56,3 +56,7 @@ func (l *Lease) End(now time.Time) {
 }
 
 func (l *Lease) Unattended(now time.Time) bool { return l.detached || l.Expired(now) }
+
+func (l *Lease) Idle(now time.Time) bool { return l.requests == 0 && l.Unattended(now) }
+
+func (l *Lease) Deadline() time.Time { return l.deadline }

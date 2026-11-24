@@ -179,6 +179,9 @@ func relocationSources(ctx context.Context) ([]relocationItem, error) {
 }
 
 func (a *App) verifyLocation(ctx context.Context, book, previous, path string, confirm bool) (relocationItem, error) {
+	return a.verifyLocationWith(ctx, book, previous, path, confirm, nil)
+}
+func (a *App) verifyLocationWith(ctx context.Context, book, previous, path string, confirm bool, beginCommit func() error) (relocationItem, error) {
 	var empty relocationItem
 	if !validExportDigest(book) || !filepath.IsAbs(path) {
 		return empty, errors.New("请选择来源记录并提供新文件的完整路径")
@@ -274,6 +277,11 @@ func (a *App) verifyLocation(ctx context.Context, book, previous, path string, c
 		file, err := savedConfigPath("source-locations", book)
 		if err != nil {
 			return empty, err
+		}
+		if beginCommit != nil {
+			if err := beginCommit(); err != nil {
+				return empty, err
+			}
 		}
 		if err = writeSavedConfig(file, locationLimit, loc, durableConfigOps); err != nil {
 			return empty, err

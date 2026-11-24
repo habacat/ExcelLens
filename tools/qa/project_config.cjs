@@ -21,10 +21,11 @@ exports.validationVersion = () => {
 };
 
 exports.index = () => {
-  const page = execFileSync('go', ['run', './tools/project', 'render-index'], {
+  const renderedPage = execFileSync('go', ['run', './tools/project', 'render-index'], {
     cwd: root, encoding: 'utf8', windowsHide: true,
     env: {...process.env, GOTOOLCHAIN:'local', GOPROXY:'off', GOSUMDB:'off', GOFLAGS:'-mod=vendor', CGO_ENABLED:'0'}
   });
+  const page = renderedPage.replace(/(\/assets\/[\w.-]+)\?v=[a-f0-9]{64}(?=")/g, '$1');
   const formats = fs.readFileSync(path.join(root, 'internal/ui/web/formats.js'), 'utf8');
   // Legacy about:blank harnesses strip external script tags before installing
   // their API fixtures. This tiny independent adapter can run immediately.

@@ -123,6 +123,8 @@
     returnHomeAfterCacheReset() {
       if (cacheCleared) return;
       cacheCleared = true;
+      save(key, '');
+      save(generationKey, '');
       window.location.replace(window.location.pathname);
     },
     nativeLaunch:valid(launch),

@@ -14,9 +14,23 @@ type Progress struct {
 	Items int    `json:"items"`
 }
 type TransferOptions struct {
-	Password string
-	Report   func(Progress)
+	Password   string
+	spaceProbe spaceProbe
+	Report     func(Progress)
+	// BeginCommit arbitrates publication with the process-wide cancellation endpoint.
+	BeginCommit func() error
 }
+
+func (o TransferOptions) enterCommit(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if o.BeginCommit != nil {
+		return o.BeginCommit()
+	}
+	return nil
+}
+
 type meterKey struct{}
 type meter struct {
 	Progress

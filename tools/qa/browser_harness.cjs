@@ -28,19 +28,21 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
   };
   async function close() {
     // Let Chrome stop its renderer and storage processes before removing the profile.
-    if (clients.length && browser?.exitCode === null && browser.signalCode === null) {
-      await new Promise(resolve => {
-        const done = () => {
-          clearTimeout(timer);
-          browser.off('exit', done);
-          resolve();
-        };
-        const timer = setTimeout(done, 4000);
-        browser.once('exit', done);
-        // Chrome can close the CDP socket before its profile has been flushed.
-        // Only process exit (or the timeout) ends the graceful shutdown wait.
-        clients[0].call('Browser.close').catch(() => {});
-      });
+    if (port && browser?.exitCode === null && browser.signalCode === null) {
+      // A test may have closed or navigated its first tab. End the browser
+      // through its own endpoint so profile databases close before removal.
+      try {
+        const metadata=await (await fetch('http://127.0.0.1:'+port+'/json/version',{signal:AbortSignal.timeout(2000)})).json();
+        const socket=new WebSocket(metadata.webSocketDebuggerUrl);
+        await new Promise((resolve,reject)=>{
+          const timeout=setTimeout(()=>reject(Error('Browser close connection timed out')),2000);
+          socket.onopen=()=>{clearTimeout(timeout);resolve();};
+          socket.onerror=()=>{clearTimeout(timeout);reject(Error('Browser disconnected'));};
+        });
+        socket.send(JSON.stringify({id:1,method:'Browser.close'}));
+        for(let n=0;n<80 && browser.exitCode===null && browser.signalCode===null;n++)await pause(100);
+        socket.close();
+      } catch { /* A browser which already exited needs only the process check below. */ }
     }
     for (const client of clients.splice(0)) client.close();
     await stop(browser);
@@ -51,7 +53,7 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
       for (let attempt = 0; ; attempt++) {
         try { await fs.promises.rm(resolved, {recursive:true, force:true}); break; }
         catch (error) {
-          if (attempt === 3 || !['EBUSY','ENOTEMPTY','EPERM'].includes(error.code)) throw error;
+          if (attempt === 8 || !['EBUSY','ENOTEMPTY','EPERM'].includes(error.code)) throw error;
           await pause(300 * (attempt + 1));
         }
       }
@@ -71,9 +73,9 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
     await startServer();
     // Headless Chrome has a private clipboard. A Windows interop check needs
     // the browser's platform clipboard, shared with the separate Excel instance.
-    const display=systemClipboard ? ['--incognito','--disable-background-mode','--window-position=-32000,-32000'] : ['--headless=new'];
+    const display=systemClipboard ? ['--incognito','--window-position=-32000,-32000'] : ['--headless=new'];
     if (nativeScale) display.push('--force-device-scale-factor='+nativeScale,'--window-size=1600,800');
-    browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',[...display,'--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+    browser=spawn(process.env.QA_CHROME||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',[...display,'--disable-background-mode','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-component-update','--disable-sync','--disable-background-networking','--disable-popup-blocking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
     await new Promise((resolve, reject) => {
       browser.once('spawn', resolve);
       browser.once('error', reject);

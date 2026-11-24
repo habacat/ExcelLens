@@ -209,3 +209,107 @@ func TestFullCacheResetReleasesMappedIndexAndKeepsConfirmedEdit(t *testing.T) {
 		t.Fatal(cell)
 	}
 }
+
+func TestAssetCachingAndETag304(t *testing.T) {
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	h := a.Handler()
+
+	// Static embedded assets carry ETag and immutable cache header, and honor If-None-Match.
+	req := localTestConnection(httptest.NewRequest(http.MethodGet, "/assets/style.css", nil))
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || res.Body.Len() == 0 {
+		t.Fatalf("GET /assets/style.css status=%d len=%d", res.Code, res.Body.Len())
+	}
+	etag := res.Header().Get("ETag")
+	if len(etag) != 66 || !strings.Contains(res.Header().Get("Cache-Control"), "no-cache") {
+		t.Fatalf("unexpected asset headers: ETag=%q Cache-Control=%q", etag, res.Header().Get("Cache-Control"))
+	}
+	req304 := localTestConnection(httptest.NewRequest(http.MethodGet, "/assets/style.css", nil))
+	req304.URL.RawQuery = "v=" + strings.Trim(etag, `"`)
+	req304.Header.Set("If-None-Match", etag)
+	res304 := httptest.NewRecorder()
+	h.ServeHTTP(res304, req304)
+	if res304.Code != http.StatusNotModified || res304.Body.Len() != 0 || !strings.Contains(res304.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("304 expected, got status=%d len=%d", res304.Code, res304.Body.Len())
+	}
+
+	// Dynamic index and API responses must remain no-store.
+	for _, path := range []string{"/", "/api/status"} {
+		r := localTestConnection(httptest.NewRequest(http.MethodGet, path, nil))
+		r.Header.Set("X-ExcelLens-Token", a.token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatalf("%s: status=%d Cache-Control=%q", path, w.Code, w.Header().Get("Cache-Control"))
+		}
+	}
+}
+
+func TestInterfaceLongPollWakesOnLayoutAndCacheReset(t *testing.T) {
+	isolateTestStorage(t)
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	h := a.Handler()
+
+	// Retiring a child must leave the shared notification channel alive.
+	child, err := a.newBrowserSession("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	child.app.Close()
+	if _, open := a.toolbar.waitChannel(); !open {
+		t.Fatal("child shutdown disabled interface watches")
+	}
+
+	// Waiting request wakes immediately when layout changes.
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		r := localTestConnection(httptest.NewRequest(http.MethodGet, "/api/interface?wait=1&ribbon=false&epoch=0", nil))
+		r.Header.Set("X-ExcelLens-Token", a.token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		done <- w
+	}()
+	time.Sleep(25 * time.Millisecond)
+	if err := a.SetRibbonLayout(true); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case w := <-done:
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ribbon":true`) {
+			t.Fatalf("unexpected layout wake response: %d %s", w.Code, w.Body.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("interface long-poll did not wake on SetRibbonLayout")
+	}
+
+	// Waiting request must not block ClearAllCaches and must wake with the new epoch.
+	doneReset := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		r := localTestConnection(httptest.NewRequest(http.MethodGet, "/api/interface?wait=1&ribbon=true&epoch=0", nil))
+		r.Header.Set("X-ExcelLens-Token", a.token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		doneReset <- w
+	}()
+	time.Sleep(25 * time.Millisecond)
+	if _, err := a.ClearAllCaches(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case w := <-doneReset:
+		if w.Code != http.StatusOK || w.Header().Get("X-ExcelLens-Cache-Epoch") != "1" || !strings.Contains(w.Body.String(), `"cacheEpoch":1`) {
+			t.Fatalf("unexpected cache-reset wake response: %d hdr=%q body=%s", w.Code, w.Header().Get("X-ExcelLens-Cache-Epoch"), w.Body.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("interface long-poll did not wake on ClearAllCaches")
+	}
+}

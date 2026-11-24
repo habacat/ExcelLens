@@ -132,14 +132,18 @@
     fit(){
       if (!this.ribbon) {
         if (!this.classic.clientWidth) return;
+        const children = [...this.classic.children];
+        // Clear overflow attributes in one write pass before measuring widths so
+        // the browser performs a single layout instead of one reflow per button.
+        for (const node of children) node.removeAttribute('data-toolbar-overflow');
+        const containerWidth = this.classic.getBoundingClientRect().width;
+        const gap = parseFloat(getComputedStyle(this.classic).columnGap) || 0;
         const items = [];
-        for (const node of this.classic.children) {
-          node.removeAttribute('data-toolbar-overflow');
+        for (const node of children) {
           const width = node.getBoundingClientRect().width;
           if (width) items.push({node, width, priority:Number(node.dataset.classicPriority)});
         }
-        const gap = parseFloat(getComputedStyle(this.classic).columnGap) || 0;
-        const shown = AdaptiveToolbar.choose(items, this.classic.getBoundingClientRect().width, gap);
+        const shown = AdaptiveToolbar.choose(items, containerWidth, gap);
         const focused = document.activeElement;
         for (const {node} of items) {
           if (shown.has(node)) continue;

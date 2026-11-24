@@ -2,8 +2,8 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const icon = name => `<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
-  const fileFormats = window.ExcelLensFileFormats.create(JSON.parse($("fileFormats").textContent));
+  const icon = name => window.ExcelLensDisplayFormat?.icon ? window.ExcelLensDisplayFormat.icon(name) : `<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
+  const fileFormats = window.ExcelLensFileFormats.current?.() || window.ExcelLensFileFormats.create(JSON.parse($("fileFormats").textContent));
   window.ExcelLensClipboard?.configure(fileFormats.clipboard);
   let ROW_HEAD = 26;
   const BASE_ROW = 25;
@@ -376,11 +376,8 @@
   }
 
   function repaintDisplayFonts() {
-    for (const node of document.querySelectorAll(".grid-cell")) {
-      const data = S.cellMap.get(node.dataset.ref) || S.frozenCellMap.get(node.dataset.ref);
-      const visual = S.styles[Number(data?.style) || 0];
-      applyDisplayFont(node, visual?.fontName || "");
-    }
+    // Paint keys include S.fontOverride; renderGridFromCurrentWindow() and
+    // frozenPanes.schedule(true) repaint every visible cell and text spill once.
     renderGridFromCurrentWindow();
     frozenPanes?.schedule(true);
   }
@@ -607,7 +604,7 @@
         if(data.archive)archiveCenter.present(data.archive);
         S.opened = false;
 	  catalogueCenter?.resetBook();
-	  dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();profileCenter?.resetBook();
+	  dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();
         showWelcome();
         recentManager?.load();
         if (data.error) {
@@ -702,8 +699,10 @@
     }
   }
 
-  function uploadFile(file) {
-    if (!file || S.opening) return;
+  async function uploadFile(file) {
+    if (!file) return;
+    await window.ExcelLensWorkbookReady;
+    if (S.opening) return;
     if (!fileFormats.supports(file.name)) { toast("支持表格、台账及 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包",'warning'); return; }
     return openWorkbook(activity => window.ExcelLensTransport.upload(file,activity,fmtBytes), file.name, file.size).catch(error => toast(error.message,'error'));
   }
@@ -725,7 +724,7 @@
       // particular, don't lay out the previous grid again on leaving Home.
       invalidateViewport();
       frozenPanes?.reset();
-      S.searchCache.clear();
+      searchPanel.resetWorkbook();
       traceUI?.reset();
       formulaInspector?.resetWorkbook();
       selectionInspector?.resetWorkbook();
@@ -734,23 +733,10 @@
       reconcileCenter?.resetBook();
       relationsCenter?.resetBook();
       namedViews?.resetBook();
-	  catalogueCenter?.resetBook();
-	  dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();profileCenter?.resetBook();
+      catalogueCenter?.resetBook();
+      dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();profileCenter?.resetBook();
       rowViews?.resetBook();
       if(S.filterJob)cancelFilter(S.filterJob);
-      S.searchSession = null;
-      S.searchActivity?.end();
-      ++S.searchRequestID;
-      S.searchSelectedIndex = -1;
-      S.searchJob = null;
-      S.serverSearchHistory = [];
-      S.visibleSearchIndexes = [];
-      $("searchResults").replaceChildren();
-      $("searchInput").value = "";
-      $("searchResultFilter").value = "";
-      $("searchResultSheet").value = "";
-      $("searchHistoryPanel").hidden = true;
-      $("searchSummary").textContent = "输入内容并搜索";
       S.history = [];
       S.historyIndex = -1;
       S.filtersBySheet.clear();
@@ -1157,8 +1143,12 @@
 
   // A size or visibility change moves cells without a scroll or selection
   // event, so the selection frame and crosshair are put back here.
+  // Keep mounted DOM rows/panes visible until the refreshed viewport commits
+  // to avoid blank white flashes during resize and column visibility changes.
   function relayoutGrid(){
-    invalidateViewport();updateCanvasSize();frozenPanes.reset();scheduleViewport(true);
+    invalidateViewport({preserveDOM:true});updateCanvasSize();
+    frozenPanes.reset({preserveDOM:true});frozenPanes.schedule(true);
+    scheduleViewport(true);
     paintRangeFrames();
   }
 
@@ -1261,190 +1251,21 @@
       autoFitSize(kind,index);
     });
   }
-  // A contiguous column-header selection includes hidden columns between the
-  // visible endpoints (e.g. dragging A to C selects A:B:C when B is hidden).
-  // The selection is UI state, never a mutation of the original workbook.
-  function selectedColumnSpan() {
-    const p=S.columnSelection;
-    if(!p)return null;
-    return {start:Math.min(p.start,p.end),end:Math.max(p.start,p.end)};
-  }
-  function columnSpanLabel(span) {
-    if(!span)return '';
-    return span.start===span.end?colName(span.start):`${colName(span.start)}:${colName(span.end)}`;
-  }
-  function parseColumnSpan(value) {
-    const parts=String(value||'').replaceAll('$','').trim().split(/\s*:\s*/);
-    if(parts.length<1||parts.length>2)return null;
-    const first=parseColumn(parts[0]),last=parseColumn(parts.at(-1));
-    return first&&last?{start:Math.min(first,last),end:Math.max(first,last)}:null;
-  }
-  function hasColumnOfType(span,hidden) {
-    if(!span)return false;
-    for(let col=span.start;col<=span.end;col++)if(S.hiddenColumns.has(col)===hidden)return true;
-    return false;
-  }
-  function paintColumnSelection() {
-    const span=selectedColumnSpan();
-    for(const head of document.querySelectorAll('.grid-region .column-head[data-col]')) {
-      const col=Number(head.dataset.col);
-      head.classList.toggle('column-selected',Boolean(span&&col>=span.start&&col<=span.end));
-    }
-    // Only virtualized cells are touched; no full-sheet DOM materialization.
-    for(const row of S.renderedRows.values())for(const [col,cell] of row._xlCells||[])
-      cell.classList.toggle('column-range-cell',Boolean(span&&col>=span.start&&col<=span.end));
-    for(const cell of document.querySelectorAll('.grid-region .pinned-cell[data-col]')) {
-      const col=Number(cell.dataset.col);
-      cell.classList.toggle('column-range-cell',Boolean(span&&col>=span.start&&col<=span.end));
-    }
-  }
-  function selectColumnSpan(anchor,end) {
-    if(!S.indexReady||!Number.isInteger(anchor)||!Number.isInteger(end)||anchor<1||end<1||anchor>16384||end>16384)return;
-    S.columnSelection={start:anchor,end};
-    S.columnAnchor=anchor;
-    S.range=null;S.multiRanges=[];S.rangeAnchor=null;S.wholeRowSelected=false;
-    const span=selectedColumnSpan();
-    $('selectionStatus').textContent=`${columnSpanLabel(span)} · ${span.end-span.start+1} 列`;
-    selectionStats?.clear();
-    paintColumnSelection();
-  }
-  let columnDragAnchor=0,columnDragEnd=0,columnDragFrame=0;
-  function beginColumnDrag(event) {
-    if(event.button!==0||!S.indexReady||event.target.closest?.('.column-resize-grip,.column-filter,.auto-filter-button'))return;
-    const head=event.target.closest?.('.column-head[data-col]');
-    if(!head)return;
-    const col=Number(head.dataset.col);
-    if(!col)return;
-    hideCellMenu();hideColumnsMenu();
-    const anchor=event.shiftKey?(S.columnAnchor||col):col;
-    columnDragAnchor=anchor;columnDragEnd=col;
-    selectColumnSpan(anchor,col);
-    event.preventDefault();
-  }
-  function updateColumnDrag(event) {
-    if(!columnDragAnchor||!(event.buttons&1))return;
-    const el=document.elementFromPoint(event.clientX,event.clientY);
-    const head=el?.closest?.('.column-head[data-col]');
-    if(!head)return;
-    const col=Number(head.dataset.col);
-    if(!col||col===columnDragEnd)return;
-    columnDragEnd=col;
-    if(columnDragFrame)return;
-    columnDragFrame=requestAnimationFrame(()=>{columnDragFrame=0;if(columnDragAnchor)selectColumnSpan(columnDragAnchor,columnDragEnd);});
-  }
-  function captureColumnSelection() {
-    const span=selectedColumnSpan();
-    if(span&&calculator?.picking)calculator.captureRange(`${colName(span.start)}:${colName(span.end)}`);
-  }
-  function endColumnDrag(event) {
-    if(columnDragFrame){cancelAnimationFrame(columnDragFrame);columnDragFrame=0;}
-    if(columnDragAnchor){
-      selectColumnSpan(columnDragAnchor,columnDragEnd);
-      if(event?.type!=='pointercancel')captureColumnSelection();
-    }
-    columnDragAnchor=columnDragEnd=0;
-  }
-
-  // The original <cols hidden=...> metadata and user overrides are two
-  // different concerns. Neither writes to the XLSX, and query/search/export
-  // are independent of visibility. A zero-size override removes a column
-  // from geometry rather than merely making its text transparent.
-  function applyColumnVisibility() {
-    const hidden=new Set();
-    if (S.columnMode==='hide-all') {
-      for(let c=1;c<=16384;c++)hidden.add(c);
-    } else if (S.columnMode!=='show-all') {
-      for(const range of S.columnSourceRanges) {
-        const min=Math.max(1,Number(range.min)||1),max=Math.min(16384,Number(range.max)||0);
-        for(let c=min;c<=max;c++)hidden.add(c);
-      }
-    }
-    for(const [raw,flag] of Object.entries(S.columnOverrides)) {
-      const c=Number(raw);
-      if(!Number.isInteger(c)||c<1||c>16384)continue;
-      if(flag)hidden.add(c); else hidden.delete(c);
-    }
-    S.hiddenColumns=hidden;
-    const effective={...S.sourceColumnWidths,...S.columnWidths};
-    for(const col of hidden)effective[String(col)]=0;
-    geometry.rows.setBase(S.sourceDefaultRow||BASE_ROW);
-    geometry.cols.setBase(S.sourceDefaultCol||BASE_COL);
-    geometry.rows.load(S.rowSizes,S.sourceRowSizes);
-    geometry.cols.load(effective);
-  }
-
-  function nextVisibleColumn(from) {
-    for(let c=Math.max(1,Math.trunc(from)||1);c<=Math.max(1,S.maxCol);c++)
-      if(!S.hiddenColumns.has(c))return c;
-    return Math.min(16384,Math.max(1,Math.trunc(from)||1));
-  }
-  function previousVisibleColumn(from) {
-    for(let c=Math.min(S.maxCol,Math.trunc(from)||1);c>=1;c--)
-      if(!S.hiddenColumns.has(c))return c;
-    return 0;
-  }
-
-  function hideColumnsMenu(){
-    const menus=window.ExcelLensOverlays.menus;
-    if(menus.current?.menu===$('columnsMenu'))menus.close(false);
-  }
-  function refreshColumnMenuTarget(){
-    const span=parseColumnSpan($('columnTarget').value);
-    $('hideSelectedColumnBtn').disabled=!hasColumnOfType(span,false);
-    $('showSelectedColumnBtn').disabled=!hasColumnOfType(span,true);
-    const multiple=span&&span.start!==span.end;
-    $('hideSelectedColumnBtn').textContent=multiple?'隐藏选中列':'隐藏此列';
-    $('showSelectedColumnBtn').textContent='显示隐藏列';
-  }
-  function targetColumnSpan(){
-    const span=parseColumnSpan($('columnTarget').value);
-    if(!span)toast('请输入有效的列或区域，如 A、AB、A:C','warning');
-    return span;
-  }
-  function prepareColumnsMenu(event){
-    if(!S.indexReady){event.preventDefault();return;}
-    const selectedCol=S.selected?.col||nextVisibleColumn(1),label=columnSpanLabel(selectedColumnSpan())||colName(selectedCol);
-    $('columnMenuSelection').textContent='选择列';
-    $('columnTarget').value=label;
-    refreshColumnMenuTarget();
-  }
-  // Serialize visibility writes: fast consecutive clicks must persist in the
-  // same order as the optimistic UI state. Stale failures may not roll back
-  // newer successful user edits.
-  let visibilitySaveQueue=Promise.resolve();
-  let visibilityRevision=0;
-  async function setColumnVisibility(mode,index,hidden,end=index) {
-    if(!S.indexReady || !S.sheet)return;
-    const sheet=S.sheet,epoch=S.sheetEpoch;
-    const previousMode=S.columnMode,previousOverrides={...S.columnOverrides};
-    if(mode==='column'||mode==='range'){
-      const first=Math.min(index,end),last=Math.max(index,end);
-      if(!Number.isInteger(first)||!Number.isInteger(last)||first<1||last>16384)return;
-      for(let col=first;col<=last;col++)S.columnOverrides[String(col)]=Boolean(hidden);
-      index=first;end=last;
-    } else{S.columnMode=mode;S.columnOverrides={};}
-    applyColumnVisibility();hideColumnsMenu();
-    if(S.selected && S.hiddenColumns.has(S.selected.col)){
-      let next=nextVisibleColumn(S.selected.col+1);
-      if(S.hiddenColumns.has(next))next=previousVisibleColumn(S.selected.col-1)||S.selected.col;
-      if(!S.hiddenColumns.has(next))selectCellByAddress(`${colName(next)}${S.selected.row}`,S.selectedVisualIndex);
-    }
-    relayoutGrid();
-    const revision=++visibilityRevision;
-    const save=()=>api('/api/layout',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sheet,kind:'visibility',mode,index:index||0,end:end||0,hidden:Boolean(hidden)})});
-    const pending=visibilitySaveQueue.then(save,save);
-    visibilitySaveQueue=pending.catch(()=>{});
-    try{
-      await pending;
-    }catch(error){
-      if(S.sheet===sheet&&S.sheetEpoch===epoch&&visibilityRevision===revision){
-        S.columnMode=previousMode;S.columnOverrides=previousOverrides;
-        applyColumnVisibility();relayoutGrid();
-      }
-      toast('保存列显隐失败：'+error.message,'error');
-    }
-  }
+  const columnController = new window.ExcelLensColumnController({
+    state: S, api, toast, geometry, baseRow: BASE_ROW, baseCol: BASE_COL, colName, parseColumn,
+    relayoutGrid, selectCellByAddress: (ref, visual) => selectCellByAddress(ref, visual),
+    hideCellMenu: () => hideCellMenu(), selectionStats: () => selectionStats, calculator: () => calculator
+  });
+  const selectedColumnSpan = () => columnController.selectedSpan();
+  const hasColumnOfType = (span, hidden) => columnController.hasOfType(span, hidden);
+  const paintColumnSelection = () => columnController.paintSelection();
+  const selectColumnSpan = (anchor, end) => columnController.selectSpan(anchor, end);
+  const captureColumnSelection = () => columnController.captureSelection();
+  const applyColumnVisibility = () => columnController.applyVisibility();
+  const nextVisibleColumn = from => columnController.nextVisible(from);
+  const previousVisibleColumn = from => columnController.previousVisible(from);
+  const hideColumnsMenu = () => columnController.hideMenu();
+  const setColumnVisibility = (mode, index, hidden, end) => columnController.setVisibility(mode, index, hidden, end);
 
   // Data fetching and DOM painting deliberately use separate generations. A
   // request for a scrolled-away tile must never replace the tile under the
@@ -1534,7 +1355,7 @@
       const req=getViewportRequest();
       const bounds=sameViewportRows(S.window,req)?S.window:null;
       if(viewportCoversVisible(bounds,req)){canvas.hidden=true;return;}
-      const grid=$("grid"),rh=rowHeight(),cw=colWidth(),hh=headerHeight();
+      const grid=$("grid"),hh=headerHeight();
       const w=Math.max(1,grid.clientWidth),h=Math.max(1,grid.clientHeight);
       const scale=Math.min(2,window.devicePixelRatio||1);
       const pw=Math.round(w*scale),ph=Math.round(h*scale);
@@ -1553,38 +1374,8 @@
       const colsToPaint=req.selectedCols||Array.from({length:Math.min(85,S.maxCol)},(_,i)=>i+Math.max(1,colAtOffset(grid.scrollLeft)));
       const bufferedColumns=bounds?.columns?(bounds.columnSet||(bounds.columnSet=new Set(bounds.columns))):null;
 
-      ctx.font="10px Consolas, monospace";
-      const reading=document.documentElement?.getAttribute('data-reading-tone')==='dark'?getComputedStyle(document.documentElement):null;
-      const fallbackColor=(name,original)=>reading?.getPropertyValue(name).trim()||original;
-      for(let r=minVisual;r<=maxVisual;r=S.filtered?r+1:(nextVisibleRow(r+1)||Infinity)) {
-        if(!S.filtered&&!rowVisible(r))continue;
-        const cellH=rowHeight(r);
-        const y=hh+rowTop(r)+(S.filtered?sourceRowTop(pinned.rows+1):0)-getVirtualScrollTop();
-        if(y+cellH<=top||y>=h)continue;
-        let rowMissing=false;
-        for(const c of colsToPaint) {
-          if(c>S.maxCol||S.hiddenColumns.has(c))continue;
-          const cellW=colWidth(c);
-          const x=ROW_HEAD+colLeft(c)-grid.scrollLeft;
-          if(x+cellW<=left||x>=w)continue;
-          if(bounds&&r>=bounds.displayStart&&r<=bounds.displayEnd&&c>=bounds.startCol&&c<=bounds.endCol&&
-             (!bufferedColumns||bufferedColumns.has(c)))continue;
-          rowMissing=true;
-          ctx.fillStyle=fallbackColor('--paper',"#f8fafc");ctx.fillRect(Math.max(left,x),Math.max(top,y),
-            Math.min(w,x+cellW)-Math.max(left,x),Math.min(h,y+cellH)-Math.max(top,y));
-          if(!S.showStyles||S.sourceGridLines){
-            ctx.strokeStyle=fallbackColor('--grid-line-color',"#e6e6e6");ctx.beginPath();
-            ctx.moveTo(x+cellW-0.5,Math.max(top,y));ctx.lineTo(x+cellW-0.5,Math.min(h,y+cellH));
-            ctx.moveTo(Math.max(left,x),y+cellH-0.5);ctx.lineTo(Math.min(w,x+cellW),y+cellH-0.5);
-            ctx.stroke();
-          }
-        }
-        if(rowMissing&&!S.filtered&&r>pinned.rows){
-          ctx.fillStyle=fallbackColor('--surface',"#f3f6f9");ctx.fillRect(0,y,ROW_HEAD,Math.min(cellH,h-y));
-          ctx.fillStyle=fallbackColor('--muted',"#8493a4");ctx.textAlign="right";ctx.textBaseline="middle";
-          ctx.fillText(String(r),ROW_HEAD-8,y+cellH/2);
-        }
-      }
+      window.ExcelLensGridBackdrop.paintMissing({ctx,bounds,pinned,top,left,minVisual,maxVisual,colsToPaint,bufferedColumns,
+        grid,w,h,hh,rowHead:ROW_HEAD,state:S,scrollTop:getVirtualScrollTop(),sourceRowTop,colWidth,colLeft,rowHeight,rowTop,nextVisibleRow,rowVisible});
     });
   }
 
@@ -1820,14 +1611,16 @@
   function toggleFormulaView() {
     S.showFormulas = !S.showFormulas;
     $('formulaViewBtn').setAttribute('aria-pressed',String(S.showFormulas));
-    for (const el of document.querySelectorAll('.grid-region .grid-cell')) {
-      const data = S.cellMap.get(el.dataset.ref) || S.frozenCellMap.get(el.dataset.ref);
-      replaceCellText(el,displayCellValue(data));
-      el.classList.toggle('formula-view-cell',Boolean(S.showFormulas && data?.hasFormula));
+    // Paint keys include S.showFormulas; re-rendering from the current tile
+    // updates cell values, classes and text-spill in place without blanking rows.
+    if(S.viewportData) {renderGrid(S.viewportData.data,S.viewportData.request);frozenPanes.schedule(true);}
+    else {
+      for (const el of document.querySelectorAll('.grid-region .grid-cell')) {
+        const data = S.cellMap.get(el.dataset.ref) || S.frozenCellMap.get(el.dataset.ref);
+        replaceCellText(el,displayCellValue(data));
+        el.classList.toggle('formula-view-cell',Boolean(S.showFormulas && data?.hasFormula));
+      }
     }
-    // Text-spill depends on the current formula display mode. Recreate only
-    // the visible nodes, without another worksheet read.
-    if(S.viewportData) {resetGridDOM();renderGrid(S.viewportData.data,S.viewportData.request);frozenPanes.schedule(true);}
     toast(S.showFormulas?'显示公式':'显示数值');
   }
 
@@ -1950,7 +1743,16 @@
       left:edge(false,x1,y1,y2),right:edge(false,x2,y1,y2)});
   }
 
+  function scheduleRangeFrames() {
+    if (S.rangeFrameRaf) return;
+    S.rangeFrameRaf = requestAnimationFrame(() => {
+      S.rangeFrameRaf = 0;
+      paintRangeFrames();
+    });
+  }
+
   function paintRangeFrames(areas = window.ExcelLensMultiSelection.areas(S)) {
+    if (S.rangeFrameRaf) { cancelAnimationFrame(S.rangeFrameRaf); S.rangeFrameRaf = 0; }
     const layer=$('rangeFrames');
     const visible=S.indexReady || S.previewOnly;
     layer.parentElement.classList.toggle('has-range',Boolean(visible && areas.length));
@@ -2283,11 +2085,12 @@
     // Range highlight has a bounded visible intersection; only scan its DOM
     // when entering/leaving/changing a range, never on normal arrow presses.
     const areas=window.ExcelLensMultiSelection.areas(S);
-    if(old.row!==selectedRow||old.col!==selectedCol){
+    if((typeof mergedCells==='undefined'||mergedCells.root)&&(old.row!==selectedRow||old.col!==selectedCol)){
       for(const node of document.getElementsByClassName('merged-cell'))mergedCells.paintCrosshair(node,focus,colLeft,rowTop);
     }
     paintRangeFrames(areas);
-    const pinnedCells=document.querySelectorAll('.grid-region .pinned-cell');
+    const hasFreeze=!S.freeze||S.freeze.rows>0||S.freeze.cols>0||(typeof frozenPanes!=='undefined'&&frozenPanes?.cells?.size>0);
+    const pinnedCells=hasFreeze?document.querySelectorAll('.grid-region .pinned-cell'):[];
     for(const node of pinnedCells){
       node.classList.toggle('selected',node.dataset.ref===selectedRef);
       node.classList.toggle('crosshair-row',Number(node.dataset.row)===selectedRow);
@@ -2305,7 +2108,9 @@
     if(selectedCol){
       for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${selectedCol}"]`))node.classList.add('active');
     }
-    for(const node of document.querySelectorAll('.grid-region .pinned-row-head'))node.classList.toggle('active',Number(node.dataset.row)===selectedRow);
+    if(hasFreeze){
+      for(const node of document.querySelectorAll('.grid-region .pinned-row-head'))node.classList.toggle('active',Number(node.dataset.row)===selectedRow);
+    }
     S.lastHighlight={row:selectedRow,col:selectedCol,anchorCol,ref:selectedRef,hadRange:Boolean(areas.length)};
   }
 
@@ -2342,7 +2147,7 @@
     $("copyValueBtn").disabled = false;
     applySelectionClasses();
     selectionStats?.schedule();
-    recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
+    recordCardCenter?.controls();
     editCopy?.grid.selection();
   }
 
@@ -2845,105 +2650,28 @@
     if (dialog.open) dialog.close();
   }
 
+  const searchPanel = new window.ExcelLensSearchPanel({
+    state: S, api, toast, delay, copyText: (value, msg) => copyText(value, msg),
+    navigateToCell: (sheet, ref) => navigateToCell(sheet, ref),
+    runSearch: sheet => runSearch(sheet), cancelSearch: (id, updateUI) => cancelSearch(id, updateUI)
+  });
+
   function searchKey(mode, scope, query, sheet) {
     const text=query.trim();
     return [mode, scope, mode==='advanced'?text:text.toLowerCase(), scope === "all" ? "*" : sheet].join("\u0000");
   }
 
-  function buildSearchHits(matches) {
-    S.searchHitMap = new Map();
-    for (const match of matches) {
-      const sheet = match.sheet || S.searchSession?.sheet || S.sheet;
-      if (!S.searchHitMap.has(sheet)) S.searchHitMap.set(sheet, new Set());
-      S.searchHitMap.get(sheet).add(match.ref);
-    }
-  }
-
-  function isSearchMatch(sheet, ref) {
-    return S.searchHitMap?.get(sheet)?.has(ref) || false;
-  }
-
-  function updateSearchNavButtons() {
-    const count = S.visibleSearchIndexes.length || 0;
-    $("searchPrevBtn").disabled = !count;
-    $("searchNextBtn").disabled = !count;
-    $("copySearchResultsBtn").disabled = !count;
-    $("saveSearchResultsBtn").disabled = !count;
-  }
-
-  async function refreshSearchHistory() {
-    if (!S.opened) return;
-    const data = await api("/api/search/history");
-    S.serverSearchHistory = data.items || [];
-    const list = $("searchHistoryList");
-    list.replaceChildren();
-    if (!S.serverSearchHistory.length) {
-      const message = document.createElement("div");
-      message.className = "history-empty";
-      message.textContent = "尚无已完成的搜索";
-      list.append(message);
-      return;
-    }
-    for (const item of S.serverSearchHistory) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "history-item";
-      button.title = `${item.query} · ${item.scope === "all" ? "全部工作表" : item.sheet} · ${item.hits} 条`;
-      const query = document.createElement("span");
-      query.className = "history-query";
-      query.textContent = `${item.mode === "value" ? "内容" : item.mode === "reference" ? "引用" : item.mode === "advanced" ? "高级" : "公式"} · ${item.query}`;
-      const meta = document.createElement("span");
-      meta.className = "history-meta";
-      meta.textContent = `${item.scope === "all" ? "全表" : "当前表"} · ${item.hits} 条`;
-      button.append(query,meta);
-      button.addEventListener("click", async () => {
-        $("searchHistoryPanel").hidden = true;
-        $("searchMode").value = item.mode;
-        $("searchScope").value = item.scope;
-        $("searchInput").value = item.query;
-        $("searchAdvancedInput").value = item.query;
-        syncSearchMode();
-        $("searchResultFilter").value = "";
-        $("searchResultSheet").value = "";
-        // Restore cached results without forcing the original worksheet to be
-        // decompressed; navigation happens only when a hit is clicked.
-        await runSearch(item.scope === "current" ? item.sheet : null);
-      });
-      list.append(button);
-    }
-  }
-
-  function buildSearchSheetChoices(matches) {
-    const select = $("searchResultSheet");
-    const old = select.value;
-    const names = new Set(matches.map(item => item.sheet || S.searchSession?.sheet || S.sheet));
-    select.replaceChildren();
-    const all = document.createElement("option");
-    all.value = ""; all.textContent = "全部 Sheet";
-    select.append(all);
-    for (const sheet of S.sheets) {
-      if (!names.has(sheet.name)) continue;
-      const option = document.createElement("option");
-      option.value = sheet.name;
-      option.textContent = sheet.name;
-      select.append(option);
-    }
-    select.value = names.has(old) ? old : "";
-  }
-
-  function filteredSearchIndexes(matches) {
-    const needle = $("searchResultFilter").value.trim().toLocaleLowerCase();
-    const sheetOnly = $("searchResultSheet").value;
-    const found = [];
-    for (let i=0; i<matches.length; i++) {
-      const item = matches[i];
-      const sheet = item.sheet || S.searchSession?.sheet || S.sheet;
-      if (sheetOnly && sheet !== sheetOnly) continue;
-      if (needle && ![sheet,item.ref,item.formula||"",item.value||""].some(text => String(text).toLocaleLowerCase().includes(needle))) continue;
-      found.push(i);
-    }
-    return found;
-  }
+  function buildSearchHits(matches) { searchPanel.buildHits(matches); }
+  const isSearchMatch = (sheet, ref) => searchPanel.isMatch(sheet, ref);
+  const updateSearchNavButtons = () => searchPanel.updateNavButtons();
+  const refreshSearchHistory = () => searchPanel.refreshHistory();
+  const displaySearchSummary = message => searchPanel.displaySummary(message);
+  const syncSearchMode = () => searchPanel.syncMode();
+  const openSearch = (mode = null, query = null) => searchPanel.open(mode, query);
+  const applySearchHighlightClasses = () => searchPanel.applyHighlightClasses();
+  const renderSearchResults = data => searchPanel.renderResults(data);
+  const goSearchResult = index => searchPanel.goResult(index);
+  const stepSearch = delta => searchPanel.step(delta);
 
   function copyCellEvidence() {
     const c=S.selected;
@@ -2963,109 +2691,6 @@
     if(!S.selected)return toast('请先选择单元格','warning');
     const sheet="'"+String(S.sheet).replaceAll("'","''")+"'";
     return copyText(`${sheet}!${S.selected.ref}`);
-  }
-
-  function copyVisibleSearchResults() {
-    const matches = S.searchSession?.matches || [];
-    const rows = [["Sheet", "单元格", "缓存值", "公式"]];
-    const clean = value => String(value ?? "").replaceAll("\t"," ").replaceAll("\r"," ").replaceAll("\n"," ");
-    for (const i of S.visibleSearchIndexes) {
-      const hit = matches[i];
-      rows.push([hit.sheet || S.searchSession.sheet,hit.ref,hit.value,hit.formula].map(clean));
-    }
-    copyText(rows.map(row=>row.join("\t")).join("\n"));
-  }
-
-  function downloadVisibleSearchResults() {
-    const matches = S.searchSession?.matches || [];
-    if (!S.visibleSearchIndexes.length) {toast('没有可导出的搜索结果','warning');return;}
-    const guard = text => {
-      let value=String(text??'');
-      if (/^[\s]*[=+\-@]/.test(value)) value="'"+value;
-      return '"'+value.replaceAll('"','""')+'"';
-    };
-    const rows=[['工作表','单元格','缓存显示值','原始公式']];
-    for(const i of S.visibleSearchIndexes) {
-      const hit=matches[i];rows.push([hit.sheet || S.searchSession?.sheet || S.sheet,hit.ref,hit.value,hit.formula]);
-    }
-    const csv='\ufeff'+rows.map(row=>row.map(guard).join(',')).join('\r\n');
-    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-    const link=document.createElement('a');link.href=url;link.download='ExcelLens_搜索结果.csv';link.click();
-    setTimeout(()=>URL.revokeObjectURL(url),30000);
-    toast(`已导出 ${S.visibleSearchIndexes.length} 条结果`,'success');
-  }
-
-  function displaySearchSummary(message) {
-    $("searchSummary").textContent = message;
-    $("searchSummary").hidden = !message;
-    if (S.searchSession) S.searchSession.summary = message;
-  }
-
-  function syncSearchMode() {
-    const advanced=$('searchMode').value==='advanced';
-    $('searchAdvanced').hidden=!advanced;
-    $('searchInput').hidden=advanced;
-    if(advanced) {
-      // Keep the primary action aligned: the advanced expression already has
-      // its own edit area; don't duplicate hints in a second input.
-      if(!$('searchAdvancedInput').value&&$('searchInput').value) $('searchAdvancedInput').value=$('searchInput').value;
-      populateSearchFields();validateAdvancedQuery();
-    }
-  }
-  let searchSyntaxSeq=0,searchSyntaxTimer=0;
-  async function validateAdvancedQuery(){
-    if($('searchMode').value!=='advanced')return;
-    clearTimeout(searchSyntaxTimer);const source=$('searchAdvancedInput').value.trim();
-    const feedback=$('searchAdvancedFeedback');feedback.classList.remove('is-invalid');
-    if(!source){feedback.textContent='输入表达式，或选择下面的示例';return}
-    const token=++searchSyntaxSeq;
-    searchSyntaxTimer=setTimeout(async()=>{
-      try{
-        await api('/api/search/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:source})});
-        if(token===searchSyntaxSeq){feedback.classList.remove('is-invalid');feedback.textContent='语法正确 · 运行时将逐行联合判断'}
-      }catch(e){if(token===searchSyntaxSeq){feedback.classList.add('is-invalid');feedback.textContent=e.message}}
-    },350);
-  }
-  function insertAdvancedText(text,replace=false){
-    const input=$('searchAdvancedInput');
-    const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
-    input.value=replace?text:input.value.slice(0,start)+text+input.value.slice(end);
-    const caret=replace?input.value.length:start+text.length;
-    input.focus();input.setSelectionRange(caret,caret);validateAdvancedQuery();
-  }
-  async function populateSearchFields(){
-    const host=$('searchAdvancedFields');if(!host)return;
-    const sheet=S.sheet;if(!sheet||host.dataset.sheet===sheet)return;
-    host.dataset.sheet=sheet;host.replaceChildren();
-    try{
-      const data=await api('/api/analysis/fields?'+new URLSearchParams({source:'wb:'+sheet,headerRow:'1'}));
-      if(host.dataset.sheet!==sheet)return;
-      for(const f of (data.fields||[]).slice(0,96)){
-        const btn=document.createElement('button');btn.type='button';btn.textContent=f.name;
-        btn.title='插入字段 '+f.id;btn.addEventListener('click',()=>insertAdvancedText('['+f.name+']:',false));host.append(btn);
-      }
-    }catch(e){host.replaceChildren()}
-  }
-  function openSearch(mode = null, query = null) {
-    if (mode !== null) $("searchMode").value = mode;
-    if (query !== null) {$("searchInput").value = query;$("searchAdvancedInput").value=query;}
-    if (S.searchSession && mode === null && query === null) {
-      $("searchMode").value = S.searchSession.mode;
-      $("searchScope").value = S.searchSession.scope;
-      $("searchInput").value = S.searchSession.input;
-      $("searchAdvancedInput").value=S.searchSession.input;
-      displaySearchSummary(S.searchSession.summary || "搜索结果已保留");
-      renderSearchResults({matches:S.searchSession.matches,mode:S.searchSession.mode,status:S.searchSession.status});
-    }
-    if (!S.searchSession && mode === null && query === null) {
-      $("searchMode").value='value';
-      $("searchSummary").hidden=true;
-      $("searchResultsPane").hidden=true;
-    }
-    if (!$("searchDialog").open) $("searchDialog").show(); // Non-modal: grid remains clickable.
-    syncSearchMode();updateSearchNavButtons();
-    setTimeout(() => ($('searchMode').value==='advanced'?$('searchAdvancedInput'):$('searchInput')).focus(), 20);
-    if (query !== null && query !== "") runSearch();
   }
 
   async function runSearch(preferredSheet = null) {
@@ -3177,139 +2802,8 @@
     refreshAutoFilterHeaders();updateAutoFilterButton();
   }
 
-  async function pollSearch(jobID, requestID, alreadyCached, activity=globalThis.ExcelLensActivity?.begin('正在搜索',{slot:'searchActivity'})) {
-    S.searchActivity=activity;
-    try {
-      while (S.searchJob === jobID && requestID === S.searchRequestID) {
-        if (!alreadyCached) await delay(350);
-        let data;
-        try { data = await api(`/api/search/status?id=${encodeURIComponent(jobID)}`); }
-        catch (error) {
-          if (requestID !== S.searchRequestID) return;
-          displaySearchSummary(error.message);
-          S.searchJob = null;
-          S.searchSession.status = "error";
-          $("searchBtn").disabled = false;
-          $("cancelSearchBtn").hidden = true;
-          return;
-        }
-        if (requestID !== S.searchRequestID || S.searchJob !== jobID) return;
-        activity?.report(data.progress, 100, data.stage || '正在搜索');
-        const matches = data.matches || [];
-        const changed = S.searchSession.matches.length !== matches.length ||
-          (S.searchSession.matches.length && matches.length && S.searchSession.matches.at(-1)?.ref !== matches.at(-1)?.ref);
-        S.searchSession.matches = matches;
-        S.searchSession.status = data.status;
-        S.searchSession.truncated = Boolean(data.truncated);
-        if (changed || data.status !== "running") {
-          buildSearchHits(matches);
-          renderSearchResults(data);
-          applySearchHighlightClasses();
-        }
-        if (data.status === "running") {
-          if (data.scope === "all") displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.stage || "搜索中"} · ${matches.length} 条`);
-          else displaySearchSummary(`${Number(data.progress || 0).toFixed(0)}% · ${data.scanned || 0}/${data.total || 0} 行 · ${matches.length} 条`);
-          continue;
-        }
-        if (data.status === "done") {
-          S.searchCache.set(S.searchSession.key, {matches, truncated:Boolean(data.truncated),status:"done"});
-          if (S.searchCache.size > 32) S.searchCache.delete(S.searchCache.keys().next().value);
-          const elapsed = alreadyCached ? " · 本机缓存" : ` · ${(Number(data.durationMs || 0) / 1000).toFixed(2)}秒`;
-          displaySearchSummary(`${matches.length} 条匹配${data.truncated ? "（最多显示500条）" : ""}${elapsed}`);
-          if (!alreadyCached) refreshSearchHistory().catch(() => {});
-        } else if (data.status === "cancelled") displaySearchSummary("已取消搜索 · 已找到的结果仍可访问");
-        else displaySearchSummary(data.error || "搜索失败");
-        S.searchJob = null;
-        $("searchBtn").disabled = false;
-        $("cancelSearchBtn").hidden = true;
-        return;
-      }
-    } finally { activity?.end(); }
-  }
-
-  function applySearchHighlightClasses() {
-    document.querySelectorAll(".grid-region .grid-cell").forEach(node => {
-      node.classList.toggle("search-match", isSearchMatch(S.sheet, node.dataset.ref));
-    });
-  }
-
-  function renderSearchResults(data) {
-    const box = $("searchResults");
-    const matches = data.matches || [];
-    $("searchResultsPane").hidden = !matches.length;
-    if (!matches.length) {
-      S.visibleSearchIndexes = [];
-      $("searchVisibleCount").hidden = true;
-      buildSearchSheetChoices([]);
-      box.textContent = data.status === "done" ? "没有找到匹配项" : "正在搜索…";
-      updateSearchNavButtons();
-      return;
-    }
-    const fragment = document.createDocumentFragment();
-    buildSearchSheetChoices(matches);
-    S.visibleSearchIndexes = filteredSearchIndexes(matches);
-    const counter = $("searchVisibleCount");
-    counter.hidden = !matches.length;
-    counter.textContent = S.visibleSearchIndexes.length === matches.length ? `${matches.length} 条结果` : `显示 ${S.visibleSearchIndexes.length} / ${matches.length} 条结果`;
-    for (const index of S.visibleSearchIndexes) {
-      const match = matches[index];
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "result-item" + (index === S.searchSelectedIndex ? " active" : "");
-      button.dataset.matchIndex = String(index);
-      button.setAttribute("role", "option");
-      button.setAttribute("aria-selected", String(index === S.searchSelectedIndex));
-      const sheet = document.createElement("span");
-      sheet.className = "result-sheet";
-      sheet.textContent = match.sheet || S.searchSession?.sheet || S.sheet;
-      sheet.title = sheet.textContent;
-      const ref = document.createElement("span");
-      ref.className = "result-ref"; ref.textContent = match.ref;
-      const snippet = document.createElement("span");
-      snippet.className = "result-snippet";
-      snippet.textContent = data.mode === "value" ? match.value : match.formula;
-      snippet.title = snippet.textContent;
-      button.append(sheet, ref, snippet);
-      button.addEventListener("click", () => goSearchResult(index));
-      fragment.appendChild(button);
-    }
-    if (!S.visibleSearchIndexes.length) {
-      const empty = document.createElement("div");
-      empty.className = "history-empty";
-      empty.textContent = "没有符合结果筛选条件的记录";
-      fragment.appendChild(empty);
-    }
-    const prevScroll = box.scrollTop;
-    box.replaceChildren(fragment);
-    box.scrollTop = prevScroll;
-    updateSearchNavButtons();
-  }
-
-  async function goSearchResult(index) {
-    const matches = S.searchSession?.matches || [];
-    if (!matches.length) return;
-    const normalized = (index + matches.length) % matches.length;
-    const match = matches[normalized];
-    S.searchSelectedIndex = normalized;
-    S.searchSession.selected = normalized;
-    document.querySelectorAll(".result-item").forEach(node => {
-      const active = Number(node.dataset.matchIndex) === normalized;
-      node.classList.toggle("active", active);
-      node.setAttribute("aria-selected", String(active));
-    });
-    $("searchResults").querySelector(`.result-item[data-match-index="${normalized}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
-    // Keep panel and all search results alive while the workbook switches sheets.
-    const destination = match.sheet || S.searchSession.sheet;
-    try {await navigateToCell(destination, match.ref);}
-    catch (error) {toast(error.message,'error');}
-  }
-
-  function stepSearch(delta) {
-    const visible = S.visibleSearchIndexes;
-    if (!visible.length) { openSearch(); return; }
-    const at = visible.indexOf(S.searchSelectedIndex);
-    const next = at < 0 ? (delta > 0 ? 0 : visible.length-1) : (at + delta + visible.length) % visible.length;
-    goSearchResult(visible[next]);
+  async function pollSearch(jobID, requestID, alreadyCached, activity) {
+    return searchPanel.poll(jobID, requestID, alreadyCached, activity);
   }
 
   async function cancelSearch(jobID, updateUI = true) {
@@ -3983,8 +3477,9 @@
     document.documentElement.style.setProperty("--col-width", `${colWidth()}px`);
     document.documentElement.style.setProperty("--header-height", `${headerHeight()}px`);
 	if(S.previewOnly&&S.previewData){resetGridDOM();updateCanvasSize();renderInitialPreview();paintRangeFrames();return;}
-    invalidateViewport();
+    invalidateViewport({preserveDOM:true});
     updateCanvasSize();
+    frozenPanes.reset({preserveDOM:true});
     frozenPanes.schedule(true);
     if (S.selected) {
       setVirtualScrollTop(headerHeight()+rowTop(row)-rowHeight(row)*2);
@@ -4221,6 +3716,7 @@
     buttonCommand('关联','relationsOpenBtn','关联提取 连接 左表 右表 未匹配'),
     buttonCommand('标记与备注','bookmarkOpenBtn','审计标记 备注复核 异常 核实 审核 提醒 标签 待复核','Ctrl+Alt+B'),
     buttonCommand('比较快照','snapshotsOpenBtn','保存 分析 趋势 差额 历史 比较'),
+    buttonCommand('本地数据','storageOpenBtn','数据管理 备份 迁入 缓存 清理 存储'),
     buttonCommand('任务恢复','taskRecoveryOpenBtn','继续 查询 筛选 排序 导出 下载 中断'),
     {name:'跳转到单元格',shortcut:'Ctrl+G',tags:'定位 行 列 名称框',run:()=>{$('nameBox').focus();$('nameBox').select();}},
     {name:'跳到数据区域边界',shortcut:'Ctrl+方向键',tags:'跳至数据区域边界 移动 跳过 空值 快速定位',run:()=>jumpDataEdge('down')},
@@ -4293,6 +3789,7 @@
   // modal dialog controls. Only the grid receives caret/navigation keys;
   // read-only application commands also work after toolbar clicks.
   function handleSpreadsheetKeydown(event){
+    if (window.ExcelLensDisplayFormat?.isComposing?.(event) || event.isComposing || event.keyCode === 229) return;
     if (editCopy?.grid.active && !document.querySelector('dialog:modal')) return;
     const key=event.key.toLowerCase();
     const ctrl=event.ctrlKey||event.metaKey;
@@ -4433,7 +3930,9 @@
       event.target.value = '';
       uploadFile(file);
     });
+    const isComposing = event => window.ExcelLensDisplayFormat?.isComposing?.(event) ?? (event.isComposing || event.keyCode === 229);
     $("nameBox").addEventListener("keydown", event => {
+      if (isComposing(event)) return;
       if (event.key === "Enter") {
         event.preventDefault();
         const address = $("nameBox").value;
@@ -4445,14 +3944,7 @@
         $("nameBox").blur();
       }
     });
-    $('columnsMenu').addEventListener('menuopen',prepareColumnsMenu);
-    $('columnTarget').addEventListener('input',refreshColumnMenuTarget);
-    $('hideSelectedColumnBtn').addEventListener('click',()=>{const span=targetColumnSpan();if(span)setColumnVisibility(span.start===span.end?'column':'range',span.start,true,span.end);});
-    $('showSelectedColumnBtn').addEventListener('click',()=>{const span=targetColumnSpan();if(span)setColumnVisibility(span.start===span.end?'column':'range',span.start,false,span.end);});
-    $('showAllColumnsBtn').addEventListener('click',()=>setColumnVisibility('show-all'));
-    $('hideAllColumnsBtn').addEventListener('click',()=>setColumnVisibility('hide-all'));
-    $('restoreColumnsBtn').addEventListener('click',()=>setColumnVisibility('original'));
-    $("searchOpenBtn").addEventListener("click", () => openSearch());
+    searchPanel.bind?.();
     $("multiSortBtn").addEventListener("click",()=>multiSort.show());
     $("inspectOpenBtn").addEventListener("click",()=>selectionInspector.open());
     $("duplicateOpenBtn").addEventListener("click",()=>selectionInspector.open("duplicates"));
@@ -4461,28 +3953,6 @@
     $("profileOpenBtn").addEventListener("click", () => profileCenter.open());
     $("commandOpenBtn").addEventListener("click", () => openCommandPalette());
     $("selectionStatus").addEventListener("click", () => profileCenter.open());
-    $("searchBtn").addEventListener("click", runSearch);
-    $("searchHistoryBtn").addEventListener("click", () => {
-      $("searchHistoryPanel").hidden = !$("searchHistoryPanel").hidden;
-      $("searchHistoryBtn").setAttribute('aria-expanded',String(!$("searchHistoryPanel").hidden));
-      if (!$("searchHistoryPanel").hidden) refreshSearchHistory().catch(error => toast(error.message,'error'));
-    });
-    $("searchHistoryRefreshBtn").addEventListener("click", () => refreshSearchHistory().catch(error => toast(error.message,'error')));
-    $("searchResultFilter").addEventListener("input", () => renderSearchResults({matches:S.searchSession?.matches||[],mode:S.searchSession?.mode,status:S.searchSession?.status}));
-    $("searchResultSheet").addEventListener("change", () => renderSearchResults({matches:S.searchSession?.matches||[],mode:S.searchSession?.mode,status:S.searchSession?.status}));
-    $("copySearchResultsBtn").addEventListener("click", copyVisibleSearchResults);
-    $("saveSearchResultsBtn").addEventListener("click",downloadVisibleSearchResults);
-    $("searchPrevBtn").addEventListener("click", () => stepSearch(-1));
-    $("searchNextBtn").addEventListener("click", () => stepSearch(1));
-    $("cancelSearchBtn").addEventListener("click", () => cancelSearch(S.searchJob));
-    $('searchMode').addEventListener('change',syncSearchMode);
-    $('searchAdvancedInput').addEventListener('input',validateAdvancedQuery);
-    $('searchAdvancedInput').addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();runSearch()}});
-    $('searchSyntaxHelp').addEventListener('click',()=>{$('searchAdvancedHelp').hidden=!$('searchAdvancedHelp').hidden});
-    const suggestions=[['并且',' AND '],['或者',' OR '],['排除',' NOT '],['范围',' BETWEEN 100 AND 200'],['多选',' IN ("债券","基金")'],['空值',' IS EMPTY'],['正则','~"^BX[0-9]+$"'],['公式','formula:SUMIF']];
-    const chips=$('searchAdvancedSnippets');
-    for(const [label,syntax] of suggestions){const b=document.createElement('button');b.type='button';b.textContent=label;b.title=syntax;b.onclick=()=>insertAdvancedText(syntax);chips.append(b)}
-    $("searchInput").addEventListener("keydown", event => { if (event.key === "Enter") runSearch(); });
     $("filterOpenBtn").addEventListener("click", toggleAutoFilter);
     $('textHeaderBtn').addEventListener('click',()=>{
       if(!S.indexReady)return;
@@ -4491,7 +3961,7 @@
       openDialog('textHeaderDialog');
     });
     $('textHeaderApply').addEventListener('click',()=>applyTextTableHeader(Number($('textHeaderRow').value)));
-    $('textHeaderRow').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();applyTextTableHeader(Number(event.target.value));}});
+    $('textHeaderRow').addEventListener('keydown',event=>{if(!isComposing(event)&&event.key==='Enter'){event.preventDefault();applyTextTableHeader(Number(event.target.value));}});
     $('textHeaderAuto').addEventListener('click',()=>applyTextTableHeader(0,true));
     $('textHeaderPlain').addEventListener('click',disableTextTableHeader);
     $("advancedFilterBtn").addEventListener("click", () => openFilter());
@@ -4562,14 +4032,13 @@
       followGridScroll();
     }, { passive:false });
     $("grid").addEventListener("scroll", () => {
-      paintRangeFrames();
+      scheduleRangeFrames();
       if(S.sheetLoadingEpoch)return;
-      hideCellMenu();
+      if(!$("cellMenu").hidden||!$("sizeContextMenu").hidden||!$("editGridMenu").hidden)hideCellMenu();
       followGridScroll();
       syncTableColumnHeaders();
       frozenPanes?.followScroll();
-      $("cellTooltip").hidden = true;
-      hoverRef = "";
+      if(hoverRef||!$("cellTooltip").hidden){$("cellTooltip").hidden = true;hoverRef = "";}
       scheduleViewport(false);
     }, { passive: true });
     $("grid").addEventListener("click", event => {
@@ -4630,10 +4099,7 @@
       if(calculator?.picking){event.preventDefault();return;}
       if (event.target.closest?.(".grid-cell")) showCellDetail();
     });
-    region.addEventListener("pointerdown", beginColumnDrag, true);
-    document.addEventListener("pointermove", updateColumnDrag, true);
-    document.addEventListener("pointerup", endColumnDrag, true);
-    document.addEventListener("pointercancel", endColumnDrag, true);
+    columnController.bind?.(region);
     region.addEventListener("pointerdown", beginRangeDrag);
     document.addEventListener("pointermove", updateRangeDrag);
     document.addEventListener("pointerup", endRangeDrag);
@@ -4691,8 +4157,8 @@
       const file = event.dataTransfer?.files?.[0];
       if (file) uploadFile(file);
     });
-    new ResizeObserver(() => {syncFreezeScrollGutters();paintRangeFrames();}).observe($("grid"));
-    let gridPixelRatio = window.devicePixelRatio || 1;
+    new ResizeObserver(() => {syncFreezeScrollGutters();scheduleRangeFrames();}).observe($("grid"));
+    let gridPixelRatio = window.devicePixelRatio || 1, resizeFrame = 0;
     function resizeWorkspace() {
       const ratio = window.devicePixelRatio || 1, changed = ratio !== gridPixelRatio;
       gridPixelRatio = ratio;
@@ -4702,16 +4168,24 @@
       if (changed) {
         renderGridFromCurrentWindow();
         paintRangeFrames();
+      } else {
+        scheduleRangeFrames();
       }
-      scheduleViewport(true);
-      frozenPanes.schedule(true);
+      // Ordinary window resizes reuse existing buffered tiles whenever they
+      // still cover the visible area; only a DPR change forces a full repaint.
+      scheduleViewport(changed);
+      frozenPanes.schedule(changed);
+    }
+    function scheduleResizeWorkspace() {
+      if (resizeFrame) return;
+      resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resizeWorkspace(); });
     }
     function watchPixelRatio() {
       if ((window.devicePixelRatio || 1) !== gridPixelRatio) resizeWorkspace();
       window.matchMedia?.(`(resolution: ${gridPixelRatio}dppx)`).addEventListener('change', watchPixelRatio, {once:true});
     }
     watchPixelRatio();
-    window.addEventListener("resize", resizeWorkspace);
+    window.addEventListener("resize", scheduleResizeWorkspace);
     // Exactly one keyboard dispatcher. Grid shortcuts bubble here, so a
     // non-modal search panel cannot trigger two actions or open a JS prompt.
     document.addEventListener('keydown',handleSpreadsheetKeydown);
@@ -4914,7 +4388,7 @@
   archiveCenter = new window.ExcelLensArchives({api,toast,open:acceptOpenedWorkbook,fmtBytes,canOpen:canOpenWorkbook});
   autoFilterUI = new window.ExcelLensAutoFilterDropdown({state:S,api,colName,toast,onApply:applyAutoFilter});
   exportCenter = new window.ExcelLensExportCenter({state:S,api,toast,colName,openDialog,excludeThroughRow:()=>frozenPanes.effective().rows,sourceCapabilities:()=>fileFormats.source(S.source?.format)});
-  taskRecovery=new window.ExcelLensTaskRecovery({state:S,api,toast,openDialog,maximum:JSON.parse($('fileFormats').textContent).taskRecovery.tasks,openSource:openTaskSource,adopt:adoptRecoveredTask,
+  taskRecovery=new window.ExcelLensTaskRecovery({state:S,api,toast,openDialog,maximum:fileFormats.taskRecovery?.tasks,openSource:openTaskSource,adopt:adoptRecoveredTask,
     context:()=>[S.workbookKey,S.book,S.sheetEpoch,S.searchRequestID,S.filterRequest,exportCenter.serial].join('|'),
     canResume:(item,action)=>{if(action==='open')return !S.opening&&canOpenWorkbook();if(S.opening||S.sheetLoadingEpoch){toast('请先完成文件加载','warning');return false;}if(item.kind==='export'?(exportCenter.running||exportCenter.busy):!!(S.searchJob||S.filterJob)){toast('请先完成或取消当前任务','warning');return false;}return true;}});
   $('taskRecoveryHome').addEventListener('click',()=>taskRecovery.open());
@@ -4927,7 +4401,7 @@
   window.ExcelLensAuditExport=(path,payload,label)=>exportCenter.startGenerated(path,payload,label);
   window.ExcelLensExportReconcile=(jobId,protectCSV,label,options={})=>exportCenter.startGenerated('/api/reconcile/export',{jobId,protectCSV,...options},label);
   if(window.ExcelLensReconcile)reconcileCenter=new window.ExcelLensReconcile({state:S,api,toast,colName,navigate:navigateToCell,canRun:canOpenWorkbook,recordBytes:fileFormats.reconcileRecordBytes});
-  if(window.ExcelLensRelations){relationsCenter=new window.ExcelLensRelations({api,toast,formats:fileFormats,fieldLimits:JSON.parse($('fileFormats').textContent).composition,navigate:navigateToCell,canRun:canOpenWorkbook,context:()=>({bookKey:S.workbookKey,book:S.book,opened:S.opened,source:'wb:'+S.sheet}),onExport:(payload,name)=>exportCenter.startGenerated('/api/relation/export',payload,name)});window.ExcelLensRelationsUI=relationsCenter;}
+  if(window.ExcelLensRelations){relationsCenter=new window.ExcelLensRelations({api,toast,formats:fileFormats,fieldLimits:fileFormats.composition,navigate:navigateToCell,canRun:canOpenWorkbook,context:()=>({bookKey:S.workbookKey,book:S.book,opened:S.opened,source:'wb:'+S.sheet}),onExport:(payload,name)=>exportCenter.startGenerated('/api/relation/export',payload,name)});window.ExcelLensRelationsUI=relationsCenter;}
   if(window.ExcelLensNamedViews)namedViews=new window.ExcelLensNamedViews({state:S,api,toast,capture:captureNamedView,apply:applyNamedView,supportsRowVisibility:()=>!!rowViews,canApply:()=>{if(S.filterJob||S.opening||S.sheetLoadingEpoch||rowViews?.busy){toast('请先完成当前加载、筛选或行显隐更新','warning');return false;}return true;}});
 	if(window.ExcelLensCatalogue)catalogueCenter=new window.ExcelLensCatalogue({state:S,api,toast,limits:fileFormats.catalogue,supported:()=>!!fileFormats.source(S.source?.format).catalogueMetadata,navigate:navigateCatalogueArea,canNavigate:()=>!!S.opened&&!S.opening&&!S.sheetLoadingEpoch&&!S.filterJob&&!rowViews?.busy});
 	if(window.ExcelLensDataRules)dataRulesCenter=new window.ExcelLensDataRules({state:S,api,toast,limits:fileFormats.dataRules,supported:()=>!!fileFormats.source(S.source?.format).dataRuleMetadata,navigate:navigateCatalogueArea,canNavigate:()=>!!S.opened&&!S.opening&&!S.sheetLoadingEpoch&&!S.filterJob&&!rowViews?.busy});

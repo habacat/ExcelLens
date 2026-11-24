@@ -26,7 +26,7 @@ import (
 )
 
 type App struct {
-	submitted browserlease.Work
+	submitted *browserlease.Work
 	workAdmission
 	queryController
 	workbookSession
@@ -40,7 +40,9 @@ type App struct {
 	archiveTask      *archiveTask
 	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
 	transfers        storageJobs
-	restorePending   atomic.Bool
+	restoreState     recoveryMode
+	restoreActive    atomic.Bool
+	storageView      sync.RWMutex // storage readers and the worker changing their inputs
 	storageMu        sync.Mutex   // root only: one explicit storage operation at a time
 	cacheResetMu     sync.RWMutex // root only: drain requests before discarding active caches
 	cacheEpoch       atomic.Uint64
@@ -75,6 +77,7 @@ type App struct {
 	token        string
 	mediaTicket  string
 	shutdownOnce sync.Once
+	sessionGate  sync.RWMutex // serializes result handoff with new page acquisitions
 	sessionsMu   sync.Mutex
 	sessions     map[string]*browserSession
 	retiring     map[*App]struct{}
@@ -91,7 +94,8 @@ func New() (*App, error) {
 		return nil, err
 	}
 	if err := roots.Recover(context.Background()); err != nil {
-		return nil, fmt.Errorf("恢复事务尚未完成：%w", err)
+		a.restoreState.set(err)
+		log.Printf("已进入受限恢复模式：%v", err)
 	}
 	return a, nil
 }
@@ -106,6 +110,7 @@ func newApp() (*App, error) {
 		return nil, fmt.Errorf("生成图片访问票据失败：%w", err)
 	}
 	return &App{
+		submitted:       &browserlease.Work{},
 		workAdmission:   newWorkAdmission(),
 		queryController: newQueryController(),
 		edits:           newEditController(),
@@ -176,6 +181,7 @@ func (a *App) Serve(ln net.Listener) error {
 
 func (a *App) Shutdown() {
 	a.shutdownOnce.Do(func() {
+		a.restoreState.stop()
 		a.transfers.stop()
 		a.mu.Lock()
 		for _, job := range a.catalogueJobs {
@@ -210,6 +216,9 @@ func (a *App) Shutdown() {
 		a.analysisMu.Unlock()
 		a.cancelReconciliations()
 		a.cancelRecipeCaptures()
+		if a.owner == nil {
+			a.toolbar.shutdown()
+		}
 		if srv != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()

@@ -13,7 +13,7 @@
   margin: 0 auto;
   width: max-content;
   max-width: calc(100% - 24px);
-  z-index: 120;
+  z-index: var(--z-activity);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -75,20 +75,36 @@
 .analysis-progress-top:has(.activity-slot [data-estimate]) #analysisProgressPercent {visibility:hidden;}
 @keyframes activity-spin {to {transform:rotate(1turn);}}
 @keyframes ui-rise {from {opacity:0;translate:0 3px;} to {opacity:1;translate:0 0;}}
+@keyframes ui-slide-in {from {opacity:0;translate:12px 0;} to {opacity:1;translate:0 0;}}
+@keyframes ui-toast-in {from {opacity:0;translate:0 6px;} to {opacity:1;translate:0 0;}}
 @keyframes ui-reveal {from {opacity:0;} to {opacity:1;}}
 
 :is(.tool-button,.mini-button,.primary-button,.icon-button,.search-tool-button,.analysis-outline-button,.analysis-primary-button,
     .analysis-quiet-button,.command-entry,.command-field,.sheet-tab,.ribbon-tabs button,.recent-action,.recent-item,.activity-cancel,
-    .calculator-icon,.calculator-notes-toggle,.analysis-nav button) {
+    .calculator-icon,.calculator-notes-toggle,.analysis-nav button,.result-item,.history-item,.inspect-hit,.sheet-picker-item,
+    .archive-member,.bookmark-visit,.auto-filter-item,.freeze-option,.analysis-template-card,.analysis-dashboard-card,
+    .analysis-field-chip,.analysis-field-info-btn,.analysis-category-list button,.analysis-sheet-list button) {
   transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease),
     translate var(--motion-fast) var(--motion-ease);
+}
+:is(.field-control,.analysis-control,.toolbar-field) {
+  transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+:is(.ribbon-tabs button,.analysis-nav button)::after {
+  transition: background-color var(--motion-fast) var(--motion-ease);
 }
 :is(.mini-button,.primary-button,.analysis-outline-button,.analysis-primary-button,.recent-action,.activity-cancel,.calculator-icon):active:not(:disabled) {
   translate: 0 1px;
 }
 :is(.menu,.auto-filter-popover,.columns-menu,.cell-context-menu,.reading-mode-panel,.calculator-completion):not([hidden]) {
   animation: ui-rise var(--motion-fast) var(--motion-ease);
+}
+:is(.analysis-drill,.inspect-panel):not([hidden]) {
+  animation: ui-slide-in var(--motion-normal) var(--motion-ease);
+}
+:is(.toast,.analysis-toast):not([hidden]) {
+  animation: ui-toast-in var(--motion-fast) var(--motion-ease);
 }
 :where(dialog[open]) {animation:ui-rise var(--motion-normal) var(--motion-ease);}
 /* Native close releases focus immediately. Browsers supporting discrete

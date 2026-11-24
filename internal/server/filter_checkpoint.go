@@ -153,7 +153,7 @@ func (a *App) queueCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 	}
 	a.filterJobs[job.ID] = job
 	a.mu.Unlock()
-	a.retainSubmitted(job.done)
+	a.retainSubmitted(job.ID, job.done)
 	go a.runFilter(wb, workbook.SheetMeta{}, nil, nil, workbook.FilterOptions{}, job)
 	spec, _ := filterCheckpointSpecFor(manifest)
 	writeJSON(w, map[string]any{"jobId": job.ID, "taskId": manifest.ID, "recoverable": true, "operation": "filter", "filter": spec.Filter})

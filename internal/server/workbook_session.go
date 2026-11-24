@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"sync"
 
@@ -25,6 +26,9 @@ func (s *workbookSession) currentWorkbook() *workbook.Workbook {
 }
 
 func (a *App) OpenPath(filePath string) error {
+	if a.rootApp().restoreState.pending() {
+		return errors.New("请先完成恢复事务")
+	}
 	return a.openPathAs(filePath, "")
 }
 

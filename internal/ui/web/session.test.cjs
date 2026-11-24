@@ -9,7 +9,7 @@ function bus(){
       postMessage(data){for(const peer of channels)if(peer!==this&&!peer.closed)queue.push(()=>peer.onmessage?.({data}));}
       close(){this.closed=true;}
     }
-    const ctx={window:{location:{href:'http://localhost/'+(launch?'?session='+launch:'')},addEventListener:(name,fn)=>events[name]=fn},
+    const ctx={window:{location:{replace(){},href:'http://localhost/'+(launch?'?session='+launch:'')},addEventListener:(name,fn)=>events[name]=fn},
       fetch:async(url,options)=>{requests.push({url,options});return respond ? respond(url) : {ok:true,status:204};},Headers,setInterval:fn=>{intervals.set(++timer,fn);return timer;},clearInterval:key=>intervals.delete(key),
       document:{addEventListener:(name,fn)=>documentEvents[name]=fn,querySelector:()=>({content:'token'}),documentElement:{dataset:{cacheEpoch:'3'}}},crypto:{randomUUID:()=>String(++serial).padStart(24,'0')},BroadcastChannel:Channel,URL,history:{replaceState(){}},
       sessionStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)},
@@ -70,4 +70,12 @@ test('closing while attach is in flight sends a release before the response',asy
   assert.equal(a.requests.at(-1).url,'/api/session/detach');
   finish({ok:true,status:204});await assert.rejects(ready,/页面已关闭/);
   assert.equal(a.intervals.size,0);
+});
+
+test('a confirmed full reset opens a fresh home instead of resuming the retired tab',async()=>{
+  const b=bus(),a=b.page({stored:'stored-session-1234567890',blocked:true});
+  await a.session.ready;
+  a.session.returnHomeAfterCacheReset();
+  const stored=a.values.get('ExcelLens.tabSession.v1'),home=b.page({stored,blocked:true});
+  assert.equal(stored,'');assert.equal(home.session.restoring,false);assert.notEqual(home.session.id,a.session.id);
 });

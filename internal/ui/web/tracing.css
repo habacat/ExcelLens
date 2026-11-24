@@ -1,7 +1,7 @@
 /* Both tracing directions share the same panel, dock and arrival cue. */
 :root { --trace-accent: var(--mark); --trace-soft: var(--mark-soft); --trace-halo: var(--grid-paper); --trace-label-bg: var(--warn-soft); --trace-label-ink: var(--warn); }
 .trace-dialog[open] {
-  position: fixed; inset: calc(var(--appbar-height, 73px) + 44px) 12px auto auto; z-index: 65; margin: 0;
+  position: fixed; inset: calc(var(--appbar-height, 73px) + 44px) 12px auto auto; z-index: var(--z-trace-panel); margin: 0;
   width: min(500px, calc(100vw - 24px)); max-height: calc(100vh - var(--appbar-height, 73px) - 112px);
   box-shadow: var(--shadow-pop); animation: none;
 }

@@ -202,7 +202,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 	}
 	a.searchJobs[job.ID] = job
 	a.mu.Unlock()
-	a.retainSubmitted(job.done)
+	a.retainSubmitted(job.ID, job.done)
 	go a.runSearch(wb, workbook.SheetMeta{}, nil, job)
 	writeJSON(w, map[string]any{"jobId": job.ID, "taskId": m.ID, "recoverable": true, "operation": "search"})
 }

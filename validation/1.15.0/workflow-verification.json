@@ -1,0 +1,129 @@
+{
+  "version": "1.15.0",
+  "platform": "Windows amd64",
+  "result": "PASS",
+  "goTests": [
+    "TestRestrictedStartupReplaysWithoutTransferHistoryOrBackup",
+    "TestDetachedResultsDoNotBlockRestoreOrConsumePageSlots",
+    "TestBackgroundCenterCancelsWorkerBeforeSessionRelease",
+    "TestStorageCancellationAtPublication",
+    "TestRestoreSpaceBudgetsMissingUnitsPerPhysicalVolume",
+    "TestEncryptedBackupSpaceAndMidTransferCapacityLoss",
+    "TestAbandonedBackupStageOwnership",
+    "TestAssetCachingAndETag304",
+    "TestInterfaceLongPollWakesOnLayoutAndCacheReset",
+    "TestBackupBudgetRejectsSourceGrowthBeforeCopy",
+    "TestInventoryReadQueuesRestoreWithoutRejectingIt"
+  ],
+  "capacityCase": {
+    "declaredGiB": 80,
+    "freeGiB": 60,
+    "method": "synthetic manifest and injected volume capacity; rejected before reading payload"
+  },
+  "abandonedStage": "OS writer lock stops concurrent cleanup; forced exit of real child process releases lease",
+  "desktopManualAcceptance": false,
+  "physicalPowerLoss": false,
+  "standardProjectCheck": "PASS",
+  "frontendRegressionTests": 566,
+  "recoveryPage": {
+    "result": "PASS",
+    "realBrowser": true,
+    "conflictPreserved": true,
+    "replayedFromTarget": true,
+    "inventory": true
+  },
+  "backgroundPage": {
+    "realBrowser": true,
+    "returnedSearchResults": 1,
+    "restoredWhileClosed": true,
+    "discarded": true,
+    "orphanCleaned": true,
+    "result": "PASS"
+  },
+  "toolbar": {
+    "result": "PASS",
+    "widths": 16,
+    "checks": [
+      "Classic is the default; desktop, narrow and breakpoint widths preserve one top row, working font and search controls, hit targets and formula space",
+      "Icon hit targets, hover names, native font selection and separate formula/value clipboard commands work",
+      "Header context menu and tray callbacks both switch the same persisted preference; control identity, command search and workbook binding survive the switch without new source jobs",
+      "A tray layout change keeps an in-progress edit and the active formula field",
+      "Clear all caches returns both tabs to home, empties disk cache, preserves source bytes, and reopens the workbook with its leading-zero ID"
+    ]
+  },
+  "theme": {
+    "result": "PASS",
+    "screens": 16,
+    "presets": 12,
+    "backgroundRequests": 7,
+    "failures": 0
+  },
+  "encryptedTransfer": {
+    "totalBytes": 536870912,
+    "files": 2,
+    "cancel": {
+      "acceptedSeconds": 0.11,
+      "elapsedSeconds": 1.88,
+      "polls": 5,
+      "phaseBytes": {
+        "预算磁盘空间": 0,
+        "复制": 24707072
+      },
+      "final": "cancelled"
+    },
+    "backup": {
+      "acceptedSeconds": 0.11,
+      "elapsedSeconds": 20.31,
+      "polls": 49,
+      "phaseBytes": {
+        "预算磁盘空间": 0,
+        "复制": 521928704,
+        "复核来源": 484540416,
+        "校验备份": 536870912
+      },
+      "final": "done"
+    },
+    "restore": {
+      "acceptedSeconds": 0.016,
+      "elapsedSeconds": 10.47,
+      "polls": 26,
+      "phaseBytes": {
+        "准备": 0,
+        "核验并暂存": 521502720,
+        "复核暂存": 493912064,
+        "提交恢复事务": 0
+      },
+      "final": "done"
+    },
+    "sha256": {
+      "ledger-A.dat": "d9b277b2573d88537364dd9accc2d61646f47a3b1503d6f10137e01383f20b78",
+      "ledger-B.dat": "7f13f71b5959a81327d64151d7905565a661378dede89a9e98cb2b1c6d61827e"
+    },
+    "result": "PASS"
+  },
+  "crossCompiledDiskChecks": [
+    "linux/amd64",
+    "openbsd/amd64",
+    "netbsd/amd64",
+    "darwin/amd64"
+  ],
+  "retainedResultComparison": {
+    "result": "PASS",
+    "retained": [
+      "search",
+      "filter",
+      "analysis/query",
+      "export",
+      "reconcile"
+    ]
+  },
+  "sessionStorage": {
+    "reloadAndLateClose": true,
+    "storageBackup": true,
+    "closedTabExpiredAfterMs": 56092,
+    "storageRestore": true,
+    "result": "PASS",
+    "scriptExit": 1,
+    "cleanup": "Windows EPERM removing a temporary Chrome profile after all business assertions passed."
+  }
+}

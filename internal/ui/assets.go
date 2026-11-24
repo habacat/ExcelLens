@@ -1,12 +1,15 @@
 package ui
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"excellens/internal/buildinfo"
 	"excellens/internal/formats"
@@ -21,6 +24,16 @@ var Files embed.FS
 // with HTML escaping, and the token is generated internally as hexadecimal.
 func Index(token string) ([]byte, error) {
 	return IndexWithLayout(token, false, 0)
+}
+
+// RecoveryIndex has no workbook bootstrap or tab lease.
+func RecoveryIndex(token string) ([]byte, error) {
+	data, err := Files.ReadFile("web/storage-recovery.html")
+	if err != nil {
+		return nil, err
+	}
+	_, urls := assetCatalog()
+	return []byte(strings.ReplaceAll(urls.Replace(string(data)), "__APP_TOKEN__", token)), nil
 }
 
 func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, error) {
@@ -110,14 +123,46 @@ func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, erro
 		"__APP_VERSION__", buildinfo.Version,
 		"__MAX_SOURCE_ROWS__", strconv.Itoa(formats.ExternalRows),
 		"__FILE_ACCEPT__", formats.Accept(), "__FILE_FORMATS__", string(config))
-	return []byte(replacer.Replace(string(data))), nil
+	_, urls := assetCatalog()
+	return []byte(replacer.Replace(urls.Replace(string(data)))), nil
 }
+
+// The index names the exact bytes it uses. Unversioned URLs (including CSS
+// image references and local clients) revalidate on each use.
+var assetCatalog = sync.OnceValues(func() (map[string]string, *strings.Replacer) {
+	entries, _ := Files.ReadDir("web")
+	tags := make(map[string]string, len(entries))
+	var urls []string
+	for _, entry := range entries {
+		name := entry.Name()
+		switch path.Ext(name) {
+		case ".js", ".css", ".svg":
+			data, err := Files.ReadFile("web/" + name)
+			if err != nil {
+				continue
+			}
+			digest := sha256.Sum256(data)
+			hash := hex.EncodeToString(digest[:])
+			tags[name] = `"` + hash + `"`
+			url := "/assets/" + name
+			urls = append(urls, url+`"`, url+"?v="+hash+`"`)
+		}
+	}
+	return tags, strings.NewReplacer(urls...)
+})
 
 // Asset names come from embedded production files rather than a second manual
 // filename list in the HTTP layer. Test scripts and arbitrary paths are denied.
 func ReadAsset(name string) ([]byte, string, error) {
+	data, contentType, _, err := ReadAssetWithETag(name)
+	return data, contentType, err
+}
+
+// ReadAssetWithETag returns the embedded asset bytes, MIME type, and a strong
+// ETag derived from the asset's SHA-256 digest.
+func ReadAssetWithETag(name string) ([]byte, string, string, error) {
 	if name == "" || strings.ContainsAny(name, "/\\") {
-		return nil, "", fs.ErrNotExist
+		return nil, "", "", fs.ErrNotExist
 	}
 	var contentType string
 	switch path.Ext(name) {
@@ -128,8 +173,12 @@ func ReadAsset(name string) ([]byte, string, error) {
 	case ".svg":
 		contentType = "image/svg+xml"
 	default:
-		return nil, "", fs.ErrNotExist
+		return nil, "", "", fs.ErrNotExist
 	}
 	data, err := Files.ReadFile("web/" + name)
-	return data, contentType, err
+	if err != nil {
+		return nil, "", "", err
+	}
+	tags, _ := assetCatalog()
+	return data, contentType, tags[name], nil
 }

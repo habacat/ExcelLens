@@ -25,6 +25,16 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	root := a.rootApp()
+	if root.restoreState.pending() {
+		page, err := ui.RecoveryIndex(root.token)
+		if err != nil {
+			http.Error(w, "恢复界面不可用", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(page)
+		return
+	}
 	ribbon, _ := root.RibbonLayout() // keep the page usable if a preference is unreadable
 	b, err := ui.IndexWithLayout(a.token, ribbon, root.cacheEpoch.Load())
 	if err != nil {
@@ -41,13 +51,37 @@ func (a *App) handleAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/assets/")
-	b, contentType, err := ui.ReadAsset(name)
+	b, contentType, etag, err := ui.ReadAssetWithETag(name)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	// Embedded assets are immutable for the lifetime of this ephemeral-port process.
 	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("ETag", etag)
+	if r.URL.Query().Get("v") == strings.Trim(etag, `"`) {
+		w.Header().Set("Cache-Control", "private, max-age=86400, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	_, _ = w.Write(b)
+}
+
+func etagMatches(header, etag string) bool {
+	if header == "" || etag == "" {
+		return false
+	}
+	for _, candidate := range strings.Split(header, ",") {
+		tag := strings.TrimSpace(candidate)
+		if tag == "*" || tag == etag || strings.TrimPrefix(tag, "W/") == etag {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {

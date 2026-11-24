@@ -75,6 +75,10 @@ async function main() {
     assert.ok((await home.api('/api/status')).opened===false);
     assert.deepEqual(errors,[]);
     console.log(JSON.stringify({...report,result:'PASS'}));
+  } catch(error) {
+    const snapshot=async p=>p?.evaluate('({status:document.getElementById("storageStatus")?.textContent,alert:document.getElementById("welcomeError")?.textContent,open:document.getElementById("storageDialog")?.open,coverage:window.ExcelLensPerformance?.().hasVisibleCoverage})').catch(()=>null);
+    console.error(JSON.stringify({report,assertionFailure:error.stack,home:await snapshot(home),errors}));
+    throw error;
   } finally { await h.close(); }
 }
 

@@ -14,6 +14,7 @@
         this.searchTimer=setTimeout(()=>{this.offset=0;this.load();},120);
       });
       $('archiveSearch').addEventListener('keydown',event=>{
+        if(event.isComposing||event.keyCode===229)return;
         if(event.key==='ArrowDown'&&this.items.length){event.preventDefault();$('archiveList').focus();this.select(this.selected>=0?this.selected:this.items[0].id);}
         if(event.key==='Enter'&&this.selected>=0){event.preventDefault();this.openSelected();}
       });
@@ -124,7 +125,7 @@
       this.controls();
     }
     keydown(event) {
-      if(this.busy||!this.items.length)return;
+      if(this.busy||!this.items.length||event.isComposing||event.keyCode===229)return;
       let index=this.items.findIndex(x=>x.id===this.selected);
       if(event.key==='Enter'){event.preventDefault();this.openSelected();return;}
       if(event.key==='ArrowDown')index++;

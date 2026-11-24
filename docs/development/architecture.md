@@ -43,9 +43,9 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 | 包 | 可以依赖 |
 | --- | --- |
-| fileidentity / localstore / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
+| fileidentity / filelock / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
 | sourceview | formats |
-| checkpoint | formats |
+| checkpoint | formats、filelock |
 | editdoc | checkpoint、formats |
 | editfile | workbook、editdoc、formats、separated、calculator、opc |
 | opc | Go 标准库 |
@@ -63,9 +63,14 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | ui | formats、buildinfo |
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
+| localstore | filelock |
 | server | localstore、browserlease、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
 
 ### 备份、来源与任务
+
+后台任务运行时由任务登记及源引用保护。已离开的工作页可把完成的五类结果、筛选行序和来源引用交给 `server/background_results.go`，其余页面资源随页回收。用户接回结果时建立新的工作页。进程内按任务记录保留窗口和取消状态，迁入会在排他阶段核对打开的工作簿与未结束的任务。
+
+`localstore/space.go` 负责按物理卷合并数据、元数据及加密开销。选定目录的未完成备份带有归属标记，`filelock` 复用系统级独占写锁。恢复准备与日志发布分别位于 `restore.go` 和 `restore_journal.go`。服务端在同一把任务锁内处理取消及进入提交的请求；受限恢复的独立入口也能在传输历史不可读时重试。
 
 `localstore` 在配置目录记录事务决定，每个数据卷独立暂存。全部源文件验证后落盘提交计划，每迁入一个单元同步确认游标。重启按计划核对已发布文件并继续。加密格式固定使用 Argon2id v19（64 MiB、3 次、1 通道、16 字节随机盐），按备份内逻辑路径由 HMAC-SHA-256 分别派生对象名和密钥，使用固定为 DARE 2.0、AES-256-GCM 的 minio/sio v0.5.1。每个对象含认证格式字节，空文件也接受完整性校验。依赖和许可随源码发布。
 

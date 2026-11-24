@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type fileRecord struct {
@@ -105,9 +104,13 @@ func (r Roots) snapshot(ctx context.Context, dst *backupVolume) (map[string]file
 					return e
 				}
 				defer f.Close()
+				expected, ok := dst.planned[key]
+				if !ok || expected.Bytes != st.Size() {
+					return fmt.Errorf("备份预算后文件发生变化：%s", name)
+				}
 				hash := sha256.New()
 				count := &countWriter{}
-				err = dst.write(key, io.TeeReader(meteredReader(ctx, f), io.MultiWriter(hash, count)))
+				err = dst.write(key, io.TeeReader(meteredReader(ctx, io.LimitReader(f, st.Size()+1)), io.MultiWriter(hash, count)))
 				rec = fileRecord{count.n, hex.EncodeToString(hash.Sum(nil))}
 				if err == nil && count.n != st.Size() {
 					err = fmt.Errorf("文件大小已变化：%s", name)
@@ -159,24 +162,38 @@ func (r Roots) Backup(ctx context.Context, parent string) (string, error) {
 	return r.BackupWith(ctx, parent, TransferOptions{})
 }
 
-func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOptions) (string, error) {
+func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOptions) (published string, err error) {
 	ctx = options.start(ctx)
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	parent, err := r.externalFolder(parent)
+	parent, err = r.externalFolder(parent)
 	if err != nil {
 		return "", err
 	}
 	if err := r.AdoptFrozen(ctx); err != nil {
 		return "", err
 	}
-	stage, err := os.MkdirTemp(parent, ".ExcelLens-"+time.Now().Format("20060102-150405")+"-")
+	phase(ctx, "预算磁盘空间", 0, 0)
+	space, total, items, err := r.backupSpace(ctx, parent, options)
 	if err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(stage)
-	dest, err := openDirectory(stage)
+	stage, cleanup, err := newBackupStage(parent)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			if published != "" {
+				err = errors.Join(err, fmt.Errorf("备份已发布到 %s，清理暂存失败：%w", published, cleanupErr))
+			} else {
+				err = errors.Join(err, fmt.Errorf("清理备份暂存 %s 失败：%w", stage, cleanupErr))
+			}
+		}
+	}()
+	payload := filepath.Join(stage, stagePayload)
+	dest, err := openDirectory(payload)
 	if err != nil {
 		return "", err
 	}
@@ -186,12 +203,16 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 		return "", err
 	}
 	defer clear(volume.key)
-	phase(ctx, "复制", 0, 0)
+	volume.disk, volume.planned = space.targets["backup"], space.planned
+	phase(ctx, "复制", total, items)
 	files, err := r.snapshot(ctx, &volume)
 	if err != nil {
 		return "", err
 	}
-	var total int64
+	if len(files) != items {
+		return "", errors.New("备份预算后文件集合发生变化，请重试")
+	}
+	total = 0
 	for _, f := range files {
 		total += f.Bytes
 	}
@@ -240,7 +261,13 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 	if _, err = os.Lstat(out); !errors.Is(err, os.ErrNotExist) {
 		return "", errors.New("备份目标已存在或不可用")
 	}
-	if err = publishNew(stage, out); err != nil {
+	if err = space.check(); err != nil {
+		return "", err
+	}
+	if err = options.enterCommit(ctx); err != nil {
+		return "", err
+	}
+	if err = publishNew(payload, out); err != nil {
 		return "", err
 	}
 	return out, syncDir(parent)

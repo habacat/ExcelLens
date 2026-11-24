@@ -16,6 +16,7 @@
       const search = this.node('commandSearch');
       search.addEventListener('input', () => { this.index = 0; this.render(); });
       search.addEventListener('keydown', event => {
+        if (event.isComposing || event.keyCode === 229) return;
         if (event.key === 'Enter') {
           event.preventDefault();
           this.run(this.visible[this.index]);

@@ -129,7 +129,14 @@
     return {dialog, body, actions, close};
   }
   function present(dialog, resolve, result) {
-    dialog.addEventListener('close', () => { dialog.remove(); resolve(result()); }, {once: true});
+    const opener = document.activeElement;
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      if (opener && opener.isConnected && typeof opener.focus === 'function' && (!document.activeElement || document.activeElement === document.body)) {
+        opener.focus({preventScroll: true});
+      }
+      resolve(result());
+    }, {once: true});
     document.body.append(dialog);
     dialog.showModal();
   }
@@ -137,13 +144,17 @@
   // Resolves with {value}, with {alternative: true} for the optional second
   // action, or with null when cancelled. `validate` returns a message to keep
   // the dialog open, or nothing to accept the text.
-  function ask({title, label = '', value = '', inputMode = 'text', confirmLabel = '确定', alternative = '', validate}) {
+  function ask({title, label = '', value = '', placeholder = '', maxLength = 0, inputMode = 'text', confirmLabel = '确定', alternative = '', validate}) {
     return new Promise(resolve => {
       const {dialog, body, actions, close} = frame(title, 'ask-input');
       const field = make('label', 'ask-field'), input = make('input', 'field-control'), problem = make('p', 'ask-problem');
       input.value = value; input.inputMode = inputMode; input.autocomplete = 'off'; input.spellcheck = false;
+      if (placeholder) input.placeholder = placeholder;
+      if (maxLength > 0) input.maxLength = maxLength;
       problem.setAttribute('role', 'alert'); problem.hidden = true;
-      field.append(make('span', '', label), input);
+      if (label) field.append(make('span', '', label));
+      else input.setAttribute('aria-label', title);
+      field.append(input);
       body.prepend(field, problem);
       let result = null;
       const finish = next => { result = next; dialog.close(); };
@@ -154,12 +165,16 @@
       };
       const other = alternative ? make('button', 'mini-button ask-alternative', alternative) : null;
       const cancel = make('button', 'mini-button', '取消'), ok = make('button', 'primary-button', confirmLabel);
+      cancel.dataset.no = ''; ok.dataset.yes = '';
       other?.addEventListener('click', () => finish({alternative: true}));
       cancel.addEventListener('click', () => finish(null));
       close.addEventListener('click', () => finish(null));
       ok.addEventListener('click', accept);
       input.addEventListener('input', () => { problem.hidden = true; });
-      input.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); accept(); } });
+      input.addEventListener('keydown', event => {
+        const composing = window.ExcelLensDisplayFormat?.isComposing?.(event) ?? (event.isComposing || event.keyCode === 229);
+        if (event.key === 'Enter' && !composing) { event.preventDefault(); accept(); }
+      });
       actions.append(...(other ? [other] : []), cancel, ok);
       present(dialog, resolve, () => result);
       input.focus(); input.select();
@@ -174,6 +189,7 @@
       let result = false;
       const finish = next => { result = next; dialog.close(); };
       const cancel = make('button', 'mini-button', '取消'), ok = make('button', 'primary-button' + (danger ? ' danger' : ''), confirmLabel);
+      cancel.dataset.no = ''; ok.dataset.yes = '';
       cancel.addEventListener('click', () => finish(false));
       close.addEventListener('click', () => finish(false));
       ok.addEventListener('click', () => finish(true));

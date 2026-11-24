@@ -23,8 +23,10 @@ const volumeHeader = "ExcelLens-DARE2-AES256GCM-Argon2id-v1\n"
 const manifestLimit = 128 << 20
 
 type backupVolume struct {
-	root *os.Root
-	key  []byte
+	root    *os.Root
+	key     []byte
+	disk    *diskNeed
+	planned map[string]fileRecord
 }
 
 func newVolume(root *os.Root, password string, create bool) (backupVolume, error) {
@@ -75,10 +77,10 @@ func (v backupVolume) write(name string, src io.Reader) error {
 	out, config := v.object(name)
 	return writeNew(v.root, out, func(f *os.File) error {
 		if v.key != nil {
-			_, err := sio.Encrypt(f, io.MultiReader(bytes.NewReader([]byte{1}), src), config)
+			_, err := sio.Encrypt(v.disk.writer(f), io.MultiReader(bytes.NewReader([]byte{1}), src), config)
 			return err
 		}
-		_, err := io.Copy(f, src)
+		_, err := io.Copy(v.disk.writer(f), src)
 		return err
 	})
 }

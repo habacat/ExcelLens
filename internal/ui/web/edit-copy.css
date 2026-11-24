@@ -25,7 +25,7 @@
 .editing-copy:has(#editGridKind:not([hidden])) .range-frames .range-corner { pointer-events:auto;cursor:crosshair;touch-action:none; }
 .formula-entry-frames .range-frame { border-color:var(--reference-color); background:color-mix(in srgb,var(--reference-color) 7%,transparent); }
 .edit-formula-popup {
-  position:fixed; z-index:90; box-sizing:border-box; overflow:auto;
+  position:fixed; z-index:var(--z-formula-popup); box-sizing:border-box; overflow:auto;
   min-width:min(14em,calc(100vw - 10px)); max-width:min(32em,calc(100vw - 10px));
   border:1px solid var(--line); border-radius:var(--r-1);
   color:var(--ink); background:var(--paper);

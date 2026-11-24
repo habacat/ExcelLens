@@ -160,6 +160,9 @@ async function main() {
     assert(fs.readdirSync(folder).length>0); assert.equal(hash(source),original);
     report.checks.push('Clear all caches returns both tabs to home, empties disk cache, preserves source bytes, and reopens the workbook with its leading-zero ID');
     assert.deepEqual(errors,[]);
+  } catch (err) {
+    report.businessFailure=err.stack;
+    throw err;
   } finally { await h.close(); }
 }
 main().then(()=>{report.result='PASS';}).catch(err=>{report.failure=err.stack;process.exitCode=1;}).finally(()=>{

@@ -170,7 +170,7 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 	}
 	job, err := a.exports.startLocked(wb, format)
 	if err == nil {
-		a.retainSubmitted(job.done)
+		a.retainSubmitted(job.ID, job.done)
 	}
 	return job, err
 }

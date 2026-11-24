@@ -91,6 +91,7 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		close(job.done)
+		a.retainSubmitted(job.ID, job.done)
 		job.Status = "done"
 		job.Stage = "从本机缓存加载"
 		job.Progress = 100
@@ -132,7 +133,7 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.searchJobs[job.ID] = job
 	a.mu.Unlock()
-	a.retainSubmitted(job.done)
+	a.retainSubmitted(job.ID, job.done)
 	go a.runSearch(wb, meta, idx, job)
 	writeJSON(w, map[string]any{"jobId": job.ID})
 }

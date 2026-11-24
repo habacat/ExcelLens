@@ -8,14 +8,21 @@
       const headers = new Headers(options.headers || {});
       headers.set("X-ExcelLens-Token", TOKEN);
       window.ExcelLensSession?.apply(headers);
+      if (options.body && typeof FormData !== 'undefined' && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
       const response = await fetch(url, { ...options, headers, cache: "no-store" });
-      if(response.ok&&responseType==='text')return response.text();
+      if (response.headers?.get?.('X-ExcelLens-Recovery') === 'required') window.location.replace(window.location.pathname);
+      if (responseType === 'response') return response;
+      if (response.ok && responseType === 'text') return response.text();
+      if (response.ok && responseType === 'blob') return response.blob();
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {const error=new Error(data.error || `请求失败（HTTP ${response.status}）`);error.status=response.status;throw error;}
       if(data.compact===1 && Array.isArray(data.rows))data.rows=window.ExcelLensWire.unpack(data.rows);
       return data;
     } finally { activity?.end(); }
   }
+  const post=(url,payload,options={})=>api(url,{...options,method:'POST',body:JSON.stringify(payload)});
 
   function upload(file,activity,fmtBytes){
     return new Promise((resolve, reject) => {
@@ -41,5 +48,5 @@
       xhr.send(form);
     });
   }
-  window.ExcelLensTransport=Object.freeze({api,upload});
+  window.ExcelLensTransport=Object.freeze({api,post,upload});
 })();

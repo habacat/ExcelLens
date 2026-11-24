@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
 	"path/filepath"
 	"sync"
 	"time"
@@ -20,13 +19,14 @@ type transferResult struct {
 }
 type storageJob struct {
 	transferResult
-	ID       string              `json:"id"`
-	Action   string              `json:"action"`
-	State    string              `json:"state"`
-	Progress localstore.Progress `json:"progress"`
-	Error    string              `json:"error,omitempty"`
-	Started  time.Time           `json:"started"`
-	Finished time.Time           `json:"finished,omitzero"`
+	ID          string              `json:"id"`
+	Action      string              `json:"action"`
+	State       string              `json:"state"`
+	Transaction string              `json:"transaction"`
+	Progress    localstore.Progress `json:"progress"`
+	Error       string              `json:"error,omitempty"`
+	Started     time.Time           `json:"started"`
+	Finished    time.Time           `json:"finished,omitzero"`
 }
 type storageJobs struct {
 	mu             sync.Mutex
@@ -47,6 +47,7 @@ func (s *storageJobs) load(file string) error {
 	for i := range jobs {
 		if jobs[i].State == "running" {
 			jobs[i].State = "interrupted"
+			jobs[i].Transaction = "finished"
 			jobs[i].Error = "程序退出前未记录完成，请核对目标后重试"
 		}
 	}
@@ -56,7 +57,8 @@ func (s *storageJobs) load(file string) error {
 func (s *storageJobs) stop() {
 	s.mu.Lock()
 	s.closed = true
-	if s.cancel != nil {
+	if s.cancel != nil && s.jobs[0].Transaction != "committing" {
+		s.jobs[0].Transaction = "cancelling"
 		s.cancel()
 	}
 	done := s.done
@@ -66,8 +68,8 @@ func (s *storageJobs) stop() {
 	}
 }
 func (a *App) startStorage(roots localstore.Roots, action, dir, password string) (storageJob, error) {
-	return a.submitStorage(roots, action, func(ctx context.Context, report func(localstore.Progress)) (transferResult, error) {
-		options := localstore.TransferOptions{Password: password, Report: report}
+	return a.submitStorage(roots, action, func(ctx context.Context, options localstore.TransferOptions) (transferResult, error) {
+		options.Password = password
 		var msg string
 		var err error
 		switch action {
@@ -97,7 +99,7 @@ func (a *App) startStorage(roots localstore.Roots, action, dir, password string)
 		return transferResult{Message: msg}, err
 	})
 }
-func (a *App) submitStorage(roots localstore.Roots, action string, run func(context.Context, func(localstore.Progress)) (transferResult, error)) (storageJob, error) {
+func (a *App) submitStorage(roots localstore.Roots, action string, run func(context.Context, localstore.TransferOptions) (transferResult, error)) (storageJob, error) {
 
 	s := &a.transfers
 	s.mu.Lock()
@@ -106,14 +108,14 @@ func (a *App) submitStorage(roots localstore.Roots, action string, run func(cont
 	if s.closed {
 		return empty, errors.New("程序正在退出")
 	}
-	if a.restorePending.Load() && action != "restore" {
+	if a.restoreState.pending() && action != "restore" {
 		return empty, errors.New("请先完成恢复事务")
 	}
 	file := filepath.Join(roots.Config, "transfer-history.json")
 	if err := s.load(file); err != nil {
 		return empty, err
 	}
-	job := storageJob{ID: randomID(), Action: action, State: "running", Started: time.Now().UTC(), Progress: localstore.Progress{Phase: "准备"}}
+	job := storageJob{ID: randomID(), Action: action, State: "running", Transaction: "preparing", Started: time.Now().UTC(), Progress: localstore.Progress{Phase: "准备"}}
 	jobs := append([]storageJob{job}, s.jobs[:min(len(s.jobs), 31)]...)
 	if err := writeSavedConfig(file, 1<<20, jobs, durableConfigOps); err != nil {
 		return empty, err
@@ -122,14 +124,40 @@ func (a *App) submitStorage(roots localstore.Roots, action string, run func(cont
 	s.jobs, s.cancel, s.done = jobs, cancel, make(chan struct{})
 	go func() {
 		defer cancel()
-		result, err := run(ctx, func(p localstore.Progress) { s.mu.Lock(); s.jobs[0].Progress = p; s.mu.Unlock() })
+		s.mu.Lock()
+		if s.jobs[0].Transaction == "preparing" {
+			s.jobs[0].Transaction = "cancellable"
+		}
+		s.mu.Unlock()
+		options := localstore.TransferOptions{
+			Report: func(p localstore.Progress) { s.mu.Lock(); s.jobs[0].Progress = p; s.mu.Unlock() },
+			BeginCommit: func() error {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				s.jobs[0].Transaction = "committing"
+				return nil
+			},
+		}
+		a.storageView.Lock()
+		result, err := run(ctx, options)
+		a.storageView.Unlock()
 		s.mu.Lock()
 		current := &s.jobs[0]
+		if current.Transaction == "cancelling" && err == nil {
+			err = context.Canceled
+		}
+		current.Transaction = "finished"
 		current.Finished = time.Now().UTC()
 		if err != nil {
 			current.State, current.Error = "failed", err.Error()
 			if errors.Is(err, context.Canceled) {
-				current.State, current.Error = "cancelled", "已取消"
+				current.State = "cancelled"
+				if err == context.Canceled {
+					current.Error = "已取消"
+				}
 			}
 		} else {
 			current.State, current.transferResult = "done", result
@@ -190,76 +218,14 @@ func (a *App) handleStorageJobs(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 409, "任务已结束或不存在")
 			return
 		}
-		if s.jobs[0].Progress.Phase == "提交恢复事务" {
-			writeError(w, 409, "已开始提交恢复事务")
+		if s.jobs[0].Transaction == "committing" {
+			writeError(w, 409, "已进入提交阶段，无法取消")
 			return
 		}
+		s.jobs[0].Transaction = "cancelling"
 		s.cancel()
 		writeJSON(w, map[string]bool{"cancelled": true})
 	default:
 		methodNotAllowed(w)
 	}
-}
-func (a *App) handleSources(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		methodNotAllowed(w)
-		return
-	}
-	roots, err := dataRoots()
-	if err != nil {
-		writeError(w, 500, err.Error())
-		return
-	}
-	var req struct {
-		Book, Previous, Path string
-		Confirm              bool
-	}
-	if r.Method == http.MethodPost {
-		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 96<<10))
-		if err != nil || decodeSavedConfig(data, &req) != nil || !validExportDigest(req.Book) || !filepath.IsAbs(req.Path) {
-			writeError(w, 400, "来源定位参数无效")
-			return
-		}
-	}
-	if !a.storageMu.TryLock() {
-		writeError(w, 409, "另一项数据管理操作正在进行")
-		return
-	}
-	if a.restorePending.Load() {
-		a.storageMu.Unlock()
-		writeError(w, 409, "请先完成恢复事务")
-		return
-	}
-	if r.Method == http.MethodGet {
-		defer a.storageMu.Unlock()
-		items, err := relocationSources(r.Context())
-		if err != nil {
-			writeError(w, 409, err.Error())
-			return
-		}
-		writeJSON(w, map[string]any{"items": items})
-		return
-	}
-	action := "verify-source"
-	if req.Confirm {
-		action = "relocate-source"
-	}
-	job, err := a.submitStorage(roots, action, func(ctx context.Context, report func(localstore.Progress)) (transferResult, error) {
-		report(localstore.Progress{Phase: "核验来源指纹"})
-		item, err := a.verifyLocation(ctx, req.Book, req.Previous, req.Path, req.Confirm)
-		if err != nil {
-			return transferResult{}, err
-		}
-		msg := "内容指纹相符"
-		if req.Confirm {
-			msg = "已更新来源位置"
-		}
-		return transferResult{Message: msg, Candidate: item.Candidate}, nil
-	})
-	if err != nil {
-		a.storageMu.Unlock()
-		writeError(w, 409, err.Error())
-		return
-	}
-	writeJSONStatus(w, 202, job)
 }

@@ -32,8 +32,7 @@
       }
       return {rows,cols};
     }
-    reset() {
-      this.cells.clear();
+    reset({preserveDOM = false} = {}) {
       ++this.serial;
       clearTimeout(this.timer);
       this.abort?.abort(); this.abort = null;
@@ -41,6 +40,8 @@
       this.key = '';
       this.cache.clear();
       this.cacheSizes.clear();this.cacheBytes=0;
+      if (preserveDOM) return;
+      this.cells.clear();
       this.o.state.frozenCellMap.clear();
       for (const id of ['freezeTop','freezeLeft','freezeCorner','freezeHeader','freezeRowHeads']) {
         const el = document.getElementById(id);

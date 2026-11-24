@@ -12,7 +12,7 @@
       $('printPreviewUpdate').addEventListener('click',()=>this.refresh());$('printPreviewCancel').addEventListener('click',()=>this.cancel());
       $('printSettingsForm').addEventListener('submit',event=>{event.preventDefault();this.refresh();});$('printSettingsForm').addEventListener('input',()=>this.changed());$('printSettingsForm').addEventListener('change',()=>this.changed());
       $('printPreviewPrev').addEventListener('click',()=>this.go(this.index-1));$('printPreviewNext').addEventListener('click',()=>this.go(this.index+1));
-      $('printPreviewPage').addEventListener('change',()=>this.goInput());$('printPreviewPage').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();this.goInput();}});
+      $('printPreviewPage').addEventListener('change',()=>this.goInput());$('printPreviewPage').addEventListener('keydown',event=>{if(!event.isComposing&&event.keyCode!==229&&event.key==='Enter'){event.preventDefault();this.goInput();}});
       $('printOutputMode').addEventListener('change',()=>this.controls());
       $('printOutput').addEventListener('click',()=>this.exportPaper());
       $('printScreenZoom').addEventListener('change',()=>this.zoom());

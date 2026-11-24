@@ -332,8 +332,8 @@
           <div id="indexTitle" class="index-title">正在准备工作表</div>
           <div id="indexDetail" class="index-detail">首次打开需要建立本机索引。</div>
           <div class="index-actions">
-            <button id="retryIndexBtn" class="mini-button primary-mini" hidden>重试</button>
-            <button id="showRowsRecoveryBtn" class="mini-button" hidden>暂时显示全部行</button>
+            <button id="retryIndexBtn" type="button" class="mini-button primary-mini" hidden>重试</button>
+            <button id="showRowsRecoveryBtn" type="button" class="mini-button" hidden>暂时显示全部行</button>
           </div>
         </div>
       </div>
@@ -476,9 +476,9 @@
 
   <aside id="calculatorWindow" class="calculator-window" role="dialog" aria-modal="false" aria-label="公式计算" hidden>
     <div id="calculatorDrag" class="calculator-head" tabindex="0" aria-label="拖动计算">
-      <span class="calculator-grip" aria-hidden="true">⠿</span><strong>计算</strong>
-      <span id="calculatorSaveStatus" class="calculator-save-status" role="status" aria-live="polite"></span><button id="calculatorRecovery" class="calculator-notes-toggle" type="button">恢复</button><button id="calculatorNotes" class="calculator-notes-toggle" type="button" aria-pressed="false" title="备注列">备注</button><button id="calculatorMinimize" class="calculator-icon" type="button" title="收起" aria-label="收起">−</button>
-      <button id="calculatorClose" class="calculator-icon" type="button" title="关闭" aria-label="关闭">×</button>
+      <span class="calculator-grip" aria-hidden="true"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-grip"/></svg></span><strong>计算</strong>
+      <span id="calculatorSaveStatus" class="calculator-save-status" role="status" aria-live="polite"></span><button id="calculatorRecovery" class="calculator-notes-toggle" type="button">恢复</button><button id="calculatorNotes" class="calculator-notes-toggle" type="button" aria-pressed="false" title="备注列">备注</button><button id="calculatorMinimize" class="calculator-icon" type="button" title="收起" aria-label="收起"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-minus"/></svg></button>
+      <button id="calculatorClose" class="calculator-icon" type="button" title="关闭" aria-label="关闭"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
     </div>
     <details class="calculator-compat"><summary>计算口径</summary><p>原生表格的文本金额不计入范围汇总。外部台账可计入合规文本金额。整行、整列取已用区域，财务迭代可能有尾差，≈ 表示近似值。</p></details>
     <div id="calculatorScroll" class="calculator-scroll" role="grid" aria-label="计算"><div class="calculator-columns" role="row"><span></span><span role="columnheader">公式</span><span role="columnheader">结果</span><span class="calculator-note-head" role="columnheader">备注</span></div><div id="calculatorRows" class="calculator-rows" role="rowgroup"></div></div>
@@ -719,8 +719,8 @@
     </div>
     <footer class="filter-footer">
       <label id="filterProgressChoice" class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="filterRecoverable" type="checkbox">保留进度</label>
-      <button id="cancelFilterJobBtn" class="mini-button" hidden>取消任务</button>
-      <button id="applyFilterBtn" class="primary-button compact">应用筛选</button>
+      <button id="cancelFilterJobBtn" type="button" class="mini-button" hidden>取消任务</button>
+      <button id="applyFilterBtn" type="button" class="primary-button compact">应用筛选</button>
     </footer>
   </dialog>
 
@@ -790,7 +790,7 @@
     <div class="dialog-body">
       <div class="profile-controls"><label>范围 <input id="profileStart" class="field-control" placeholder="A1"></label><span class="profile-divider">—</span><input id="profileEnd" class="field-control" aria-label="结束单元格" placeholder="D500"><label class="profile-filter-label"><input id="profileFiltered" type="checkbox">仅筛选行</label><label class="profile-filter-label"><input id="profileDistribution" type="checkbox">分位数与分布</label><button id="profileAnalyzeBtn" class="primary-button compact" type="button">统计</button><button id="profileCancelBtn" class="mini-button" type="button" hidden>取消</button></div>
       <div id="profilePending" class="dialog-summary" role="status" aria-live="polite" hidden></div>
-	  <button id="profileQuickBtn" class="mini-button" type="button">快速分析</button>
+      <button id="profileQuickBtn" class="mini-button" type="button">快速分析</button>
       <div id="profileSummary" class="profile-summary" hidden></div>
       <div id="profileDetail" class="profile-detail" hidden></div>
     </div>
@@ -809,6 +809,7 @@
       </div>
       <label for="storageDirectory">备份目录</label>
       <div class="storage-actions"><input id="storageDirectory" class="field-control" type="text" placeholder="目录完整路径"><button class="mini-button" data-storage="backup" type="button">备份到此处</button><button class="mini-button" data-storage="restore" type="button">从此处迁入</button></div>
+      <details id="storageStages"><summary>未完成的备份</summary><button class="mini-button" type="button" data-storage="list-stages">检查目录</button><div id="storageStageList"></div></details>
       <label for="storagePassword">备份口令（可选）</label>
       <input id="storagePassword" class="field-control" type="password" autocomplete="new-password" placeholder="明文备份可留空">
       <button id="storageCancel" class="mini-button" type="button" hidden>取消传输</button>
@@ -881,7 +882,7 @@
       <label id="inspectColumnWrap" hidden>列<input id="inspectColumn" type="text" maxlength="3" placeholder="例如 D"></label>
       <label id="inspectSkipHeaderWrap" class="inspect-checkbox" hidden><input id="inspectSkipHeader" type="checkbox" checked> 跳过表头</label>
       <p id="inspectHint" class="inspect-hint"></p>
-      <div class="inspect-actions"><button id="inspectRun" class="inspect-run" type="button">查找</button><button id="inspectCancel" type="button" hidden>取消</button><button id="inspectClear" type="button">清除高亮</button><button id="inspectCopy" type="button">复制结果</button></div>
+      <div class="inspect-actions"><button id="inspectRun" class="primary-button compact inspect-run" type="button">查找</button><button id="inspectCancel" class="mini-button" type="button" hidden>取消</button><button id="inspectClear" class="mini-button" type="button">清除高亮</button><button id="inspectCopy" class="mini-button" type="button">复制结果</button></div>
       <div id="inspectProgress" class="inspect-progress" role="status" aria-live="polite"></div>
     </div>
     <div class="inspect-list-header"><span>匹配的单元格</span><div><button id="inspectPrev" type="button" disabled title="上一条" aria-label="上一条"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-up"/></svg></button><button id="inspectNext" type="button" disabled title="下一条" aria-label="下一条"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button></div></div>
@@ -1084,28 +1085,12 @@
     <div id="editFormulaHint" role="status" hidden></div>
   </div>
 
-  <script src="/assets/cell-address.js"></script>
-  <script src="/assets/display-format.js"></script>
   <dialog id="taskRecoveryDialog" class="float-dialog task-recovery-dialog" aria-labelledby="taskRecoveryTitle">
     <div class="dialog-head"><div id="taskRecoveryTitle" class="dialog-title">任务恢复</div><button id="taskRecoveryClose" type="button" class="dialog-close" aria-label="关闭">×</button></div>
     <div class="task-recovery-toolbar"><button id="taskRecoveryRefresh" class="mini-button" type="button">刷新</button></div>
     <div id="taskRecoveryList" class="task-recovery-list" aria-label="已保存的任务"></div>
     <p id="taskRecoveryStatus" class="task-recovery-status" role="status" aria-live="polite" hidden></p>
   </dialog>
-  <script src="/assets/task-recovery-model.js"></script>
-  <script src="/assets/task-recovery.js"></script>
-  <script src="/assets/session.js"></script>
-  <script src="/assets/activity.js"></script>
-  <script src="/assets/grid-backdrop.js"></script>
-  <script src="/assets/grid-borders.js"></script>
-  <script src="/assets/recent.js"></script>
-  <script src="/assets/multisort.js"></script>
-  <script src="/assets/inspect.js"></script>
-  <script src="/assets/multiselection.js"></script>
-  <script src="/assets/range-frame.js"></script>
-  <script src="/assets/selectionstats.js"></script>
-  <script src="/assets/conditional.js"></script>
-  <script src="/assets/richtext.js"></script>
   <dialog id="copySpecialDialog" class="clipboard-dialog" aria-labelledby="copySpecialTitle">
     <form id="copySpecialForm">
       <div class="clipboard-head"><div><h3 id="copySpecialTitle">选择性复制</h3><p id="copySpecialSource"></p></div><button id="copySpecialClose" type="button" class="mini-button">关闭</button></div>
@@ -1130,39 +1115,24 @@
       <div class="clipboard-footer"><button id="pasteSpecialApply" type="submit" class="primary-button compact" disabled>确认粘贴</button></div>
     </form>
   </dialog>
-  <script src="/assets/clipboard.js"></script>
-  <script src="/assets/transpose-model.js"></script>
-  <script src="/assets/transpose.js"></script>
-  <script src="/assets/clipboard-special.js"></script>
-  <script src="/assets/clipboard-panels.js"></script>
-  <script src="/assets/geometry.js"></script>
-  <script src="/assets/images.js"></script>
-  <script src="/assets/freeze.js"></script>
-  <script src="/assets/autofilter.js"></script>
-  <script src="/assets/export.js"></script>
-  <script src="/assets/bookmarks.js"></script>
-  <script src="/assets/profile-model.js"></script>
-  <script src="/assets/profile.js"></script>
-  <script src="/assets/formula_inspector.js"></script>
-
   <div id="pictureViewer" class="picture-viewer" role="dialog" aria-modal="true" aria-label="查看工作表图片" hidden tabindex="-1">
     <div class="picture-viewer-bar">
       <span id="pictureCaption" class="picture-caption"></span>
       <span id="pictureIndex" class="picture-index"></span>
       <div class="picture-viewer-controls">
-        <button id="picturePrevious" type="button" title="上一张（←）" aria-label="上一张">‹</button>
-        <button id="pictureNext" type="button" title="下一张（→）" aria-label="下一张">›</button>
+        <button id="picturePrevious" type="button" title="上一张（←）" aria-label="上一张"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg></button>
+        <button id="pictureNext" type="button" title="下一张（→）" aria-label="下一张"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-right"/></svg></button>
         <span class="picture-separator" aria-hidden="true"></span>
-        <button id="pictureZoomOut" type="button" title="缩小（-）" aria-label="缩小">−</button>
+        <button id="pictureZoomOut" type="button" title="缩小（-）" aria-label="缩小"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-minus"/></svg></button>
         <span id="pictureZoomValue" class="picture-zoom-value">100%</span>
-        <button id="pictureZoomIn" type="button" title="放大（+）" aria-label="放大">＋</button>
+        <button id="pictureZoomIn" type="button" title="放大（+）" aria-label="放大"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
         <button id="pictureFit" type="button" title="适合窗口（0）">适应</button>
         <button id="pictureActual" type="button" title="实际像素（1）">1:1</button>
         <button id="pictureRotate" type="button" title="顺时针旋转（R）" aria-label="旋转"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></button>
         <span class="picture-separator" aria-hidden="true"></span>
         <button id="pictureCopy" type="button" title="复制图片" aria-label="复制图片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
         <a id="pictureDownload" href="#" download="ExcelLens-image" title="保存原图" aria-label="保存原图"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download"/></svg></a>
-        <button id="pictureClose" class="picture-close" type="button" title="关闭（Esc）" aria-label="关闭图片">×</button>
+        <button id="pictureClose" class="picture-close" type="button" title="关闭（Esc）" aria-label="关闭图片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
       </div>
     </div>
     <div id="pictureStage" class="picture-stage" aria-label="拖动平移图片、滚动鼠标滚轮缩放">
@@ -1191,10 +1161,10 @@
     <div class="analysis-topbar">
       <div class="analysis-brand"><span class="analysis-brand-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart"/></svg></span><strong>分析</strong><span class="analysis-source-label" id="analysisSourceCaption"></span></div>
       <nav class="analysis-nav" aria-label="分析视图">
-        <button data-analysis-tab="pivot" class="is-active">透视分析</button>
-        <button data-analysis-tab="dashboard">仪表盘</button>
-        <button data-analysis-tab="sheets">编辑工作表</button>
-        <button data-analysis-tab="templates">模板库</button>
+        <button type="button" data-analysis-tab="pivot" class="is-active">透视分析</button>
+        <button type="button" data-analysis-tab="dashboard">仪表盘</button>
+        <button type="button" data-analysis-tab="sheets">编辑工作表</button>
+        <button type="button" data-analysis-tab="templates">模板库</button>
         <button id="analysisSnapshotsOpen" type="button">比较快照</button>
       </nav>
       <div class="analysis-top-actions"><button id="analysisSettingsOpen" class="analysis-quiet-button" type="button" aria-haspopup="dialog">设置</button><span id="analysisAutoSave" class="analysis-autosave" role="status" aria-live="polite"></span><button id="analysisRetrySave" class="analysis-quiet-button" type="button" hidden>重试保存</button><button id="analysisBackupExport" class="analysis-quiet-button" type="button" title="导出全部编辑表和报表配置">备份</button><button id="analysisDraftRecovery" class="analysis-quiet-button" type="button">恢复草稿</button><button id="analysisBackupImport" class="analysis-quiet-button" type="button">导入备份</button><input id="analysisBackupFile" type="file" accept=".json,application/json" hidden><button id="analysisClose" class="analysis-back" type="button" title="返回工作簿"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-left"/></svg><span>返回工作簿</span></button></div>
@@ -1233,7 +1203,7 @@
       </aside>
       <main class="analysis-main">
         <section class="analysis-panel" data-analysis-panel="pivot">
-          <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" disabled title="把加工后的明细提取到编辑表（最多 1 万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" disabled>导出结果</button></div></div></div>
+          <div class="analysis-content-head"><div><h2 id="analysisReportTitle">透视分析</h2><p id="analysisReportSubtitle" class="analysis-subtitle">从左侧拖入字段，或从模板库快速开始。</p></div><div class="analysis-head-buttons"><button id="analysisIssuesOpen" class="analysis-outline-button" type="button" hidden>核对项目</button><button id="analysisSaveReport" class="analysis-outline-button" type="button" disabled>保存报表</button><button id="analysisMaterialize" class="analysis-outline-button" type="button" disabled>生成编辑表</button><button id="analysisMaterializeDetails" class="analysis-outline-button" type="button" disabled title="把加工后的明细提取到编辑表（最多 1 万行）">提取明细</button><div class="analysis-export-control"><select id="analysisExportFormat" class="analysis-chart-select" aria-label="导出格式"><option value="xlsx">XLSX</option><option value="csv">CSV</option></select><button id="analysisExport" class="analysis-outline-button" type="button" disabled>导出结果</button></div></div></div>
           <div id="analysisProgress" class="analysis-progress" hidden><div class="analysis-progress-top"><span class="activity-line"><span id="analysisActivity" class="activity-slot" data-native-percent></span><span id="analysisProgressText">正在分析…</span></span><strong id="analysisProgressPercent"></strong></div><div class="analysis-progress-track"><span id="analysisProgressBar"></span></div></div>
           <div id="analysisMetrics" class="analysis-metrics" hidden></div>
           <div class="analysis-chart-card"><div class="analysis-card-header"><div><h3>图表</h3><span id="analysisChartSummary">选择分类和指标后生成图表</span></div><div class="analysis-chart-tools"><button id="analysisSnapshotSave" type="button" class="analysis-outline-button" disabled>保存快照</button><button id="analysisChartImage" type="button" class="analysis-outline-button" disabled>导出图片</button><label for="analysisChartMetric" id="analysisChartMetricLabel" hidden>指标</label><select id="analysisChartMetric" class="analysis-chart-select" hidden aria-label="选择图表指标"></select><label for="analysisChartSelect">类型</label><select id="analysisChartSelect" class="analysis-chart-select"><option value="bar">纵向柱状</option><option value="horizontal">横向条形</option><option value="line">折线</option><option value="area">面积</option><option value="donut">环形</option><option value="pie">饼图</option><option value="scatter">散点</option><option value="stacked">堆叠柱状</option><option value="heatmap">热力矩阵</option></select></div></div>
@@ -1241,12 +1211,12 @@
           <div class="analysis-table-card"><div class="analysis-card-header"><div><h3>透视结果</h3><span id="analysisTableSummary">等待生成结果</span></div><span id="analysisTableHint" class="analysis-table-hint">点数值查看明细</span></div><div id="analysisTreeTools" class="analysis-tree-tools" hidden><button id="analysisTreeCollapse" class="analysis-quiet-button" type="button">收起全部</button><span class="status-spacer"></span><button id="analysisTreePrevious" class="analysis-quiet-button" type="button">上一页</button><span id="analysisTreePage" role="status"></span><button id="analysisTreeNext" class="analysis-quiet-button" type="button">下一页</button></div><div class="analysis-table-scroll"><table id="analysisPivotTable" class="analysis-data-table"></table></div></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="dashboard" hidden>
-          <div class="analysis-content-head"><h2>仪表盘</h2><button id="analysisDashboardRefresh" class="analysis-outline-button">刷新数据</button></div>
+          <div class="analysis-content-head"><h2>仪表盘</h2><button id="analysisDashboardRefresh" class="analysis-outline-button" type="button">刷新数据</button></div>
           <div id="analysisDashboardCards" class="analysis-dashboard-grid"></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="sheets" hidden>
-          <div class="analysis-content-head"><h2>编辑工作表</h2><button id="analysisCreateSheet" class="analysis-primary-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>新建工作表</button></div>
-          <div class="analysis-sheet-layout"><nav id="analysisSheetList" class="analysis-sheet-list" aria-label="已创建编辑表"></nav><div class="analysis-sheet-editor"><div class="analysis-sheet-tools"><strong id="analysisSheetTitle">选择编辑表</strong><div><button id="analysisPasteSpecial" class="analysis-quiet-button" disabled title="选择性粘贴（Ctrl+Shift+V）">选择性粘贴</button><button id="analysisUndo" class="analysis-quiet-button" disabled title="撤销（Ctrl+Z）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg>撤销</button><button id="analysisRedo" class="analysis-quiet-button" disabled title="重做（Ctrl+Y）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-redo"/></svg>重做</button><button id="analysisAddColumn" class="analysis-quiet-button" disabled>添加列</button><button id="analysisAddRows" class="analysis-quiet-button" disabled>添加 10 行</button><button id="analysisDeleteSheet" class="analysis-quiet-button danger" disabled>删除</button></div></div><div id="analysisEditableGrid" class="analysis-edit-grid"></div><div id="analysisSheetPagination" class="analysis-pagination"></div></div></div>
+          <div class="analysis-content-head"><h2>编辑工作表</h2><button id="analysisCreateSheet" class="analysis-primary-button" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>新建工作表</button></div>
+          <div class="analysis-sheet-layout"><nav id="analysisSheetList" class="analysis-sheet-list" aria-label="已创建编辑表"></nav><div class="analysis-sheet-editor"><div class="analysis-sheet-tools"><strong id="analysisSheetTitle">选择编辑表</strong><div><button id="analysisPasteSpecial" class="analysis-quiet-button" type="button" disabled title="选择性粘贴（Ctrl+Shift+V）">选择性粘贴</button><button id="analysisUndo" class="analysis-quiet-button" type="button" disabled title="撤销（Ctrl+Z）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg>撤销</button><button id="analysisRedo" class="analysis-quiet-button" type="button" disabled title="重做（Ctrl+Y）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-redo"/></svg>重做</button><button id="analysisAddColumn" class="analysis-quiet-button" type="button" disabled>添加列</button><button id="analysisAddRows" class="analysis-quiet-button" type="button" disabled>添加 10 行</button><button id="analysisDeleteSheet" class="analysis-quiet-button danger" type="button" disabled>删除</button></div></div><div id="analysisEditableGrid" class="analysis-edit-grid"></div><div id="analysisSheetPagination" class="analysis-pagination"></div></div></div>
         </section>
         <section class="analysis-panel" data-analysis-panel="templates" hidden>
           <div class="analysis-content-head"><h2>模板库</h2><input id="analysisTemplateSearch" type="search" class="analysis-control analysis-template-search" placeholder="搜索模板…"></div>
@@ -1255,11 +1225,70 @@
       </main>
     </div>
     <aside id="analysisDrill" class="analysis-drill" role="dialog" aria-label="源数据下钻" hidden>
-      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="连同原始行号存到编辑表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭">×</button></div></div>
+      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="连同原始行号存到编辑表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div></div>
       <div id="analysisDrillTable" class="analysis-drill-table"></div><div id="analysisDrillPaging" class="analysis-pagination"></div>
     </aside>
     <div id="analysisToast" class="analysis-toast" role="status" hidden></div>
   </section>
+  <dialog id="analysisIssuesDialog" class="analysis-issues-dialog" aria-labelledby="analysisIssuesTitle">
+    <div class="analysis-issues-head"><div><h3 id="analysisIssuesTitle">异常与排除项目</h3><p id="analysisIssuesSummary"></p></div><button id="analysisIssuesClose" type="button" class="analysis-outline-button">关闭</button></div>
+    <div class="analysis-issues-tools"><button id="analysisIssuesExtract" class="analysis-outline-button" type="button">提取编辑表</button><button id="analysisIssuesExport" class="analysis-primary-button" type="button">导出完整CSV</button><label title="给公式形式的文本加单引号；要逐字保留原文时取消"><input id="analysisIssuesCSVGuard" type="checkbox" checked>CSV 文本保护</label></div>
+    <p id="analysisIssuesTextNote" class="analysis-issues-note"></p>
+    <div class="analysis-issues-scroll"><table id="analysisIssuesTable" class="analysis-data-table"></table></div>
+  </dialog>
+  <dialog id="analysisSettingsDialog" class="analysis-settings-dialog" aria-labelledby="analysisSettingsTitle">
+    <form id="analysisSettingsForm">
+      <div class="analysis-settings-head"><h3 id="analysisSettingsTitle">分析显示设置</h3><button id="analysisSettingsClose" type="button" class="analysis-outline-button" aria-label="关闭显示设置">关闭</button></div>
+      <fieldset id="analysisSettingsFields">
+        <label class="analysis-settings-toggle"><input id="analysisGroupThousands" type="checkbox" checked><span>显示千分位分隔符</span></label>
+        <label class="analysis-settings-toggle"><input id="analysisScientific" type="checkbox" checked><span>大数使用科学计数法</span></label>
+        <div class="analysis-settings-threshold"><label for="analysisScientificExponent">大数门槛（绝对值）</label><select id="analysisScientificExponent" class="analysis-control"><option value="9">十亿 · 10⁹</option><option value="12" selected>万亿 · 10¹²</option><option value="15">千万亿 · 10¹⁵</option></select></div>
+        <div class="analysis-settings-preview" aria-label="显示预览"><span>普通数值</span><output id="analysisNumberPreview"></output><span>大数</span><output id="analysisLargePreview"></output></div>
+        <button id="analysisSettingsDefaults" class="analysis-quiet-button" type="button">恢复默认</button>
+      </fieldset>
+      <p id="analysisSettingsStatus" class="analysis-settings-status" role="status" aria-live="polite"></p>
+      <div class="analysis-settings-actions"><button id="analysisSettingsReload" type="button" class="analysis-outline-button">重新载入</button><button id="analysisSettingsSave" type="submit" class="analysis-primary-button" disabled>保存设置</button></div>
+    </form>
+  </dialog>
+  <dialog id="analysisClustersDialog" class="analysis-clusters-dialog" aria-labelledby="analysisClustersTitle">
+    <div class="analysis-clusters-head"><h3 id="analysisClustersTitle">疑似重复</h3><button id="analysisClustersClose" type="button" class="analysis-outline-button">关闭</button></div>
+    <div class="analysis-clusters-tools"><fieldset id="analysisClustersOptions" aria-label="候选比较规则"><label><input id="analysisClustersCase" type="checkbox">忽略大小写</label><label title="比较全角ASCII字母、数字、符号及全角空格；不转换假名等其他文字"><input id="analysisClustersWidth" type="checkbox">忽略英数符号全半角</label><label>空白<select id="analysisClustersSpace" class="analysis-control"><option value="">保留原样</option><option value="trim">去除首尾</option><option value="collapse">整理连续空白</option><option value="remove">忽略全部空白</option></select></label><label><input id="analysisClustersPunctuation" type="checkbox">忽略标点</label></fieldset><button id="analysisClustersRun" type="button" class="analysis-primary-button">检查</button><button id="analysisClustersCancel" type="button" class="analysis-outline-button" hidden>取消检查</button></div>
+    <p class="analysis-clusters-note">原始文本 · 未应用分析条件</p>
+    <p id="analysisClustersSummary" class="analysis-clusters-note"></p>
+    <div class="analysis-clusters-main"><section class="analysis-clusters-master" aria-label="候选组"><div id="analysisClustersGroups" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClustersPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClustersPage">尚未检查</span><button id="analysisClustersNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section><section class="analysis-clusters-detail" aria-label="候选原文"><h4 id="analysisClusterDetailTitle">选择候选组查看原文</h4><div id="analysisClusterDetailKey" class="analysis-clusters-key"></div><div id="analysisClusterVariants" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClusterVariantsPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClusterVariantsPage">源位置为有限样例</span><button id="analysisClusterVariantsNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section></div>
+    <div class="analysis-clusters-footer"><p id="analysisClustersStatus" class="analysis-clusters-status" role="status" aria-live="polite"></p><button id="analysisClustersConfirm" type="button" class="analysis-primary-button" disabled>添加文本映射</button><button id="analysisClustersExport" type="button" class="analysis-outline-button" disabled>导出候选CSV</button><label><input id="analysisClustersCSVGuard" type="checkbox" checked>CSV文本保护</label></div>
+  </dialog>
+
+  <script src="/assets/cell-address.js"></script>
+  <script src="/assets/display-format.js"></script>
+  <script src="/assets/task-recovery-model.js"></script>
+  <script src="/assets/task-recovery.js"></script>
+  <script src="/assets/session.js"></script>
+  <script src="/assets/activity.js"></script>
+  <script src="/assets/grid-backdrop.js"></script>
+  <script src="/assets/grid-borders.js"></script>
+  <script src="/assets/recent.js"></script>
+  <script src="/assets/multisort.js"></script>
+  <script src="/assets/inspect.js"></script>
+  <script src="/assets/multiselection.js"></script>
+  <script src="/assets/range-frame.js"></script>
+  <script src="/assets/selectionstats.js"></script>
+  <script src="/assets/conditional.js"></script>
+  <script src="/assets/richtext.js"></script>
+  <script src="/assets/clipboard.js"></script>
+  <script src="/assets/transpose-model.js"></script>
+  <script src="/assets/transpose.js"></script>
+  <script src="/assets/clipboard-special.js"></script>
+  <script src="/assets/clipboard-panels.js"></script>
+  <script src="/assets/geometry.js"></script>
+  <script src="/assets/images.js"></script>
+  <script src="/assets/freeze.js"></script>
+  <script src="/assets/autofilter.js"></script>
+  <script src="/assets/export.js"></script>
+  <script src="/assets/bookmarks.js"></script>
+  <script src="/assets/profile-model.js"></script>
+  <script src="/assets/profile.js"></script>
+  <script src="/assets/formula_inspector.js"></script>
   <script src="/assets/formats.js"></script>
   <script src="/assets/edit-copy-model.js"></script>
   <script src="/assets/edit-grid-paste.js"></script>
@@ -1296,16 +1325,16 @@
   <script src="/assets/analysis-jobs.js"></script>
   <script src="/assets/reconcile.js"></script>
   <script src="/assets/named-views.js"></script>
-	<script src="/assets/catalogue.js"></script>
-	<script src="/assets/data-rules.js"></script>
-	<script src="/assets/printing-model.js"></script>
-	<script src="/assets/printing-render.js"></script>
-	<script src="/assets/printing-output.js"></script>
-	<script src="/assets/printing.js"></script>
-	<script src="/assets/record-card-model.js"></script>
-	<script src="/assets/record-card.js"></script>
-	<script src="/assets/selection-quick-model.js"></script>
-	<script src="/assets/selection-quick.js"></script>
+  <script src="/assets/catalogue.js"></script>
+  <script src="/assets/data-rules.js"></script>
+  <script src="/assets/printing-model.js"></script>
+  <script src="/assets/printing-render.js"></script>
+  <script src="/assets/printing-output.js"></script>
+  <script src="/assets/printing.js"></script>
+  <script src="/assets/record-card-model.js"></script>
+  <script src="/assets/record-card.js"></script>
+  <script src="/assets/selection-quick-model.js"></script>
+  <script src="/assets/selection-quick.js"></script>
   <script src="/assets/row-visibility.js"></script>
   <script src="/assets/row-views.js"></script>
   <script src="/assets/cell-explanation.js"></script>
@@ -1322,6 +1351,8 @@
   <script src="/assets/transport.js"></script>
   <script src="/assets/background-tasks.js"></script>
   <script src="/assets/storage.js"></script>
+  <script src="/assets/grid-columns.js"></script>
+  <script src="/assets/search-panel.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>
   <script src="/assets/analysis-numbers.js"></script>
@@ -1329,43 +1360,15 @@
   <script src="/assets/analytics-charts.js"></script>
   <script src="/assets/analysis-drafts.js"></script>
   <script src="/assets/analysis-results.js"></script>
-	<script src="/assets/chart-export-model.js"></script>
-	<script src="/assets/chart-export-surface.js"></script>
-	<script src="/assets/chart-export.js"></script>
+  <script src="/assets/chart-export-model.js"></script>
+  <script src="/assets/chart-export-surface.js"></script>
+  <script src="/assets/chart-export.js"></script>
   <script src="/assets/analysis-tree.js"></script>
   <script src="/assets/analysis-sources.js"></script>
   <script src="/assets/composition.js"></script>
-  <dialog id="analysisIssuesDialog" class="analysis-issues-dialog" aria-labelledby="analysisIssuesTitle">
-    <div class="analysis-issues-head"><div><h3 id="analysisIssuesTitle">异常与排除项目</h3><p id="analysisIssuesSummary"></p></div><button id="analysisIssuesClose" type="button" class="analysis-outline-button">关闭</button></div>
-    <div class="analysis-issues-tools"><button id="analysisIssuesExtract" class="analysis-outline-button" type="button">提取编辑表</button><button id="analysisIssuesExport" class="analysis-primary-button" type="button">导出完整CSV</button><label title="给公式形式的文本加单引号；要逐字保留原文时取消"><input id="analysisIssuesCSVGuard" type="checkbox" checked>CSV 文本保护</label></div>
-    <p id="analysisIssuesTextNote" class="analysis-issues-note"></p>
-    <div class="analysis-issues-scroll"><table id="analysisIssuesTable" class="analysis-data-table"></table></div>
-  </dialog>
   <script src="/assets/analysis-issues.js"></script>
   <script src="/assets/recipes.js"></script>
-  <dialog id="analysisSettingsDialog" class="analysis-settings-dialog" aria-labelledby="analysisSettingsTitle">
-    <form id="analysisSettingsForm">
-      <div class="analysis-settings-head"><h3 id="analysisSettingsTitle">分析显示设置</h3><button id="analysisSettingsClose" type="button" class="analysis-outline-button" aria-label="关闭显示设置">关闭</button></div>
-      <fieldset id="analysisSettingsFields">
-        <label class="analysis-settings-toggle"><input id="analysisGroupThousands" type="checkbox" checked><span>显示千分位分隔符</span></label>
-        <label class="analysis-settings-toggle"><input id="analysisScientific" type="checkbox" checked><span>大数使用科学计数法</span></label>
-        <div class="analysis-settings-threshold"><label for="analysisScientificExponent">大数门槛（绝对值）</label><select id="analysisScientificExponent" class="analysis-control"><option value="9">十亿 · 10⁹</option><option value="12" selected>万亿 · 10¹²</option><option value="15">千万亿 · 10¹⁵</option></select></div>
-        <div class="analysis-settings-preview" aria-label="显示预览"><span>普通数值</span><output id="analysisNumberPreview"></output><span>大数</span><output id="analysisLargePreview"></output></div>
-        <button id="analysisSettingsDefaults" class="analysis-quiet-button" type="button">恢复默认</button>
-      </fieldset>
-      <p id="analysisSettingsStatus" class="analysis-settings-status" role="status" aria-live="polite"></p>
-      <div class="analysis-settings-actions"><button id="analysisSettingsReload" type="button" class="analysis-outline-button">重新载入</button><button id="analysisSettingsSave" type="submit" class="analysis-primary-button" disabled>保存设置</button></div>
-    </form>
-  </dialog>
   <script src="/assets/analysis-settings.js"></script>
-  <dialog id="analysisClustersDialog" class="analysis-clusters-dialog" aria-labelledby="analysisClustersTitle">
-    <div class="analysis-clusters-head"><h3 id="analysisClustersTitle">疑似重复</h3><button id="analysisClustersClose" type="button" class="analysis-outline-button">关闭</button></div>
-    <div class="analysis-clusters-tools"><fieldset id="analysisClustersOptions" aria-label="候选比较规则"><label><input id="analysisClustersCase" type="checkbox">忽略大小写</label><label title="比较全角ASCII字母、数字、符号及全角空格；不转换假名等其他文字"><input id="analysisClustersWidth" type="checkbox">忽略英数符号全半角</label><label>空白<select id="analysisClustersSpace" class="analysis-control"><option value="">保留原样</option><option value="trim">去除首尾</option><option value="collapse">整理连续空白</option><option value="remove">忽略全部空白</option></select></label><label><input id="analysisClustersPunctuation" type="checkbox">忽略标点</label></fieldset><button id="analysisClustersRun" type="button" class="analysis-primary-button">检查</button><button id="analysisClustersCancel" type="button" class="analysis-outline-button" hidden>取消检查</button></div>
-    <p class="analysis-clusters-note">原始文本 · 未应用分析条件</p>
-    <p id="analysisClustersSummary" class="analysis-clusters-note"></p>
-    <div class="analysis-clusters-main"><section class="analysis-clusters-master" aria-label="候选组"><div id="analysisClustersGroups" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClustersPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClustersPage">尚未检查</span><button id="analysisClustersNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section><section class="analysis-clusters-detail" aria-label="候选原文"><h4 id="analysisClusterDetailTitle">选择候选组查看原文</h4><div id="analysisClusterDetailKey" class="analysis-clusters-key"></div><div id="analysisClusterVariants" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClusterVariantsPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClusterVariantsPage">源位置为有限样例</span><button id="analysisClusterVariantsNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section></div>
-    <div class="analysis-clusters-footer"><p id="analysisClustersStatus" class="analysis-clusters-status" role="status" aria-live="polite"></p><button id="analysisClustersConfirm" type="button" class="analysis-primary-button" disabled>添加文本映射</button><button id="analysisClustersExport" type="button" class="analysis-outline-button" disabled>导出候选CSV</button><label><input id="analysisClustersCSVGuard" type="checkbox" checked>CSV文本保护</label></div>
-  </dialog>
   <script src="/assets/analysis-clusters.js"></script>
   <script src="/assets/snapshot-model.js"></script>
   <script src="/assets/snapshots.js"></script>
