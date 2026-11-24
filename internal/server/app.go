@@ -22,6 +22,7 @@ import (
 
 	"excellens/internal/browserlease"
 	"excellens/internal/recovery"
+	"excellens/internal/transferjobs"
 	"excellens/internal/workbook"
 )
 
@@ -39,7 +40,7 @@ type App struct {
 	archiveView      *archiveView
 	archiveTask      *archiveTask
 	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
-	transfers        storageJobs
+	transfers        transferjobs.Manager
 	restoreState     recoveryMode
 	restoreActive    atomic.Bool
 	storageView      sync.RWMutex // storage readers and the worker changing their inputs
@@ -93,9 +94,13 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := roots.Recover(context.Background()); err != nil {
+	pending, err := roots.RecoveryPending()
+	if err != nil {
 		a.restoreState.set(err)
 		log.Printf("已进入受限恢复模式：%v", err)
+	} else if pending {
+		a.restoreState.set(errors.New("检测到未完成的恢复事务"))
+		a.restoreState.startup = true
 	}
 	return a, nil
 }
@@ -166,6 +171,9 @@ func (a *App) Serve(ln net.Listener) error {
 	if a.server == nil {
 		return errors.New("HTTP 服务尚未初始化")
 	}
+	if roots, err := dataRoots(); err == nil {
+		a.startRecovery(roots, false)
+	}
 	stop, done := make(chan struct{}), make(chan struct{})
 	ticker := time.NewTicker(10 * time.Second)
 	go func() { defer close(done); a.runSessionReaper(stop, ticker.C) }()
@@ -182,7 +190,7 @@ func (a *App) Serve(ln net.Listener) error {
 func (a *App) Shutdown() {
 	a.shutdownOnce.Do(func() {
 		a.restoreState.stop()
-		a.transfers.stop()
+		a.transfers.Stop()
 		a.mu.Lock()
 		for _, job := range a.catalogueJobs {
 			job.cancel()
@@ -284,7 +292,7 @@ func (a *App) securityHeaders(next http.Handler) http.Handler {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/export/download" && r.URL.Path != "/api/image/content" && r.URL.Path != "/api/edits/download" && r.Header.Get("X-ExcelLens-Token") != a.token {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/search/export" && r.URL.Path != "/api/export/download" && r.URL.Path != "/api/image/content" && r.URL.Path != "/api/edits/download" && r.Header.Get("X-ExcelLens-Token") != a.token {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

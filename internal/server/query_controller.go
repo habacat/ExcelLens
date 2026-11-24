@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"excellens/internal/searchresults"
 	"excellens/internal/workbook"
 )
 
@@ -81,6 +82,7 @@ func (q *queryController) waitAndRelease() {
 	}
 	for _, job := range q.searchJobs {
 		<-job.done
+		job.Results.Close()
 	}
 	for _, job := range q.filterJobs {
 		<-job.done
@@ -150,6 +152,10 @@ type DistinctCache struct {
 }
 
 type SearchJob struct {
+	Full        bool
+	Ticket      string
+	Results     *searchresults.Store
+	HitCount    int64
 	mu          sync.RWMutex
 	ID          string
 	TaskID      string

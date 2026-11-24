@@ -4,6 +4,7 @@
     const $ = id => document.getElementById(id);
     const dialog = $('storageDialog'), status = $('storageStatus'), body = $('storageRows');
     const buttons = Array.from(dialog.querySelectorAll('[data-storage]'));
+    let historyIssue=null;
     let busy = false,job=null,timer,serial=0,sources=[];
     function working(value) {
       busy = value;
@@ -64,8 +65,15 @@
     }
     async function observe(ticket){
       try{
-        const {jobs}=await api('/api/storage/jobs');
+        const data=await api('/api/storage/jobs');
         if(ticket!==serial)return;
+        const jobs=data.jobs;
+        historyIssue=data.historyIssue;
+        $('storageHistoryIssue').hidden=!historyIssue;
+        if(historyIssue){
+          $('storageHistoryReason').textContent=historyIssue.reason+'。本次传输记录暂存于内存。';
+          $('storageHistoryIssue').querySelector('button').hidden=!historyIssue.revision;
+        }
         renderHistory(jobs);
         const item=jobs.find(x=>x.id===job)||jobs[0];
         if(item?.state==='running'){
@@ -81,6 +89,15 @@
     }
     async function run(action){
       if(busy)return;
+      if(action==='repair-history'){
+        const revision=historyIssue?.revision;
+        if(!revision||!await askConfirm({title:'重建传输历史',message:'保留原文件作为诊断副本，并使用本次运行的记录重建传输历史？',confirmLabel:'重建'}))return;
+        if(busy||!dialog.open||revision!==historyIssue?.revision)return;
+        const ticket=++serial;working(true);
+        try{const result=await post('/api/storage',{action,revision,confirm:true});await observe(ticket);if(ticket===serial)show(result.message);}
+        catch(e){if(ticket===serial){await observe(ticket);show(e.message,true);}}
+        return;
+      }
       if(confirmations[action]&&!(await askConfirm(confirmations[action])))return;
       if(busy||!dialog.open)return;
       const directory=$('storageDirectory').value.trim();

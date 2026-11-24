@@ -10,9 +10,15 @@
       const result = await response.json();
       if (!response.ok) throw Error(result.error || '无法读取恢复事务');
       if (!result.pending) { window.location.replace('/'); return; }
-      document.getElementById('recoveryReason').textContent = result.reason;
+      const reason = document.getElementById('recoveryReason');
+      reason.hidden = result.running;
+      reason.textContent = result.running ? '' : result.reason;
       document.getElementById('recoveryDirectories').textContent = '配置目录　'+result.roots.config+'\n数据目录　'+result.roots.local;
-      status.textContent = result.running ? [result.progress.phase, result.progress.items ? result.progress.files+' / '+result.progress.items+' 项' : ''].filter(Boolean).join(' · ') : '';
+      const progress = result.progress;
+      const bytes = window.ExcelLensDisplayFormat.bytes;
+      const transferred = progress.total ? bytes(progress.bytes || 0) + ' / ' + bytes(progress.total) : '';
+      const files = progress.items ? (progress.files || 0) + ' / ' + progress.items + ' 项' : '';
+      status.textContent = result.running ? [progress.phase, transferred, files].filter(Boolean).join(' · ') : '';
       button.disabled = result.running;
       if (result.running) setTimeout(() => update('GET'), 600);
     } catch (error) { status.textContent = error.message; button.disabled = false; }

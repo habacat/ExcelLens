@@ -49,7 +49,8 @@
             button.onclick=()=>openResult(item).catch(e=>toast(e.message,'error'));row.append(button);
           }
           const live=item.state==='running'||item.state==='queued';
-          addAction(row,live?'取消任务':'丢弃结果',{action:live?'cancel':'discard',session:item.session,kind:item.kind,id:item.id});
+          if(item.protected&&!live){const note=document.createElement('span');note.textContent='活动页面使用中';row.append(note);}
+          else addAction(row,live?'取消任务':'丢弃结果',{action:live?'cancel':'discard',session:item.session,kind:item.kind,id:item.id});
           holder.append(row);
         }
         for(const session of sessions||[]){

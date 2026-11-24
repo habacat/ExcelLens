@@ -14,6 +14,8 @@
     constructor({state, api, toast, delay, copyText, navigateToCell, runSearch, cancelSearch}) {
       Object.assign(this, {s: state, api, toast, delay, copyText, navigateToCell, runSearch, cancelSearch});
       this.positions = new Map();
+      this.pageSerial = 0;
+      this.pages = null;
       this.syntaxSeq = 0;
       this.syntaxTimer = 0;
       this.renderedCount = 0;
@@ -39,10 +41,11 @@
       $('searchPrevBtn').disabled = !count;
       $('searchNextBtn').disabled = !count;
       $('copySearchResultsBtn').disabled = !count;
-      $('saveSearchResultsBtn').disabled = !count;
+      $('saveSearchResultsBtn').disabled = this.pages ? !this.pages.total : !count;
     }
 
     resetWorkbook() {
+      this.leavePages();
       clearTimeout(this.syntaxTimer);
       clearTimeout(this.filterTimer);
       this.renderedCount = 0;
@@ -98,6 +101,8 @@
           $('searchHistoryBtn').setAttribute('aria-expanded', 'false');
           $('searchMode').value = item.mode;
           $('searchScope').value = item.scope;
+          $('searchFull').checked = false;
+          $('searchRecoverable').checked = false;
           $('searchInput').value = item.query;
           $('searchAdvancedInput').value = item.query;
           this.syncMode();
@@ -158,6 +163,11 @@
     }
 
     downloadVisible() {
+      if(this.pages){
+        const url=new URL(this.pages.download,window.location.href);
+        url.searchParams.set('text',$('searchResultFilter').value);url.searchParams.set('sheet',$('searchResultSheet').value);
+        const link=document.createElement('a');link.href=url.href;link.download='ExcelLens_搜索结果.csv';link.click();return;
+      }
       const matches = this.s.searchSession?.matches || [];
       if (!this.s.visibleSearchIndexes.length) { this.toast('没有可导出的搜索结果', 'warning'); return; }
       const guard = text => {
@@ -249,7 +259,7 @@
         $('searchInput').value = this.s.searchSession.input;
         $('searchAdvancedInput').value = this.s.searchSession.input;
         this.displaySummary(this.s.searchSession.summary || '搜索结果已保留');
-        this.renderResults({matches: this.s.searchSession.matches, mode: this.s.searchSession.mode, status: this.s.searchSession.status});
+        if (!this.pages) this.renderResults({matches: this.s.searchSession.matches, mode: this.s.searchSession.mode, status: this.s.searchSession.status});
       }
       if (!this.s.searchSession && mode === null && query === null) {
         $('searchMode').value = 'value';
@@ -280,6 +290,23 @@
           }
           if (requestID !== this.s.searchRequestID || this.s.searchJob !== jobID) return;
           activity?.report(data.progress, 100, data.stage || '正在搜索');
+          if (data.full) {
+            this.s.searchSession.status=data.status;
+            $('searchFull').checked=true;
+            const count=Number(data.hitCount||0);
+            if (data.status==='running') {
+              this.displaySummary((data.stage||'全量搜索')+' · '+count+' 条');
+              continue;
+            }
+            this.s.searchJob=null;$('searchBtn').disabled=false;$('cancelSearchBtn').hidden=true;
+            if(data.status==='done'){
+              this.pages={id:jobID,total:count,download:data.downloadUrl,previous:[],after:0,next:null};
+              this.displaySummary('共 '+count+' 条匹配');
+              this.buildSheetChoices(this.s.sheets.map(x=>({sheet:x.name})));
+              await this.loadPage('reset');
+            }else this.displaySummary(data.error||'全量搜索已取消');
+            return;
+          }
           const matches = data.matches || [];
           const changed = this.s.searchSession.matches.length !== matches.length ||
             (this.s.searchSession.matches.length && matches.length && this.s.searchSession.matches.at(-1)?.ref !== matches.at(-1)?.ref);
@@ -337,6 +364,73 @@
       snippet.title = snippet.textContent;
       button.append(sheet, ref, snippet);
       return button;
+    }
+
+    leavePages() {
+      this.pages = null;
+      ++this.pageSerial;
+      this.pageAbort?.abort();
+      clearTimeout(this.filterTimer);
+      $('searchPaging').hidden = true;
+      $('copySearchResultsBtn').title = '复制结果';
+      $('copySearchResultsBtn').setAttribute('aria-label', '复制结果');
+    }
+
+    async loadPage(move) {
+      const state = this.pages;
+      if (!state) return;
+      const text = $('searchResultFilter').value, sheet = $('searchResultSheet').value;
+      // Cursors belong to the filter that produced them. A click during the
+      // input debounce must start at the first matching record of the new query.
+      if (text !== state.text || sheet !== state.sheet) move = 'reset';
+      const previous = state.previous;
+      let after = 0;
+      if (move === 'next') {
+        if (state.next === null) return;
+        after = state.next;
+      } else if (move === 'prev') {
+        if (!previous.length) return;
+        after = previous.at(-1);
+      }
+      clearTimeout(this.filterTimer);
+      const serial = ++this.pageSerial;
+      this.pageAbort?.abort();
+      this.pageAbort = new AbortController();
+      const params = new URLSearchParams({id: state.id, after: String(after), text, sheet});
+      try {
+        const page = await this.api('/api/search/page?' + params, {signal: this.pageAbort.signal});
+        if (serial !== this.pageSerial || state !== this.pages) return;
+        if (move === 'next') previous.push(state.after);
+        else if (move === 'prev') previous.pop();
+        else previous.length = 0;
+        Object.assign(state, {text, sheet, after, next: page.more ? page.next : null});
+
+        const matches = page.matches;
+        this.s.searchSession.matches = matches;
+        this.s.searchSelectedIndex = -1;
+        this.s.visibleSearchIndexes = matches.map((_, i) => i);
+        this.positions = new Map(matches.map((_, i) => [i, i]));
+        this.renderedCount = 0;
+        this.renderedData = {matches, mode: this.s.searchSession.mode};
+        const box = $('searchResults');
+        box.replaceChildren();
+        this.appendResultChunk(matches.length);
+        box.scrollTop = 0;
+        this.buildHits(matches);
+        this.applyHighlightClasses();
+        this.updateNavButtons();
+        $('searchResultsPane').hidden = false;
+        $('searchPaging').hidden = false;
+        $('searchVisibleCount').hidden = true;
+        $('searchPagePrev').disabled = !previous.length;
+        $('searchPageNext').disabled = !page.more;
+        $('searchPageCount').textContent = '第 ' + (previous.length + 1) + ' 页 · ' + matches.length + ' 条' +
+          (page.previewClipped ? ' · 长文本预览已缩短' : '');
+        $('copySearchResultsBtn').title = '复制本页预览';
+        $('copySearchResultsBtn').setAttribute('aria-label', '复制本页预览');
+      } catch (error) {
+        if (serial === this.pageSerial && error.name !== 'AbortError') this.toast(error.message, 'error');
+      }
     }
 
     appendResultChunk(targetCount = this.renderedCount + CHUNK_SIZE) {
@@ -427,6 +521,8 @@
     }
 
     bind() {
+      $('searchPagePrev').addEventListener('click',()=>this.loadPage('prev'));
+      $('searchPageNext').addEventListener('click',()=>this.loadPage('next'));
       $('searchOpenBtn').addEventListener('click', () => this.open());
       $('searchBtn').addEventListener('click', () => this.runSearch());
       $('searchHistoryBtn').addEventListener('click', () => {
@@ -447,6 +543,7 @@
       }, {passive: true});
       $('searchResultFilter').addEventListener('input', () => {
         clearTimeout(this.filterTimer);
+        if(this.pages){++this.pageSerial;this.pageAbort?.abort();this.filterTimer=setTimeout(()=>this.loadPage('reset'),100);return;}
         const matches = this.s.searchSession?.matches || [];
         const apply = () => this.renderResults({matches: this.s.searchSession?.matches || [], mode: this.s.searchSession?.mode, status: this.s.searchSession?.status});
         if (matches.length <= 250) apply();
@@ -454,6 +551,7 @@
       });
       $('searchResultSheet').addEventListener('change', () => {
         clearTimeout(this.filterTimer);
+        if(this.pages){this.loadPage('reset');return;}
         this.renderResults({matches: this.s.searchSession?.matches || [], mode: this.s.searchSession?.mode, status: this.s.searchSession?.status});
       });
       $('copySearchResultsBtn').addEventListener('click', () => this.copyVisible());

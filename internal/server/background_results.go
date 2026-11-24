@@ -42,7 +42,7 @@ func (s *browserSession) results() backgroundResults {
 	set := a.resultSetLocked()
 	set.searches = maps.Clone(set.searches)
 	set.filters = maps.Clone(set.filters)
-	set.orders = nil
+	set.orders = maps.Clone(set.orders)
 	set.exports = maps.Clone(set.exports)
 	set.analyses = maps.Clone(set.analyses)
 	set.comparisons = maps.Clone(set.comparisons)
@@ -68,6 +68,9 @@ func (set *backgroundResults) attach(a *App) {
 	set.release()
 }
 func (set *backgroundResults) close() {
+	for _, j := range set.searches {
+		j.Results.Close()
+	}
 	for _, j := range set.orders {
 		j.close()
 	}
@@ -143,7 +146,7 @@ func (a *App) parkUnattended(force bool, only string) {
 	}
 }
 
-func (s *browserSession) manageResult(action, kind, id string) error {
+func (s *browserSession) manageResult(action, kind, id string, protect, otherPage bool) error {
 	var set backgroundResults
 	if s.saved != nil {
 		set = *s.saved
@@ -158,11 +161,30 @@ func (s *browserSession) manageResult(action, kind, id string) error {
 	switch kind {
 	case "search":
 		if j := set.searches[id]; j != nil {
+			if action == "discard" && protect && otherPage {
+				j.mu.RLock()
+				inUse := j.Results != nil
+				j.mu.RUnlock()
+				if inUse {
+					return errors.New("活动页面正在使用全量搜索结果，请先关闭该页")
+				}
+			}
 			done, cancel = j.done, j.cancel
-			remove = func() { delete(set.searches, id) }
+			remove = func() {
+				delete(set.searches, id)
+				j.Results.Close()
+			}
 		}
 	case "filter":
 		if j := set.filters[id]; j != nil {
+			if action == "discard" && protect {
+				j.mu.RLock()
+				inUse := set.orders[j.ResultID] != nil
+				j.mu.RUnlock()
+				if inUse {
+					return errors.New("活动页面正在使用此筛选，请先清除筛选或关闭该页")
+				}
+			}
 			done, cancel = j.done, j.cancel
 			remove = func() {
 				delete(set.filters, id)

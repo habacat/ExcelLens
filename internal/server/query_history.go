@@ -47,6 +47,11 @@ func pruneFilterJobsLocked(jobs map[string]*FilterJob, keep int) bool {
 
 func pruneSearchJobsLocked(jobs map[string]*SearchJob, keep int) bool {
 	return pruneQueryHistory(jobs, keep, func(job *SearchJob) queryTaskLifetime {
-		return queryTaskLifetime{job.Started, job.done, job.cancel}
+		return queryTaskLifetime{job.Started, job.done, func() {
+			if job.cancel != nil {
+				job.cancel()
+			}
+			job.Results.Close()
+		}}
 	})
 }

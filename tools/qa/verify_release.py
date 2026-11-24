@@ -125,7 +125,7 @@ def verify_windows(archive, version, tree=None, *, candidate=False):
             "checks": ["ZIP CRC", "every file equals the release directory", "EXE SHA-256 and PE header", "version"]}
 
 
-def finalize(directory, version, ref):
+def finalize(directory, version, ref, performance_report=None):
     tree = source_tree(ref)
     windows = directory / ("ExcelLens_" + version + "_Windows_x64_Full.zip")
     win = verify_windows(windows, version, tree)
@@ -138,9 +138,21 @@ def finalize(directory, version, ref):
         src = verify_source(archive, version, tree)
         write_json(staging / "source-package.json", src)
         sums = staging / ("ExcelLens_" + version + "_SHA256SUMS.txt")
-        sums.write_bytes((win["zipSHA256"] + "  " + windows.name + "\n" +
-                          src["zipSHA256"] + "  " + archive.name + "\n").encode("ascii"))
-        for item in (archive, staging / "source-package.json", sums):
+        hashes = {windows.name: win["zipSHA256"], archive.name: src["zipSHA256"]}
+        products = [archive, staging / "source-package.json"]
+        if performance_report is not None:
+            report = json.loads(performance_report.read_bytes())
+            require(report["version"] == version and report["checkoutHead"] == tree[0]
+                    and report["modifiedBuildInputs"] is False and report["profile"] == "release"
+                    and report["result"] == "PASS" and report["sourceDigestsVerified"] is True,
+                    "Performance report must come from the tested release checkout")
+            report["cleanup"] = [{k: entry[k] for k in ("scenario", "code")} for entry in report["cleanup"]]
+            public_report = staging / ("ExcelLens_" + version + "_Performance.json")
+            write_json(public_report, report)
+            products.append(public_report)
+            hashes[public_report.name] = digest(public_report)
+        sums.write_bytes("".join(value + "  " + name + "\n" for name, value in hashes.items()).encode("ascii"))
+        for item in [*products, sums]:
             os.replace(str(item), str(directory / item.name))
     write_json(ROOT / "validation" / version / "release-package.json", win)
     return {"result":"PASS", "version":version, "windows":win, "source":src, "checksums":sums.name}
@@ -153,14 +165,17 @@ def main():
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--source", action="store_true")
     modes.add_argument("--candidate", action="store_true", help="Verify a StageOnly package against the development manifest")
-    modes.add_argument("--finalize", action="store_true", help="Create and verify the tagged source ZIP and both asset checksums")
+    modes.add_argument("--finalize", action="store_true", help="Create and verify the tagged source ZIP and release checksums")
     parser.add_argument("--ref", help="Git tag or commit to verify")
+    parser.add_argument("--performance-report", type=Path, help="Include the completed release matrix when finalizing")
     args = parser.parse_args()
     version, directory = args.version, args.dir.resolve()
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         parser.error("Expected a numeric release version")
+    if args.performance_report and not args.finalize:
+        parser.error("--performance-report requires --finalize")
     if args.finalize:
-        result = finalize(directory, version, args.ref or "v" + version)
+        result = finalize(directory, version, args.ref or "v" + version, args.performance_report)
     elif args.source:
         result = verify_source(directory / ("ExcelLens_" + version + "_Source_Full.zip"), version, source_tree(args.ref or "HEAD"))
         write_json(directory / "source-package.json", result)

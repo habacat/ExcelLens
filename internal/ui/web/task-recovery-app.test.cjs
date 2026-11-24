@@ -3,7 +3,7 @@ const source=fs.readFileSync(__dirname+'/app.js','utf8');
 function setup(){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'',checked:false,hidden:true,replaceChildren(){}});return nodes.get(id);};
   const S={sheet:'数据',sheetEpoch:1,book:'book',workbookKey:'hash',searchRequestID:0,searchJob:null,searchSession:null,searchCache:new Map()};
-  const calls=[],polled=[],ctx={S,$:node,window:{},buildSearchHits(){},displaySearchSummary(){},renderSearchResults(){},applySearchHighlightClasses(){},api:async(url,opts)=>{calls.push({url,body:JSON.parse(opts.body)});return {jobId:'search-job'};},pollSearch:async(...args)=>polled.push(args),syncSearchMode(){},toast(){}};
+  const calls=[],polled=[],ctx={S,$:node,searchPanel:{leavePages(){}},window:{},buildSearchHits(){},displaySearchSummary(){},renderSearchResults(){},applySearchHighlightClasses(){},api:async(url,opts)=>{calls.push({url,body:JSON.parse(opts.body)});return {jobId:'search-job'};},pollSearch:async(...args)=>polled.push(args),syncSearchMode(){},toast(){}};
   for(const [start,end] of [['  async function runSearch(','  async function pollSearch('],['  async function cancelSearch(','  function addFilterRule(']]){const a=source.indexOf(start),b=source.indexOf(end,a);vm.runInNewContext(source.slice(a,b),ctx);}
   ctx.searchKey=(...args)=>args.join('|');node('searchMode').value='value';node('searchScope').value='current';node('searchInput').value='金额';return {ctx,S,node,calls,polled};
 }

@@ -16,7 +16,7 @@ func taskDefinitionForWorkbook(wb *workbook.Workbook, m checkpoint.Manifest) (ch
 		if err != nil {
 			return checkpoint.Definition{}, err
 		}
-		return searchTaskDefinition(wb, searchRequest{Sheet: spec.Sheet, Query: spec.Query, Mode: spec.Mode, Scope: spec.Scope})
+		return searchTaskDefinition(wb, searchRequest{Sheet: spec.Sheet, Query: spec.Query, Mode: spec.Mode, Scope: spec.Scope, Full: spec.Full})
 	case filterCheckpointDriver:
 		spec, err := filterCheckpointSpecFor(m)
 		if err != nil {

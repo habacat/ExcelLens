@@ -20,6 +20,7 @@ type taskCheckpointRequest struct {
 }
 
 type taskCheckpointInfo struct {
+	Full        bool      `json:"full,omitempty"`
 	ID          string    `json:"id"`
 	Revision    uint64    `json:"revision,string"`
 	Kind        string    `json:"kind"`
@@ -84,7 +85,7 @@ func (a *App) handleTaskCheckpoints(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					item.Error = err.Error()
 				} else {
-					item.Sheet, item.Query, item.Mode, item.Scope = spec.Sheet, spec.Query, spec.Mode, spec.Scope
+					item.Sheet, item.Query, item.Mode, item.Scope, item.Full = spec.Sheet, spec.Query, spec.Mode, spec.Scope, spec.Full
 				}
 			case filterCheckpointDriver:
 				spec, err := filterCheckpointSpecFor(*m)
@@ -189,11 +190,11 @@ func (a *App) handleTaskCheckpointResume(w http.ResponseWriter, r *http.Request)
 		case searchCheckpointDriver:
 			var spec searchCheckpointSpec
 			spec, err = searchCheckpointSpecFor(m)
-			if err == nil && (m.DataBytes > formats.CheckpointSearchBytes || m.Records > formats.CheckpointSearchHits) {
+			if err == nil && !spec.Full && (m.DataBytes > formats.CheckpointSearchBytes || m.Records > formats.CheckpointSearchHits) {
 				err = checkpoint.ErrCorrupt
 			}
 			if err == nil {
-				search := searchRequest{Sheet: spec.Sheet, Query: spec.Query, Mode: spec.Mode, Scope: spec.Scope}
+				search := searchRequest{Sheet: spec.Sheet, Query: spec.Query, Mode: spec.Mode, Scope: spec.Scope, Full: spec.Full}
 				def, err = searchTaskDefinition(wb, search)
 				queue = func(lease *checkpoint.Lease) { a.queueCheckpointSearch(w, r, wb, search, store, lease, false) }
 			}

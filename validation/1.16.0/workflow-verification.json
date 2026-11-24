@@ -1,0 +1,99 @@
+{
+  "version": "1.16.0",
+  "result": "PASS",
+  "platform": "Windows amd64",
+  "testedGo": [
+    "TestBackgroundDiscardProtectsLiveFilter",
+    "TestCacheClearKeepsFullResultPublishedWhileDraining",
+    "TestFullSearchPagesExportAndRecoveredResults",
+    "TestFullSearchResumesInterruptedHighHitScan",
+    "TestWholeWorkbookSearchOrdersResultsAndReportsLastSheetOverflow",
+    "TestRestrictedStartupReplaysWithoutTransferHistoryOrBackup",
+    "TestListenerServesRecoveryWhileReplayBlocked",
+    "TestUnavailableHistoryKeepsWorkingTransfersAndPreservesFile"
+  ],
+  "browser": {
+    "source": "full_search_storage_qa.cjs",
+    "damagedHistoryBackup": true,
+    "confirmedRepairPreservesOriginalBytes": true,
+    "fullSearchHits": 1503,
+    "filteredCSVDataRows": 1,
+    "afterRejectedDiscardSourceRows": [
+      1,
+      1504
+    ],
+    "crossPageFullSearchStillReadable": true,
+    "restartRecovery": {
+      "result": "PASS",
+      "realBrowser": true,
+      "conflictPreserved": true,
+      "replayedFromTarget": true,
+      "inventory": true
+    },
+    "startupReplay": {
+      "result": "PASS",
+      "method": "acknowledged files sharing a hard-linked 1 MiB synthetic payload",
+      "logicalBytes": 1073741824,
+      "units": 1024,
+      "restrictedPageAfterRestartMs": 222,
+      "sampledBytes": 115048448,
+      "sampledUnits": 109,
+      "visibleText": "提交恢复事务 · 109.7 MB / 1 GB · 109 / 1024 项",
+      "workbookHTTPDuringReplay": 503,
+      "automaticHomeMs": 7113
+    }
+  },
+  "resumableSearch": {
+    "hitsAfterInterruptionAndRestart": 30000,
+    "allCoordinatesVerified": true,
+    "quickWorkbookLimit": 500
+  },
+  "desktopManualAcceptance": false,
+  "soak24Hours": "omitted by request",
+  "nonTestGoLines": {
+    "method": "physical lines including blanks and comments; compared with maintenance commit a1199ca",
+    "packages": {
+      "server": {
+        "previous": 30904,
+        "current": 30766,
+        "difference": -138
+      },
+      "workbook": {
+        "previous": 30764,
+        "current": 30806,
+        "difference": 42
+      },
+      "editfile": {
+        "previous": 26102,
+        "current": 26102,
+        "difference": 0
+      },
+      "transferjobs": {
+        "previous": 0,
+        "current": 303,
+        "difference": 303
+      },
+      "searchservice": {
+        "previous": 0,
+        "current": 305,
+        "difference": 305
+      },
+      "searchresults": {
+        "previous": 0,
+        "current": 221,
+        "difference": 221
+      },
+      "savedconfig": {
+        "previous": 0,
+        "current": 128,
+        "difference": 128
+      }
+    }
+  },
+  "engineering": {
+    "go": "go1.27.4",
+    "standardSteps": 6,
+    "raceSteps": 7,
+    "frontEndTests": 566
+  }
+}

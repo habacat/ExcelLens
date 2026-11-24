@@ -2703,7 +2703,8 @@
     if (mode === "reference" && scope === "all" && !query.includes("!")) {
       query = `'${currentSheet.replaceAll("'", "''")}'!${query}`;
     }
-    const key = searchKey(mode,scope,query,currentSheet);
+    const full = $('searchFull').checked;
+    const key = (full?'full:':'')+searchKey(mode,scope,query,currentSheet);
     const recoverable=$('searchRecoverable').checked,book=S.book,workbookKey=S.workbookKey;
     const requestID = ++S.searchRequestID;
     S.searchActivity?.end();
@@ -2711,13 +2712,13 @@
     if (S.searchJob) await cancelSearch(S.searchJob, false);
     if(!current())return;
     const oldSession = S.searchSession;
-    if (!recoverable&&oldSession?.key === key && oldSession.status === "done") {
+    if (!full&&!recoverable&&oldSession?.key === key && oldSession.status === "done") {
       displaySearchSummary(`${oldSession.matches.length} 条匹配 · 已保留`);
       renderSearchResults({matches:oldSession.matches,status:"done",mode});
       return;
     }
-    beginSearchSession({key,sheet:currentSheet,input,query,mode,scope});
-    const cached = !recoverable&&S.searchCache.get(key);
+    beginSearchSession({key,sheet:currentSheet,input,query,mode,scope,full});
+    const cached = !full&&!recoverable&&S.searchCache.get(key);
     if (cached) {
       S.searchSession.matches = cached.matches || [];
       buildSearchHits(S.searchSession.matches);
@@ -2734,7 +2735,7 @@
     try {
       const start = await api("/api/search/start", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({sheet:currentSheet,query,mode,scope,recoverable,book,workbookKey})
+        body:JSON.stringify({sheet:currentSheet,query,mode,scope,recoverable,full,book,workbookKey})
       });
       if (!current()){cancelSearch(start.jobId,false);return;}
       S.searchJob = start.jobId;
@@ -2749,9 +2750,10 @@
   }
 
   function beginSearchSession(spec){
+    searchPanel.leavePages();
     S.searchSession={...spec,matches:[],status:'running',truncated:false,summary:'正在搜索…',selected:-1};
     $('searchResultFilter').value='';$('searchResultSheet').value='';S.visibleSearchIndexes=[];S.searchSelectedIndex=-1;
-    buildSearchHits([]);displaySearchSummary('正在搜索…');$('searchResults').replaceChildren();$('searchResultsPane').hidden=true;
+    buildSearchHits([]);applySearchHighlightClasses();displaySearchSummary('正在搜索…');$('searchResults').replaceChildren();$('searchResultsPane').hidden=true;
     $('searchBtn').disabled=true;$('cancelSearchBtn').hidden=false;
   }
 
@@ -2770,7 +2772,7 @@
       const {query,mode,scope,sheet}=item,key=searchKey(mode,scope,query,sheet),request=++S.searchRequestID;
       $('searchMode').value=mode;$('searchScope').value=scope;
       (mode==='advanced'?$('searchAdvancedInput'):$('searchInput')).value=query;syncSearchMode();
-      beginSearchSession({key,sheet,input:query,query,mode,scope});S.searchJob=start.jobId;
+      $('searchFull').checked=!!item.full;beginSearchSession({key:(item.full?'full:':'')+key,sheet,input:query,query,mode,scope,full:!!item.full});S.searchJob=start.jobId;
       openDialog('searchDialog');pollSearch(start.jobId,request,false).catch(error=>toast(error.message,'error'));return true;
     }
     if(start.operation==='filter'){

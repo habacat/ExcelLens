@@ -58,6 +58,8 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		Directory string `json:"directory"`
 		Password  string `json:"password,omitempty"`
 		Stage     string `json:"stage,omitempty"`
+		Revision  string `json:"revision,omitempty"`
+		Confirm   bool   `json:"confirm,omitempty"`
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<10))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
@@ -87,6 +89,16 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	var message string
 	switch req.Action {
+	case "repair-history":
+		if !req.Confirm || req.Revision == "" {
+			writeError(w, 400, "请确认保留诊断副本并重建传输历史")
+			return
+		}
+		var evidence string
+		evidence, err = a.transfers.Repair(filepath.Join(roots.Config, "transfer-history.json"), req.Revision)
+		if evidence != "" {
+			message = "原传输历史已保存在 " + evidence
+		}
 	case "list-stages":
 		stages, e := roots.BackupStages(req.Directory)
 		if e != nil {

@@ -1,5 +1,7 @@
 package workbook
 
+import "excellens/internal/searchresults"
+
 import "sync"
 
 type SheetMeta struct {
@@ -153,14 +155,7 @@ type CellData struct {
 	PresentationOnly bool                     `json:"presentationOnly,omitempty"`
 }
 
-type SearchResult struct {
-	Sheet   string `json:"sheet,omitempty"`
-	Ref     string `json:"ref"`
-	Row     int    `json:"row"`
-	Col     int    `json:"col"`
-	Formula string `json:"formula,omitempty"`
-	Value   string `json:"value,omitempty"`
-}
+type SearchResult = searchresults.Hit
 
 type SearchProgress struct {
 	Scanned int

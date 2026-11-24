@@ -112,3 +112,33 @@ func TestBackgroundCenterCancelsWorkerBeforeSessionRelease(t *testing.T) {
 		t.Fatal("release failed")
 	}
 }
+
+func TestBackgroundDiscardProtectsLiveFilter(t *testing.T) {
+	isolateTestStorage(t)
+	a, _ := New()
+	defer a.Close()
+	sid, page := randomID(), randomID()
+	documentCall(a, sid, page, "attach", "1")
+	app := a.sessions[sid].app
+	id := randomID()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan struct{})
+	close(done)
+	order := rowOrderFixture(t, 5, 1, 3)
+	app.filterJobs[id] = &FilterJob{ID: id, ResultID: id, Status: "done", ctx: ctx, cancel: cancel, done: done}
+	app.filterResults[id] = &FilterResult{ID: id, Rows: order}
+	body := fmt.Sprintf(`{"action":"discard","session":%q,"id":%q,"kind":"filter"}`, sid, id)
+	if got := sessionCall(t, a, randomID(), "POST", "/api/background", body); got.Code != 409 {
+		t.Fatal(got.Code, got.Body)
+	}
+	snapshot := app.filterSnapshot(id)
+	if snapshot == nil || snapshot.Rows.Len() != 2 {
+		t.Fatal("live filter lost rows")
+	}
+	snapshot.close()
+	documentCall(a, sid, page, "detach", "")
+	if got := sessionCall(t, a, "", "POST", "/api/background", body); got.Code != 200 {
+		t.Fatal(got.Body)
+	}
+}

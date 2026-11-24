@@ -1,0 +1,332 @@
+{
+  "schema": 1,
+  "profile": "release",
+  "version": "1.16.0",
+  "checkoutHead": "a1199cabb198a74e74f941e362092ef1fdd90bfc",
+  "modifiedBuildInputs": true,
+  "started": "2026-11-24T16:13:42.242Z",
+  "host": {
+    "platform": "win32",
+    "os": "10.0.19045",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "logicalCPUs": 12,
+    "ramBytes": 68441210880,
+    "node": "v24.18.0",
+    "go": "go version go1.27.4 windows/amd64",
+    "browser": "Chrome/158.0.8127.88"
+  },
+  "samples": [
+    {
+      "name": "csv-1000000.csv",
+      "rows": 1000000,
+      "bytes": 33889637,
+      "sha256": "b7f66b5d52ebe5bace6d6a0600720835d562b798cd6c854ebf2e1203883fa735"
+    },
+    {
+      "name": "csv-5000000.csv",
+      "rows": 5000000,
+      "bytes": 169448280,
+      "sha256": "f2e710b6af6f80d9f3448333c5f7075617e6cf4becab9578d75d94bd02c6598c"
+    },
+    {
+      "name": "csv-10000000.csv",
+      "rows": 10000000,
+      "bytes": 338896585,
+      "sha256": "a2eaee440518956af6f7630ff4e7352c9dfc292cc8695a2953a0d55e1ffbe335"
+    },
+    {
+      "name": "xlsx-100000.xlsx",
+      "rows": 100000,
+      "bytes": 1847499,
+      "sha256": "17cf16ea964db6a26e6b037a30060eabbc9669b54ed1b65d24d03099966aa2b3"
+    },
+    {
+      "name": "xlsx-500000.xlsx",
+      "rows": 500000,
+      "bytes": 9111803,
+      "sha256": "14620a0356ff47e3540bc735279ba0305f7719c892a5e09c5b7b71b1be32899c"
+    },
+    {
+      "name": "xlsx-1000000.xlsx",
+      "rows": 1000000,
+      "bytes": 18192593,
+      "sha256": "719dea4e03588ceee6634c4febbf7cfd22cd5e3c31c4364f4d4041d96d01b4ef"
+    },
+    {
+      "name": "csv-1000001.csv",
+      "rows": 1000001,
+      "bytes": 33889669,
+      "sha256": "8023679d08338f38a23fc4053360280ac7ea20773c836de321c94a149566c9d2"
+    },
+    {
+      "name": "csv-1000001-right.csv",
+      "rows": 1000001,
+      "bytes": 33889670,
+      "sha256": "84de01017f8469210ddbbc9eccf0c3e0008e46f4053606371cb30312d7b7e69b"
+    },
+    {
+      "name": "csv-501.csv",
+      "rows": 501,
+      "bytes": 16909,
+      "sha256": "4699181fb40162ae28505c6c4161e340fde8013313d3d68c20b7737682a5f978"
+    }
+  ],
+  "readings": [
+    {
+      "format": "csv",
+      "rows": 1000000,
+      "firstVisibleMs": 714.1999999880791,
+      "indexRequestToReadyMs": 673.5999999940395,
+      "visibleCoverageMs": 1511.0999999940395,
+      "peakServiceRSSBytes": 177004544,
+      "sampledPeakServiceRSSBytes": 177000448,
+      "initialServiceRSSBytes": 20070400
+    },
+    {
+      "format": "csv",
+      "rows": 5000000,
+      "firstVisibleMs": 2595.9000000059605,
+      "indexRequestToReadyMs": 2624,
+      "visibleCoverageMs": 5253.4000000059605,
+      "peakServiceRSSBytes": 222789632,
+      "sampledPeakServiceRSSBytes": 222371840,
+      "initialServiceRSSBytes": 20082688
+    },
+    {
+      "format": "csv",
+      "rows": 10000000,
+      "firstVisibleMs": 5863,
+      "indexRequestToReadyMs": 4975,
+      "visibleCoverageMs": 10996.299999982119,
+      "peakServiceRSSBytes": 221401088,
+      "sampledPeakServiceRSSBytes": 220991488,
+      "initialServiceRSSBytes": 20127744
+    },
+    {
+      "format": "xlsx",
+      "rows": 100000,
+      "firstVisibleMs": 1000.9000000059605,
+      "indexRequestToReadyMs": 671.6000000238419,
+      "visibleCoverageMs": 1886.4000000059605,
+      "peakServiceRSSBytes": 33243136,
+      "sampledPeakServiceRSSBytes": 33239040,
+      "initialServiceRSSBytes": 20291584
+    },
+    {
+      "format": "xlsx",
+      "rows": 500000,
+      "firstVisibleMs": 641.5999999940395,
+      "indexRequestToReadyMs": 3338.4000000059605,
+      "visibleCoverageMs": 4186.300000011921,
+      "peakServiceRSSBytes": 74559488,
+      "sampledPeakServiceRSSBytes": 71946240,
+      "initialServiceRSSBytes": 20443136
+    },
+    {
+      "format": "xlsx",
+      "rows": 1000000,
+      "firstVisibleMs": 723.1999999880791,
+      "indexRequestToReadyMs": 5342,
+      "visibleCoverageMs": 6139.5999999940395,
+      "peakServiceRSSBytes": 133132288,
+      "sampledPeakServiceRSSBytes": 133099520,
+      "initialServiceRSSBytes": 20709376
+    }
+  ],
+  "cleanup": [
+    {
+      "scenario": "csv-1000000",
+      "code": "EPERM"
+    },
+    {
+      "scenario": "tabs",
+      "code": "EPERM"
+    },
+    {
+      "scenario": "lifecycle",
+      "code": "EPERM"
+    },
+    {
+      "scenario": "edit",
+      "code": "EPERM"
+    }
+  ],
+  "result": "PASS",
+  "productionSHA256": "e9596cc470fab0c58eacdf6af58b93921e07032238667f75686680c8688d4604",
+  "suiteSHA256": "40f623ad765b48582dd69cc33a9fc341d626134e367ee3215a7ce35511926af5",
+  "scroll": {
+    "durationMs": 60015.80000001192,
+    "frames": 3043,
+    "fps": 50.7033147937609,
+    "p95FrameMs": 35.80000000000291,
+    "noCoverageFrames": 0,
+    "emptyFrames": 0
+  },
+  "fullSearch": {
+    "rows": 5000000,
+    "hits": 50000,
+    "searchMs": 5532.89,
+    "csvStreamAndVerifyMs": 139.82,
+    "everyCoordinateVerified": true
+  },
+  "reconcile": {
+    "rowsPerLedger": 1000000,
+    "elapsedMs": 14229.86,
+    "peakServiceRSSBytes": 247951360,
+    "peakAdditionalDataBytes": 96000480,
+    "counts": {
+      "withinTolerance": 0,
+      "equal": 999999,
+      "different": 1,
+      "leftOnly": 0,
+      "rightOnly": 0,
+      "duplicate": 0,
+      "review": 0,
+      "invalidKeys": 0,
+      "leftRecords": 1000000,
+      "rightRecords": 1000000
+    }
+  },
+  "tabs": [
+    {
+      "pages": 10,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 19,
+        "sampledProcesses": 19,
+        "sumWorkingSetBytes": 1889902592,
+        "sumHandles": 8055
+      },
+      "requests": 30,
+      "p95StatusMs": 49.96,
+      "serviceRSSBytes": 27123712,
+      "serviceHandles": 218,
+      "initialRSSBytes": 21381120,
+      "peakRSSBytes": 27553792
+    },
+    {
+      "pages": 30,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 36,
+        "sampledProcesses": 36,
+        "sumWorkingSetBytes": 4320743424,
+        "sumHandles": 15736
+      },
+      "requests": 90,
+      "p95StatusMs": 120.12,
+      "serviceRSSBytes": 29675520,
+      "serviceHandles": 219,
+      "initialRSSBytes": 27123712,
+      "peakRSSBytes": 32522240
+    },
+    {
+      "pages": 64,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 70,
+        "sampledProcesses": 70,
+        "sumWorkingSetBytes": 8552030208,
+        "sumHandles": 29809
+      },
+      "requests": 192,
+      "p95StatusMs": 285.01,
+      "serviceRSSBytes": 39796736,
+      "serviceHandles": 218,
+      "initialRSSBytes": 29675520,
+      "peakRSSBytes": 40738816
+    }
+  ],
+  "lifecycle": {
+    "rounds": 100,
+    "method": "close actual tab then release detached session through the task center",
+    "baseline": {
+      "rssBytes": 20512768,
+      "processPeakRSSBytes": 21745664,
+      "handles": 174
+    },
+    "samples": [
+      {
+        "round": 10,
+        "rssBytes": 27803648,
+        "processPeakRSSBytes": 28663808,
+        "handles": 217
+      },
+      {
+        "round": 20,
+        "rssBytes": 28377088,
+        "processPeakRSSBytes": 28663808,
+        "handles": 217
+      },
+      {
+        "round": 30,
+        "rssBytes": 28241920,
+        "processPeakRSSBytes": 29097984,
+        "handles": 217
+      },
+      {
+        "round": 40,
+        "rssBytes": 27541504,
+        "processPeakRSSBytes": 29097984,
+        "handles": 217
+      },
+      {
+        "round": 50,
+        "rssBytes": 28782592,
+        "processPeakRSSBytes": 29102080,
+        "handles": 217
+      },
+      {
+        "round": 60,
+        "rssBytes": 28262400,
+        "processPeakRSSBytes": 29503488,
+        "handles": 225
+      },
+      {
+        "round": 70,
+        "rssBytes": 28626944,
+        "processPeakRSSBytes": 29528064,
+        "handles": 225
+      },
+      {
+        "round": 80,
+        "rssBytes": 28307456,
+        "processPeakRSSBytes": 29655040,
+        "handles": 225
+      },
+      {
+        "round": 90,
+        "rssBytes": 28450816,
+        "processPeakRSSBytes": 30138368,
+        "handles": 224
+      },
+      {
+        "round": 100,
+        "rssBytes": 28196864,
+        "processPeakRSSBytes": 30138368,
+        "handles": 225
+      }
+    ],
+    "deltaRSSBytes": 7684096,
+    "deltaHandles": 51
+  },
+  "edit": {
+    "rows": 100000,
+    "saveAndVerifyMs": 4385.85,
+    "peakServiceRSSBytes": 256008192,
+    "fidelity": {
+      "recalcMetadataVerified": true,
+      "dependentFormulaPreservedAndCacheCleared": true,
+      "otherPartsMatched": 4,
+      "unchangedCells": 300000,
+      "sheetFeaturesMatched": 3,
+      "editedCell": "B3",
+      "value": "4242.5"
+    }
+  },
+  "sourceDigestsVerified": true,
+  "comparison": {
+    "comparable": false
+  },
+  "finished": "2026-11-24T16:22:21.589Z"
+}

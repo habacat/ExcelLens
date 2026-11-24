@@ -48,6 +48,8 @@ Windows竞态检查出现初始化分配失败、错误87，或需要指定MinGW
 
 1. 修改 `internal/buildinfo/version.go` 后执行 `go run ./tools/icon`，一并提交重建的 Windows 资源。同步 README 当前标题，在 `docs/releases/<版本>.md` 记录变更及验证；历史报告保留原版本。
 2. 执行 `build.ps1` 或 `upgrade-build.ps1`。构建脚本从唯一版本源、`go.mod` 和发布清单读取配置；先通过全部检查，再构建、检查 PE、UPX 压缩与校验、逐文件核对 ZIP。
+正式构建会通过隔离服务与无头 Chromium 运行合成基准。开发机需安装 Python 3、Node.js 22+ 及 Chrome，测试工具可通过 `QA_PYTHON`、`QA_CHROME` 指定。用户安装的程序继续独立运行。完整测量含短时滚动和 100 轮回收，规则及复现方法见[发行基准](docs/development/reading-benchmarks.md)。
+
 3. 候选核验使用 `build.ps1 -StageOnly`。完整检查结果写入 `validation/<版本>/private/candidate-check.json`，同版本正式发行的检查收据继续对应正式源码。PE、UPX 和 ZIP 核验通过后，完整候选包位于 `artifacts/<版本>-verified-*`。普通构建全部成功后才原子替换 `release/`。正在运行旧版时会保留已验证包，用户退出托盘后可继续发布。
 4. 不自动提交、推送或公开发布。源码交付需与指定 Git 提交一致；工作树未提交时不能宣称源码包等于 HEAD。
 
@@ -61,6 +63,6 @@ python tools/qa/verify_release.py $releaseVersion
 python tools/qa/verify_release.py $releaseVersion --source --ref $releaseTag
 ```
 
-本地与 GitHub 交付相同双包时，先在公开源码提交建立对应标签，再从该工作树运行 `build.ps1 -TaggedRelease -DeliveryRoot <本地同版本项目目录>`。脚本校验标签对应的构建输入，在同一暂存目录完成 Windows 包、标签源码包和 SHA-256 清单核验，再整体切换 `release/`。可加 `-StageOnly` 预备双包。仅需独立复验现有附件时使用 `tools/qa/verify_release.py`。
+本地与 GitHub 交付相同双包时，先在公开源码提交建立对应标签，再从该工作树运行 `build.ps1 -TaggedRelease -DeliveryRoot <本地同版本项目目录>`。脚本校验标签对应的构建输入，在同一暂存目录核验 Windows 包、标签源码包及该标签实测的 Performance.json，三项摘要收录于 SHA-256 清单，再整体切换 `release/`。可加 `-StageOnly` 预备双包。仅需独立复验现有附件时使用 `tools/qa/verify_release.py`。
 
 用户指南、当前变更及验证分开放置；完整目录说明见 [文档索引](docs/README.md)。

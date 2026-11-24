@@ -24,12 +24,14 @@ type SearchCheckpointSave func(SearchCheckpoint) error
 // only discover the journal limit at the next 4096-record checkpoint. Budget
 // each retained hit before append; ordinary searches keep their prior behavior.
 type searchHitBudget struct {
+	stream  *searchStream
+	hits    int64
 	enabled bool
 	bytes   int64
 }
 
-func newSearchHitBudget(save SearchCheckpointSave, previous []SearchResult) (*searchHitBudget, error) {
-	budget := &searchHitBudget{enabled: save != nil}
+func newSearchHitBudget(save SearchCheckpointSave, previous []SearchResult, stream *searchStream) (*searchHitBudget, error) {
+	budget := &searchHitBudget{enabled: save != nil && stream == nil, stream: stream}
 	for _, hit := range previous {
 		if err := budget.add(hit); err != nil {
 			return nil, err
@@ -50,6 +52,31 @@ func (budget *searchHitBudget) add(hit SearchResult) error {
 	}
 	budget.bytes += weight
 	return nil
+}
+
+// In streaming mode the callback owns each hit before the scanner advances.
+type searchStream struct {
+	hit func(SearchResult) error
+	row func(int, bool) error
+}
+
+func (b *searchHitBudget) collect(out *[]SearchResult, h SearchResult) error {
+	b.hits++
+	if b.stream != nil {
+		return b.stream.hit(h)
+	}
+	if err := b.add(h); err != nil {
+		return err
+	}
+	*out = append(*out, h)
+	return nil
+}
+func (w *Workbook) StreamSearch(ctx context.Context, idx *SheetIndex, sheet, query, mode string, start int, hit func(SearchResult) error, row func(int, bool) error, progress func(int, int, []SearchResult)) error {
+	if hit == nil || row == nil {
+		return errors.New("搜索缺少结果接收器")
+	}
+	_, err := w.scanSearch(ctx, idx, sheet, query, mode, 500, SearchCheckpoint{Next: start}, nil, progress, &searchStream{hit, row})
+	return err
 }
 
 func cloneSearchCheckpoint(state SearchCheckpoint) SearchCheckpoint {
@@ -80,7 +107,10 @@ func prepareSearchCheckpoint(idx *SheetIndex, sheet, mode string, limit int, sta
 	return cloneSearchCheckpoint(state), nil
 }
 
-func saveSearchCheckpoint(state SearchCheckpoint, save SearchCheckpointSave, force bool) error {
+func saveSearchCheckpoint(state SearchCheckpoint, save SearchCheckpointSave, force bool, stream *searchStream) error {
+	if stream != nil {
+		return stream.row(state.Next, state.Complete)
+	}
 	if save != nil && (force || state.Next%formats.CheckpointSearchRows == 0) {
 		return save(cloneSearchCheckpoint(state))
 	}
@@ -91,6 +121,9 @@ func saveSearchCheckpoint(state SearchCheckpoint, save SearchCheckpointSave, for
 // bind source, index and query identities before supplying a saved cursor.
 // Only an explicit query scans rows; opening or listing never resumes work.
 func (w *Workbook) SearchSheetResumable(ctx context.Context, idx *SheetIndex, sheet, query, mode string, limit int, previous SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult)) (SearchCheckpoint, error) {
+	return w.scanSearch(ctx, idx, sheet, query, mode, limit, previous, save, progress, nil)
+}
+func (w *Workbook) scanSearch(ctx context.Context, idx *SheetIndex, sheet, query, mode string, limit int, previous SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult), stream *searchStream) (SearchCheckpoint, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return SearchCheckpoint{}, errors.New("搜索内容不能为空")
@@ -119,9 +152,9 @@ func (w *Workbook) SearchSheetResumable(ctx context.Context, idx *SheetIndex, sh
 		return state, nil
 	}
 	if mode == "advanced" {
-		return w.searchAdvancedResumable(ctx, idx, sheet, query, limit, state, save, progress)
+		return w.searchAdvancedResumable(ctx, idx, sheet, query, limit, state, save, progress, stream)
 	}
-	return w.searchSimpleResumable(ctx, idx, sheet, query, mode, limit, state, save, progress)
+	return w.searchSimpleResumable(ctx, idx, sheet, query, mode, limit, state, save, progress, stream)
 }
 
 func searchContext(cancel <-chan struct{}) (context.Context, context.CancelFunc) {

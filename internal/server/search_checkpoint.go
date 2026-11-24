@@ -15,6 +15,7 @@ import (
 	"excellens/internal/checkpoint"
 	"excellens/internal/formats"
 	"excellens/internal/searchdsl"
+	"excellens/internal/searchservice"
 	"excellens/internal/workbook"
 )
 
@@ -35,6 +36,7 @@ type searchRequest struct {
 	Mode        string `json:"mode"`
 	Scope       string `json:"scope"`
 	Recoverable bool   `json:"recoverable,omitempty"`
+	Full        bool   `json:"full,omitempty"`
 	WorkbookKey string `json:"workbookKey,omitempty"`
 	Book        string `json:"book,omitempty"`
 }
@@ -65,12 +67,10 @@ func (req *searchRequest) normalize() error {
 	return nil
 }
 
-type searchCheckpointSheet struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-}
+type searchCheckpointSheet = searchservice.Sheet
 
 type searchCheckpointSpec struct {
+	Full   bool                    `json:"full,omitempty"`
 	Query  string                  `json:"query"`
 	Mode   string                  `json:"mode"`
 	Scope  string                  `json:"scope"`
@@ -81,17 +81,7 @@ type searchCheckpointSpec struct {
 
 // Hits are appended once in verified blocks; the small cursor never embeds
 // snippets or repeatedly copies the existing result prefix into the journal.
-type searchTaskCursor struct {
-	Sheet         int    `json:"sheet"`
-	Index         string `json:"index"`
-	Rows          int    `json:"rows"`
-	Next          int    `json:"next"`
-	Before        int    `json:"before"`
-	Count         int    `json:"count"`
-	ScannedBefore int    `json:"scannedBefore"`
-	SheetComplete bool   `json:"sheetComplete"`
-	Truncated     bool   `json:"truncated"`
-}
+type searchTaskCursor = searchservice.Cursor
 
 func searchTaskDefinition(wb *workbook.Workbook, req searchRequest) (checkpoint.Definition, error) {
 	if wb == nil {
@@ -101,6 +91,10 @@ func searchTaskDefinition(wb *workbook.Workbook, req searchRequest) (checkpoint.
 		return checkpoint.Definition{}, err
 	}
 	spec := searchCheckpointSpec{Query: req.Query, Mode: req.Mode, Scope: req.Scope, Sheet: req.Sheet, Limit: formats.CheckpointSearchHits}
+	if req.Full {
+		spec.Full = true
+		spec.Limit = 0
+	}
 	if req.Mode != "advanced" {
 		spec.Query = strings.ToLower(spec.Query)
 	}
@@ -177,7 +171,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 	run := &taskCheckpointRun{store: store, lease: lease, release: release}
 	ctx, cancel := context.WithCancel(context.Background())
 	m := lease.Snapshot()
-	job := &SearchJob{ID: randomID(), TaskID: m.ID, Sheet: req.Sheet, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
+	job := &SearchJob{Full: req.Full, Ticket: randomID(), ID: randomID(), TaskID: m.ID, Sheet: req.Sheet, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
 		Status: "running", Stage: "准备搜索", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), checkpoint: run}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
@@ -209,7 +203,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 
 func searchCheckpointSpecFor(m checkpoint.Manifest) (searchCheckpointSpec, error) {
 	var spec searchCheckpointSpec
-	if m.Definition.Kind != "query" || m.Definition.Driver != searchCheckpointDriver || len(m.Definition.Sources) != 1 || m.Definition.Semantics != searchCheckpointSemantics(m.Definition.Sources[0].Format) || decodeSavedConfig(m.Definition.Payload, &spec) != nil || spec.Limit != formats.CheckpointSearchHits || len(spec.Sheets) == 0 {
+	if m.Definition.Kind != "query" || m.Definition.Driver != searchCheckpointDriver || len(m.Definition.Sources) != 1 || m.Definition.Semantics != searchCheckpointSemantics(m.Definition.Sources[0].Format) || decodeSavedConfig(m.Definition.Payload, &spec) != nil || ((spec.Full && spec.Limit != 0) || (!spec.Full && spec.Limit != formats.CheckpointSearchHits)) || len(spec.Sheets) == 0 {
 		return spec, checkpoint.ErrBinding
 	}
 	return spec, nil

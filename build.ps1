@@ -163,6 +163,15 @@ try {
     Assert-Succeeded 'packed executable DPI manifest verification'
     $packedBytes = (Get-Item -LiteralPath $exe).Length
 
+    if ($TaggedRelease -or -not $StageOnly) {
+        Write-Host 'Running the release performance matrix...'
+        $benchArgs = @(('--go=' + $GoExe), ('--out=' + (Join-Path $ValidationDir 'private/release-performance.json')))
+        $baseline = Join-Path $ValidationDir 'performance-baseline.json'
+        if (!(Test-Path -LiteralPath $baseline -PathType Leaf)) { $benchArgs += '--save-baseline=' + $baseline }
+        & node (Join-Path $Root 'tools/bench/release.cjs') @benchArgs
+        Assert-Succeeded 'Release performance measurements and source fidelity'
+    }
+
     Write-Host '[7/8] Writing clean release archive and checksums...'
     $fileNames = @(Get-Content -LiteralPath (Join-Path $Root 'tools/release-files.json') -Raw | ConvertFrom-Json | ForEach-Object { $_.Replace('{version}', $Version) })
     foreach ($file in $fileNames) {
@@ -178,6 +187,7 @@ try {
     $files = @('ExcelLens.exe') + $fileNames + @('ExcelLens_icon.svg', 'ExcelLens_icon.ico', 'SHA256SUMS.txt', 'BUILD_INFO.txt')
     $files = $files | ForEach-Object { Join-Path $StageDir $_ }
     $zip = Join-Path $StageDir "ExcelLens_${Version}_Windows_x64_Full.zip"
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Create)
     try {
@@ -209,7 +219,8 @@ try {
 
     Write-Host '[8/8] Finalizing the verified package...'
     if ($TaggedRelease) {
-        & $pythonExe (Join-Path $Root 'tools/qa/verify_release.py') $Version --finalize --ref $taggedCommit --dir $StageDir
+        $measurements = Join-Path $ValidationDir 'private/release-performance.json'
+        & $pythonExe (Join-Path $Root 'tools/qa/verify_release.py') $Version --finalize --ref $taggedCommit --dir $StageDir --performance-report $measurements
         Assert-Succeeded 'Verify tagged source, Windows archive and checksums before delivery'
     }
     # Do not replace an executable that is still running.

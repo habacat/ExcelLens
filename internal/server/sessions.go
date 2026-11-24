@@ -213,6 +213,9 @@ func (a *App) runSessionReaper(stop <-chan struct{}, ticks <-chan time.Time) {
 // PreparePathForLaunch lets the browser paint before the first API request
 // reads the native file. Only the new tab waits, outside the sessions lock.
 func (a *App) PreparePathForLaunch(path string) (string, error) {
+	if a.restoreState.pending() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
 	if a.restoreState.pending() {
@@ -231,6 +234,9 @@ func (a *App) PreparePathForLaunch(path string) (string, error) {
 // in a NEW tab session rather than changing whichever browser tab was active.
 // A normal app/tray launch supplies no workbook and always opens the home page.
 func (a *App) OpenPathForLaunch(path string) (string, error) {
+	if a.restoreState.pending() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
 	if a.restoreState.pending() {
@@ -315,7 +321,7 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 		id := r.Header.Get("X-ExcelLens-Session")
 		// <img> and download anchors cannot set custom headers. Those two
 		// endpoints require their existing unguessable media/download tickets.
-		ticket := id == "" && (r.URL.Path == "/api/image/content" || r.URL.Path == "/api/export/download")
+		ticket := id == "" && (r.URL.Path == "/api/image/content" || r.URL.Path == "/api/export/download" || r.URL.Path == "/api/search/export")
 		if ticket {
 			id = r.URL.Query().Get("session")
 		}

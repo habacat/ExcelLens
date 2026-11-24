@@ -26,38 +26,39 @@ type backgroundItem struct {
 	Created   time.Time `json:"created"`
 	Session   string    `json:"session"`
 	CanAttach bool      `json:"canAttach"`
+	Protected bool      `json:"protected,omitempty"`
 }
 
-func (set backgroundResults) items(sid string, canAttach bool) []backgroundItem {
+func (set backgroundResults) items(sid string, canAttach, idle bool) []backgroundItem {
 	items := []backgroundItem{}
-	add := func(id, kind, state, stage, msg string, t time.Time, wb *workbook.Workbook) {
+	add := func(id, kind, state, stage, msg string, t time.Time, wb *workbook.Workbook, protected bool) {
 		if wb != nil {
-			items = append(items, backgroundItem{id, kind, workbookDisplayName(wb), state, stage, msg, t, sid, canAttach})
+			items = append(items, backgroundItem{id, kind, workbookDisplayName(wb), state, stage, msg, t, sid, canAttach, protected})
 		}
 	}
 	for _, j := range set.exports {
 		j.mu.RLock()
-		add(j.ID, "export", j.Status, j.Stage, j.Error, j.Started, j.wb)
+		add(j.ID, "export", j.Status, j.Stage, j.Error, j.Started, j.wb, false)
 		j.mu.RUnlock()
 	}
 	for _, j := range set.searches {
 		j.mu.RLock()
-		add(j.ID, "search", j.Status, j.Stage, j.Error, j.Started, set.book)
+		add(j.ID, "search", j.Status, j.Stage, j.Error, j.Started, set.book, !idle && !canAttach && j.Results != nil)
 		j.mu.RUnlock()
 	}
 	for _, j := range set.filters {
 		j.mu.RLock()
-		add(j.ID, "filter", j.Status, j.Stage, j.Error, j.Started, set.book)
+		add(j.ID, "filter", j.Status, j.Stage, j.Error, j.Started, set.book, !idle && set.orders[j.ResultID] != nil)
 		j.mu.RUnlock()
 	}
 	for _, j := range set.analyses {
 		j.mu.RLock()
-		add(j.ID, "analysis", j.Status, j.Stage, j.Error, j.Created, j.Workbook)
+		add(j.ID, "analysis", j.Status, j.Stage, j.Error, j.Created, j.Workbook, false)
 		j.mu.RUnlock()
 	}
 	for _, j := range set.comparisons {
 		j.mu.RLock()
-		add(j.ID, "reconcile", j.Status, j.Stage, j.Error, j.Created, j.Workbook)
+		add(j.ID, "reconcile", j.Status, j.Stage, j.Error, j.Created, j.Workbook, false)
 		j.mu.RUnlock()
 	}
 	return items
@@ -90,7 +91,7 @@ func (a *App) handleBackground(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "后台任务参数无效")
 			return
 		}
-		if err := a.manageBackground(cmd.Action, cmd.Session, cmd.Kind, cmd.ID); err != nil {
+		if err := a.manageBackground(cmd.Action, cmd.Session, cmd.Kind, cmd.ID, r.Header.Get("X-ExcelLens-Session")); err != nil {
 			writeError(w, 409, err.Error())
 			return
 		}
@@ -105,7 +106,7 @@ func (a *App) handleBackground(w http.ResponseWriter, r *http.Request) {
 	var sessions []map[string]string
 	for _, o := range a.backgroundOwners(r.Header.Get("X-ExcelLens-Session")) {
 		set := o.session.results()
-		items = append(items, set.items(o.id, o.attach)...)
+		items = append(items, set.items(o.id, o.attach, o.idle)...)
 		if name := o.session.fileName(); name != "" && o.idle {
 			sessions = append(sessions, map[string]string{"session": o.id, "file": name})
 		}
@@ -124,7 +125,7 @@ func (a *App) backgroundOwners(requester string) []backgroundOwner {
 	return owners
 }
 
-func (a *App) manageBackground(action, sid, kind, id string) error {
+func (a *App) manageBackground(action, sid, kind, id, requester string) error {
 	a.sessionsMu.Lock()
 	s := a.sessions[sid]
 	if s == nil {
@@ -142,8 +143,9 @@ func (a *App) manageBackground(action, sid, kind, id string) error {
 		s.close()
 		return nil
 	}
+	protect := !s.lease.Idle(time.Now())
 	a.sessionsMu.Unlock()
-	if err := s.manageResult(action, kind, id); err != nil {
+	if err := s.manageResult(action, kind, id, protect, requester != sid); err != nil {
 		return err
 	}
 	if action == "discard" {
@@ -169,7 +171,7 @@ func (a *App) restoreBlockers() error {
 			continue
 		}
 		name := o.session.fileName()
-		for _, j := range o.session.results().items(o.id, o.attach) {
+		for _, j := range o.session.results().items(o.id, o.attach, o.idle) {
 			if j.State == "running" || j.State == "queued" {
 				names = append(names, j.File+"（"+kinds[j.Kind]+"）")
 			}

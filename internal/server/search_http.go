@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
+	"net/url"
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/searchservice"
 	"excellens/internal/workbook"
 )
 
@@ -51,7 +52,7 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	var idx *workbook.SheetIndex
 	ctx, cancel := context.WithCancel(context.Background())
 	job := &SearchJob{
-		ID: randomID(), Sheet: meta.Name, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
+		Full: req.Full, Ticket: randomID(), ID: randomID(), Sheet: meta.Name, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
 		Status: "running", Stage: "准备搜索", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{}),
 	}
 	a.mu.Lock()
@@ -70,7 +71,7 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	// Reuse an in-flight or completed identical search instead of scanning again.
 	for _, existing := range a.searchJobs {
 		existing.mu.RLock()
-		same := searchCacheKey(existing.Sheet, existing.Query, existing.Mode, existing.Scope) == searchCacheKey(meta.Name, req.Query, req.Mode, req.Scope)
+		same := existing.Full == req.Full && searchCacheKey(existing.Sheet, existing.Query, existing.Mode, existing.Scope) == searchCacheKey(meta.Name, req.Query, req.Mode, req.Scope)
 		status := existing.Status
 		id := existing.ID
 		running := status == "running" && existing.ctx != nil && existing.ctx.Err() == nil
@@ -83,25 +84,27 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// A completed search is also cached on disk across application restarts.
-	if cached, err := loadSearchCache(wb, meta.Name, req.Query, req.Mode, req.Scope); err == nil {
-		if !pruneSearchJobsLocked(a.searchJobs, formats.QueryTaskHistory) {
+	if !req.Full {
+		if cached, err := loadSearchCache(wb, meta.Name, req.Query, req.Mode, req.Scope); err == nil {
+			if !pruneSearchJobsLocked(a.searchJobs, formats.QueryTaskHistory) {
+				a.mu.Unlock()
+				cancel()
+				writeError(w, http.StatusTooManyRequests, "正在回收搜索任务，请稍后重试")
+				return
+			}
+			close(job.done)
+			a.retainSubmitted(job.ID, job.done)
+			job.Status = "done"
+			job.Stage = "从本机缓存加载"
+			job.Progress = 100
+			job.Matches = cached.Matches
+			job.Truncated = cached.Truncated
+			a.searchJobs[job.ID] = job
 			a.mu.Unlock()
 			cancel()
-			writeError(w, http.StatusTooManyRequests, "正在回收搜索任务，请稍后重试")
+			writeJSON(w, map[string]any{"jobId": job.ID, "cached": true, "reused": false})
 			return
 		}
-		close(job.done)
-		a.retainSubmitted(job.ID, job.done)
-		job.Status = "done"
-		job.Stage = "从本机缓存加载"
-		job.Progress = 100
-		job.Matches = cached.Matches
-		job.Truncated = cached.Truncated
-		a.searchJobs[job.ID] = job
-		a.mu.Unlock()
-		cancel()
-		writeJSON(w, map[string]any{"jobId": job.ID, "cached": true, "reused": false})
-		return
 	}
 	// Check persistent query results before requiring a worksheet index: a user
 	// can reopen prior search results without loading that Sheet's XML again.
@@ -153,7 +156,10 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 				job.mu.Unlock()
 			}
 		}
-		_ = saveSearchCache(wb, job) // Search completion also persists its on-disk index.
+		// The quick search cache also supplies the recent search list.
+		if !job.Full {
+			_ = saveSearchCache(wb, job)
+		}
 		close(job.done)
 	}()
 	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
@@ -167,6 +173,10 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 	defer releaseScan()
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
+	if job.Full {
+		a.runFullSearch(wb, job)
+		return
+	}
 	if job.checkpoint != nil {
 		a.runCheckpointSearch(wb, job)
 		return
@@ -175,13 +185,7 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 		a.runWorkbookSearch(wb, job)
 		return
 	}
-	search := func(idx *workbook.SheetIndex, sheet, query, mode string, limit int, done <-chan struct{}, update func(int, int, []workbook.SearchResult)) ([]workbook.SearchResult, bool, error) {
-		if mode == "advanced" {
-			return wb.SearchSheetAdvanced(idx, sheet, query, limit, done, update)
-		}
-		return wb.SearchSheet(idx, sheet, query, mode, limit, done, update)
-	}
-	matches, truncated, err := search(currentIndex, current.Name, job.Query, job.Mode, 500, job.ctx.Done(), func(scanned, total int, currentMatches []workbook.SearchResult) {
+	matches, truncated, err := searchservice.QuickSheet(wb, currentIndex, current.Name, job.Query, job.Mode, job.ctx, func(scanned, total int, currentMatches []workbook.SearchResult) {
 		job.mu.Lock()
 		job.Scanned = scanned
 		job.Total = total
@@ -212,194 +216,36 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 	job.Stage = "搜索完成"
 }
 
-// runWorkbookSearch overlaps worksheet indexing and scanning. At most two
-// workers run concurrently to avoid flooding the disk with large extracted XML
-// files. Results are merged in workbook order, not worker completion order.
 func (a *App) runWorkbookSearch(wb *workbook.Workbook, job *SearchJob) {
-	sheets := wb.Sheets
-	if len(sheets) == 0 {
-		job.mu.Lock()
-		job.Status = "done"
-		job.Progress = 100
-		job.mu.Unlock()
-		return
-	}
-	const maxHits = 500
-	workerCount := 2
-	if len(sheets) < workerCount {
-		workerCount = len(sheets)
-	}
-	ctx, cancelWork := context.WithCancel(job.ctx)
-	defer cancelWork()
-	type sheetResult struct {
-		position  int
-		matches   []workbook.SearchResult
-		truncated bool
-		err       error
-		rows      int
-	}
-	tasks := make(chan int)
-	results := make(chan sheetResult, workerCount)
-	var workers sync.WaitGroup
 	job.mu.Lock()
-	job.SheetsTotal = len(sheets)
-	job.Stage = fmt.Sprintf("准备搜索全部 %d 个 Sheet", len(sheets))
+	job.SheetsTotal = len(wb.Sheets)
+	job.Stage = fmt.Sprintf("准备搜索全部 %d 个 Sheet", len(wb.Sheets))
 	job.mu.Unlock()
-	for worker := 0; worker < workerCount; worker++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for position := range tasks {
-				if ctx.Err() != nil {
-					return
-				}
-				meta := sheets[position]
-				report := func(stage string, ratio float64) {
-					job.mu.Lock()
-					job.Stage = fmt.Sprintf("%s %d/%d · %s", stage, position+1, len(sheets), meta.Name)
-					// Progress must be monotonic while concurrent sheets finish.
-					estimate := (float64(position) + ratio) / float64(len(sheets)) * 100
-					if estimate > job.Progress {
-						job.Progress = estimate
-					}
-					job.mu.Unlock()
-				}
-				idx := wb.GetCachedIndex(meta.Path)
-				var err error
-				if idx == nil {
-					report("建立索引", 0)
-					releaseIndex, admissionErr := a.backgroundIndex(ctx)
-					if admissionErr != nil {
-						return
-					}
-					// Another worker or interactive request may have just finished.
-					idx = wb.GetCachedIndex(meta.Path)
-					if idx == nil {
-						idx, err = wb.BuildIndex(meta, func(done, total int64, stage string) {
-							if total > 0 {
-								report("正在索引", .4*float64(done)/float64(total))
-							}
-						}, ctx.Done())
-					}
-					releaseIndex()
-				}
-				if err != nil {
-					select {
-					case results <- sheetResult{position: position, err: fmt.Errorf("建立 Sheet「%s」索引失败：%w", meta.Name, err)}:
-					case <-ctx.Done():
-					}
-					return
-				}
-				report("搜索", .4)
-				last := time.Now()
-				search := func(idx *workbook.SheetIndex, sheet, query, mode string, limit int, done <-chan struct{}, update func(int, int, []workbook.SearchResult)) ([]workbook.SearchResult, bool, error) {
-					if mode == "advanced" {
-						return wb.SearchSheetAdvanced(idx, sheet, query, limit, done, update)
-					}
-					return wb.SearchSheet(idx, sheet, query, mode, limit, done, update)
-				}
-				hits, truncated, err := search(idx, meta.Name, job.Query, job.Mode, maxHits, ctx.Done(), func(scanned, total int, _ []workbook.SearchResult) {
-					if time.Since(last) > 250*time.Millisecond {
-						if total > 0 {
-							report("搜索中", .4+.6*float64(scanned)/float64(total))
-						}
-						last = time.Now()
-					}
-				})
-				result := sheetResult{position: position, matches: hits, truncated: truncated, err: err, rows: idx.RowCount()}
-				select {
-				case results <- result:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}
-	go func() {
-		defer close(tasks)
-		for i := range sheets {
-			select {
-			case tasks <- i:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	// Merge by original order. A fast later Sheet must never reorder results
-	// or push an earlier matching cell beyond the first 500 matches.
-	pending := make(map[int]sheetResult, workerCount)
-	all := make([]workbook.SearchResult, 0, 64)
-	doneCount := 0
-	scannedRows := 0
-	truncated := false
-	var firstErr error
-	for next := 0; next < len(sheets); {
-		var item sheetResult
-		var ok bool
-		if item, ok = pending[next]; ok {
-			delete(pending, next)
-		} else {
-			select {
-			case item = <-results:
-			case <-ctx.Done():
-				firstErr = ctx.Err()
-				break
-			}
-			if firstErr != nil {
-				break
-			}
-			if item.position != next {
-				pending[item.position] = item
-				continue
-			}
-		}
-		if item.err != nil {
-			firstErr = item.err
-			break
-		}
-		scannedRows += item.rows
-		remaining := maxHits - len(all)
-		if remaining > 0 && len(item.matches) > 0 {
-			take := len(item.matches)
-			if take > remaining {
-				take = remaining
-			}
-			all = append(all, item.matches[:take]...)
-		}
-		doneCount++
-		next++
+	result, err := searchservice.QuickWorkbook(job.ctx, wb, job.Query, job.Mode, a.backgroundIndex, func(p searchservice.QuickProgress) {
 		job.mu.Lock()
-		job.Matches = append(job.Matches[:0], all...)
-		job.SheetsDone = doneCount
-		job.Scanned = scannedRows
-		job.Total = scannedRows
-		progress := float64(doneCount) / float64(len(sheets)) * 100
-		if progress > job.Progress {
-			job.Progress = progress
+		defer job.mu.Unlock()
+		job.Progress = max(job.Progress, p.Percent)
+		if p.Stage != "" {
+			job.Stage = p.Stage
 		}
-		job.mu.Unlock()
-		if len(all) >= maxHits {
-			truncated = item.truncated || next < len(sheets)
-			break
+		if p.SheetsDone > 0 {
+			job.Matches = append(job.Matches[:0], p.Matches...)
+			job.SheetsDone = p.SheetsDone
+			job.Scanned, job.Total = p.Rows, p.Rows
 		}
-	}
-	cancelWork() // Cancel pending operations and finish before returning to caller.
-	workers.Wait()
+	})
 	job.mu.Lock()
 	defer job.mu.Unlock()
-	if job.ctx.Err() != nil || errors.Is(firstErr, context.Canceled) {
-		job.Status = "cancelled"
-		job.Stage = "已取消"
-	} else if firstErr != nil {
-		job.Status = "error"
-		job.Error = firstErr.Error()
-	} else {
-		job.Status = "done"
-		job.Progress = 100
-		job.Stage = fmt.Sprintf("搜索完成 · 已检查 %d 个 Sheet", doneCount)
+	job.Matches, job.Truncated = result.Matches, result.Truncated
+	switch {
+	case job.ctx.Err() != nil || errors.Is(err, context.Canceled):
+		job.Status, job.Stage = "cancelled", "已取消"
+	case err != nil:
+		job.Status, job.Error = "error", err.Error()
+	default:
+		job.Status, job.Progress = "done", 100
+		job.Stage = fmt.Sprintf("搜索完成 · 已检查 %d 个 Sheet", result.SheetsDone)
 	}
-	job.Matches = all
-	job.Truncated = truncated
 }
 
 func (a *App) handleSearchStatus(w http.ResponseWriter, r *http.Request) {
@@ -421,6 +267,12 @@ func (a *App) handleSearchStatus(w http.ResponseWriter, r *http.Request) {
 		"total": job.Total, "sheetsDone": job.SheetsDone, "sheetsTotal": job.SheetsTotal,
 		"matches": append([]workbook.SearchResult{}, job.Matches...), "truncated": job.Truncated, "error": job.Error,
 		"taskId": job.TaskID,
+	}
+	if job.Full {
+		data["full"], data["hitCount"] = true, job.HitCount
+		if job.Status == "done" {
+			data["downloadUrl"] = "/api/search/export?" + (url.Values{"id": {job.ID}, "ticket": {job.Ticket}, "session": {r.Header.Get("X-ExcelLens-Session")}}).Encode()
+		}
 	}
 	job.mu.RUnlock()
 	writeJSON(w, data)
@@ -470,5 +322,7 @@ func (a *App) registerQueryRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/search/validate", a.handleSearchValidate)
 	mux.HandleFunc("/api/search/history", a.handleSearchHistory)
 	mux.HandleFunc("/api/search/status", a.handleSearchStatus)
+	mux.HandleFunc("/api/search/page", a.handleSearchResults)
+	mux.HandleFunc("/api/search/export", a.handleSearchResults)
 	mux.HandleFunc("/api/search/cancel", a.handleSearchCancel)
 }

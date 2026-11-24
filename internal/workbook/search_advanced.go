@@ -22,7 +22,7 @@ func (w *Workbook) SearchSheetAdvanced(idx *SheetIndex, sheet, query string, lim
 	return state.Matches, state.Truncated, nil
 }
 
-func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex, sheet, query string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult)) (SearchCheckpoint, error) {
+func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex, sheet, query string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult), stream *searchStream) (SearchCheckpoint, error) {
 	expr, err := searchdsl.Parse(query)
 	if err != nil {
 		return state, err
@@ -33,7 +33,7 @@ func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex,
 	if limit < 1 || limit > 10000 {
 		return state, errors.New("结果数量限制无效")
 	}
-	budget, err := newSearchHitBudget(save, state.Matches)
+	budget, err := newSearchHitBudget(save, state.Matches, stream)
 	if err != nil {
 		return state, err
 	}
@@ -64,7 +64,7 @@ func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex,
 	total := idx.RowCount()
 	if state.Next == total {
 		state.Complete = true
-		return state, saveSearchCheckpoint(state, save, true)
+		return state, saveSearchCheckpoint(state, save, true, stream)
 	}
 	for start := state.Next; start < total; start += 128 {
 		if err := ctx.Err(); err != nil {
@@ -115,13 +115,12 @@ func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex,
 				ref := fmt.Sprintf("%s%d", ColumnName(col), row.Number)
 				matched := cells[col]
 				hit := SearchResult{Sheet: sheet, Ref: ref, Row: row.Number, Col: col, Value: matched.Display, Formula: matched.Formula}
-				if err := budget.add(hit); err != nil {
+				if err := budget.collect(&matches, hit); err != nil {
 					return state, err
 				}
-				matches = append(matches, hit)
 				if len(matches) >= limit {
 					state.Matches, state.Complete, state.Truncated = matches, true, true
-					if err := saveSearchCheckpoint(state, save, true); err != nil {
+					if err := saveSearchCheckpoint(state, save, true, stream); err != nil {
 						return state, err
 					}
 					if progress != nil {
@@ -131,7 +130,7 @@ func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex,
 				}
 			}
 			state.Next, state.Matches, state.Complete = scanned, matches, scanned == total
-			if err := saveSearchCheckpoint(state, save, state.Complete); err != nil {
+			if err := saveSearchCheckpoint(state, save, state.Complete, stream); err != nil {
 				return state, err
 			}
 		}

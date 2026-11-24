@@ -31,6 +31,10 @@ internal/composition       只读多来源字段对齐、流式追加及源格�
 internal/fileidentity       文件修订、内容指纹及可靠版本的摘要缓存
 internal/localstore         数据位置、流式明密文备份、事务暂存与重放
 internal/browserlease       单页租约、刷新代次、在途请求和回收期限
+internal/transferjobs       传输准入、取消与提交仲裁、历史与确认重建
+internal/savedconfig        带摘要的本地 JSON 设置、读写与替换
+internal/searchservice      跨表搜索调度、源行扫描次序与检查点续做
+internal/searchresults      磁盘命中记录、有界分页、筛选与流式 CSV
 internal/server            HTTP、会话、任务及业务装配
 internal/ui                嵌入的 HTML/CSS/JS 与格式配置注入
 internal/tray, shellmenu    Windows 用户入口
@@ -51,7 +55,11 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | opc | Go 标准库 |
 | separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
-| workbook | fileidentity、formats、searchdsl、sourceview |
+| workbook | fileidentity、formats、searchdsl、sourceview、searchresults |
+| savedconfig | Go 标准库 |
+| transferjobs | localstore、savedconfig |
+| searchresults | formats、separated |
+| searchservice | workbook、checkpoint、formats、searchresults |
 | archives | formats、workbook |
 | calculator | analysis、valueconv、formats（统一地址容量） |
 | reconcile | analysis、workbook、formats |
@@ -64,17 +72,17 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
 | localstore | filelock |
-| server | localstore、browserlease、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+| server | localstore、browserlease、transferjobs、savedconfig、searchservice、searchresults、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
 
 ### 备份、来源与任务
 
 后台任务运行时由任务登记及源引用保护。已离开的工作页可把完成的五类结果、筛选行序和来源引用交给 `server/background_results.go`，其余页面资源随页回收。用户接回结果时建立新的工作页。进程内按任务记录保留窗口和取消状态，迁入会在排他阶段核对打开的工作簿与未结束的任务。
 
-`localstore/space.go` 负责按物理卷合并数据、元数据及加密开销。选定目录的未完成备份带有归属标记，`filelock` 复用系统级独占写锁。恢复准备与日志发布分别位于 `restore.go` 和 `restore_journal.go`。服务端在同一把任务锁内处理取消及进入提交的请求；受限恢复的独立入口也能在传输历史不可读时重试。
+`localstore/space.go` 负责按物理卷合并数据、元数据及加密开销。选定目录的未完成备份带有归属标记，`filelock` 复用系统级独占写锁。恢复准备与日志发布分别位于 `restore.go` 和 `restore_journal.go`。传输管理器在同一把任务锁内仲裁取消与提交。启动仅查看恢复日志的文件元数据，监听启动后重放事务。独立恢复页可以在数据尚未就绪时查询进度。
 
 `localstore` 在配置目录记录事务决定，每个数据卷独立暂存。全部源文件验证后落盘提交计划，每迁入一个单元同步确认游标。重启按计划核对已发布文件并继续。加密格式固定使用 Argon2id v19（64 MiB、3 次、1 通道、16 字节随机盐），按备份内逻辑路径由 HMAC-SHA-256 分别派生对象名和密钥，使用固定为 DARE 2.0、AES-256-GCM 的 minio/sio v0.5.1。每个对象含认证格式字节，空文件也接受完整性校验。依赖和许可随源码发布。
 
-`server/storage_jobs.go` 负责进程级传输与最近 32 次任务收据。`source_location.go` 用独立记录绑定经用户核验的新路径，`task_portability.go` 在显式备份时为能核对的旧索引建立内容证明。`fileidentity` 复用可靠的文件修订和完整摘要；无可靠修订时重新读取内容。浏览器请求和上传由 `transport.js` 装配令牌与会话。后台结果使用原任务注册表，已提交任务在执行期间持有独立租约，完成后保留 15 分钟供离开的页面接回。
+`server/storage_jobs.go` 将 HTTP 请求交给 `transferjobs`。该包保留最近 32 次传输，通过 `savedconfig` 核验和替换收据。遇到损坏时保留原字节，显式重建前再次核对摘要。`source_location.go` 用独立记录绑定经用户核验的新路径，`task_portability.go` 在显式备份时为能核对的旧索引建立内容证明。`fileidentity` 复用可靠的文件修订和完整摘要；无可靠修订时重新读取内容。浏览器请求和上传由 `transport.js` 装配令牌与会话。后台结果使用原任务注册表，已提交任务在执行期间持有独立租约，完成后保留 15 分钟供离开的页面接回。
 
 ### 服务入口和前端组件
 
@@ -84,7 +92,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 原生文件打开入口先分配独立会话，该会话的首次 API 调用再读取文件。网页等待任务由当前文档的 `activity.js` 持有。一次任务可以连续跨过传输、解析、索引和显示阶段，轮询、取消和迟到响应均使用原任务句柄。已有进度区可接入同一指示器，空闲文档不订阅其他页的任务。`motion.css` 负责控件与弹层的时序，网格坐标和大小直接更新。
 
-工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
+工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。快速跨表搜索由 searchservice 限制在两个在途工作表内，全量查询沿源表顺序流式生成结果。searchresults 通过 workbook 的临时文件配额分配磁盘，查询完成后支持只读分页与导出。关闭结果会等待已开始的读取。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
 
 界面的 A1 坐标转换由 `cell-address.js` 提供，调用方传入来源容量。命令检索、键盘选择及可用性判断由 `command-palette.js` 管理，操作回调由应用装配。视口的覆盖范围、字节估计和缓存淘汰由 `viewport-cache.js` 管理。网格请求直接持有写入或复用的条目，缓存总量由同一组件维护。
 

@@ -59,7 +59,7 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
       }
     }
   }
-  const harness={storage,close,async tabs(){return(await fetch('http://127.0.0.1:'+port+'/json/list')).json();},async connect(tab){const socket=new WebSocket(tab.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});const c=new Client(socket,errors);clients.push(c);await c.call('Runtime.enable');await c.call('Page.enable');return c;}};
+  const harness={storage,close,get servicePID(){return server.pid},get debugEndpoint(){return 'http://127.0.0.1:'+port},async tabs(){return(await fetch('http://127.0.0.1:'+port+'/json/list')).json();},async connect(tab){const socket=new WebSocket(tab.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});const c=new Client(socket,errors);clients.push(c);await c.call('Runtime.enable');await c.call('Page.enable');return c;}};
   const startServer=async()=>{
     const args=['-duration',duration,'-storage',storage];
     if(launchFile)args.push('-launch-file',path.resolve(launchFile));

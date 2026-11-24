@@ -539,6 +539,7 @@
         <button id="searchBtn" class="primary-button compact" type="button">查找</button>
         <button id="searchHistoryBtn" class="search-tool-button" type="button" title="搜索历史" aria-label="搜索历史" aria-expanded="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg></button>
       </div>
+      <label class="task-progress-choice"><input id="searchFull" type="checkbox">全量搜索</label>
       <label class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="searchRecoverable" type="checkbox">保留进度</label>
       <div id="searchHistoryPanel" class="history-panel" hidden>
         <div class="history-heading">最近搜索 <button id="searchHistoryRefreshBtn" type="button" class="mini-button history-refresh" title="刷新搜索记录">刷新</button></div>
@@ -563,6 +564,7 @@
           <input id="searchResultFilter" class="field-control" placeholder="在结果里筛选" aria-label="在当前结果中筛选">
           <select id="searchResultSheet" class="field-control" title="按工作表筛选搜索结果" aria-label="按工作表筛选搜索结果"><option value="">全部工作表</option></select>
         </div>
+        <div id="searchPaging" class="search-results-toolbar" hidden><button id="searchPagePrev" type="button" class="mini-button">上一页</button><button id="searchPageNext" type="button" class="mini-button">下一页</button><span id="searchPageCount"></span></div>
         <div id="searchResults" class="search-results" role="listbox" aria-label="搜索结果"></div>
       </section>
     </div>
@@ -813,6 +815,7 @@
       <label for="storagePassword">备份口令（可选）</label>
       <input id="storagePassword" class="field-control" type="password" autocomplete="new-password" placeholder="明文备份可留空">
       <button id="storageCancel" class="mini-button" type="button" hidden>取消传输</button>
+      <div id="storageHistoryIssue" hidden><span id="storageHistoryReason"></span> <button class="mini-button" data-storage="repair-history" type="button">重建传输历史</button></div>
       <details id="storageHistory"><summary>传输记录</summary><div id="storageJobs"></div></details>
       <details id="storageSources"><summary>重定位来源文件</summary>
         <select id="storageSource" class="field-control" aria-label="原来源"></select>

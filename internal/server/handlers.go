@@ -339,7 +339,10 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cacheMu.Unlock()
 	a.mu.Lock()
-	if a.wb == wb {
+	if clearErr == nil && a.wb == wb {
+		for _, job := range a.searchJobs {
+			job.Results.Close()
+		}
 		a.indexJobs = make(map[string]*IndexJob)
 		a.indexBySheet = make(map[string]string)
 		a.searchJobs = make(map[string]*SearchJob)

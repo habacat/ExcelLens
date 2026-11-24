@@ -172,7 +172,16 @@ func (r Roots) publishPlan(ctx context.Context, p restorePlan, replay bool) erro
 	if err == nil && (json.Unmarshal(progress, &next) != nil || next < 0 || next > len(units)) {
 		return errors.New("恢复事务游标无效")
 	}
-	phase(ctx, "提交恢复事务", 0, len(units))
+	var total int64
+	if replay {
+		for _, rec := range p.Files {
+			if rec.Bytes > math.MaxInt64-total {
+				return errors.New("恢复事务字节总数无效")
+			}
+			total += rec.Bytes
+		}
+	}
+	phase(ctx, "提交恢复事务", total, len(units))
 	for i, u := range units {
 		if i >= next || replay {
 			if err := r.installUnit(ctx, p, u, replay, i < next); err != nil {
@@ -253,4 +262,22 @@ func (r Roots) installUnit(ctx context.Context, p restorePlan, u restoreUnit, re
 func (r Roots) Pending() bool {
 	_, err := os.Lstat(filepath.Join(r.Config, journalName))
 	return !errors.Is(err, os.ErrNotExist)
+}
+
+// RecoveryPending checks directory and journal metadata only. Parsing the
+// manifest and verifying published files belongs to the background replay.
+func (r Roots) RecoveryPending() (bool, error) {
+	dir, err := openDirectory(r.Config)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return true, err
+	}
+	defer dir.Close()
+	_, err = dir.Lstat(journalName)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return true, err
 }

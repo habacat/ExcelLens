@@ -13,20 +13,20 @@ import (
 
 // Native cache search scans sequentially with one buffered reader. No XML
 // decoding and no per-row file opens; search memory is bounded by one row.
-func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex, sheet, query, mode string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult)) (SearchCheckpoint, error) {
+func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex, sheet, query, mode string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult), stream *searchStream) (SearchCheckpoint, error) {
 	matcher, err := newSearchMatcher(sheet, query, mode)
 	if err != nil {
 		return state, err
 	}
 	results := state.Matches
-	budget, err := newSearchHitBudget(save, state.Matches)
+	budget, err := newSearchHitBudget(save, state.Matches, stream)
 	if err != nil {
 		return state, err
 	}
 	total := idx.RowCount()
 	if state.Next == total {
 		state.Complete = true
-		return state, saveSearchCheckpoint(state, save, true)
+		return state, saveSearchCheckpoint(state, save, true, stream)
 	}
 	f, err := os.Open(idx.XMLPath)
 	if err != nil {
@@ -75,7 +75,7 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 		if err != nil {
 			return state, fmt.Errorf("第 %d 行：%w", off.Number, err)
 		}
-		hitsBefore := len(results)
+		hitsBefore := budget.hits
 		for _, cell := range row.Cells {
 			matched := false
 			if mode == "value" {
@@ -91,13 +91,12 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 			if mode != "value" {
 				hit.Formula = cell.Formula
 			}
-			if err := budget.add(hit); err != nil {
+			if err := budget.collect(&results, hit); err != nil {
 				return state, err
 			}
-			results = append(results, hit)
 			if len(results) >= limit {
 				state.Matches, state.Complete, state.Truncated = results, true, true
-				if err := saveSearchCheckpoint(state, save, true); err != nil {
+				if err := saveSearchCheckpoint(state, save, true, stream); err != nil {
 					return state, err
 				}
 				if progress != nil {
@@ -106,14 +105,14 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 				return state, nil
 			}
 		}
-		if idx.odsRuns != nil && len(results) == hitsBefore {
+		if idx.odsRuns != nil && budget.hits == hitsBefore {
 			// Simple search compares the stored values and formula text. Only
 			// the result coordinate changes inside a repeated ODS template.
 			run := idx.odsRunAt(i)
 			i = min(total, run.Position+run.Count) - 1
 		}
 		state.Next, state.Matches, state.Complete = i+1, results, i+1 == total
-		if err := saveSearchCheckpoint(state, save, state.Complete); err != nil {
+		if err := saveSearchCheckpoint(state, save, state.Complete, stream); err != nil {
 			return state, err
 		}
 		if progress != nil && (i == idx.RowCount()-1 || time.Since(lastReport) > 250*time.Millisecond) {

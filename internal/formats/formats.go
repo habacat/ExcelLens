@@ -17,8 +17,12 @@ const (
 	LargeDataRows        = 5_000_000
 	MaxUploadBytes int64 = 1 << 40
 	// Shared process budget for temporary query runs and retained row orders.
-	MaxQueryTempBytes int64 = 8 << 30
-	MaxQueryTempFiles       = 8192
+	QuickSearchHits          = 500
+	SearchPageRows           = 100
+	SearchPreviewRunes       = 512
+	SearchRecordBytes        = 128 << 20
+	MaxQueryTempBytes  int64 = 8 << 30
+	MaxQueryTempFiles        = 8192
 	// Per-sort comparison keys and merge heads; excludes source/cache mappings.
 	QuerySortMemoryBytes int64 = 64 << 20
 	// Presentation spans are separate from the full source text and values.

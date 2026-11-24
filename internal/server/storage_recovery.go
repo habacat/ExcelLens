@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 type recoveryMode struct {
 	reason   atomic.Pointer[string]
 	mu       sync.Mutex
+	startup  bool
 	running  bool
 	closed   bool
 	done     chan struct{}
@@ -31,37 +33,44 @@ func (a *App) handleRecoveryMode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
-	s := &a.restoreState
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if r.Method == http.MethodPost {
-		if !s.pending() {
-			writeJSON(w, map[string]bool{"pending": false})
-			return
-		}
-		if s.closed {
-			writeError(w, 503, "程序正在退出")
-			return
-		}
-		if !s.running {
-			if !a.storageMu.TryLock() {
-				writeError(w, 409, "另一项数据管理操作正在进行")
-				return
-			}
-			s.running = true
-			s.done = make(chan struct{})
-			s.progress = localstore.Progress{Phase: "继续恢复事务"}
-			go a.retryRecovery(roots)
-		}
-	} else if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		methodNotAllowed(w)
 		return
 	}
+	if err := a.startRecovery(roots, r.Method == http.MethodPost); err != nil {
+		writeError(w, 409, err.Error())
+		return
+	}
+	s := &a.restoreState
+	s.mu.Lock()
 	reason := ""
 	if msg := s.reason.Load(); msg != nil {
 		reason = *msg
 	}
-	writeJSON(w, map[string]any{"pending": s.pending(), "reason": reason, "running": s.running, "roots": roots, "progress": s.progress})
+	state := map[string]any{"pending": s.pending(), "reason": reason, "running": s.running, "roots": roots, "progress": s.progress}
+	s.mu.Unlock()
+	writeJSON(w, state)
+}
+
+func (a *App) startRecovery(roots localstore.Roots, retry bool) error {
+	s := &a.restoreState
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.pending() || s.running || (!retry && !s.startup) {
+		return nil
+	}
+	if s.closed {
+		return errors.New("程序正在退出")
+	}
+	if !a.storageMu.TryLock() {
+		return errors.New("另一项数据管理操作正在进行")
+	}
+	s.startup = false
+	s.running = true
+	s.done = make(chan struct{})
+	s.progress = localstore.Progress{Phase: "正在读取恢复事务"}
+	go a.retryRecovery(roots)
+	return nil
 }
 
 func (a *App) retryRecovery(roots localstore.Roots) {

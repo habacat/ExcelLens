@@ -32,15 +32,15 @@ func (w *Workbook) SearchSheet(idx *SheetIndex, sheetName, query, mode string, l
 	return state.Matches, state.Truncated, err
 }
 
-func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, sheetName, query, mode string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult)) (SearchCheckpoint, error) {
+func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, sheetName, query, mode string, limit int, state SearchCheckpoint, save SearchCheckpointSave, progress func(int, int, []SearchResult), stream *searchStream) (SearchCheckpoint, error) {
 	matcher, err := newSearchMatcher(sheetName, query, mode)
 	if err != nil {
 		return state, err
 	}
 	if isExternalRows(idx.XMLPath) {
-		return w.searchExternalResumable(ctx, idx, sheetName, query, mode, limit, state, save, progress)
+		return w.searchExternalResumable(ctx, idx, sheetName, query, mode, limit, state, save, progress, stream)
 	}
-	budget, err := newSearchHitBudget(save, state.Matches)
+	budget, err := newSearchHitBudget(save, state.Matches, stream)
 	if err != nil {
 		return state, err
 	}
@@ -48,7 +48,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 	total := idx.RowCount()
 	if state.Next == total {
 		state.Complete = true
-		return state, saveSearchCheckpoint(state, save, true)
+		return state, saveSearchCheckpoint(state, save, true, stream)
 	}
 	file, err := os.Open(idx.XMLPath)
 	if err != nil {
@@ -129,10 +129,9 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 				if mode != "value" {
 					hit.Formula = cell.Formula
 				}
-				if err := budget.add(hit); err != nil {
+				if err := budget.collect(&matches, hit); err != nil {
 					return state, err
 				}
-				matches = append(matches, hit)
 				if len(matches) >= limit {
 					truncated = true
 					break
@@ -184,10 +183,9 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 							rowErr = e
 							return false
 						}
-						if rowErr = budget.add(hit); rowErr != nil {
+						if rowErr = budget.collect(&matches, hit); rowErr != nil {
 							return false
 						}
-						matches = append(matches, hit)
 					}
 				} else {
 					formulaTag, formulaBytes, found := fastElement(body, "f")
@@ -234,10 +232,9 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 							rowErr = e
 							return false
 						}
-						if rowErr = budget.add(hit); rowErr != nil {
+						if rowErr = budget.collect(&matches, hit); rowErr != nil {
 							return false
 						}
-						matches = append(matches, hit)
 					}
 				}
 				if len(matches) >= limit {
@@ -252,7 +249,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 		}
 		if truncated {
 			state.Matches, state.Complete, state.Truncated = matches, true, true
-			if err := saveSearchCheckpoint(state, save, true); err != nil {
+			if err := saveSearchCheckpoint(state, save, true, stream); err != nil {
 				return state, err
 			}
 			if progress != nil {
@@ -261,7 +258,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 			return state, nil
 		}
 		state.Next, state.Matches, state.Complete = i+1, matches, i+1 == total
-		if err := saveSearchCheckpoint(state, save, state.Complete); err != nil {
+		if err := saveSearchCheckpoint(state, save, state.Complete, stream); err != nil {
 			return state, err
 		}
 		if progress != nil && (i == total-1 || time.Since(lastProgress) > 120*time.Millisecond) {
