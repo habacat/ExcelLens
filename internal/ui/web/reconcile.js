@@ -268,6 +268,12 @@
       }catch(error){if(epoch===this.epoch&&error.name!=='AbortError')this.progress(error.message,true);}
       finally{this.controls();}
     }
+    async reopenJob(job,status){
+      await this.open();
+      this.job=job;this.result={...status.result,recordError:status.recordError,exceptionGroupsSHA256:status.exceptionGroupsSHA256};
+      this.resultBaseline=null;this.configChanged=false;$('reconcileResults').hidden=false;
+      this.progress('核对完成');this.renderResult();this.controls();
+    }
     async upload(file){
       if(!file||this.busy||this.pendingUpload)return;const epoch=this.epoch,controller=new AbortController();this.pendingUpload=controller;this.controls();
       try{const form=new FormData();form.append('file',file,file.name);form.append('reconcileSource','1');form.append('workbookKey',this.s.workbookKey);form.append('primaryBook',this.primaryBook);$('reconcileSourceNotice').textContent='正在添加核对文件…';

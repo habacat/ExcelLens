@@ -809,6 +809,17 @@
       </div>
       <label for="storageDirectory">备份目录</label>
       <div class="storage-actions"><input id="storageDirectory" class="field-control" type="text" placeholder="目录完整路径"><button class="mini-button" data-storage="backup" type="button">备份到此处</button><button class="mini-button" data-storage="restore" type="button">从此处迁入</button></div>
+      <label for="storagePassword">备份口令（可选）</label>
+      <input id="storagePassword" class="field-control" type="password" autocomplete="new-password" placeholder="明文备份可留空">
+      <button id="storageCancel" class="mini-button" type="button" hidden>取消传输</button>
+      <details id="storageHistory"><summary>传输记录</summary><div id="storageJobs"></div></details>
+      <details id="storageSources"><summary>重定位来源文件</summary>
+        <select id="storageSource" class="field-control" aria-label="原来源"></select>
+        <input id="storageCandidate" class="field-control" placeholder="新文件完整路径" aria-label="新文件完整路径">
+        <button id="storageRelocate" type="button" class="mini-button">核验并定位</button>
+        <div id="storageMoves" class="storage-paths"></div>
+      </details>
+      <details id="storageBackground"><summary>后台工作簿任务</summary><div id="storageWork"></div></details>
       <div id="storageStatus" role="status" aria-live="polite"></div>
     </div>
   </dialog>
@@ -1308,6 +1319,8 @@
   <script src="/assets/toolbar-settings.js"></script>
   <script src="/assets/command-palette.js"></script>
   <script src="/assets/viewport-cache.js"></script>
+  <script src="/assets/transport.js"></script>
+  <script src="/assets/background-tasks.js"></script>
   <script src="/assets/storage.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>

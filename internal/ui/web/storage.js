@@ -1,14 +1,15 @@
 (() => {
   'use strict';
-  window.ExcelLensStorage = function({api, openDialog}) {
+  window.ExcelLensStorage = function({api, openDialog, background}) {
     const $ = id => document.getElementById(id);
     const dialog = $('storageDialog'), status = $('storageStatus'), body = $('storageRows');
     const buttons = Array.from(dialog.querySelectorAll('[data-storage]'));
-    let busy = false;
+    let busy = false,job=null,timer,serial=0,sources=[];
     function working(value) {
       busy = value;
       for (const button of buttons) button.disabled = value;
       $('storageDirectory').disabled = value;
+      $('storagePassword').disabled=value;
       dialog.setAttribute('aria-busy', String(value));
     }
     function show(message, failed = false) {
@@ -45,30 +46,103 @@
       'clear-cache':'清理未使用的工作簿索引？',
       'clear-uploads':'删除未使用的上传副本？仅存于此处的文件将无法从这里找回。'
     };
-    async function run(action) {
-      if (busy) return;
-      if (confirmations[action] && !window.confirm(confirmations[action])) return;
-      const directory = $('storageDirectory').value.trim();
-      if ((action === 'backup' || action === 'restore') && !directory) {
-        show('请输入目录的完整路径', true); $('storageDirectory').focus(); return;
-      }
-      working(true);
-      show(action === 'backup' ? '正在复制并核验备份…' : action === 'restore' ? '正在核验并迁入备份…' : action === 'refresh' ? '正在统计…' : '正在处理…');
-      let message = '';
-      try {
-        if (action !== 'refresh') {
-          const result = await api('/api/storage', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action,directory})});
-          message = result.message;
-        }
-        await refresh();
-        show(message);
-      } catch (error) { show([message, error.message].filter(Boolean).join('。'), true); }
-      finally { working(false); }
+    const commands={backup:'备份',restore:'迁入备份',migrate:'迁入旧设置','verify-source':'核验来源','relocate-source':'更新来源'};
+    const post=(url,payload)=>api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    function describe(item){
+      const p=item.progress||{},fmt=window.ExcelLensDisplayFormat.bytes;
+      return [item.message,item.error].filter(Boolean).join('。')||[p.phase,p.files?p.files+' / '+(p.items||'…')+' 项':'',p.bytes?fmt(p.bytes)+(p.total?' / '+fmt(p.total):''):''].filter(Boolean).join(' · ');
     }
-    for (const button of buttons) button.addEventListener('click', () => run(button.dataset.storage));
-    for (const id of ['storageHome','storageOpenBtn']) $(id).addEventListener('click', () => {
-      openDialog('storageDialog');
-      if (!busy) void run('refresh');
+    function renderHistory(jobs){
+      const holder=$('storageJobs');holder.replaceChildren();
+      for(const item of jobs){const row=document.createElement('div');row.textContent=new Date(item.started).toLocaleString()+'　'+commands[item.action]+'　'+describe(item);holder.append(row);}
+      if(!jobs.length)holder.textContent='没有传输记录';
+    }
+    function schedule(ticket){
+      clearTimeout(timer);
+      if(dialog.open)timer=setTimeout(()=>observe(ticket),500);
+    }
+    async function observe(ticket){
+      try{
+        const {jobs}=await api('/api/storage/jobs');
+        if(ticket!==serial)return;
+        renderHistory(jobs);
+        const item=jobs.find(x=>x.id===job)||jobs[0];
+        if(item?.state==='running'){
+          job=item.id;working(true);show(describe(item));$('storageCancel').hidden=item.progress.phase==='提交恢复事务';schedule(ticket);return;
+        }
+        job=null;$('storageCancel').hidden=true;
+        if(dialog.open)await refresh();
+        if(ticket!==serial)return;
+        working(false);show(item?describe(item):'',!!item?.error);
+        if($('storageSources').open)await loadSources();
+      }catch(e){if(ticket===serial){show(e.message,true);if(job)schedule(ticket);else working(false);}}
+    }
+    async function run(action){
+      if(busy)return;
+      if(confirmations[action]&&!window.confirm(confirmations[action]))return;
+      const directory=$('storageDirectory').value.trim();
+      if((action==='backup'||action==='restore')&&!directory){show('请输入目录的完整路径',true);$('storageDirectory').focus();return;}
+      const ticket=++serial;working(true);show('正在处理…');
+      try{
+        if(action==='refresh'){await observe(ticket);return;}
+        const password=$('storagePassword').value;
+        if(action==='backup'&&password&&!window.confirm('使用此口令加密备份？恢复时需要同一口令。')){working(false);show('');return;}
+        $('storagePassword').value='';
+        const item=await post('/api/storage',{action,directory,password:(action==='backup'||action==='restore')?password:''});
+        if(commands[action]){job=item.id;await observe(ticket);return;}
+        await refresh();show(item.message);working(false);
+      }catch(e){show(e.message,true);working(false);}
+    }
+    $('storageCancel').addEventListener('click',async()=>{
+      if(!job)return;
+      try{await post('/api/storage/jobs?id='+encodeURIComponent(job),{});show('正在取消…');}catch(e){show(e.message,true);}
+    });
+    function selectSource(){
+      const item=sources.find(x=>x.book===$('storageSource').value);
+      $('storageCandidate').value=item?.candidate||'';
+      $('storageMoves').textContent=item?[item.original,...(item.moves||[]).map(x=>new Date(x.at).toLocaleString()+'　'+x.to)].join('\n'):'没有可重定位的来源';
+      $('storageRelocate').disabled=!item;
+    }
+    async function loadSources(){
+      try{
+        const {items}=await api('/api/storage/sources');sources=items||[];
+        const select=$('storageSource'),previous=select.value;select.replaceChildren();
+        for(const x of sources){const option=document.createElement('option');option.value=x.book;option.textContent=x.path;select.append(option);}
+        if(sources.some(x=>x.book===previous))select.value=previous;
+        selectSource();
+      }catch(e){show(e.message,true);}
+    }
+    $('storageSources').addEventListener('toggle',()=>{if($('storageSources').open&&!busy)loadSources();});
+    $('storageSource').addEventListener('change',selectSource);
+    async function locate(request,ticket){
+      const started=await post('/api/storage/sources',request);
+      job=started.id;
+      while(ticket===serial&&dialog.open){
+        const item=await api('/api/storage/jobs?id='+encodeURIComponent(started.id));
+        if(ticket!==serial||!dialog.open)return null;
+        show(describe(item),!!item.error);
+        $('storageCancel').hidden=item.state!=='running';
+        if(item.state==='done'){job=null;return item;}
+        if(item.state!=='running'){job=null;throw Error(item.error||'来源核验失败');}
+        await new Promise(resolve=>setTimeout(resolve,350));
+      }
+      return null;
+    }
+    $('storageRelocate').addEventListener('click',async()=>{
+      const item=sources.find(x=>x.book===$('storageSource').value);
+      if(!item||busy)return;
+      const request={book:item.book,previous:item.path,path:$('storageCandidate').value.trim()};
+      const ticket=++serial;working(true);
+      try{
+        const checked=await locate(request,ticket);
+        if(!checked||!window.confirm('内容指纹相符。确认更新来源位置？\n'+item.path+'\n→ '+checked.candidate))return;
+        if(await locate({...request,path:checked.candidate,confirm:true},ticket))await loadSources();
+      }catch(e){if(ticket===serial)show(e.message,true);}finally{if(ticket===serial){$('storageCancel').hidden=true;working(false);}}
+    });
+    for(const button of buttons)button.addEventListener('click',()=>run(button.dataset.storage));
+    dialog.addEventListener('close',()=>{++serial;clearTimeout(timer);$('storagePassword').value='';});
+    for(const id of ['storageHome','storageOpenBtn'])$(id).addEventListener('click',()=>{
+      openDialog('storageDialog');void observe(++serial);if($('storageBackground').open)background();
     });
   };
 })();

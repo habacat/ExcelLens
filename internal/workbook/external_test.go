@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"bytes"
 	"encoding/binary"
 	"os"
@@ -203,7 +205,7 @@ func TestSQLiteWALFingerprintAndSnapshotInvalidation(t *testing.T) {
 	if err := os.WriteFile(walPath, []byte("WAL-one"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	fingerprint, st, err := fingerprintFile(path, "sqlite")
+	fingerprint, st, err := fileidentity.Fingerprint(path, "sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +222,7 @@ func TestSQLiteWALFingerprintAndSnapshotInvalidation(t *testing.T) {
 	if err = wb.checkExternalUnchanged(); err == nil {
 		t.Fatal("WAL changes were ignored")
 	}
-	newFP, _, err := fingerprintFile(path, "sqlite")
+	newFP, _, err := fileidentity.Fingerprint(path, "sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}

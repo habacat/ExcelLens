@@ -3,7 +3,6 @@
 
   const $ = (id) => document.getElementById(id);
   const icon = name => `<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
-  const TOKEN = document.querySelector('meta[name="app-token"]')?.content || "";
   const fileFormats = window.ExcelLensFileFormats.create(JSON.parse($("fileFormats").textContent));
   window.ExcelLensClipboard?.configure(fileFormats.clipboard);
   let ROW_HEAD = 26;
@@ -154,21 +153,7 @@
     ["blank", "为空"], ["notBlank", "非空"]
   ];
 
-  async function api(url, options = {}, responseType = 'json') {
-    const activity = window.ExcelLensActivity?.request(url, options);
-    try {
-      await window.ExcelLensSession?.ready;
-      const headers = new Headers(options.headers || {});
-      headers.set("X-ExcelLens-Token", TOKEN);
-      window.ExcelLensSession?.apply(headers);
-      const response = await fetch(url, { ...options, headers, cache: "no-store" });
-      if(response.ok&&responseType==='text')return response.text();
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {const error=new Error(data.error || `请求失败（HTTP ${response.status}）`);error.status=response.status;throw error;}
-      if(data.compact===1 && Array.isArray(data.rows))data.rows=window.ExcelLensWire.unpack(data.rows);
-      return data;
-    } finally { activity?.end(); }
-  }
+  const api=window.ExcelLensTransport.api;
 
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const scale = () => S.zoom / 100;
@@ -720,28 +705,7 @@
   function uploadFile(file) {
     if (!file || S.opening) return;
     if (!fileFormats.supports(file.name)) { toast("支持表格、台账及 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包",'warning'); return; }
-    return openWorkbook(activity => new Promise((resolve, reject) => {
-      activity?.stage('正在读取文件', 0, 28);
-      const form = new FormData();
-      form.append("file", file, file.name);
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/open");
-      xhr.setRequestHeader("X-ExcelLens-Token", TOKEN);
-      window.ExcelLensSession?.apply(new Headers()).forEach((value, name) => xhr.setRequestHeader(name, value));
-      xhr.upload.onprogress = event => {
-        if (event.lengthComputable) activity?.report(event.loaded, event.total, '', fmtBytes(event.loaded) + ' / ' + fmtBytes(event.total));
-      };
-      xhr.upload.onload = () => activity?.stage('正在解析文件', 28, 60);
-      xhr.onload = () => {
-        let data;
-        try { data = JSON.parse(xhr.responseText); } catch { /* Surface malformed output as an open failure. */ }
-        if (xhr.status >= 200 && xhr.status < 300 && data) resolve(data);
-        else reject(new Error(data?.error || '无法打开文件（HTTP ' + xhr.status + '）'));
-      };
-      xhr.onerror = () => reject(new Error("本机文件读取失败，请重新选择文件"));
-      xhr.onabort = () => reject(new Error("读取已取消"));
-      xhr.send(form);
-    }), file.name, file.size).catch(error => toast(error.message,'error'));
+    return openWorkbook(activity => window.ExcelLensTransport.upload(file,activity,fmtBytes), file.name, file.size).catch(error => toast(error.message,'error'));
   }
 
   async function acceptOpenedWorkbook(data, {fallbackName = "", fallbackSize = 0, activity, revisionRef = ""} = {}) {
@@ -4453,7 +4417,11 @@
   }
 
   function bindEvents() {
-    window.ExcelLensStorage({api, openDialog});
+    window.ExcelLensStorage({api, openDialog, background: window.ExcelLensBackground({
+      api, state:S, openDialog, toast, adoptTask:adoptRecoveredTask,
+      analysis:(job,status)=>window.ExcelLensAnalytics.reopenJob(job,status),
+      reconcile:(job,status)=>reconcileCenter.reopenJob(job,status)
+    })});
     window.addEventListener("excellens:session-expired", event => { setStatus(event.detail); toast(event.detail, "warning"); });
     document.addEventListener('toolbar-setting-error', event => toast(event.detail, 'error'));
     commandPalette.bind();

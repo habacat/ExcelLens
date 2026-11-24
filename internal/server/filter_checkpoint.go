@@ -88,6 +88,9 @@ func (a *App) startCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 	}
 	defer func() { <-a.rootApp().recoverySem }()
 	def, err := filterTaskDefinition(wb, req.Sheet, newFilterSpec(req.Rules, req.options()))
+	if err == nil {
+		err = setTaskDigest(r.Context(), wb, &def)
+	}
 	if err != nil {
 		if errors.Is(err, checkpoint.ErrCapacity) {
 			checkpointHTTPError(w, err)
@@ -150,6 +153,7 @@ func (a *App) queueCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 	}
 	a.filterJobs[job.ID] = job
 	a.mu.Unlock()
+	a.retainSubmitted(job.done)
 	go a.runFilter(wb, workbook.SheetMeta{}, nil, nil, workbook.FilterOptions{}, job)
 	spec, _ := filterCheckpointSpecFor(manifest)
 	writeJSON(w, map[string]any{"jobId": job.ID, "taskId": manifest.ID, "recoverable": true, "operation": "filter", "filter": spec.Filter})
@@ -192,7 +196,7 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 	if err != nil {
 		return failure(err)
 	}
-	binding, err := checkpoint.DefinitionHash(def)
+	binding, err := taskBinding(job.ctx, wb, def, m, true)
 	if err != nil || binding != m.DefinitionHash {
 		return failure(checkpoint.ErrBinding)
 	}
@@ -200,10 +204,14 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 	if err != nil {
 		return failure(err)
 	}
+	policy, err := indexPolicy(wb, m)
+	if err != nil {
+		return failure(err)
+	}
 	meta, _ := wb.FindSheet(spec.Sheet)
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		if cursor.Index != "" {
+		if cursor.Index != "" && !policy.rebuild {
 			return failure(errors.New("筛选恢复所需索引已被清理，请重新运行"))
 		}
 		releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
@@ -219,7 +227,7 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 	if err := workbook.ValidateFilterSpec(idx, spec.Filter.Rules, spec.Filter.options()); err != nil {
 		return failure(err)
 	}
-	stamp, err := wb.SourceIndexStamp(job.ctx, meta, idx)
+	stamp, err := wb.CheckpointIndexStamp(job.ctx, meta, idx, policy.portable)
 	if err != nil {
 		return failure(err)
 	}
@@ -230,11 +238,11 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 		if err != nil {
 			return failure(err)
 		}
-	} else if cursor.Index != stamp || cursor.Rows != idx.RowCount() {
+	} else if policy.expected(cursor.Index) != stamp || cursor.Rows != idx.RowCount() {
 		return failure(checkpoint.ErrBinding)
 	}
 	check := func() error {
-		current, err := wb.SourceIndexStamp(job.ctx, meta, idx)
+		current, err := wb.CheckpointIndexStamp(job.ctx, meta, idx, policy.portable)
 		if err != nil {
 			return err
 		}

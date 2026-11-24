@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"fmt"
 	"strings"
 )
@@ -11,7 +13,7 @@ type sqliteTable struct {
 }
 
 func openSQLiteWorkbook(filePath string) (*Workbook, error) {
-	fingerprint, st, err := fingerprintFile(filePath, "sqlite")
+	fingerprint, st, err := fileidentity.Fingerprint(filePath, "sqlite")
 	if err != nil {
 		return nil, err
 	}

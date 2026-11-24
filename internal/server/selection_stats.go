@@ -384,7 +384,7 @@ func (a *App) selectionProjection(ctx context.Context, wb *workbook.Workbook, re
 		return nil, err
 	}
 	defer doc.Close()
-	if doc.Revision != edit.Revision || doc.Base.Source.Book != edit.Book {
+	if doc.Revision != edit.Revision || editViewBook(doc.ID, doc.Base) != edit.Book {
 		return nil, checkpoint.ErrConflict
 	}
 	layout, err := editfile.ParseLayout(doc.Base.Layout, doc.Base.Source.Format)

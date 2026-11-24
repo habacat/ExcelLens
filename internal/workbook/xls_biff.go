@@ -4,6 +4,8 @@ package workbook
 // through Office. Formula cells use their stored results; formula tokens are
 // decoded only where unambiguous. Unsupported tokens remain explicitly marked.
 import (
+	"excellens/internal/fileidentity"
+
 	"bufio"
 	"encoding/binary"
 	"errors"
@@ -516,7 +518,7 @@ func openBIFFWorkbook(filePath string) (*Workbook, error) {
 	if e != nil {
 		return nil, e
 	}
-	fp, st, e := fingerprintFile(filePath, "xls")
+	fp, st, e := fileidentity.Fingerprint(filePath, "xls")
 	if e != nil {
 		return nil, e
 	}

@@ -42,7 +42,7 @@ func (r Roots) groups() []group {
 		{"布局与偏好", "用户设置", "config", []string{"layouts", "frozen-panes", "settings", "row-views", "named-views"}, true},
 		{"分析表与核查方案", "工作成果", "config", []string{"workspaces", "recipes", "compositions", "snapshots"}, true},
 		{"编辑历史与生成副本", "工作成果", "config", []string{"edit-documents", "edit-revisions", "edit-files"}, true},
-		{"任务与页面恢复", "工作成果", "config", []string{"task-checkpoints", "recovery"}, true},
+		{"任务与页面恢复", "工作成果", "config", []string{"task-checkpoints", "recovery", "source-locations", "task-portability"}, true},
 		{"运行日志", "诊断记录", "config", []string{"logs"}, false},
 	}
 	if !sameDirectory(r.Local, r.Config) {

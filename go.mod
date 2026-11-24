@@ -11,7 +11,10 @@ ignore (
 
 require (
 	github.com/bodgit/sevenzip v1.6.5
+	github.com/minio/sio v0.5.1
 	github.com/ulikunitz/xz v0.5.17
+	golang.org/x/crypto v0.46.0
+	golang.org/x/sys v0.40.0
 	golang.org/x/text v0.44.0
 )
 

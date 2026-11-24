@@ -54,3 +54,5 @@ func (l *Lease) End(now time.Time) {
 		l.deadline = now.Add(SilenceLimit)
 	}
 }
+
+func (l *Lease) Unattended(now time.Time) bool { return l.detached || l.Expired(now) }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -34,16 +35,29 @@ func main() {
 		return // fail closed: never start an unprotected duplicate process
 	}
 	if len(os.Args) > 1 && os.Args[1] == "--restore-data" {
-		if len(os.Args) != 3 {
-			log.Fatal("用法：ExcelLens --restore-data 备份目录")
+		withPassword := len(os.Args) == 4 && os.Args[3] == "--password-stdin"
+		if len(os.Args) != 3 && !withPassword {
+			log.Fatal("用法：ExcelLens --restore-data 备份目录 [--password-stdin]")
 		}
 		if !owner {
 			log.Fatal("请先退出目标电脑上的 ExcelLens 再迁入备份")
 		}
 		defer release()
+		var options localstore.TransferOptions
+		if withPassword {
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, 16385))
+			if err != nil || len(data) > 16384 {
+				log.Fatal("无法读取口令")
+			}
+			options.Password = strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
+			clear(data)
+			if options.Password == "" {
+				log.Fatal("缺少口令")
+			}
+		}
 		config, err := localstore.ConfigDir()
 		if err == nil {
-			err = (localstore.Roots{Local: workbook.DataRoot(), Config: config}).Restore(context.Background(), os.Args[2])
+			err = (localstore.Roots{Local: workbook.DataRoot(), Config: config}).RestoreWith(context.Background(), os.Args[2], options)
 		}
 		if err != nil {
 			log.Fatal("迁入失败：", err)

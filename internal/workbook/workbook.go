@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"archive/zip"
 	"crypto/sha1"
 	"encoding/xml"
@@ -198,7 +200,7 @@ func (w *Workbook) CheckSourceUnchanged() error {
 		// Explicit source binding must also detect same-size rewrites with a
 		// restored timestamp. Reliable Windows revision stamps use the existing
 		// bounded fingerprint memo; other cases verify the full content hash.
-		fingerprint, _, err := fingerprintFile(w.Path, w.source.fingerprintDomain)
+		fingerprint, _, err := fileidentity.Fingerprint(w.Path, w.source.fingerprintDomain)
 		if err != nil {
 			return err
 		}

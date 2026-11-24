@@ -122,6 +122,9 @@ func prepareDefinition(def Definition) (Definition, string, error) {
 	}
 	def.Sources = append([]Source(nil), def.Sources...)
 	for _, source := range def.Sources {
+		if source.SHA256 != "" && !validHash(source.SHA256) {
+			return Definition{}, "", ErrBinding
+		}
 		if !filepath.IsAbs(source.Path) || !utf8.ValidString(source.Path) || len(source.Path) > 32768 || strings.ContainsRune(source.Path, '\x00') {
 			return Definition{}, "", ErrBinding
 		}

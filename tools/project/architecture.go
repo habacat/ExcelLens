@@ -27,6 +27,7 @@ var allowedInternalImports = map[string][]string{
 	"editfile":     {"opc", "workbook", "editdoc", "formats", "separated", "calculator"},
 	"export":       {"workbook", "formats", "separated"},
 	"formats":      {},
+	"fileidentity": {},
 	"instance":     {},
 	"localstore":   {},
 	"opc":          {},
@@ -42,7 +43,7 @@ var allowedInternalImports = map[string][]string{
 	"tray":         {"branding", "formats", "workbook", "buildinfo"},
 	"ui":           {"formats", "buildinfo"},
 	"valueconv":    {},
-	"workbook":     {"formats", "searchdsl", "sourceview"},
+	"workbook":     {"fileidentity", "formats", "searchdsl", "sourceview"},
 }
 
 var allowedCommandImports = map[string][]string{

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -93,4 +94,66 @@ func (a *App) admitCheckpoint(w http.ResponseWriter) bool {
 		writeError(w, http.StatusTooManyRequests, "任务恢复繁忙，请稍后重试")
 		return false
 	}
+}
+
+// Verify the physical source before canonicalizing the path for the immutable
+// definition hash. All driver semantics, rules and sheet bindings still match.
+func bindTaskSource(ctx context.Context, wb *workbook.Workbook, actual, saved checkpoint.Source, verifyRaw bool) error {
+	loc, err := loadSourceLocation(saved)
+	if err != nil {
+		return err
+	}
+	physical := loc.current(saved.Path)
+	if cachePathKey(actual.Path) != cachePathKey(physical) || actual.Book != bookIDAt(saved.Fingerprint, physical) {
+		return checkpoint.ErrBinding
+	}
+	raw := saved.SHA256
+	if loc.SHA256 != "" {
+		if raw != "" && raw != loc.SHA256 {
+			return checkpoint.ErrBinding
+		}
+		raw = loc.SHA256
+	}
+	if verifyRaw && raw != "" {
+		hash, err := wb.SourceFileSHA256(ctx)
+		if err != nil {
+			return err
+		}
+		if hash != raw {
+			return checkpoint.ErrBinding
+		}
+	}
+	actual.Path, actual.Book, actual.SHA256 = saved.Path, saved.Book, saved.SHA256
+	if actual != saved {
+		return checkpoint.ErrBinding
+	}
+	return nil
+}
+func taskBinding(ctx context.Context, wb *workbook.Workbook, def checkpoint.Definition, m checkpoint.Manifest, verifyRaw bool) (string, error) {
+	if len(def.Sources) != 1 || len(m.Definition.Sources) != 1 {
+		return "", checkpoint.ErrBinding
+	}
+	actual, saved := def.Sources[0], m.Definition.Sources[0]
+	if def.Driver == exportCheckpointDriver {
+		var err error
+		actual, err = exportTaskSource(wb)
+		if err != nil {
+			return "", err
+		}
+	}
+	if err := bindTaskSource(ctx, wb, actual, saved, verifyRaw); err != nil {
+		return "", err
+	}
+	if cachePathKey(actual.Path) != cachePathKey(saved.Path) {
+		def.Title = m.Definition.Title
+	}
+	def.Sources = []checkpoint.Source{saved}
+	return checkpoint.DefinitionHash(def)
+}
+func setTaskDigest(ctx context.Context, wb *workbook.Workbook, def *checkpoint.Definition) error {
+	digest, err := wb.SourceFileSHA256(ctx)
+	if err == nil {
+		def.Sources[0].SHA256 = digest
+	}
+	return err
 }

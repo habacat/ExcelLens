@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"bufio"
 	"bytes"
 	"encoding/binary"
@@ -48,7 +50,7 @@ func openTextWorkbookMode(filePath string, fragment bool) (*Workbook, error) {
 	if fragment {
 		cacheFormat += ":complete-physical-records-v1"
 	}
-	fingerprint, st, err := fingerprintFile(filePath, cacheFormat)
+	fingerprint, st, err := fileidentity.Fingerprint(filePath, cacheFormat)
 	if err != nil {
 		return nil, err
 	}

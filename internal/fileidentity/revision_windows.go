@@ -1,6 +1,6 @@
 //go:build windows
 
-package workbook
+package fileidentity
 
 import (
 	"encoding/binary"
@@ -13,7 +13,7 @@ import (
 
 var fingerprintGetFileInformation = syscall.NewLazyDLL("kernel32.dll").NewProc("GetFileInformationByHandleEx")
 
-func openFingerprintSource(path string) (*os.File, bool, error) {
+func Open(path string) (*os.File, bool, error) {
 	name, err := syscall.UTF16PtrFromString(path)
 	if err == nil {
 		// Denying write sharing makes the memo check coherent even when an
@@ -29,7 +29,7 @@ func openFingerprintSource(path string) (*os.File, bool, error) {
 	return f, false, err
 }
 
-func fingerprintSourceStamp(f *os.File, info os.FileInfo) (externalFileStamp, bool) {
+func Revision(f *os.File, info os.FileInfo) (Stamp, bool) {
 	defer runtime.KeepAlive(f)
 	var basic struct {
 		Created, Accessed, Written, Changed int64
@@ -41,17 +41,17 @@ func fingerprintSourceStamp(f *os.File, info os.FileInfo) (externalFileStamp, bo
 	}
 	ok, _, _ := fingerprintGetFileInformation.Call(f.Fd(), 0, uintptr(unsafe.Pointer(&basic)), unsafe.Sizeof(basic))
 	if ok == 0 || basic.Changed <= 0 || basic.Written <= 0 {
-		return externalFileStamp{}, false
+		return Stamp{}, false
 	}
 	ok, _, _ = fingerprintGetFileInformation.Call(f.Fd(), 18, uintptr(unsafe.Pointer(&id)), unsafe.Sizeof(id))
 	if ok == 0 || id.ID == [16]byte{} {
-		return externalFileStamp{}, false
+		return Stamp{}, false
 	}
 	revision, err := fingerprintFileRevision(f)
 	if err != nil {
-		return externalFileStamp{}, false
+		return Stamp{}, false
 	}
-	return externalFileStamp{Volume: id.Volume, ID: id.ID, Created: basic.Created, Modified: basic.Written, Changed: basic.Changed, Size: info.Size(), Revision: revision}, true
+	return Stamp{Volume: id.Volume, ID: id.ID, Created: basic.Created, Modified: basic.Written, Changed: basic.Changed, Size: info.Size(), Revision: revision}, true
 }
 
 func fingerprintFileRevision(f *os.File) (int64, error) {

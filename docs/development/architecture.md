@@ -28,7 +28,8 @@ internal/export            公共流式导出与 XLSX 快照
 internal/printing          来源绑定的纸张/缩放/重复标题及有界物理分页
 internal/clustering        显式Unicode候选键、有界排序及原文分组
 internal/composition       只读多来源字段对齐、流式追加及源格追溯
-internal/localstore         数据位置、实际分配空间、校验备份及迁入
+internal/fileidentity       文件修订、内容指纹及可靠版本的摘要缓存
+internal/localstore         数据位置、流式明密文备份、事务暂存与重放
 internal/browserlease       单页租约、刷新代次、在途请求和回收期限
 internal/server            HTTP、会话、任务及业务装配
 internal/ui                嵌入的 HTML/CSS/JS 与格式配置注入
@@ -42,7 +43,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 | 包 | 可以依赖 |
 | --- | --- |
-| localstore / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
+| fileidentity / localstore / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
 | sourceview | formats |
 | checkpoint | formats |
 | editdoc | checkpoint、formats |
@@ -50,7 +51,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | opc | Go 标准库 |
 | separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
-| workbook | formats、searchdsl、sourceview |
+| workbook | fileidentity、formats、searchdsl、sourceview |
 | archives | formats、workbook |
 | calculator | analysis、valueconv、formats（统一地址容量） |
 | reconcile | analysis、workbook、formats |
@@ -63,6 +64,12 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
 | server | localstore、browserlease、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+
+### 备份、来源与任务
+
+`localstore` 在配置目录记录事务决定，每个数据卷独立暂存。全部源文件验证后落盘提交计划，每迁入一个单元同步确认游标。重启按计划核对已发布文件并继续。加密格式固定使用 Argon2id v19（64 MiB、3 次、1 通道、16 字节随机盐），按备份内逻辑路径由 HMAC-SHA-256 分别派生对象名和密钥，使用固定为 DARE 2.0、AES-256-GCM 的 minio/sio v0.5.1。每个对象含认证格式字节，空文件也接受完整性校验。依赖和许可随源码发布。
+
+`server/storage_jobs.go` 负责进程级传输与最近 32 次任务收据。`source_location.go` 用独立记录绑定经用户核验的新路径，`task_portability.go` 在显式备份时为能核对的旧索引建立内容证明。`fileidentity` 复用可靠的文件修订和完整摘要；无可靠修订时重新读取内容。浏览器请求和上传由 `transport.js` 装配令牌与会话。后台结果使用原任务注册表，已提交任务在执行期间持有独立租约，完成后保留 15 分钟供离开的页面接回。
 
 ### 服务入口和前端组件
 

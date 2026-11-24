@@ -93,11 +93,15 @@ func sourceBookID(wb *workbook.Workbook) string {
 	if wb == nil {
 		return ""
 	}
-	path := filepath.Clean(wb.Path)
+	return bookIDAt(wb.Fingerprint, wb.Path)
+}
+
+func bookIDAt(fingerprint, file string) string {
+	path := filepath.Clean(file)
 	if runtime.GOOS == "windows" {
 		path = strings.ToLower(path)
 	}
-	digest := sha256.Sum256([]byte(wb.Fingerprint + "\x00" + path))
+	digest := sha256.Sum256([]byte(fingerprint + "\x00" + path))
 	return fmt.Sprintf("%x", digest[:])
 }
 

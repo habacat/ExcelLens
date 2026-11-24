@@ -20,11 +20,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"excellens/internal/browserlease"
 	"excellens/internal/recovery"
 	"excellens/internal/workbook"
 )
 
 type App struct {
+	submitted browserlease.Work
 	workAdmission
 	queryController
 	workbookSession
@@ -37,8 +39,10 @@ type App struct {
 	archiveView      *archiveView
 	archiveTask      *archiveTask
 	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
-	storageMu        sync.Mutex    // root only: one explicit storage operation at a time
-	cacheResetMu     sync.RWMutex  // root only: drain requests before discarding active caches
+	transfers        storageJobs
+	restorePending   atomic.Bool
+	storageMu        sync.Mutex   // root only: one explicit storage operation at a time
+	cacheResetMu     sync.RWMutex // root only: drain requests before discarding active caches
 	cacheEpoch       atomic.Uint64
 	toolbar          toolbarPreference
 	sourceMu         sync.Mutex
@@ -78,6 +82,21 @@ type App struct {
 }
 
 func New() (*App, error) {
+	a, err := newApp()
+	if err != nil {
+		return nil, err
+	}
+	roots, err := dataRoots()
+	if err != nil {
+		return nil, err
+	}
+	if err := roots.Recover(context.Background()); err != nil {
+		return nil, fmt.Errorf("恢复事务尚未完成：%w", err)
+	}
+	return a, nil
+}
+
+func newApp() (*App, error) {
 	var tokenBytes [32]byte
 	if _, err := rand.Read(tokenBytes[:]); err != nil {
 		return nil, fmt.Errorf("生成本机访问令牌失败：%w", err)
@@ -157,6 +176,7 @@ func (a *App) Serve(ln net.Listener) error {
 
 func (a *App) Shutdown() {
 	a.shutdownOnce.Do(func() {
+		a.transfers.stop()
 		a.mu.Lock()
 		for _, job := range a.catalogueJobs {
 			job.cancel()

@@ -10,6 +10,7 @@
   const save = (name, value) => { try { sessionStorage.setItem(name, value); } catch {} };
   const url = new URL(window.location.href);
   const launch = url.searchParams.get('session');
+  const background = valid(launch) && !!url.searchParams.get('job');
   const stored = read(key);
   let id = valid(launch) ? launch : valid(stored) ? stored : makeID();
   save(key, id);
@@ -58,6 +59,7 @@
     headers.set('X-ExcelLens-Token', document.querySelector('meta[name="app-token"]').content);
     if (action === 'attach') {
       headers.set('X-ExcelLens-Generation', String(generation));
+      if (background && !resumed) headers.set('X-ExcelLens-Background', '1');
       if (resumed) headers.set('X-ExcelLens-Resume', '1');
     }
     return fetch('/api/session/' + action, {method:'POST', headers, cache:'no-store', keepalive:action === 'detach'});

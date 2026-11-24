@@ -38,7 +38,7 @@ func (a *App) editGrid(ctx context.Context, doc *editdoc.Document, layout editfi
 
 func (a *App) readEditGrid(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest, include func(editdoc.Address) bool) (*editGridProjection, error) {
 	wb := a.currentWorkbook()
-	if doc.Revision != req.Revision || wb == nil || req.Book != doc.Base.Source.Book || sourceBookID(wb) != req.Book {
+	if doc.Revision != req.Revision || wb == nil || req.Book != editViewBook(doc.ID, doc.Base) || sourceBookID(wb) != req.Book {
 		return nil, checkpoint.ErrConflict
 	}
 	if len(req.Cells) > formats.EditBatchCells {
@@ -254,6 +254,11 @@ func (a *App) handleEditBase(w http.ResponseWriter, r *http.Request, req editReq
 		editError(w, err)
 		return
 	}
+	base.Source, err = editLocation(doc.ID, base)
+	if err != nil {
+		editError(w, err)
+		return
+	}
 	wb, release, err := a.openPinnedWorkbook(base.Source.Path)
 	if err != nil {
 		editError(w, err)
@@ -270,11 +275,11 @@ func (a *App) handleEditBase(w http.ResponseWriter, r *http.Request, req editReq
 		editError(w, err)
 		return
 	}
+	wb.SetDisplayName(base.Name)
 	if sourceBookID(wb) != base.Source.Book || !a.installWorkbook(wb, expected, true) {
 		editError(w, checkpoint.ErrConflict)
 		return
 	}
-	wb.SetDisplayName(base.Name)
 	a.closeArchive()
 	writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": base.Name, "fileSize": f.Size(), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo})
 }

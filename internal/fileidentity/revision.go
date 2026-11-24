@@ -1,18 +1,18 @@
-package workbook
+package fileidentity
 
 import "sync"
 
 // Only a process-local receipt of a fully hashed source is memoized. Persistent
 // caches never get to assert a source digest. Platforms without a reliable
 // change-time/file-ID/revision stamp continue hashing every byte on each open.
-type externalFileStamp struct {
+type Stamp struct {
 	Volume                           uint64
 	ID                               [16]byte
 	Created, Modified, Changed, Size int64
 	Revision                         int64
 }
 type sourceFingerprintKey struct {
-	stamp  externalFileStamp
+	stamp  Stamp
 	format string
 }
 type sourceFingerprintReceipt struct {
@@ -26,7 +26,7 @@ var sourceFingerprints = struct {
 	items map[sourceFingerprintKey]sourceFingerprintReceipt
 }{items: make(map[sourceFingerprintKey]sourceFingerprintReceipt)}
 
-func recalledSourceFingerprint(stamp externalFileStamp, format string) (string, bool) {
+func Recall(stamp Stamp, format string) (string, bool) {
 	sourceFingerprints.Lock()
 	defer sourceFingerprints.Unlock()
 	key := sourceFingerprintKey{stamp, format}
@@ -39,7 +39,7 @@ func recalledSourceFingerprint(stamp externalFileStamp, format string) (string, 
 	return receipt.digest, ok
 }
 
-func rememberSourceFingerprint(stamp externalFileStamp, format, digest string) {
+func Remember(stamp Stamp, format, digest string) {
 	sourceFingerprints.Lock()
 	defer sourceFingerprints.Unlock()
 	const limit = 64

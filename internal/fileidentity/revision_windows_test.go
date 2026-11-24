@@ -1,6 +1,6 @@
 //go:build windows
 
-package workbook
+package fileidentity
 
 import (
 	"crypto/sha256"
@@ -18,12 +18,12 @@ func TestSourceFingerprintMemoDetectsRestoredTimestampAndReplacement(t *testing.
 	if err := os.WriteFile(path, []byte(first), 0600); err != nil {
 		t.Fatal(err)
 	}
-	file, stable, err := openFingerprintSource(path)
+	file, stable, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	info, _ := file.Stat()
-	stamp, supported := fingerprintSourceStamp(file, info)
+	stamp, supported := Revision(file, info)
 	if !supported {
 		_, revisionErr := fingerprintFileRevision(file)
 		t.Log("file revision query:", revisionErr)
@@ -32,16 +32,16 @@ func TestSourceFingerprintMemoDetectsRestoredTimestampAndReplacement(t *testing.
 	if !stable || !supported {
 		t.Log("filesystem lacks a file revision stamp; checking full-hash fallback")
 	}
-	one, _, err := fingerprintFile(path, "txt:test")
+	one, _, err := Fingerprint(path, "txt:test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if stable && supported {
-		if got, ok := recalledSourceFingerprint(stamp, "txt:test"); !ok || got != one {
+		if got, ok := Recall(stamp, "txt:test"); !ok || got != one {
 			t.Fatal("verified source not memoized")
 		}
 	}
-	if again, _, err := fingerprintFile(path, "txt:test"); err != nil || again != one {
+	if again, _, err := Fingerprint(path, "txt:test"); err != nil || again != one {
 		t.Fatal("unchanged source changed digest", err)
 	}
 	// Restoring mtime and preserving size must not fool the memo. ChangeTime
@@ -53,13 +53,13 @@ func TestSourceFingerprintMemoDetectsRestoredTimestampAndReplacement(t *testing.
 	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
 		t.Fatal(err)
 	}
-	two, _, err := fingerprintFile(path, "txt:test")
+	two, _, err := Fingerprint(path, "txt:test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := fmt.Sprintf("%x", sha256.Sum256([]byte("ExcelLens-external-source-v2:\x00txt:test\x00"+second)))
 	if one == two || two != want {
-		probe, _, openErr := openFingerprintSource(path)
+		probe, _, openErr := Open(path)
 		if openErr != nil {
 			t.Fatal(openErr)
 		}
@@ -68,7 +68,7 @@ func TestSourceFingerprintMemoDetectsRestoredTimestampAndReplacement(t *testing.
 			probe.Close()
 			t.Fatal(statErr)
 		}
-		after, _ := fingerprintSourceStamp(probe, currentInfo)
+		after, _ := Revision(probe, currentInfo)
 		probe.Close()
 		t.Fatalf("restored mtime reused stale digest; before=%+v after=%+v got=%s want=%s", stamp, after, two, want)
 	}
@@ -82,7 +82,7 @@ func TestSourceFingerprintMemoDetectsRestoredTimestampAndReplacement(t *testing.
 	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
 		t.Fatal(err)
 	}
-	three, _, err := fingerprintFile(path, "txt:test")
+	three, _, err := Fingerprint(path, "txt:test")
 	if err != nil || three != one {
 		t.Fatal("replacement used old source identity", err)
 	}
@@ -122,7 +122,7 @@ func TestSourceFingerprintMemoNeverTrustsAnOpenWriter(t *testing.T) {
 	if err := os.WriteFile(path, []byte("before"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	before, _, err := fingerprintFile(path, "txt:test-writer")
+	before, _, err := Fingerprint(path, "txt:test-writer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestSourceFingerprintMemoNeverTrustsAnOpenWriter(t *testing.T) {
 	if _, err := writer.WriteAt([]byte("after!"), 0); err != nil {
 		t.Fatal(err)
 	}
-	probe, stable, err := openFingerprintSource(path)
+	probe, stable, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestSourceFingerprintMemoNeverTrustsAnOpenWriter(t *testing.T) {
 	if stable {
 		t.Fatal("memo allowed an existing writer")
 	}
-	after, _, err := fingerprintFile(path, "txt:test-writer")
+	after, _, err := Fingerprint(path, "txt:test-writer")
 	if err != nil || after == before {
 		t.Fatal("writer bypassed full hashing", err)
 	}

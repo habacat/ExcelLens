@@ -103,6 +103,7 @@ func (a *App) handleReconcileStart(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	job := &reconcileTask{ID: randomID(), Workbook: primary, Books: [2]*workbook.Workbook{leftBook, rightBook}, Refs: [2]reconcileSourceRef{req.Left, req.Right}, Query: req.Query, Status: "queued", Stage: "等待核对任务", Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), release: a.pinWorkbooks(leftBook, rightBook)}
 	a.reconcileJobs[job.ID] = job
+	a.retainSubmitted(job.done)
 	go a.runReconcile(job)
 	writeJSON(w, map[string]string{"jobId": job.ID})
 }

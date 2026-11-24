@@ -153,7 +153,7 @@ func (a *App) startEdit(ctx context.Context, store *checkpoint.Store, book strin
 			continue
 		}
 		entry, err := editdoc.EntryFromManifest(*e.Manifest)
-		if err == nil && entry.Base.Source.Book == book && entry.Updated.After(latest.Updated) {
+		if err == nil && editViewBook(entry.ID, entry.Base) == book && entry.Updated.After(latest.Updated) {
 			if e.Backup {
 				return editdoc.Key{}, checkpoint.ErrCorrupt
 			}
@@ -187,7 +187,7 @@ func (a *App) startEdit(ctx context.Context, store *checkpoint.Store, book strin
 }
 
 func (a *App) editState(doc *editdoc.Document, layout editfile.Layout) (editState, error) {
-	out := editState{Document: doc.Info, Book: doc.Base.Source.Book, OriginalBook: doc.OriginalBase().Source.Book, Format: doc.Base.Source.Format, Artifacts: []editArtifact{}}
+	out := editState{Document: doc.Info, Book: editViewBook(doc.ID, doc.Base), OriginalBook: editViewBook(doc.ID, doc.OriginalBase()), Format: doc.Base.Source.Format, Artifacts: []editArtifact{}}
 	if layout.Text != nil {
 		l := layout.Text
 		out.Encoding = l.Encoding
@@ -224,17 +224,21 @@ func (a *App) editState(doc *editdoc.Document, layout editfile.Layout) (editStat
 func openEditBase(ctx context.Context, doc *editdoc.Document) (*workbook.EditSourceFile, error) {
 	origin := doc.OriginalBase()
 	if origin.Source.Book != doc.Base.Source.Book {
-		file, err := openVerifiedEditSource(ctx, origin)
+		file, err := openVerifiedEditSource(ctx, doc.ID, origin)
 		if err != nil {
 			return nil, err
 		}
 		_ = file.Close()
 	}
-	return openVerifiedEditSource(ctx, doc.Base)
+	return openVerifiedEditSource(ctx, doc.ID, doc.Base)
 }
 
-func openVerifiedEditSource(ctx context.Context, base editdoc.Base) (*workbook.EditSourceFile, error) {
-	f, err := workbook.OpenEditSource(base.Source.Path)
+func openVerifiedEditSource(ctx context.Context, id string, base editdoc.Base) (*workbook.EditSourceFile, error) {
+	source, err := editLocation(id, base)
+	if err != nil {
+		return nil, err
+	}
+	f, err := workbook.OpenEditSource(source.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +280,12 @@ func editBasePaths() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths, filepath.Clean(entry.Base.Source.Path))
+		source, err := editLocation(entry.ID, entry.Base)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, source.Path, entry.Base.Source.Path)
+		paths = append(paths, restoredUploadCandidate(entry.Base.Source.Path))
 	}
 	return paths, nil
 }

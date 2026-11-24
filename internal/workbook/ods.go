@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
@@ -63,7 +65,7 @@ func odsNumber(el xml.StartElement, ns, key string, max int) (int, error) {
 }
 
 func openODS(path string) (*Workbook, error) {
-	digest, st, err := fingerprintFile(path, "ods")
+	digest, st, err := fileidentity.Fingerprint(path, "ods")
 	if err != nil {
 		return nil, err
 	}

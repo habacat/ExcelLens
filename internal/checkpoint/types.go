@@ -23,6 +23,7 @@ var (
 // Source binds both path and content identity. The business driver must check
 // them against the actual source again before it resumes or publishes output.
 type Source struct {
+	SHA256      string `json:"sha256,omitempty"`
 	Path        string `json:"path"`
 	Book        string `json:"book"`
 	Fingerprint string `json:"fingerprint"`

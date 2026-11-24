@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"math"
 	"os"
 	"path/filepath"
@@ -57,7 +59,7 @@ func TestHTMLSourceLayoutKeepsBlankAreasBordersAndVerticalAlignment(t *testing.T
 	if !reflect.DeepEqual(heights, h2) || !reflect.DeepEqual(widths, w2) || g2 == nil || *g2 {
 		t.Fatal("warm metadata lost layout")
 	}
-	identity, _, err := fingerprintFile(path, "xls-html-v3-document")
+	identity, _, err := fileidentity.Fingerprint(path, "xls-html-v3-document")
 	if err != nil || identity != wb.Fingerprint || reopened.Fingerprint != wb.Fingerprint {
 		t.Fatal("display metadata changed the identity used for user workspaces")
 	}

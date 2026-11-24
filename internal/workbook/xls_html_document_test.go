@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"context"
 	"os"
 	"path/filepath"
@@ -99,7 +101,7 @@ func TestHTMLDocumentSectionsKeepExcelCoordinatesAndNestedStyles(t *testing.T) {
 	if wb.Sheets[0].Name != "原始账簿" {
 		t.Fatal(wb.Sheets)
 	}
-	old, _, err := fingerprintFile(wb.Path, "xls-html-v2-styles")
+	old, _, err := fileidentity.Fingerprint(wb.Path, "xls-html-v2-styles")
 	if err != nil || old == wb.Fingerprint {
 		t.Fatal("legacy per-table cache reused", err)
 	}

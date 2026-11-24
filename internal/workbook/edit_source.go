@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"archive/zip"
 	"context"
 	"crypto/sha256"
@@ -29,7 +31,7 @@ func (w *Workbook) EditDialect() (byte, string) {
 type EditSourceFile struct {
 	*os.File
 	info    os.FileInfo
-	stamp   externalFileStamp
+	stamp   fileidentity.Stamp
 	stamped bool
 }
 
@@ -45,7 +47,7 @@ func openSourceFile(path string, maxBytes int64) (*EditSourceFile, error) {
 	if !expected.Mode().IsRegular() {
 		return nil, errors.New("编辑源必须是普通文件")
 	}
-	f, stable, err := openFingerprintSource(path)
+	f, stable, err := fileidentity.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +70,7 @@ func openSourceFile(path string, maxBytes int64) (*EditSourceFile, error) {
 	}
 	src := &EditSourceFile{File: f, info: info}
 	if stable {
-		src.stamp, src.stamped = fingerprintSourceStamp(f, info)
+		src.stamp, src.stamped = fileidentity.Revision(f, info)
 	}
 	return src, nil
 }
@@ -95,7 +97,7 @@ func (f *EditSourceFile) Check() error {
 		return errors.New("编辑源已变更或被移走，请打开原版本后重试")
 	}
 	if f.stamped {
-		if stamp, ok := fingerprintSourceStamp(f.File, info); !ok || stamp != f.stamp {
+		if stamp, ok := fileidentity.Revision(f.File, info); !ok || stamp != f.stamp {
 			return errors.New("编辑源在读取时发生了变化")
 		}
 	}
@@ -111,7 +113,7 @@ func (f *EditSourceFile) digest(ctx context.Context, domain, prefix string) (str
 		return "", err
 	}
 	if f.stamped {
-		if cached, ok := recalledSourceFingerprint(f.stamp, domain); ok {
+		if cached, ok := fileidentity.Recall(f.stamp, domain); ok {
 			return cached, f.Check()
 		}
 	}
@@ -142,7 +144,7 @@ func (f *EditSourceFile) digest(ctx context.Context, domain, prefix string) (str
 	}
 	digest := hex.EncodeToString(h.Sum(nil))
 	if f.stamped {
-		rememberSourceFingerprint(f.stamp, domain, digest)
+		fileidentity.Remember(f.stamp, domain, digest)
 	}
 	return digest, nil
 }
@@ -152,7 +154,14 @@ func (w *Workbook) CheckEditSource(ctx context.Context, f *EditSourceFile) error
 		return errors.New("编辑源路径与当前文件不一致")
 	}
 	var fingerprint string
-	if w.source != nil && w.source.fingerprintDomain != "" {
+	if w.Format == "sqlite" {
+		// SQLite identities include committed WAL bytes in addition to the DB file.
+		var err error
+		fingerprint, _, err = fileidentity.Fingerprint(w.Path, "sqlite")
+		if err != nil {
+			return err
+		}
+	} else if w.source != nil && w.source.fingerprintDomain != "" {
 		domain := w.source.fingerprintDomain
 		var err error
 		fingerprint, err = f.digest(ctx, domain, "ExcelLens-external-source-v2:\x00"+domain+"\x00")

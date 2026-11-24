@@ -1,11 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"excellens/internal/editdoc"
 
@@ -38,13 +41,13 @@ func TestDataManagerMigratesRealSettingsAndRestoresThem(t *testing.T) {
 	if len(notes.Items) != 1 || notes.Items[0].Note != "保留的核查记录" {
 		t.Fatal(notes)
 	}
-	featureCall(t, a, "POST", "/api/storage", `{"action":"migrate"}`)
+	waitStorageTransfer(t, a, `{"action":"migrate"}`)
 	layout := decodeResponse[sheetLayout](t, featureCall(t, a, "GET", "/api/layout?sheet=First", ""))
 	if layout.Rows["2"] != 44 {
 		t.Fatal(layout)
 	}
 	featureCall(t, a, "POST", "/api/layout", `{"sheet":"First","kind":"row","index":2,"size":55}`)
-	featureCall(t, a, "POST", "/api/storage", `{"action":"migrate"}`)
+	waitStorageTransfer(t, a, `{"action":"migrate"}`)
 	if b, _ := os.ReadFile(filepath.Join(roots.Local, "layouts", fp+".json")); string(b) != files["layouts"] {
 		t.Fatal("old layout overwritten")
 	}
@@ -66,7 +69,7 @@ func TestDataManagerMigratesRealSettingsAndRestoresThem(t *testing.T) {
 	}
 	backupParent := t.TempDir()
 	request, _ := json.Marshal(map[string]string{"action": "backup", "directory": backupParent})
-	featureCall(t, a, "POST", "/api/storage", string(request))
+	waitStorageTransfer(t, a, string(request))
 	featureCall(t, a, "POST", "/api/storage", `{"action":"clear-cache"}`)
 	if _, err := os.Stat(upload); err != nil {
 		t.Fatal("cache cleanup removed upload", err)
@@ -92,8 +95,8 @@ func TestDataManagerMigratesRealSettingsAndRestoresThem(t *testing.T) {
 	}
 }
 
-// Reopen the restored checkpoint through the actual edit API. Its original
-// source stays at the same path while both application data roots change.
+// Exercise the old edit key and cursor after both data roots and the original
+// paths change. A preview must not authorize using the candidate.
 func TestStoragePageRestoresConfirmedEditAndProtectsTaskUpload(t *testing.T) {
 	isolateTestStorage(t)
 	first, err := New()
@@ -154,7 +157,70 @@ func TestStoragePageRestoresConfirmedEditAndProtectsTaskUpload(t *testing.T) {
 	}
 	defer reopened.Close()
 	req, _ := json.Marshal(map[string]string{"action": "restore", "directory": folder})
-	featureCall(t, reopened, "POST", "/api/storage", string(req))
+	waitStorageTransfer(t, reopened, string(req))
+	newBase := filepath.Join(t.TempDir(), "底稿.csv")
+	if err := os.Rename(path, newBase); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(source); err != nil {
+		t.Fatal(err)
+	}
+	newUpload := filepath.Join(workbook.UploadRoot(), filepath.Base(source))
+	if _, err := reopened.ClearUnusedUploads(); err != nil {
+		t.Fatal(err)
+	}
+	listed := decodeResponse[struct{ Items []relocationItem }](t, featureCall(t, reopened, "GET", "/api/storage/sources", ""))
+	if len(listed.Items) != 2 {
+		t.Fatal(listed.Items)
+	}
+	for _, item := range listed.Items {
+		candidate := newBase
+		if cachePathKey(item.Original) == cachePathKey(source) {
+			candidate = newUpload
+			if cachePathKey(item.Candidate) != cachePathKey(newUpload) {
+				t.Fatal(item)
+			}
+		}
+		wrong := newBase
+		if wrong == candidate {
+			wrong = newUpload
+		}
+		if _, err := reopened.verifyLocation(t.Context(), item.Book, item.Path, wrong, true); err == nil {
+			t.Fatal("different bytes accepted")
+		}
+		request := map[string]any{"book": item.Book, "previous": item.Path, "path": candidate}
+		post := func() storageJob {
+			body, _ := json.Marshal(request)
+			job := startStorageAt(t, reopened, "/api/storage/sources", string(body))
+			return waitForStorage(t, reopened, job)
+		}
+		if preview := post(); cachePathKey(preview.Candidate) != cachePathKey(candidate) {
+			t.Fatal(preview)
+		}
+		entries, err := relocationSources(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, saved := range entries {
+			if saved.Book == item.Book && (len(saved.Moves) != 0 || saved.Path != item.Path) {
+				t.Fatal("preview modified source path", saved)
+			}
+		}
+		request["confirm"] = true
+		if confirmed := post(); confirmed.Message != "已更新来源位置" {
+			t.Fatal(confirmed)
+		}
+	}
+	manifest := checkpointManifest(t, taskID)
+	checkpointCall(t, reopened, "/api/tasks/open", taskCheckpointRequest{ID: taskID, Revision: manifest.Revision}, 200)
+	if cachePathKey(reopened.currentWorkbook().Path) != cachePathKey(newUpload) {
+		t.Fatal("opened wrong upload")
+	}
+	resumed := checkpointResume(t, reopened, manifest)
+	checkpointWait(t, resumed)
+	if resumed.Status != "done" || len(resumed.Matches) != 1 {
+		t.Fatal(resumed.Status, resumed.Error, resumed.Matches)
+	}
 	if m := checkpointManifest(t, taskID); m.ID != taskID || !m.Complete {
 		t.Fatal("restored checkpoint", m)
 	}
@@ -204,5 +270,158 @@ func TestCacheActionsAndBackupAdoptUnvisitedLegacyFreeze(t *testing.T) {
 				t.Fatal(view, err)
 			}
 		})
+	}
+}
+
+func startStorageTransfer(t *testing.T, a *App, body string) storageJob {
+	t.Helper()
+	return startStorageAt(t, a, "/api/storage", body)
+}
+func startStorageAt(t *testing.T, a *App, path, body string) storageJob {
+	t.Helper()
+	req := localTestConnection(httptest.NewRequest("POST", path, strings.NewReader(body)))
+	req.Header.Set("X-ExcelLens-Token", a.token)
+	res := httptest.NewRecorder()
+	a.Handler().ServeHTTP(res, req)
+	if res.Code != 202 {
+		t.Fatal(res.Code, res.Body.String())
+	}
+	var job storageJob
+	if err := json.Unmarshal(res.Body.Bytes(), &job); err != nil {
+		t.Fatal(err)
+	}
+	return job
+}
+func waitStorageTransfer(t *testing.T, a *App, body string) storageJob {
+	t.Helper()
+	return waitForStorage(t, a, startStorageTransfer(t, a, body))
+}
+func waitForStorage(t *testing.T, a *App, job storageJob) storageJob {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		job = decodeResponse[storageJob](t, featureCall(t, a, "GET", "/api/storage/jobs?id="+job.ID, ""))
+		if job.State == "done" {
+			return job
+		}
+		if job.State != "running" {
+			t.Fatal(job)
+		}
+		time.Sleep(time.Millisecond * 10)
+	}
+	t.Fatal("transfer timeout")
+	return job
+}
+
+func TestLegacyFilterAndFrozenExportMigrateAcrossProfiles(t *testing.T) {
+	isolateTestStorage(t)
+	source := filterCheckpointCSV(t, 32)
+	a := checkpointOpen(t, source)
+	wb := a.currentWorkbook()
+	old := filterCheckpointSeed(t, a, filterCheckpointRequest(false), []int{0, 1}, nil, 2, false)
+	req := exportRequest{Scope: "sheet", Sheet: wb.Sheets[0].Name, Format: "csv", Mode: "values"}
+	selections, free := exportCheckpointPrepareOwned(t, a, req)
+	expected := exportCheckpointOutput(t, wb, selections, req.options())
+	store, lease := exportCheckpointCreate(t, a, req, selections)
+	if err := captureExportCheckpoint(t.Context(), wb, lease, selections); err != nil {
+		t.Fatal(err)
+	}
+	export := lease.Snapshot()
+	lease.Close()
+	store.Close()
+	free()
+	parent := t.TempDir()
+	payload, _ := json.Marshal(map[string]string{"action": "backup", "directory": parent})
+	if completed := waitStorageTransfer(t, a, string(payload)); strings.Contains(completed.Message, "缺少") {
+		t.Fatal(completed)
+	}
+	entries, _ := os.ReadDir(parent)
+	a.Close()
+	isolateTestStorage(t)
+	b, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	folder := filepath.Join(parent, entries[0].Name())
+	payload, _ = json.Marshal(map[string]string{"action": "restore", "directory": folder})
+	waitStorageTransfer(t, b, string(payload))
+	next := filepath.Join(t.TempDir(), "moved.csv")
+	if err = os.Rename(source, next); err != nil {
+		t.Fatal(err)
+	}
+	orig := old.Definition.Sources[0]
+	if _, err = b.verifyLocation(t.Context(), orig.Book, orig.Path, next, true); err != nil {
+		t.Fatal(err)
+	}
+	checkpointCall(t, b, "/api/tasks/open", taskCheckpointRequest{ID: export.ID, Revision: export.Revision}, 200)
+	if got := exportResumeDownload(t, b, exportResumeJob(t, b, export)); !bytes.Equal(got, expected) {
+		t.Fatal("relocated export differed")
+	}
+	job := filterCheckpointResume(t, b, old)
+	filterCheckpointWait(t, job)
+	if job.Status != "done" {
+		t.Fatal("legacy filter", job.Status, job.Error)
+	}
+	result := b.filterSnapshot(job.ResultID)
+	if result == nil {
+		t.Fatal("missing legacy order")
+	}
+	defer result.close()
+	want := filterCheckpointExpected(32, false)
+	if result.Rows.Len() != len(want) {
+		t.Fatal(result.Rows.Len(), len(want))
+	}
+	for i, row := range want {
+		if result.Rows.At(i) != row {
+			t.Fatal(i, row)
+		}
+	}
+}
+
+func TestStorageCancellationRetryAndPrivateHistory(t *testing.T) {
+	isolateTestStorage(t)
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	password := "test-only-private-password"
+	body, _ := json.Marshal(map[string]string{"action": "backup", "directory": t.TempDir(), "password": password})
+	// Queue a real operation behind maintenance and cancel before publication.
+	var job storageJob
+	var url string
+	func() {
+		a.cacheResetMu.Lock()
+		defer a.cacheResetMu.Unlock()
+		job = startStorageTransfer(t, a, string(body))
+		url = "/api/storage/jobs?id=" + job.ID
+		response := sessionCall(t, a, "", "POST", url, "{}")
+		if response.Code != 200 {
+			t.Fatal(response.Body)
+		}
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		item := decodeResponse[storageJob](t, featureCall(t, a, "GET", url, ""))
+		if item.State == "cancelled" {
+			break
+		}
+		time.Sleep(time.Millisecond * 5)
+	}
+	a.Close()
+	again, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	if item := decodeResponse[storageJob](t, featureCall(t, again, "GET", url, "")); item.State != "cancelled" {
+		t.Fatal(item)
+	}
+	featureCall(t, again, "POST", url, "{}")
+	roots, _ := dataRoots()
+	b, err := os.ReadFile(filepath.Join(roots.Config, "transfer-history.json"))
+	if err != nil || bytes.Contains(b, []byte(password)) {
+		t.Fatal("transfer history stored the password or failed to load", err)
 	}
 }

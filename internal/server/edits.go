@@ -125,7 +125,7 @@ func (a *App) handleEditList(w http.ResponseWriter, r *http.Request) {
 		if item.Manifest != nil {
 			entry, err := editdoc.EntryFromManifest(*item.Manifest)
 			if err == nil {
-				out.Info, out.Book, out.Format = entry.Info, entry.Base.Source.Book, entry.Base.Source.Format
+				out.Info, out.Book, out.Format = entry.Info, editViewBook(entry.ID, entry.Base), entry.Base.Source.Format
 			} else {
 				out.Error = "编辑副本版本或确认记录无效"
 			}
@@ -288,7 +288,7 @@ func (a *App) handleEditCommand(w http.ResponseWriter, r *http.Request) {
 		switch command {
 		case "commit":
 			if req.Operation.Action == "change" {
-				body, err = editCommitResult{doc.Info, doc.Revision, false, doc.Base.Source.Book}, nil
+				body, err = editCommitResult{doc.Info, doc.Revision, false, editViewBook(doc.ID, doc.Base)}, nil
 			}
 		case "preview":
 			body, err = editBatchPreview{}, nil

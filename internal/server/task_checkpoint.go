@@ -69,7 +69,10 @@ func (a *App) handleTaskCheckpoints(w http.ResponseWriter, r *http.Request) {
 			item.Revision, item.Kind, item.Title, item.Updated, item.Complete = m.Revision, m.Definition.Kind, m.Definition.Title, m.Updated, m.Complete
 			item.Driver = m.Definition.Driver
 			if len(m.Definition.Sources) > 0 {
-				source := m.Definition.Sources[0]
+				source, locationErr := locatedSource(m.Definition.Sources[0])
+				if locationErr != nil {
+					item.Error = locationErr.Error()
+				}
 				item.File, item.Path, item.Book, item.WorkbookKey = filepath.Base(source.Path), source.Path, source.Book, source.Fingerprint
 				if m.Definition.FileName != "" {
 					item.File = m.Definition.FileName
@@ -216,7 +219,7 @@ func (a *App) handleTaskCheckpointResume(w http.ResponseWriter, r *http.Request)
 			checkpointHTTPError(w, err)
 			return
 		}
-		binding, err := checkpoint.DefinitionHash(def)
+		binding, err := taskBinding(r.Context(), wb, def, m, false)
 		if err != nil || binding != m.DefinitionHash {
 			checkpointHTTPError(w, checkpoint.ErrBinding)
 			return

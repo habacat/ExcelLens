@@ -46,7 +46,7 @@ func trialNumber(raw string) (*big.Rat, error) {
 	return v, nil
 }
 func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout editfile.Layout, req editRequest) (any, error) {
-	if req.Revision != doc.Revision || req.Book != doc.Base.Source.Book || a.currentWorkbook() == nil || sourceBookID(a.currentWorkbook()) != req.Book {
+	if req.Revision != doc.Revision || req.Book != editViewBook(doc.ID, doc.Base) || a.currentWorkbook() == nil || sourceBookID(a.currentWorkbook()) != req.Book {
 		return nil, checkpoint.ErrConflict
 	}
 	s := req.Trial

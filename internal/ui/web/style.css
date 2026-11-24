@@ -783,3 +783,6 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 #storageDirectory {flex: 1; min-width: 10rem;}
 .storage-paths, #storageRoots, #storageStatus {white-space: pre-line; overflow-wrap: anywhere;}
 #storageStatus:empty {display: none;}
+#storageSources[open] > :is(select,input) {display: block; width: 100%; margin: .4rem 0;}
+#storageWork > div {display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;}
+#storageWork > div, #storageJobs > div {padding: .25rem 0; overflow-wrap: anywhere;}

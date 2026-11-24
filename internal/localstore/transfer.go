@@ -1,6 +1,7 @@
 package localstore
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,7 +13,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 )
@@ -40,55 +40,54 @@ func (r cancelledReader) Read(p []byte) (int, error) {
 
 // Open relative to the pinned root. Recheck the actual file, even when it was
 // already enumerated. Never follow a symlink in an application data group.
-func readFile(ctx context.Context, root *os.Root, name string, dst io.Writer) (fileRecord, error) {
+func openRegular(root *os.Root, name string) (*os.File, fs.FileInfo, error) {
 	name = filepath.FromSlash(name)
 	for p := name; p != "."; p = filepath.Dir(p) {
 		st, err := root.Lstat(p)
 		if err != nil {
-			return fileRecord{}, err
+			return nil, nil, err
 		}
 		if st.Mode()&os.ModeSymlink != 0 {
-			return fileRecord{}, fmt.Errorf("路径含链接：%s", p)
+			return nil, nil, fmt.Errorf("路径含链接：%s", p)
 		}
 	}
 	f, err := root.Open(name)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	st, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	if !st.Mode().IsRegular() {
+		f.Close()
+		return nil, nil, fmt.Errorf("不是普通文件：%s", name)
+	}
+	return f, st, nil
+}
+
+func digestCopy(ctx context.Context, src io.Reader, dst io.Writer) (fileRecord, error) {
+	h := sha256.New()
+	n, err := io.Copy(io.MultiWriter(dst, h), meteredReader(ctx, src))
+	return fileRecord{n, hex.EncodeToString(h.Sum(nil))}, err
+}
+
+func readFile(ctx context.Context, root *os.Root, name string, dst io.Writer) (fileRecord, error) {
+	f, st, err := openRegular(root, name)
+	if err != nil {
 		return fileRecord{}, err
 	}
 	defer f.Close()
-	st, err := f.Stat()
-	if err != nil {
-		return fileRecord{}, err
-	}
-	if !st.Mode().IsRegular() {
-		return fileRecord{}, fmt.Errorf("不是普通文件：%s", name)
-	}
-	hash := sha256.New()
-	n, err := io.Copy(io.MultiWriter(dst, hash), cancelledReader{ctx, f})
-	if err == nil && n != st.Size() {
+	rec, err := digestCopy(ctx, f, dst)
+	if err == nil && rec.Bytes != st.Size() {
 		err = fmt.Errorf("文件大小已变化：%s", name)
 	}
-	return fileRecord{n, hex.EncodeToString(hash.Sum(nil))}, err
+	return rec, err
 }
 
-func copyFile(ctx context.Context, src *os.Root, name string, dst *os.Root, out string) (fileRecord, error) {
-	out = filepath.FromSlash(out)
-	if err := dst.MkdirAll(filepath.Dir(out), 0700); err != nil {
-		return fileRecord{}, err
-	}
-	f, err := dst.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return fileRecord{}, err
-	}
-	record, err := readFile(ctx, src, name, f)
-	if err == nil {
-		err = f.Sync()
-	}
-	err = errors.Join(err, f.Close())
-	return record, err
-}
-
-func (r Roots) snapshot(ctx context.Context, dst *os.Root) (map[string]fileRecord, error) {
+func (r Roots) snapshot(ctx context.Context, dst *backupVolume) (map[string]fileRecord, error) {
 	files := make(map[string]fileRecord)
 	for _, g := range r.groups() {
 		if !g.backup {
@@ -101,10 +100,22 @@ func (r Roots) snapshot(ctx context.Context, dst *os.Root) (map[string]fileRecor
 			if dst == nil {
 				rec, err = readFile(ctx, root, name, io.Discard)
 			} else {
-				rec, err = copyFile(ctx, root, name, dst, key)
+				f, st, e := openRegular(root, name)
+				if e != nil {
+					return e
+				}
+				defer f.Close()
+				hash := sha256.New()
+				count := &countWriter{}
+				err = dst.write(key, io.TeeReader(meteredReader(ctx, f), io.MultiWriter(hash, count)))
+				rec = fileRecord{count.n, hex.EncodeToString(hash.Sum(nil))}
+				if err == nil && count.n != st.Size() {
+					err = fmt.Errorf("文件大小已变化：%s", name)
+				}
 			}
 			if err == nil {
 				files[key] = rec
+				finishFile(ctx)
 			}
 			return err
 		})
@@ -114,6 +125,10 @@ func (r Roots) snapshot(ctx context.Context, dst *os.Root) (map[string]fileRecor
 	}
 	return files, nil
 }
+
+type countWriter struct{ n int64 }
+
+func (c *countWriter) Write(p []byte) (int, error) { c.n += int64(len(p)); return len(p), nil }
 
 func (r Roots) externalFolder(folder string) (string, error) {
 	if !filepath.IsAbs(folder) {
@@ -141,6 +156,14 @@ func (r Roots) externalFolder(folder string) (string, error) {
 // Stage outside both data roots. Publish only after the source file set and
 // every source and copied digest have been checked against the first pass.
 func (r Roots) Backup(ctx context.Context, parent string) (string, error) {
+	return r.BackupWith(ctx, parent, TransferOptions{})
+}
+
+func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOptions) (string, error) {
+	ctx = options.start(ctx)
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	parent, err := r.externalFolder(parent)
 	if err != nil {
 		return "", err
@@ -158,10 +181,21 @@ func (r Roots) Backup(ctx context.Context, parent string) (string, error) {
 		return "", err
 	}
 	defer dest.Close()
-	files, err := r.snapshot(ctx, dest)
+	volume, err := newVolume(dest, options.Password, true)
 	if err != nil {
 		return "", err
 	}
+	defer clear(volume.key)
+	phase(ctx, "复制", 0, 0)
+	files, err := r.snapshot(ctx, &volume)
+	if err != nil {
+		return "", err
+	}
+	var total int64
+	for _, f := range files {
+		total += f.Bytes
+	}
+	phase(ctx, "复核来源", total, len(files))
 	again, err := r.snapshot(ctx, nil)
 	if err != nil {
 		return "", err
@@ -169,20 +203,34 @@ func (r Roots) Backup(ctx context.Context, parent string) (string, error) {
 	if !maps.Equal(files, again) {
 		return "", errors.New("备份期间文件发生变化，请待保存完成后重试")
 	}
+	phase(ctx, "校验备份", total, len(files))
 	for name, want := range files {
-		got, err := readFile(ctx, dest, name, io.Discard)
-		if err != nil {
+		if err := volume.verify(ctx, name, want, io.Discard); err != nil {
 			return "", err
 		}
-		if got != want {
-			return "", fmt.Errorf("备份校验失败：%s", name)
-		}
+		finishFile(ctx)
 	}
 	data, err := json.MarshalIndent(manifest{1, files}, "", "  ")
 	if err != nil {
 		return "", err
 	}
-	if err = dest.WriteFile("manifest.json", data, 0600); err != nil {
+	if len(data) > manifestLimit {
+		return "", errors.New("备份清单超过容量")
+	}
+	if err = volume.write("manifest.json", bytes.NewReader(data)); err != nil {
+		return "", err
+	}
+	check, err := volume.manifest()
+	if err != nil {
+		return "", err
+	}
+	if !bytes.Equal(data, check) {
+		return "", errors.New("备份清单复核失败")
+	}
+	if err = ctx.Err(); err != nil {
+		return "", err
+	}
+	if err = syncTree(dest.Name()); err != nil {
 		return "", err
 	}
 	if err = dest.Close(); err != nil {
@@ -195,134 +243,7 @@ func (r Roots) Backup(ctx context.Context, parent string) (string, error) {
 	if err = publishNew(stage, out); err != nil {
 		return "", err
 	}
-	return out, nil
-}
-
-// The caller excludes application writers. Each document or checkpoint directory
-// is installed whole. Other documents in the same category can coexist.
-func (r Roots) Restore(ctx context.Context, folder string) error {
-	folder, err := r.externalFolder(folder)
-	if err != nil {
-		return err
-	}
-	src, err := openDirectory(folder)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-	data, err := src.ReadFile("manifest.json")
-	if err != nil {
-		return err
-	}
-	var m manifest
-	if err = json.Unmarshal(data, &m); err != nil || m.Version != 1 || m.Files == nil {
-		return errors.New("备份清单无效")
-	}
-	units := map[string][]string{}
-	for name := range m.Files {
-		if !r.backupPart(name) {
-			return fmt.Errorf("备份含未知分类或路径：%s", name)
-		}
-		segments := strings.Split(name, "/")
-		if len(segments) < 3 && segments[1] != "recent.json" {
-			return errors.New("备份文件位置无效")
-		}
-		unit := strings.Join(segments[:min(3, len(segments))], "/")
-		units[unit] = append(units[unit], name)
-	}
-	type stagedRoot struct{ dest, temp *os.Root }
-	stages := map[string]stagedRoot{}
-	var pending []string
-	destinations := map[string]bool{}
-	for _, unit := range slices.Sorted(maps.Keys(units)) {
-		base, relUnit, _ := strings.Cut(unit, "/")
-		dir := r.directory(base)
-		stage, ok := stages[base]
-		if !ok {
-			if err := os.MkdirAll(dir, 0700); err != nil {
-				return err
-			}
-			dest, err := openDirectory(dir)
-			if err != nil {
-				return err
-			}
-			defer dest.Close()
-			tmp, err := os.MkdirTemp(dir, ".restore-")
-			if err != nil {
-				return err
-			}
-			defer os.RemoveAll(tmp)
-			temp, err := openDirectory(tmp)
-			if err != nil {
-				return err
-			}
-			defer temp.Close()
-			stage = stagedRoot{dest, temp}
-			stages[base] = stage
-		}
-		if err := checkParents(stage.dest, relUnit); err != nil {
-			return err
-		}
-		// Config and cache can be the same physical directory in portable profiles.
-		key := unit
-		if sameDirectory(r.Local, r.Config) {
-			key = relUnit
-		}
-		if destinations[key] {
-			return fmt.Errorf("备份有重复迁入目标：%s", key)
-		}
-		destinations[key] = true
-		st, err := stage.dest.Lstat(filepath.FromSlash(relUnit))
-		exists := err == nil
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		if exists && st.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("迁入目标含链接：%s", unit)
-		}
-		for _, name := range units[unit] {
-			rel := strings.TrimPrefix(name, base+"/")
-			var got fileRecord
-			if exists {
-				got, err = readFile(ctx, src, name, io.Discard)
-			} else {
-				got, err = copyFile(ctx, src, name, stage.temp, rel)
-			}
-			if err != nil {
-				return err
-			}
-			if got != m.Files[name] {
-				return fmt.Errorf("备份校验失败：%s", name)
-			}
-			if exists {
-				h, err := readFile(ctx, stage.dest, rel, io.Discard)
-				if err != nil || h != got {
-					return fmt.Errorf("目标已有不同数据：%s", unit)
-				}
-			}
-		}
-		if !exists {
-			pending = append(pending, unit)
-		}
-	}
-	for _, unit := range pending {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		base, rel, _ := strings.Cut(unit, "/")
-		stage := stages[base]
-		rel = filepath.FromSlash(rel)
-		if err := checkParents(stage.dest, rel); err != nil {
-			return err
-		}
-		if err := stage.dest.MkdirAll(filepath.Dir(rel), 0700); err != nil {
-			return err
-		}
-		if err := publishNew(filepath.Join(stage.temp.Name(), rel), filepath.Join(stage.dest.Name(), rel)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return out, syncDir(parent)
 }
 
 // Each restore unit is either a top-level file or one child of a category.

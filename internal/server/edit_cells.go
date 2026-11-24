@@ -164,7 +164,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		if err != nil {
 			return nil, err
 		}
-		return editCommitResult{doc.Info, committed, true, doc.Base.Source.Book}, nil
+		return editCommitResult{doc.Info, committed, true, editViewBook(doc.ID, doc.Base)}, nil
 	}
 	var f *workbook.EditSourceFile
 	defer func() {
@@ -180,7 +180,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		}
 	}
 	if next := doc.HistoryBase(op.Action); next != nil && !doc.HasReceipt(op.Request) && op.Revision == doc.Revision {
-		file, err := openVerifiedEditSource(ctx, *next)
+		file, err := openVerifiedEditSource(ctx, doc.ID, *next)
 		if err != nil {
 			return nil, err
 		}
@@ -267,7 +267,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 	if err != nil {
 		return nil, err
 	}
-	return editCommitResult{doc.Info, commit, layout.XLSX != nil && (len(layout.XLSX.Tables) > 0 || doc.Structures > 0), doc.Base.Source.Book}, nil
+	return editCommitResult{doc.Info, commit, layout.XLSX != nil && (len(layout.XLSX.Tables) > 0 || doc.Structures > 0), editViewBook(doc.ID, doc.Base)}, nil
 }
 
 type editCommitResult struct {

@@ -229,6 +229,7 @@ func (a *App) handleFilterStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.filterJobs[job.ID] = job
 	a.mu.Unlock()
+	a.retainSubmitted(job.done)
 	go a.runFilter(wb, meta, idx, req.Rules, workbook.FilterOptions{HeaderRow: req.HeaderRow, SortColumn: req.SortColumn, Descending: req.Descending, SortKeys: req.SortKeys}, job)
 	writeJSON(w, map[string]any{"jobId": job.ID})
 }
@@ -341,6 +342,7 @@ func (a *App) handleFilterStatus(w http.ResponseWriter, r *http.Request) {
 		result := a.filterSnapshot(resultID)
 		if result != nil {
 			out["matchedRows"] = result.Rows.Len()
+			out["filter"] = result.Spec
 			result.close()
 		} else {
 			out["status"], out["error"], out["filterId"] = "error", "筛选结果已过期或取消，请重新运行", ""

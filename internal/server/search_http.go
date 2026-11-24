@@ -132,6 +132,7 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.searchJobs[job.ID] = job
 	a.mu.Unlock()
+	a.retainSubmitted(job.done)
 	go a.runSearch(wb, meta, idx, job)
 	writeJSON(w, map[string]any{"jobId": job.ID})
 }

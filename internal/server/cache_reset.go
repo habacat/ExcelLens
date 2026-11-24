@@ -22,6 +22,9 @@ func (a *App) ClearAllCaches() (string, error) {
 	root := a.rootApp()
 	root.cacheResetMu.Lock()
 	defer root.cacheResetMu.Unlock()
+	if root.restorePending.Load() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	dir := workbook.CacheRoot()
 	keep, err := root.cacheSourceProtection(dir)
 	if err != nil {

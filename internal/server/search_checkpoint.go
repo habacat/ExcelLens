@@ -144,6 +144,9 @@ func (a *App) startCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 	}
 	defer func() { <-a.rootApp().recoverySem }()
 	def, err := searchTaskDefinition(wb, req)
+	if err == nil {
+		err = setTaskDigest(r.Context(), wb, &def)
+	}
 	if err != nil {
 		checkpointHTTPError(w, err)
 		return
@@ -199,6 +202,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 	}
 	a.searchJobs[job.ID] = job
 	a.mu.Unlock()
+	a.retainSubmitted(job.done)
 	go a.runSearch(wb, workbook.SheetMeta{}, nil, job)
 	writeJSON(w, map[string]any{"jobId": job.ID, "taskId": m.ID, "recoverable": true, "operation": "search"})
 }
@@ -294,7 +298,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 	if err != nil {
 		return err
 	}
-	binding, err := checkpoint.DefinitionHash(def)
+	binding, err := taskBinding(job.ctx, wb, def, m, true)
 	if err != nil || binding != m.DefinitionHash {
 		return checkpoint.ErrBinding
 	}
@@ -314,6 +318,10 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 		job.Stage = "搜索 · " + spec.Sheets[cursor.Sheet].Name
 		job.mu.Unlock()
 	}
+	policy, err := indexPolicy(wb, m)
+	if err != nil {
+		return err
+	}
 	for {
 		if err := job.ctx.Err(); err != nil {
 			return err
@@ -321,7 +329,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 		meta := workbook.SheetMeta{Name: spec.Sheets[cursor.Sheet].Name, Path: spec.Sheets[cursor.Sheet].Path}
 		idx := wb.GetCachedIndex(meta.Path)
 		if idx == nil {
-			if cursor.Index != "" {
+			if cursor.Index != "" && !policy.rebuild {
 				return errors.New("搜索恢复所需索引已被清理，请重新运行")
 			}
 			releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
@@ -334,7 +342,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 				return err
 			}
 		}
-		stamp, err := wb.SearchSourceStamp(job.ctx, meta, idx)
+		stamp, err := wb.CheckpointIndexStamp(job.ctx, meta, idx, policy.portable)
 		if err != nil {
 			return err
 		}
@@ -345,7 +353,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 			if err != nil {
 				return err
 			}
-		} else if cursor.Index != stamp || cursor.Rows != idx.RowCount() {
+		} else if policy.expected(cursor.Index) != stamp || cursor.Rows != idx.RowCount() {
 			return checkpoint.ErrBinding
 		}
 		update(cursor.Next, hits[cursor.Before:])
@@ -366,7 +374,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 			terminal := saved.Complete && (saved.Truncated || next.Count == spec.Limit || next.Sheet == len(spec.Sheets)-1)
 			stage := "scan"
 			if saved.Complete {
-				current, err := wb.SearchSourceStamp(job.ctx, meta, idx)
+				current, err := wb.CheckpointIndexStamp(job.ctx, meta, idx, policy.portable)
 				if err != nil {
 					return err
 				}

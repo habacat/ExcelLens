@@ -146,12 +146,5 @@ func exportCheckpointResumeDefinition(wb *workbook.Workbook, m checkpoint.Manife
 	if !cursor.Snapshot {
 		return checkpoint.Definition{}, errExportCaptureIncomplete
 	}
-	source, err := exportTaskSource(wb)
-	if err != nil {
-		return checkpoint.Definition{}, err
-	}
-	if source != m.Definition.Sources[0] {
-		return checkpoint.Definition{}, checkpoint.ErrBinding
-	}
 	return m.Definition, nil
 }

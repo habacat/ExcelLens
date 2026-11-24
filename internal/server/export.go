@@ -168,7 +168,11 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 	if a.wb != wb || a.maintenance {
 		return nil, errors.New("工作簿已切换或正在维护缓存")
 	}
-	return a.exports.startLocked(wb, format)
+	job, err := a.exports.startLocked(wb, format)
+	if err == nil {
+		a.retainSubmitted(job.done)
+	}
+	return job, err
 }
 
 // The session mutex protects registration and workbook replacement together.
@@ -408,6 +412,7 @@ func (a *App) handleExportStatus(w http.ResponseWriter, r *http.Request) {
 		resp["taskId"], resp["recoverable"] = job.TaskID, true
 	}
 	if job.Status == "done" {
+		resp["format"] = job.Format
 		resp["auditReport"] = job.auditReport
 		resp["downloadUrl"] = "/api/export/download?id=" + url.QueryEscape(job.ID) + "&ticket=" + url.QueryEscape(job.Ticket)
 		if id := r.Header.Get("X-ExcelLens-Session"); id != "" {

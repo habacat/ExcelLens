@@ -58,18 +58,33 @@ func readExportCheckpointSelections(ctx context.Context, wb *workbook.Workbook, 
 	if wb == nil {
 		return nil, checkpoint.ErrBinding
 	}
+	policy, err := indexPolicy(wb, m)
+	if err != nil {
+		return nil, err
+	}
 	for _, sheet := range spec.Sheets {
 		meta, found := wb.FindSheet(sheet.Name)
 		if !found || meta.Path != sheet.Path {
 			return nil, checkpoint.ErrBinding
 		}
 		idx := wb.GetCachedIndex(meta.Path)
+		if idx == nil && policy.rebuild {
+			if source, e := exportTaskSource(wb); e != nil {
+				return nil, e
+			} else if e = bindTaskSource(ctx, wb, source, m.Definition.Sources[0], true); e != nil {
+				return nil, e
+			}
+			idx, err = wb.BuildIndex(meta, nil, ctx.Done())
+			if err != nil {
+				return nil, err
+			}
+		}
 		if idx == nil {
 			return nil, errors.New("导出恢复所需索引已被清理，请重新运行")
 		}
 		candidate.selections = append(candidate.selections, excelExport.Selection{Sheet: meta, Index: idx, FirstRow: sheet.FirstRow, LastRow: sheet.LastRow, FirstCol: sheet.FirstCol, LastCol: sheet.LastCol, Filtered: sheet.Filtered, Compact: sheet.Compact})
 	}
-	if err := checkExportCheckpointSources(ctx, wb, m.Definition, spec, candidate.selections); err != nil {
+	if err := checkExportSources(ctx, wb, m.Definition, spec, candidate.selections, policy); err != nil {
 		return nil, err
 	}
 	var visitErr error
@@ -151,7 +166,7 @@ func readExportCheckpointSelections(ctx context.Context, wb *workbook.Workbook, 
 	if visitErr != nil {
 		return nil, visitErr
 	}
-	if err := checkExportCheckpointSources(ctx, wb, m.Definition, spec, candidate.selections); err != nil {
+	if err := checkExportSources(ctx, wb, m.Definition, spec, candidate.selections, policy); err != nil {
 		return nil, err
 	}
 	if err := excelExport.Validate(spec.Options, candidate.selections); err != nil {

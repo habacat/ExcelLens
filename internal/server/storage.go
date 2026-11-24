@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"path/filepath"
@@ -40,27 +40,47 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w)
 		return
 	}
-	if !a.storageMu.TryLock() {
-		writeError(w, 409, "另一项数据管理操作正在进行")
-		return
-	}
-	defer a.storageMu.Unlock()
 	roots, err := dataRoots()
 	if err != nil {
 		writeError(w, 500, err.Error())
 		return
 	}
 	if r.Method == http.MethodGet {
+		if !a.storageMu.TryLock() {
+			writeError(w, 409, "数据传输进行中，可查看任务进度")
+			return
+		}
+		defer a.storageMu.Unlock()
 		writeJSON(w, map[string]any{"roots": roots, "groups": roots.Inventory(r.Context())})
 		return
 	}
 	var req struct {
 		Action    string `json:"action"`
 		Directory string `json:"directory"`
+		Password  string `json:"password,omitempty"`
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<10))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
 		writeError(w, 400, "数据管理参数无效")
+		return
+	}
+	if !a.storageMu.TryLock() {
+		writeError(w, 409, "另一项数据管理操作正在进行")
+		return
+	}
+	if req.Action == "backup" || req.Action == "restore" || req.Action == "migrate" {
+		job, err := a.startStorage(roots, req.Action, req.Directory, req.Password)
+		if err != nil {
+			a.storageMu.Unlock()
+			writeError(w, 409, err.Error())
+			return
+		}
+		writeJSONStatus(w, 202, job)
+		return
+	}
+	defer a.storageMu.Unlock()
+	if a.restorePending.Load() {
+		writeError(w, 409, "请先完成恢复事务")
 		return
 	}
 	var message string
@@ -69,25 +89,6 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		message, err = a.ClearUnusedCaches()
 	case "clear-uploads":
 		message, err = a.ClearUnusedUploads()
-	case "migrate":
-		a.cacheResetMu.RLock()
-		var report localstore.Migration
-		report, err = roots.MigrateLegacy(r.Context())
-		a.cacheResetMu.RUnlock()
-		message = fmt.Sprintf("已迁入 %d 个，相同 %d 个，内容不同且保留两份 %d 个", report.Copied, report.Identical, report.Different)
-	case "restore":
-		err = a.restoreStorage(r.Context(), roots, req.Directory)
-		if err == nil {
-			message = "已核验并迁入备份，刷新页面可读取恢复记录"
-		}
-	case "backup":
-		a.cacheResetMu.RLock()
-		var folder string
-		folder, err = roots.Backup(r.Context(), req.Directory)
-		a.cacheResetMu.RUnlock()
-		if err == nil {
-			message = "备份已核验：" + folder
-		}
 	default:
 		writeError(w, 400, "请选择数据管理操作")
 		return
@@ -102,7 +103,7 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"message": message})
 }
 
-func (a *App) restoreStorage(ctx context.Context, roots localstore.Roots, folder string) error {
+func (a *App) restoreStorage(ctx context.Context, roots localstore.Roots, folder string, options localstore.TransferOptions) error {
 	a.cacheResetMu.Lock()
 	defer a.cacheResetMu.Unlock()
 	for _, app := range a.activeBrowserWorkbooks() {
@@ -116,5 +117,7 @@ func (a *App) restoreStorage(ctx context.Context, roots localstore.Roots, folder
 	a.toolbar.mu.Lock()
 	defer a.toolbar.mu.Unlock()
 	defer func() { a.toolbar.loaded = false }()
-	return roots.Restore(ctx, folder)
+	err := roots.RestoreWith(ctx, folder, options)
+	a.restorePending.Store(err != nil && roots.Pending())
+	return err
 }

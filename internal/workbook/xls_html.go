@@ -4,6 +4,8 @@ package workbook
 // stored cell text into the native row cache without Office, a browser, script
 // execution, external resources, or an in-memory HTML document tree.
 import (
+	"excellens/internal/fileidentity"
+
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -47,7 +49,7 @@ func openXLSWorkbook(filePath string) (*Workbook, error) {
 func openHTMLXLSWorkbook(filePath, encoding string) (*Workbook, error) {
 	// Display metadata has its own version. Keep the workbook identity so local
 	// annotations, analysis sheets and user layout settings remain associated.
-	fingerprint, st, err := fingerprintFile(filePath, "xls-html-v3-document")
+	fingerprint, st, err := fileidentity.Fingerprint(filePath, "xls-html-v3-document")
 	if err != nil {
 		return nil, err
 	}

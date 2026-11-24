@@ -21,7 +21,7 @@
   window.ExcelLensSnapshots=snapshots;
   const pasteSpecial=new window.ExcelLensPasteSpecial({capture:capturePasteTarget,toast,refresh:refreshPasteTarget,
     commit:(context,changes)=>commitBatch(context.id,changes,{refresh:true,guard:context.current})});
-  const analysisJobs=new window.ExcelLensAnalysisJobs({api,slot:'analysisActivity',identity:()=>JSON.stringify([state.fingerprint,state.book,state.opened]),requestIdentity:()=>state.fingerprint,sleep,
+  const analysisJobs=new window.ExcelLensAnalysisJobs({api,maxPolls:0,slot:'analysisActivity',identity:()=>JSON.stringify([state.fingerprint,state.book,state.opened]),requestIdentity:()=>state.fingerprint,sleep,
     onBusy:setAnalysisBusy,onProgress:showAnalysisProgress});
   const treeRenderer=new window.ExcelLensAnalysisTreeRenderer();
   const tree=new window.ExcelLensAnalysisTree({api,context:()=>({bookKey:state.fingerprint,book:state.book,opened:state.opened}),limits:JSON.parse($('fileFormats').textContent).analysisTree,
@@ -1207,7 +1207,11 @@
     if(!target)throw Error('未能读取所选来源位置');
     target.focus();target.scrollIntoView({block:'center',inline:'nearest'});
   }
-  window.ExcelLensAnalytics={open,close,bookChanged,hasUnsaved,navigateSheet,refresh:refreshWorkspace,diagnostics:()=>({opened:state.opened,tab:state.tab,source:state.source,sourceMode:state.query?.sourceScope?.mode||'full',layout:state.query?.layout||'',tree:tree.diagnostics(),fields:state.fields.length,fieldsReady:!!state.fieldsReady,fieldsLoading:!!state.fieldsLoading,resultJob:state.jobID,hasResult:!!state.activeResult,pendingWrites,drafts:drafts.size,activeJobs:analysisJobs.tasks.size})};
+  async function reopenJob(job,status){
+    await open();
+    return adoptAnalysisPlan({job,result:status,current:()=>true},{ref:{source:status.query.source},stamp:status.sourceStamp},()=>state.opened);
+  }
+  window.ExcelLensAnalytics={open,close,reopenJob,bookChanged,hasUnsaved,navigateSheet,refresh:refreshWorkspace,diagnostics:()=>({opened:state.opened,tab:state.tab,source:state.source,sourceMode:state.query?.sourceScope?.mode||'full',layout:state.query?.layout||'',tree:tree.diagnostics(),fields:state.fields.length,fieldsReady:!!state.fieldsReady,fieldsLoading:!!state.fieldsLoading,resultJob:state.jobID,hasResult:!!state.activeResult,pendingWrites,drafts:drafts.size,activeJobs:analysisJobs.tasks.size})};
   function capturePasteTarget(previous){
     const data=state.gridData;
     if(!state.opened||state.tab!=='sheets'||!data||data.id!==state.loadedSheet)throw Error('请先打开独立编辑表');

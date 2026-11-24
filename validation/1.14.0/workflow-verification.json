@@ -1,0 +1,47 @@
+{
+  "version": "1.14.0",
+  "result": "PASS",
+  "platform": "Windows amd64",
+  "go": "go1.27.4",
+  "standardProjectCheck": "PASS",
+  "frontendRegressionTests": 563,
+  "verified": [
+    "Migrated an external edit base and protected restored upload across two isolated data roots. Original edit key and transaction survived, search results reopened on the new path",
+    "Generated a portable index proof for an existing legacy filter. Restored filter row order and frozen export bytes matched after rebuilding the index in another profile",
+    "Authenticated empty and multi-block encrypted files, rejected missing and wrong passwords, detected modified ciphertext before publication",
+    "Restarted a committed multi-volume restore with the backup offline and no password. Verified the published unit after losing its cursor acknowledgement, preserved a conflict and finished the pending unit",
+    "Cancellation before the commit decision published no files",
+    "Submitted long search survived page lease expiry; fresh document reclaimed the original job and result, simultaneous takeover was rejected"
+  ],
+  "browser": {
+    "storage": {
+      "reloadAndLateClose": true,
+      "storageBackup": true,
+      "closedTabExpiredAfterMs": 56109,
+      "storageRestore": true,
+      "result": "PASS"
+    },
+    "background": {
+      "realBrowser": true,
+      "returnedSearchResults": 1,
+      "result": "PASS"
+    },
+    "relocation": {
+      "realBrowser": true,
+      "confirmedMoves": 1,
+      "asynchronousOperations": 2,
+      "result": "PASS"
+    }
+  },
+  "encryptedBackup": {
+    "files": 2,
+    "verifiedBytes": 21474836480,
+    "started": "2026-11-24T08:29:48.5228011Z",
+    "finished": "2026-11-24T08:41:08.7428785Z",
+    "status": "done",
+    "returnedHTTP": 202,
+    "cancelledSeparateRun": true
+  },
+  "desktopManual": "Not performed",
+  "physicalPowerLoss": "Not performed"
+}

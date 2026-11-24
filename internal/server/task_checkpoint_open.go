@@ -67,6 +67,11 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := m.Definition.Sources[0]
+	source, err = locatedSource(source)
+	if err != nil {
+		checkpointHTTPError(w, err)
+		return
+	}
 	wb, release, err := a.openPinnedWorkbook(source.Path)
 	if err != nil {
 		writeError(w, 422, "无法打开任务原文件："+err.Error())
@@ -79,7 +84,7 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 	def, err := taskDefinitionForWorkbook(wb, m)
 	if err == nil {
 		var binding string
-		binding, err = checkpoint.DefinitionHash(def)
+		binding, err = taskBinding(r.Context(), wb, def, m, true)
 		if err == nil && binding != m.DefinitionHash {
 			err = checkpoint.ErrBinding
 		}

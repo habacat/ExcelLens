@@ -32,6 +32,9 @@ func LogDir() string {
 func (a *App) ClearUnusedCaches() (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
+	if a.rootApp().restorePending.Load() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	releaseArchiveMaintenance := archives.LockCacheMaintenance()
 	defer releaseArchiveMaintenance()
 	rootApp := a.rootApp()
@@ -92,6 +95,9 @@ func (a *App) ClearUnusedCaches() (string, error) {
 func (a *App) ClearUnusedUploads() (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
+	if a.rootApp().restorePending.Load() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	rootApp := a.rootApp()
 	rootApp.cacheMu.Lock()
 	defer rootApp.cacheMu.Unlock()
@@ -179,7 +185,11 @@ func savedTaskSources() ([]string, error) {
 			return nil, errors.New("任务恢复记录的来源无法核对，已保留文件")
 		}
 		for _, s := range item.Manifest.Definition.Sources {
-			paths = append(paths, s.Path)
+			source, err := locatedSource(s)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, s.Path, source.Path, restoredUploadCandidate(s.Path))
 		}
 	}
 	return paths, nil

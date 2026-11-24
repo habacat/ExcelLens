@@ -108,6 +108,11 @@ func (r Roots) Adopt(ctx context.Context, kind, name string) (bool, error) {
 }
 
 func (r Roots) MigrateLegacy(ctx context.Context) (Migration, error) {
+	return r.MigrateLegacyWith(ctx, TransferOptions{})
+}
+func (r Roots) MigrateLegacyWith(ctx context.Context, options TransferOptions) (Migration, error) {
+	ctx = options.start(ctx)
+	phase(ctx, "迁入旧设置", 0, 0)
 	var report Migration
 	if err := r.migrateFrozen(ctx, &report); err != nil {
 		return report, err
@@ -154,6 +159,10 @@ func digestAt(ctx context.Context, base, name string) (fileRecord, error) {
 func (r Roots) AdoptFrozen(ctx context.Context) error { return r.migrateFrozen(ctx, nil) }
 
 func (r Roots) migrateFile(ctx context.Context, kind, name, source string, report *Migration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	defer finishFile(ctx)
 	copied, err := r.Adopt(ctx, kind, name)
 	if err != nil || report == nil {
 		return err

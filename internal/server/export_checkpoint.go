@@ -76,7 +76,7 @@ func exportTaskDefinition(ctx context.Context, wb *workbook.Workbook, req export
 	}
 	spec := exportCheckpointSpec{Scope: req.Scope, Options: req.options(), IncludeHidden: req.IncludeHidden}
 	for _, s := range selections {
-		stamp, err := wb.SourceIndexStamp(ctx, s.Sheet, s.Index)
+		stamp, err := wb.CheckpointIndexStamp(ctx, s.Sheet, s.Index, true)
 		if err != nil {
 			return empty, err
 		}
@@ -102,6 +102,9 @@ func exportTaskDefinition(ctx context.Context, wb *workbook.Workbook, req export
 		return empty, checkpoint.ErrCapacity
 	}
 	def := checkpoint.Definition{Kind: "export", Driver: exportCheckpointDriver, Semantics: exportCheckpointSemantics, Title: checkpointTitle("导出", source.Path), FileName: workbookDisplayName(wb), Sources: []checkpoint.Source{source}, Payload: payload}
+	if err := setTaskDigest(ctx, wb, &def); err != nil {
+		return empty, err
+	}
 	if _, err := exportCheckpointSpecFor(checkpoint.Manifest{Definition: def}); err != nil {
 		return empty, err
 	}
@@ -219,20 +222,26 @@ func exportCheckpointCursor(m checkpoint.Manifest, spec exportCheckpointSpec) (e
 }
 
 func checkExportCheckpointSources(ctx context.Context, wb *workbook.Workbook, def checkpoint.Definition, spec exportCheckpointSpec, selections []excelExport.Selection) error {
+	return checkExportSources(ctx, wb, def, spec, selections, taskIndexes{portable: len(def.Sources) == 1 && def.Sources[0].SHA256 != ""})
+}
+func checkExportSources(ctx context.Context, wb *workbook.Workbook, def checkpoint.Definition, spec exportCheckpointSpec, selections []excelExport.Selection, policy taskIndexes) error {
 	source, err := exportTaskSource(wb)
 	if err != nil {
 		return err
 	}
-	if len(def.Sources) != 1 || source != def.Sources[0] || len(selections) != len(spec.Sheets) {
+	if len(def.Sources) != 1 || len(selections) != len(spec.Sheets) {
 		return checkpoint.ErrBinding
+	}
+	if err := bindTaskSource(ctx, wb, source, def.Sources[0], true); err != nil {
+		return err
 	}
 	for i, s := range selections {
 		bound := spec.Sheets[i]
-		stamp, err := wb.SourceIndexStamp(ctx, s.Sheet, s.Index)
+		stamp, err := wb.CheckpointIndexStamp(ctx, s.Sheet, s.Index, policy.portable)
 		if err != nil {
 			return err
 		}
-		if s.Sheet.Name != bound.Name || s.Sheet.Path != bound.Path || s.Index.RowCount() != bound.SourceRows || stamp != bound.Index {
+		if s.Sheet.Name != bound.Name || s.Sheet.Path != bound.Path || s.Index.RowCount() != bound.SourceRows || stamp != policy.expected(bound.Index) {
 			return checkpoint.ErrBinding
 		}
 	}

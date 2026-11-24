@@ -3,6 +3,7 @@
 package localstore
 
 import (
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -19,7 +20,7 @@ func publishNew(from, to string) error {
 	if err != nil {
 		return err
 	}
-	return syscall.MoveFile(source, dest)
+	return windows.MoveFileEx(source, dest, windows.MOVEFILE_WRITE_THROUGH)
 }
 
 func widePath(name string) (*uint16, error) {
@@ -35,4 +36,19 @@ func widePath(name string) (*uint16, error) {
 		}
 	}
 	return syscall.UTF16PtrFromString(absolute)
+}
+
+// Windows commits same-volume renames with WRITE_THROUGH, and files are flushed
+// before publication. Directory handles do not support FlushFileBuffers here.
+func syncDir(string) error { return nil }
+func replaceFile(from, to string) error {
+	src, err := widePath(from)
+	if err != nil {
+		return err
+	}
+	dst, err := widePath(to)
+	if err != nil {
+		return err
+	}
+	return windows.MoveFileEx(src, dst, windows.MOVEFILE_REPLACE_EXISTING|windows.MOVEFILE_WRITE_THROUGH)
 }

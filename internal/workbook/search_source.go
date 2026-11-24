@@ -1,6 +1,8 @@
 package workbook
 
 import (
+	"excellens/internal/fileidentity"
+
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,6 +26,12 @@ func (w *Workbook) SearchSourceStamp(ctx context.Context, meta SheetMeta, idx *S
 // SourceIndexStamp is shared by read-only query drivers. The caller retains
 // the Workbook/cache read lease; no query rules or saved row orders are inferred.
 func (w *Workbook) SourceIndexStamp(ctx context.Context, meta SheetMeta, idx *SheetIndex) (string, error) {
+	return w.CheckpointIndexStamp(ctx, meta, idx, false)
+}
+
+// CheckpointIndexStamp can bind the serialized index and row stream by content
+// so an explicitly relocated task can use a byte-identical rebuilt index.
+func (w *Workbook) CheckpointIndexStamp(ctx context.Context, meta SheetMeta, idx *SheetIndex, portable bool) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -37,11 +45,11 @@ func (w *Workbook) SourceIndexStamp(ctx context.Context, meta SheetMeta, idx *Sh
 	if err := w.CheckSourceUnchanged(); err != nil {
 		return "", err
 	}
-	index, err := searchCacheStamp(ctx, idx.IndexPath, -1)
+	index, err := searchCacheStamp(ctx, idx.IndexPath, -1, portable)
 	if err != nil {
 		return "", err
 	}
-	rows, err := searchCacheStamp(ctx, idx.XMLPath, idx.XMLSize)
+	rows, err := searchCacheStamp(ctx, idx.XMLPath, idx.XMLSize, portable)
 	if err != nil {
 		return "", err
 	}
@@ -57,8 +65,8 @@ func (w *Workbook) SourceIndexStamp(ctx context.Context, meta SheetMeta, idx *Sh
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func searchCacheStamp(ctx context.Context, path string, expectedSize int64) (string, error) {
-	f, stable, err := openFingerprintSource(path)
+func searchCacheStamp(ctx context.Context, path string, expectedSize int64, portable bool) (string, error) {
+	f, stable, err := fileidentity.Open(path)
 	if err != nil {
 		return "", err
 	}
@@ -73,16 +81,21 @@ func searchCacheStamp(ctx context.Context, path string, expectedSize int64) (str
 	if expectedSize >= 0 && info.Size() != expectedSize {
 		return "", errors.New("搜索缓存长度与来源索引不一致，请重新运行")
 	}
-	stamp, reliable := fingerprintSourceStamp(f, info)
+	stamp, reliable := fileidentity.Revision(f, info)
 	reliable = reliable && stable
 	var result string
-	if reliable {
+	if portable && reliable {
+		if receipt, ok := fileidentity.Recall(stamp, "checkpoint-index-sha256"); ok {
+			result = "sha256:" + receipt
+		}
+	}
+	if reliable && !portable {
 		data, err := json.Marshal(stamp)
 		if err != nil {
 			return "", err
 		}
 		result = "revision:" + string(data)
-	} else {
+	} else if result == "" {
 		digest := sha256.New()
 		buffer := make([]byte, formats.CheckpointIOBytes)
 		for {
@@ -108,10 +121,13 @@ func searchCacheStamp(ctx context.Context, path string, expectedSize int64) (str
 		return "", errors.New("搜索缓存在绑定时发生变化，请重新运行")
 	}
 	if reliable {
-		current, ok := fingerprintSourceStamp(f, after)
+		current, ok := fileidentity.Revision(f, after)
 		if !ok || current != stamp {
 			return "", errors.New("搜索缓存修订已变化，请重新运行")
 		}
+	}
+	if portable && reliable {
+		fileidentity.Remember(stamp, "checkpoint-index-sha256", result[len("sha256:"):])
 	}
 	return result, ctx.Err()
 }

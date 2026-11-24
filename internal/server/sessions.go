@@ -44,6 +44,7 @@ var (
 type sessionAccess struct {
 	page         string
 	generation   uint64 // nonzero only on an explicit attach
+	background   bool
 	existingOnly bool
 }
 
@@ -58,7 +59,7 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 	defer func() { a.sessionsMu.Unlock(); a.finishRetirement(expired) }()
 	now := time.Now()
 	s := a.sessions[id]
-	if s == nil || s.lease.Expired(now) {
+	if s == nil || s.lease.Expired(now) && !s.app.submitted.Retained(now) {
 		expired = a.takeExpiredLocked(now)
 		if access.existingOnly {
 			return nil, errSessionExpired
@@ -72,6 +73,9 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 			return nil, err
 		}
 		a.sessions[id] = s
+	}
+	if access.background && !s.lease.Unattended(now) {
+		return nil, errPageReplaced
 	}
 	if access.generation != 0 {
 		if !s.lease.Attach(access.page, access.generation, now) {
@@ -91,7 +95,7 @@ func (a *App) releaseSession(s *browserSession) {
 }
 
 func (a *App) newBrowserSession(launchPath string) (*browserSession, error) {
-	child, err := New()
+	child, err := newApp()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +124,7 @@ func (a *App) newBrowserSession(launchPath string) (*browserSession, error) {
 func (a *App) takeExpiredLocked(now time.Time) []*App {
 	var expired []*App
 	for id, s := range a.sessions {
-		if s.lease.Expired(now) {
+		if s.lease.Expired(now) && !s.app.submitted.Retained(now) {
 			expired = append(expired, s.app)
 			a.retiring[s.app] = struct{}{}
 			delete(a.sessions, id)
@@ -159,6 +163,9 @@ func (a *App) runSessionReaper(stop <-chan struct{}, ticks <-chan time.Time) {
 func (a *App) PreparePathForLaunch(path string) (string, error) {
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
+	if a.restorePending.Load() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	id := randomID()
 	s, err := a.acquireSession(id, path, sessionAccess{})
 	if err != nil {
@@ -174,6 +181,9 @@ func (a *App) PreparePathForLaunch(path string) (string, error) {
 func (a *App) OpenPathForLaunch(path string) (string, error) {
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
+	if a.restorePending.Load() {
+		return "", errors.New("请先完成恢复事务")
+	}
 	id := randomID()
 	session, err := a.acquireSession(id, "", sessionAccess{})
 	if err != nil {
@@ -198,12 +208,31 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 			defaultRoutes.ServeHTTP(w, r)
 			return
 		}
+		if r.URL.Path == "/api/background" {
+			a.handleBackground(w, r)
+			return
+		}
+		if r.URL.Path == "/api/storage/jobs" {
+			a.handleStorageJobs(w, r)
+			return
+		}
+		if r.URL.Path == "/api/storage/sources" {
+			a.handleSources(w, r)
+			return
+		}
 		if r.URL.Path == "/api/storage" {
 			a.handleStorage(w, r)
 			return
 		}
-		a.cacheResetMu.RLock()
-		defer a.cacheResetMu.RUnlock()
+		// Lease control stays responsive while restore has exclusive data access.
+		if !strings.HasPrefix(r.URL.Path, "/api/session/") {
+			a.cacheResetMu.RLock()
+			defer a.cacheResetMu.RUnlock()
+			if a.restorePending.Load() {
+				writeError(w, 503, "恢复事务尚未完成，请从本地数据重试迁入")
+				return
+			}
+		}
 		if r.URL.Path == "/api/interface" {
 			defaultRoutes.ServeHTTP(w, r)
 			return
@@ -238,7 +267,8 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 					writeError(w, 400, "页面租约序号无效")
 					return
 				}
-				access.generation, access.existingOnly = gen, r.Header.Get("X-ExcelLens-Resume") == "1"
+				access.background = r.Header.Get("X-ExcelLens-Background") == "1"
+				access.generation, access.existingOnly = gen, access.background || r.Header.Get("X-ExcelLens-Resume") == "1"
 			case "/api/session/heartbeat":
 			case "/api/session/detach":
 				a.sessionsMu.Lock()

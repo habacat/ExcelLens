@@ -181,6 +181,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	a.analysisJobs[job.ID] = job
 	a.analysisMu.Unlock()
 	accepted = true
+	a.retainSubmitted(job.done)
 	go a.runAnalysisQuery(job, q)
 	return job, nil
 }
@@ -391,6 +392,7 @@ func (a *App) handleAnalysisQueryStatus(w http.ResponseWriter, r *http.Request) 
 	if job.Status == "done" {
 		response["result"] = job.Result
 		response["query"] = job.Query
+		response["sourceStamp"] = job.SourceStamp
 		response["sourceFields"] = job.SourceFields
 		if job.RecipePlan != nil {
 			response["recipeId"], response["exportFormat"] = job.RecipePlan.RecipeID, job.RecipePlan.ExportFormat
