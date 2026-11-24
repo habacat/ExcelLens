@@ -1,6 +1,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const source=fs.readFileSync(__dirname+'/app.js','utf8'),start=source.indexOf('  function gridBackdropPanes('),end=source.indexOf('  function syncGridBackdrop(',start);
-const sandbox={};vm.runInNewContext(source.slice(start,end)+';this.panes=gridBackdropPanes;',sandbox);
+const source=fs.readFileSync(__dirname+'/app.js','utf8'),end=source.indexOf('  function syncGridBackdrop(');
+const context={window:{}};
+vm.runInNewContext(fs.readFileSync(__dirname+'/grid-backdrop.js','utf8'),context);
+const sandbox=context.window.ExcelLensGridBackdrop;
 test('one viewport texture covers frozen blank strips while protecting frozen source cells after scrolling',()=>{
   const bounds={width:1200,height:800,rowHead:42,header:27,pinWidth:260,pinHeight:50,right:100,bottom:100,fixedRight:700,fixedBottom:400};
   const panes=sandbox.panes(bounds);assert.equal(panes.length,4);

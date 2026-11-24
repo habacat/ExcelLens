@@ -1,10 +1,16 @@
 package server
 
 import (
+	"context"
+	"errors"
+	"excellens/internal/localstore"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"excellens/internal/archives"
 	"excellens/internal/workbook"
@@ -105,14 +111,15 @@ func (a *App) ClearUnusedUploads() (string, error) {
 	for _, wb := range rootApp.referencedWorkbooks() {
 		active[filepath.Clean(wb.Path)] = struct{}{}
 	}
-	editPaths, err := editBasePaths()
+	root := workbook.UploadRoot()
+	keep, err := rootApp.cacheSourceProtection(root)
 	if err != nil {
 		return "", err
 	}
-	for _, path := range editPaths {
-		active[path] = struct{}{}
+	pinned, err := protectedCacheSources(root, slices.Collect(maps.Keys(active)))
+	if err != nil {
+		return "", err
 	}
-	root := workbook.UploadRoot()
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
 		return "没有可清理的临时文件", nil
@@ -122,11 +129,12 @@ func (a *App) ClearUnusedUploads() (string, error) {
 	}
 	count, skipped, failed := 0, 0, 0
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "ExcelLens-upload-") {
+		if !entry.Type().IsRegular() || !strings.HasPrefix(entry.Name(), "ExcelLens-upload-") {
 			continue
 		}
 		path := filepath.Join(root, entry.Name())
-		if _, inUse := active[filepath.Clean(path)]; inUse {
+		key := cachePathKey(entry.Name())
+		if keep[key] || pinned[key] {
 			skipped++
 			continue
 		}
@@ -141,4 +149,38 @@ func (a *App) ClearUnusedUploads() (string, error) {
 		return info, fmt.Errorf("另外 %d 个文件无法删除（可能被其他程序占用）", failed)
 	}
 	return info, nil
+}
+
+// Confirmed task sources have to be reopenable even after their tab closes.
+func savedTaskSources() ([]string, error) {
+	root, err := localstore.ConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	if _, err = os.Stat(filepath.Join(root, "task-checkpoints")); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	store, err := openTaskCheckpoints()
+	if err != nil {
+		return nil, err
+	}
+	defer store.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	items, err := listTaskCheckpoints(ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, item := range items {
+		if item.Manifest == nil {
+			return nil, errors.New("任务恢复记录的来源无法核对，已保留文件")
+		}
+		for _, s := range item.Manifest.Definition.Sources {
+			paths = append(paths, s.Path)
+		}
+	}
+	return paths, nil
 }

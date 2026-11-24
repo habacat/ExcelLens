@@ -49,10 +49,10 @@ async function launch({errors=[],duration='8m',exe=process.env.QA_UIPROBE||path.
     if (path.dirname(resolved) === path.resolve(os.tmpdir()) && path.basename(resolved).startsWith('excellens-ui-qa-')) {
       // Retry the whole profile, so a locked file cannot trigger nested retries at every directory level.
       for (let attempt = 0; ; attempt++) {
-        try { fs.rmSync(resolved, {recursive:true, force:true}); break; }
+        try { await fs.promises.rm(resolved, {recursive:true, force:true}); break; }
         catch (error) {
           if (attempt === 3 || !['EBUSY','ENOTEMPTY','EPERM'].includes(error.code)) throw error;
-          await pause(300);
+          await pause(300 * (attempt + 1));
         }
       }
     }

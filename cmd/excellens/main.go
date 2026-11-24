@@ -14,6 +14,7 @@ import (
 
 	"excellens/internal/buildinfo"
 	"excellens/internal/instance"
+	"excellens/internal/localstore"
 	"excellens/internal/server"
 	"excellens/internal/shellmenu"
 	"excellens/internal/tray"
@@ -31,6 +32,24 @@ func main() {
 	if lockErr != nil {
 		log.Printf("ExcelLens 单实例检查失败：%v", lockErr)
 		return // fail closed: never start an unprotected duplicate process
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--restore-data" {
+		if len(os.Args) != 3 {
+			log.Fatal("用法：ExcelLens --restore-data 备份目录")
+		}
+		if !owner {
+			log.Fatal("请先退出目标电脑上的 ExcelLens 再迁入备份")
+		}
+		defer release()
+		config, err := localstore.ConfigDir()
+		if err == nil {
+			err = (localstore.Roots{Local: workbook.DataRoot(), Config: config}).Restore(context.Background(), os.Args[2])
+		}
+		if err != nil {
+			log.Fatal("迁入失败：", err)
+		}
+		fmt.Println("已核验并迁入本地备份")
+		return
 	}
 	if !owner {
 		var filePath string
@@ -121,6 +140,13 @@ func main() {
 		}
 		return exec.Command("explorer.exe", path).Start()
 	}
+	openSettingDirectory := func(kind string) error {
+		root, err := localstore.ConfigDir()
+		if err != nil {
+			return err
+		}
+		return openDirectory(filepath.Join(root, kind))
+	}
 	options := tray.Options{
 		Address:          url,
 		OnOpen:           openViewer,
@@ -139,8 +165,8 @@ func main() {
 		OnOpenTemp:           func() error { return openDirectory(server.TempDir()) },
 		OnOpenLog:            func() error { return openDirectory(server.LogDir()) },
 		OnOpenExports:        func() error { return openDirectory(server.ExportDir()) },
-		OnOpenNotes:          func() error { return openDirectory(filepath.Join(workbook.DataRoot(), "annotations")) },
-		OnOpenLayouts:        func() error { return openDirectory(filepath.Join(workbook.DataRoot(), "layouts")) },
+		OnOpenNotes:          func() error { return openSettingDirectory("annotations") },
+		OnOpenLayouts:        func() error { return openSettingDirectory("layouts") },
 		OnClearCache:         app.ClearUnusedCaches,
 		OnClearTemp:          app.ClearUnusedUploads,
 		ContextMenuInstalled: shellmenu.IsInstalled,

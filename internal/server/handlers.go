@@ -288,7 +288,14 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	} else if wb.HasMappedIndexes() || workbook.QueryFilesInUse(wb.CacheDir) || a.otherTabUsesCache(wb.CacheDir) {
 		clearErr, conflict = errors.New("缓存仍有在用索引或查询结果，未执行清理"), true
 	} else {
-		clearErr = os.RemoveAll(wb.CacheDir)
+		roots, err := dataRoots()
+		clearErr = err
+		if clearErr == nil {
+			_, clearErr = roots.Adopt(r.Context(), "frozen-panes", wb.Fingerprint+".json")
+		}
+		if clearErr == nil {
+			clearErr = os.RemoveAll(wb.CacheDir)
+		}
 		if clearErr == nil {
 			clearErr = os.MkdirAll(wb.CacheDir, 0700)
 		}

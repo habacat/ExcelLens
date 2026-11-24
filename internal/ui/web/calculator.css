@@ -50,3 +50,7 @@
 .calculator-convert { flex: none; margin-left: 6px; padding: 1px 5px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); color: var(--accent); font: var(--fs-1) var(--font-ui); cursor: pointer; }
 .calculator-conversion-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { .calculator-window { right: 8px; bottom: 8px; width: min(440px, calc(100vw - 16px)); } }
+
+.calculator-compat {padding: 2px 8px; font-size: 12px;}
+.calculator-compat summary {cursor: pointer;}
+.calculator-compat p {margin: 4px 0; line-height: 1.5;}

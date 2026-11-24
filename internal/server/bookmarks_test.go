@@ -41,7 +41,11 @@ func TestBookmarksStayOutsideCacheAndFollowWorkbookContent(t *testing.T) {
 	if err := os.RemoveAll(cache); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(workbook.DataRoot(), "annotations", sourceFingerprint+".json")); err != nil {
+	target, err := savedConfigPath("annotations", sourceFingerprint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(target); err != nil {
 		t.Fatal(err)
 	}
 	app2 := prepareFeatureApp(t, renamed)

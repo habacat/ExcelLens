@@ -70,6 +70,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.13.4.md](releases/1.13.4.md) | 浏览器会话回收、独立计算原生对照及本地数据管理 |
 | [releases/1.13.3.md](releases/1.13.3.md) | 选框与表格线、公式栏、工作表标签及选区统计 |
 | [releases/1.13.2.md](releases/1.13.2.md) | 双布局、托盘及 Windows 长短路径缓存清理 |
 | [releases/1.13.1.md](releases/1.13.1.md) | 已撤回的双布局源码候选与路径问题 |

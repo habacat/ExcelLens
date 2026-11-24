@@ -14,10 +14,13 @@ func TestDisplayFontPrefsPreserveWidthAndSurviveReload(t *testing.T) {
 	original := workbookLayouts{Version: 1, Sheets: map[string]sheetLayout{
 		"表1": {Rows: map[string]int{"3": 42}, Cols: map[string]int{"5": 210}, Font: "仿宋"},
 	}}
-	if err := writeLayouts(file, original); err != nil {
+	if err := writeWorkbookSetting(file, original); err != nil {
 		t.Fatal(err)
 	}
-	loaded := readLayouts(file)
+	loaded, err := readLayouts(file)
+	if err != nil {
+		t.Fatal(err)
+	}
 	value := loaded.Sheets["表1"]
 	if value.Font != "仿宋" || value.Rows["3"] != 42 || value.Cols["5"] != 210 {
 		t.Fatalf("bad layout: %+v", value)

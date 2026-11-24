@@ -772,3 +772,14 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .source-sheet-view .grid-cell { line-height: 1.2; padding: 0 2px; }
 .source-sheet-view .grid-cell.auto-filter-header { padding-right: 25px; }
 .grid-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.storage-dialog {width: min(38rem, calc(100vw - 1.5rem));}
+.storage-dialog .dialog-body {display: grid; gap: .6rem; overflow: auto; max-height: 75vh;}
+.storage-usage {width: 100%; border-collapse: collapse;}
+.storage-usage th, .storage-usage td {padding: .28rem .36rem; text-align: left;}
+.storage-usage th:last-child, .storage-usage td:last-child {text-align: right; font-variant-numeric: tabular-nums;}
+.storage-usage th {border-bottom: 1px solid var(--border);}
+.storage-actions {display: flex; flex-wrap: wrap; gap: .35rem;}
+#storageDirectory {flex: 1; min-width: 10rem;}
+.storage-paths, #storageRoots, #storageStatus {white-space: pre-line; overflow-wrap: anywhere;}
+#storageStatus:empty {display: none;}

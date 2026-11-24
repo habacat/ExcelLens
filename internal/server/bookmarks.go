@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -32,12 +31,9 @@ type bookmarkStore struct {
 	Items   []Bookmark `json:"items"`
 }
 
-func bookmarkFile(wb *workbook.Workbook) string {
-	return filepath.Join(workbook.DataRoot(), "annotations", wb.Fingerprint+".json")
-}
-func readBookmarks(wb *workbook.Workbook) (bookmarkStore, error) {
+func readBookmarks(path string) (bookmarkStore, error) {
 	store := bookmarkStore{Version: 1, Items: []Bookmark{}}
-	bytes, err := os.ReadFile(bookmarkFile(wb))
+	bytes, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return store, nil
 	}
@@ -58,35 +54,6 @@ func readBookmarks(wb *workbook.Workbook) (bookmarkStore, error) {
 	}
 	return store, nil
 }
-func saveBookmarks(wb *workbook.Workbook, store bookmarkStore) error {
-	if err := os.MkdirAll(filepath.Dir(bookmarkFile(wb)), 0700); err != nil {
-		return err
-	}
-	temp, err := os.CreateTemp(filepath.Dir(bookmarkFile(wb)), ".bookmarks-*.tmp")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(temp.Name())
-	if err = json.NewEncoder(temp).Encode(store); err != nil {
-		temp.Close()
-		return err
-	}
-	if err = temp.Sync(); err != nil {
-		temp.Close()
-		return err
-	}
-	if err = temp.Close(); err != nil {
-		return err
-	}
-	if err = os.Rename(temp.Name(), bookmarkFile(wb)); err == nil {
-		return nil
-	}
-	// On Windows Rename does not always replace an existing destination.
-	if rmErr := os.Remove(bookmarkFile(wb)); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-		return err
-	}
-	return os.Rename(temp.Name(), bookmarkFile(wb))
-}
 func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 	wb := a.currentWorkbook()
 	if wb == nil {
@@ -95,10 +62,13 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 	}
 	a.bookmarkMu.Lock()
 	defer a.bookmarkMu.Unlock()
-	lock := persistentFileLock(bookmarkFile(wb))
-	lock.Lock()
-	defer lock.Unlock()
-	store, err := readBookmarks(wb)
+	path, unlock, err := lockWorkbookSetting(r.Context(), "annotations", wb.Fingerprint)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	defer unlock()
+	store, err := readBookmarks(path)
 	if err != nil {
 		writeError(w, 500, err.Error())
 		return
@@ -187,7 +157,7 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "不支持的操作")
 		return
 	}
-	if err := saveBookmarks(wb, store); err != nil {
+	if err := writeWorkbookSetting(path, store); err != nil {
 		writeError(w, 500, "保存本机标记失败："+err.Error())
 		return
 	}

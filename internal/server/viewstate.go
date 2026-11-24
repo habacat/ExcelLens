@@ -8,15 +8,13 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"excellens/internal/workbook"
 )
 
-// A separate view-state file is stored beside each workbook's fingerprinted
-// index. Nothing is written into the workbook itself.
+// Freeze overrides belong to the workbook fingerprint in the user profile.
 type freezeSettings struct {
 	Rows int `json:"rows"`
 	Cols int `json:"cols"`
@@ -33,50 +31,25 @@ func validateFreeze(f freezeSettings) bool {
 	return f.Rows >= 0 && f.Rows <= maxFrozenRows && f.Cols >= 0 && f.Cols <= maxFrozenCols
 }
 
-func viewPath(wb *workbook.Workbook) string { return filepath.Join(wb.CacheDir, "view.json") }
-
-func readViews(wb *workbook.Workbook) savedViews {
+func readViews(path string) (savedViews, error) {
 	v := savedViews{Version: 1, Sheets: make(map[string]freezeSettings)}
-	b, err := os.ReadFile(viewPath(wb))
-	if err != nil || len(b) > 1<<20 {
-		return v
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return v, nil
+	}
+	if err != nil {
+		return v, err
 	}
 	var stored savedViews
-	if json.Unmarshal(b, &stored) != nil || stored.Version != 1 || stored.Sheets == nil {
-		return v
+	if len(b) > 1<<20 || json.Unmarshal(b, &stored) != nil || stored.Version != 1 || stored.Sheets == nil {
+		return v, errors.New("冻结布局文件损坏或版本不兼容")
 	}
 	for sheet, p := range stored.Sheets {
 		if validateFreeze(p) {
 			v.Sheets[sheet] = p
 		}
 	}
-	return v
-}
-
-func writeViews(wb *workbook.Workbook, v savedViews) error {
-	path := viewPath(wb)
-	f, err := os.CreateTemp(wb.CacheDir, ".view-*.tmp")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-	if err := json.NewEncoder(f).Encode(v); err != nil {
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(f.Name(), path); err != nil {
-		if rmErr := os.Remove(path); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-			return err
-		}
-		return os.Rename(f.Name(), path)
-	}
-	return nil
+	return v, nil
 }
 
 func nativeFrozenPane(wb *workbook.Workbook, meta workbook.SheetMeta) freezeSettings {
@@ -167,17 +140,26 @@ func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "工作簿已切换")
 		return
 	}
+	path, unlock, err := lockWorkbookSetting(r.Context(), "frozen-panes", wb.Fingerprint)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	defer unlock()
+	views, err := readViews(path)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
 	if r.Method == http.MethodPost {
-		views := readViews(wb)
 		views.Sheets[meta.Name] = requested
-		if err := writeViews(wb, views); err != nil {
+		if err := writeWorkbookSetting(path, views); err != nil {
 			writeError(w, http.StatusInternalServerError, "保存冻结设置失败："+err.Error())
 			return
 		}
 		writeJSON(w, map[string]any{"sheet": meta.Name, "rows": requested.Rows, "cols": requested.Cols, "source": "saved"})
 		return
 	}
-	views := readViews(wb)
 	if pane, found := views.Sheets[meta.Name]; found {
 		writeJSON(w, map[string]any{"sheet": meta.Name, "rows": pane.Rows, "cols": pane.Cols, "source": "saved"})
 		return

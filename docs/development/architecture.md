@@ -28,6 +28,8 @@ internal/export            公共流式导出与 XLSX 快照
 internal/printing          来源绑定的纸张/缩放/重复标题及有界物理分页
 internal/clustering        显式Unicode候选键、有界排序及原文分组
 internal/composition       只读多来源字段对齐、流式追加及源格追溯
+internal/localstore         数据位置、实际分配空间、校验备份及迁入
+internal/browserlease       单页租约、刷新代次、在途请求和回收期限
 internal/server            HTTP、会话、任务及业务装配
 internal/ui                嵌入的 HTML/CSS/JS 与格式配置注入
 internal/tray, shellmenu    Windows 用户入口
@@ -40,7 +42,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 | 包 | 可以依赖 |
 | --- | --- |
-| formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
+| localstore / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
 | sourceview | formats |
 | checkpoint | formats |
 | editdoc | checkpoint、formats |
@@ -60,9 +62,11 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | ui | formats、buildinfo |
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
-| server | 格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+| server | localstore、browserlease、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
 
 ### 服务入口和前端组件
+
+浏览器每 30 秒续租。关闭通知带当前文档代次所绑定的标识，服务端保留 45 秒供刷新接管；未收到关闭通知的会话在连续 10 分钟无活动后到期。服务每 10 秒回收一次，在途请求持有会话至结束。网格背景的窗格裁切和遮罩绘制由 `grid-backdrop.js` 接收可见尺寸，滚动仅更新显示。
 
 网格正文和冻结窗格通过 `multiselection.js` 判定单元格是否在选区内。`range-frame.js` 按当前缩放、滚动位置、冻结边界和可用视口绘制外框。一个连续区域最多生成四段轮廓，冻结分界线和屏外裁切处只绘制实际可见的选区边。选择端点、框选底色和显示角标都留在视图层，工作簿的单元格格式仍由格式适配器提供。
 
@@ -243,3 +247,10 @@ Windows 图标和应用清单由 `tools/icon` 生成同一个 COFF 资源，模�
 
 F21输出由`export.Resume`/`AssembleResume`依赖声明式`ResumeJournal`，共享原格式的行写入、XLSX部件和容器元数据；记录窗口直接读取确认序号，HTML保留累计呈现状态，XLSX保存样式XML/去重映射后按完整Sheet继续，不重新查询已确认Sheet。`checkpoint.AdvanceStream`独立负责共享配额中的增量预留和跨物理块事务，最后块计完整业务记录，整个部件Sync及清单原子安装后才确认；不确定安装不重放回调。`server/export_checkpoint_journal.go`拥有输入/输出游标、完整链及来源前后绑定，`export_checkpoint_tasks.go`只装配既有导出槽、取消、缓存/源租约和原子下载发布。完整部件传输采用固定大小分帧，不将传输边界当作CSV/XML业务确认点。输出完成确认与下载文件发布分开，完整任务可重建容器而不追加检查点修订；未增加运行依赖或源缓存编码。
 F21恢复目录的原文件打开由`server/task_checkpoint_open.go`先验证预期修订、来源/规则绑定及内容，再通过共享安装生命周期原子拒绝迟到候选；列表不读来源。可选原文件显示名受清单校验但不计入绑定，旧定义哈希兼容。`task-recovery-model.js`保留字符串修订，控制器只显式启动并交还原搜索/筛选/导出拥有者；关闭、切档或新意图后的迟到启动仅取消自己返回的jobId，不丢弃持久确认点。集合/排序恢复使用进度视图，不伪装成简化单值规则编辑器。
+
+
+### 计算对照库
+
+`internal/server/testdata/calculator-native/` 中的源表 XML 和用例供原生采集器和 Go HTTP 回归共同读取。在安装 Excel 和 pywin32 的 Windows 机器上运行 `python tools/qa/calculator_native_excel.py`，脚本使用独立 Excel 实例和新建的合成工作簿，按 Formula2 计算，以 Value2 和错误类型记录结果。Go 测试复核输入 SHA-256、函数清单、日期系统、结果类型、数值和错误码。一般浮点容差为 2×10⁻¹² 乘以 max(1, |期望值|)，该 XIRR 现金流的绝对容差为 10⁻⁸。预期产品差异在对照测试中逐项声明。重放命令为 `go test ./internal/server -run TestCalculatorExcelReference`。
+
+格式适配器继续以 Workbook、CellData 和 SourceLayout 作为迁移边界。索引构建与查询消费方按同一索引身份交接；编辑事务按已确认修订、计算缓存按来源及修订交接。后续拆分随各自的实际功能变更安排，并复用对应读写、取消和撤销回归。

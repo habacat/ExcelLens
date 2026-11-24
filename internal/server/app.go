@@ -37,6 +37,7 @@ type App struct {
 	archiveView      *archiveView
 	archiveTask      *archiveTask
 	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
+	storageMu        sync.Mutex    // root only: one explicit storage operation at a time
 	cacheResetMu     sync.RWMutex  // root only: drain requests before discarding active caches
 	cacheEpoch       atomic.Uint64
 	toolbar          toolbarPreference
@@ -72,6 +73,7 @@ type App struct {
 	shutdownOnce sync.Once
 	sessionsMu   sync.Mutex
 	sessions     map[string]*browserSession
+	retiring     map[*App]struct{}
 	owner        *App
 }
 
@@ -110,6 +112,7 @@ func New() (*App, error) {
 		analysisTreeJobs: make(map[string]*analysisTreeTask),
 		analysisSources:  make(map[string]*analysisSourceSnapshot),
 		sessions:         make(map[string]*browserSession),
+		retiring:         make(map[*App]struct{}),
 	}, nil
 }
 
@@ -139,7 +142,13 @@ func (a *App) Serve(ln net.Listener) error {
 	if a.server == nil {
 		return errors.New("HTTP 服务尚未初始化")
 	}
+	stop, done := make(chan struct{}), make(chan struct{})
+	ticker := time.NewTicker(10 * time.Second)
+	go func() { defer close(done); a.runSessionReaper(stop, ticker.C) }()
 	err := a.server.Serve(ln)
+	ticker.Stop()
+	close(stop)
+	<-done
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
@@ -192,6 +201,8 @@ func (a *App) Shutdown() {
 func (a *App) Close() {
 	a.closeArchive()
 	a.Shutdown()
+	a.cacheResetMu.Lock()
+	defer a.cacheResetMu.Unlock()
 	a.closeBrowserSessions()
 	a.replaceWorkbook(nil)
 }

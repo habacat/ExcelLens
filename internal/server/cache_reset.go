@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -71,10 +72,24 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 			return nil, fmt.Errorf("缓存目录不是普通目录：%s", path)
 		}
 	}
+	if dir == workbook.CacheRoot() {
+		roots, err := dataRoots()
+		if err != nil {
+			return nil, err
+		}
+		if err := roots.AdoptFrozen(context.Background()); err != nil {
+			return nil, err
+		}
+	}
 	sources, err := editBasePaths()
 	if err != nil {
 		return nil, fmt.Errorf("无法核对已保存的编辑来源：%w", err)
 	}
+	taskPaths, err := savedTaskSources()
+	if err != nil {
+		return nil, err
+	}
+	sources = append(sources, taskPaths...)
 	for _, wb := range root.referencedWorkbooks() {
 		path := wb.Path
 		if wb.ArchiveOrigin != nil {

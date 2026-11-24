@@ -24,10 +24,12 @@ func (a *App) sourceNavigation(book *workbook.Workbook, kind, source, sheet stri
 		params.Set("sourceRef", workbook.ColumnName(col)+strconv.Itoa(row))
 	}
 	id := randomID()
-	session, err := a.rootApp().sessionFor(id)
+	root := a.rootApp()
+	session, err := root.acquireSession(id, "", sessionAccess{})
 	if err != nil {
 		return nil, err
 	}
+	defer root.releaseSession(session)
 	session.app.replaceWorkbook(book)
 	params.Set("session", id)
 	return map[string]any{"sameBook": false, "url": "/?" + params.Encode()}, nil

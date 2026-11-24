@@ -727,8 +727,7 @@
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/open");
       xhr.setRequestHeader("X-ExcelLens-Token", TOKEN);
-      xhr.setRequestHeader("X-ExcelLens-Cache-Epoch", document.documentElement.dataset.cacheEpoch);
-      if (window.ExcelLensSession?.id) xhr.setRequestHeader("X-ExcelLens-Session", window.ExcelLensSession.id);
+      window.ExcelLensSession?.apply(new Headers()).forEach((value, name) => xhr.setRequestHeader(name, value));
       xhr.upload.onprogress = event => {
         if (event.lengthComputable) activity?.report(event.loaded, event.total, '', fmtBytes(event.loaded) + ' / ' + fmtBytes(event.total));
       };
@@ -3436,17 +3435,6 @@
     syncGridBackdrop();
   }
 
-  function gridBackdropPanes({width,height,rowHead,header,pinWidth,pinHeight,right,bottom,fixedRight,fixedBottom}) {
-    const xs=[[rowHead,pinWidth,true],[rowHead+pinWidth,Math.max(0,width-rowHead-pinWidth),false]];
-    const ys=[[header,pinHeight,true],[header+pinHeight,Math.max(0,height-header-pinHeight),false]];
-    const panes=[];
-    for(const [x,w,fixedX]of xs)for(const [y,h,fixedY]of ys) {
-      if(w<=0||h<=0)continue;
-      panes.push({x,y,width:w,height:h,right:Math.max(-96,Math.min(w+96,(fixedX?fixedRight:right)-x)),bottom:Math.max(-80,Math.min(h+80,(fixedY?fixedBottom:bottom)-y))});
-    }
-    return panes;
-  }
-
   function syncGridBackdrop() {
     const backdrop=$('gridBackdrop');
     backdrop.hidden=!readingMode?.textureEnabled||!S.indexReady;
@@ -3454,27 +3442,13 @@
     const grid=$('grid'),hh=headerHeight();
     const pinned=frozenPanes?.effective()||{rows:0,cols:0};
     const rows=S.filtered?S.filterTotal+pinned.rows:S.usedMaxRow;
-    // Use logical scroll coordinates even for compressed, very tall sheets.
-    // Clamp at the fade length so no off-screen canvas or large layer is made.
-    const right=Math.max(-96,Math.min(grid.clientWidth,ROW_HEAD+colTotal(S.usedMaxCol)-grid.scrollLeft));
-    const bottom=Math.max(-80,Math.min(grid.clientHeight,hh+rowTotal(rows)-getVirtualScrollTop()));
-    for(const [name,value]of [['header',hh],['row-head',ROW_HEAD],['data-right',right],['data-bottom',bottom]]) {
-      const key='--backdrop-'+name,px=value+'px';
-      if(backdrop.style.getPropertyValue(key)!==px)backdrop.style.setProperty(key,px);
-    }
-    const panes=gridBackdropPanes({width:grid.clientWidth,height:grid.clientHeight,rowHead:ROW_HEAD,header:hh,
-      pinWidth:colTotal(pinned.cols),pinHeight:sourceRowTop(pinned.rows+1),
-      right:ROW_HEAD+colTotal(S.usedMaxCol)-grid.scrollLeft,bottom:hh+rowTotal(rows)-getVirtualScrollTop(),
-      fixedRight:ROW_HEAD+colTotal(S.usedMaxCol),fixedBottom:hh+rowTotal(S.usedMaxRow)});
-    const masks=[],sizes=[],positions=[];
-    for(const pane of panes)for(const [direction,start,fade]of [['right',pane.right,96],['bottom',pane.bottom,80]]) {
-      if(start>=(direction==='right'?pane.width:pane.height))continue;
-      masks.push(`linear-gradient(to ${direction},transparent ${start}px,#000 ${start+fade}px)`);
-      sizes.push(`${pane.width}px ${pane.height}px`);positions.push(`${pane.x}px ${pane.y}px`);
-    }
-    for(const [key,value]of [['mask-image',masks.join(',')||'linear-gradient(transparent,transparent)'],['mask-size',sizes.join(',')||'100% 100%'],['mask-position',positions.join(',')||'0px 0px']]) {
-      if(backdrop.style.getPropertyValue(key)!==value)backdrop.style.setProperty(key,value);
-    }
+    const fixedRight = ROW_HEAD + colTotal(S.usedMaxCol);
+    window.ExcelLensGridBackdrop.paint(backdrop, {
+      width:grid.clientWidth, height:grid.clientHeight, rowHead:ROW_HEAD, header:hh,
+      pinWidth:colTotal(pinned.cols), pinHeight:sourceRowTop(pinned.rows+1),
+      right:fixedRight-grid.scrollLeft, bottom:hh+rowTotal(rows)-getVirtualScrollTop(),
+      fixedRight, fixedBottom:hh+rowTotal(S.usedMaxRow)
+    });
   }
 
   function decorateTableColumnHeader(head,col) {
@@ -4479,6 +4453,8 @@
   }
 
   function bindEvents() {
+    window.ExcelLensStorage({api, openDialog});
+    window.addEventListener("excellens:session-expired", event => { setStatus(event.detail); toast(event.detail, "warning"); });
     document.addEventListener('toolbar-setting-error', event => toast(event.detail, 'error'));
     commandPalette.bind();
     $("openBtn").addEventListener("click", chooseFile);

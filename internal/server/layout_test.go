@@ -8,7 +8,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/workbook"
 )
+
+func layoutFile(wb *workbook.Workbook) string {
+	p, err := savedConfigPath("layouts", wb.Fingerprint)
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
 
 func TestSheetLayoutPersistsAndIsolated(t *testing.T) {
 	isolateTestStorage(t)

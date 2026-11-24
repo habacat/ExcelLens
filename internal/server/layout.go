@@ -42,22 +42,21 @@ type workbookLayouts struct {
 	Sheets  map[string]sheetLayout `json:"sheets"`
 }
 
-// Layout overrides are user settings, NOT disposable search/index caches.
-// Put them beside audit annotations so clearing old caches keeps the user's
-// column widths and row heights.
-func layoutFile(wb *workbook.Workbook) string {
-	return filepath.Join(workbook.DataRoot(), "layouts", wb.Fingerprint+".json")
-}
-
-func readLayouts(path string) workbookLayouts {
+func readLayouts(path string) (workbookLayouts, error) {
 	out := workbookLayouts{Version: 1, Sheets: make(map[string]sheetLayout)}
 	b, err := os.ReadFile(path)
-	if err != nil || len(b) > 2<<20 {
-		return out
+	if errors.Is(err, os.ErrNotExist) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	if len(b) > 2<<20 {
+		return out, errors.New("本机布局文件超过大小上限")
 	}
 	var found workbookLayouts
 	if json.Unmarshal(b, &found) != nil || found.Version != 1 || found.Sheets == nil {
-		return out
+		return out, errors.New("本机布局文件损坏或版本不兼容")
 	}
 	for name, layout := range found.Sheets {
 		clean := sheetLayout{Rows: make(map[string]int), Cols: make(map[string]int), ColumnVisibility: make(map[string]bool)}
@@ -88,7 +87,7 @@ func readLayouts(path string) workbookLayouts {
 		}
 		out.Sheets[name] = clean
 	}
-	return out
+	return out, nil
 }
 
 // Only known platform fonts are accepted as user display overrides. An empty
@@ -117,7 +116,7 @@ func validLayoutSize(kind string, index, value int) bool {
 	}
 	return kind == "col" && index >= 1 && index <= 16384 && value >= 32 && value <= 800
 }
-func writeLayouts(path string, v workbookLayouts) error {
+func writeWorkbookSetting(path string, v any) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -138,13 +137,7 @@ func writeLayouts(path string, v workbookLayouts) error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	if err = os.Rename(f.Name(), path); err != nil {
-		if rmErr := os.Remove(path); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-			return err
-		}
-		return os.Rename(f.Name(), path)
-	}
-	return nil
+	return os.Rename(f.Name(), path)
 }
 func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
@@ -193,7 +186,17 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 409, "工作簿已切换")
 		return
 	}
-	all := readLayouts(layoutFile(wb))
+	path, unlock, err := lockWorkbookSetting(r.Context(), "layouts", wb.Fingerprint)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	defer unlock()
+	all, err := readLayouts(path)
+	if err != nil {
+		writeError(w, 500, "读取布局失败："+err.Error())
+		return
+	}
 	layout := all.Sheets[meta.Name]
 	if layout.Rows == nil {
 		layout.Rows = make(map[string]int)
@@ -221,7 +224,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 				clear(layout.ColumnVisibility)
 			}
 			all.Sheets[meta.Name] = layout
-			if err := writeLayouts(layoutFile(wb), all); err != nil {
+			if err := writeWorkbookSetting(path, all); err != nil {
 				writeError(w, 500, "保存列显隐设置失败："+err.Error())
 				return
 			}
@@ -231,7 +234,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 		if input.Kind == "font" {
 			layout.Font = input.Font
 			all.Sheets[meta.Name] = layout
-			if err := writeLayouts(layoutFile(wb), all); err != nil {
+			if err := writeWorkbookSetting(path, all); err != nil {
 				writeError(w, 500, "保存字体显示设置失败："+err.Error())
 				return
 			}
@@ -255,7 +258,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		all.Sheets[meta.Name] = layout
-		if err := writeLayouts(layoutFile(wb), all); err != nil {
+		if err := writeWorkbookSetting(path, all); err != nil {
 			writeError(w, 500, "保存行列尺寸失败："+err.Error())
 			return
 		}

@@ -254,6 +254,8 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 }
 
 type calculatorCollector struct {
+	formulaBook                                           *workbook.Workbook // non-nil for formula reference semantics
+	firstFault                                            error
 	sum                                                   *big.Rat
 	minimum, maximum                                      *big.Rat
 	trackExtrema                                          bool
@@ -268,13 +270,25 @@ func (c *calculatorCollector) add(row workbook.RowData) error {
 		c.nonEmpty++
 		if cell.CacheMissing {
 			c.missing++
+			if c.firstFault == nil {
+				c.firstFault = errors.New("#VALUE! 公式缺少保存结果：" + cell.Ref)
+			}
 			continue
 		}
 		if cell.Type == "e" {
 			c.errors++
+			if c.firstFault == nil {
+				c.firstFault = fmt.Errorf("%s: %s", cell.Raw, cell.Ref)
+			}
 			continue
 		}
-		v, ok := calcCellNumber(cell)
+		var v *big.Rat
+		var ok bool
+		if c.formulaBook != nil {
+			v, ok = formulaCellNumber(c.formulaBook, cell)
+		} else {
+			v, ok = calcCellNumber(cell)
+		}
 		if !ok {
 			continue
 		}

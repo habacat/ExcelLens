@@ -1,0 +1,1127 @@
+{
+  "application": "Microsoft Excel",
+  "version": "16.0",
+  "build": 20326.0,
+  "inputs": {
+    "cases.json": "6dbeae0bc504376737ca5efa34b836c2fec968fd64615e6106785463a2f74a79",
+    "sheet.xml": "d7dcbbb388e063ce749a1237d9a0eae5bd14e6980638f38a824ed321d1b6f314"
+  },
+  "systems": {
+    "1900": {
+      "ABS": [
+        "number",
+        "2"
+      ],
+      "ACOS": [
+        "number",
+        "0"
+      ],
+      "ACOSH": [
+        "number",
+        "0"
+      ],
+      "ADDRESS": [
+        "text",
+        "$B$3"
+      ],
+      "AND": [
+        "boolean",
+        "TRUE"
+      ],
+      "ASIN": [
+        "number",
+        "0"
+      ],
+      "ASINH": [
+        "number",
+        "0"
+      ],
+      "ATAN": [
+        "number",
+        "0.78539816339744828"
+      ],
+      "ATAN2": [
+        "number",
+        "0.78539816339744828"
+      ],
+      "ATANH": [
+        "number",
+        "0"
+      ],
+      "AVEDEV": [
+        "number",
+        "1.5"
+      ],
+      "AVERAGE": [
+        "number",
+        "2"
+      ],
+      "AVERAGEIF": [
+        "number",
+        "5.0499999999999998"
+      ],
+      "AVERAGEIFS": [
+        "number",
+        "4"
+      ],
+      "AVG": [
+        "error",
+        "#NAME?"
+      ],
+      "CEILING": [
+        "number",
+        "-4"
+      ],
+      "CEILING.MATH": [
+        "number",
+        "-6"
+      ],
+      "CEILING.PRECISE": [
+        "number",
+        "-4"
+      ],
+      "CHAR": [
+        "text",
+        "A"
+      ],
+      "CHOOSE": [
+        "text",
+        "乙"
+      ],
+      "CHOOSECOLS": [
+        "number",
+        "3"
+      ],
+      "CHOOSEROWS": [
+        "number",
+        "4"
+      ],
+      "CLEAN": [
+        "text",
+        "ab"
+      ],
+      "CODE": [
+        "number",
+        "65"
+      ],
+      "COLUMN": [
+        "number",
+        "3"
+      ],
+      "COLUMNS": [
+        "number",
+        "3"
+      ],
+      "COMBIN": [
+        "number",
+        "15"
+      ],
+      "COMBINA": [
+        "number",
+        "6"
+      ],
+      "CONCAT": [
+        "text",
+        "合计：0.3"
+      ],
+      "CONCATENATE": [
+        "text",
+        "001"
+      ],
+      "CORREL": [
+        "number",
+        "1"
+      ],
+      "COS": [
+        "number",
+        "1"
+      ],
+      "COSH": [
+        "number",
+        "1"
+      ],
+      "COUNT": [
+        "number",
+        "2"
+      ],
+      "COUNTA": [
+        "number",
+        "3"
+      ],
+      "COUNTBLANK": [
+        "number",
+        "1"
+      ],
+      "COUNTIF": [
+        "number",
+        "3"
+      ],
+      "COUNTIFS": [
+        "number",
+        "2"
+      ],
+      "COVAR": [
+        "number",
+        "1.3333333333333333"
+      ],
+      "COVARIANCE.P": [
+        "number",
+        "1.3333333333333333"
+      ],
+      "COVARIANCE.S": [
+        "number",
+        "2"
+      ],
+      "DATE": [
+        "number",
+        "45292"
+      ],
+      "DATEDIF": [
+        "number",
+        "47"
+      ],
+      "DATEVALUE": [
+        "number",
+        "45292"
+      ],
+      "DAY": [
+        "number",
+        "1"
+      ],
+      "DAYS": [
+        "number",
+        "1"
+      ],
+      "DAYS360": [
+        "number",
+        "360"
+      ],
+      "DDB": [
+        "number",
+        "40"
+      ],
+      "DEGREES": [
+        "number",
+        "180"
+      ],
+      "DEVSQ": [
+        "number",
+        "17.5"
+      ],
+      "DOLLARDE": [
+        "number",
+        "1.125"
+      ],
+      "DOLLARFR": [
+        "number",
+        "1.02"
+      ],
+      "DROP": [
+        "number",
+        "1"
+      ],
+      "EDATE": [
+        "number",
+        "45351"
+      ],
+      "EFFECT": [
+        "number",
+        "0.12682503013196977"
+      ],
+      "EOMONTH": [
+        "number",
+        "45351"
+      ],
+      "ERROR.TYPE": [
+        "number",
+        "2"
+      ],
+      "EVEN": [
+        "number",
+        "-4"
+      ],
+      "EXACT": [
+        "boolean",
+        "FALSE"
+      ],
+      "EXP": [
+        "number",
+        "2.7182818284590451"
+      ],
+      "FACT": [
+        "number",
+        "120"
+      ],
+      "FACTDOUBLE": [
+        "number",
+        "105"
+      ],
+      "FALSE": [
+        "boolean",
+        "FALSE"
+      ],
+      "FILTER": [
+        "number",
+        "1"
+      ],
+      "FIND": [
+        "number",
+        "3"
+      ],
+      "FIXED": [
+        "text",
+        "1,234.57"
+      ],
+      "FLOOR": [
+        "number",
+        "-6"
+      ],
+      "FLOOR.MATH": [
+        "number",
+        "-4"
+      ],
+      "FLOOR.PRECISE": [
+        "number",
+        "-6"
+      ],
+      "FORECAST": [
+        "number",
+        "9"
+      ],
+      "FORECAST.LINEAR": [
+        "number",
+        "1"
+      ],
+      "FV": [
+        "number",
+        "1257.7892535548831"
+      ],
+      "GCD": [
+        "number",
+        "6"
+      ],
+      "GEOMEAN": [
+        "number",
+        "2.9937951655239088"
+      ],
+      "HARMEAN": [
+        "number",
+        "1.6363636363636365"
+      ],
+      "HLOOKUP": [
+        "text",
+        "北京"
+      ],
+      "HOUR": [
+        "number",
+        "15"
+      ],
+      "HSTACK": [
+        "number",
+        "1"
+      ],
+      "IF": [
+        "text",
+        "一致"
+      ],
+      "IFERROR": [
+        "text",
+        "未匹配"
+      ],
+      "IFNA": [
+        "text",
+        "未找到"
+      ],
+      "IFS": [
+        "text",
+        "符合"
+      ],
+      "INDEX": [
+        "text",
+        "北京"
+      ],
+      "INDIRECT": [
+        "number",
+        "3"
+      ],
+      "INT": [
+        "number",
+        "-3"
+      ],
+      "INTERCEPT": [
+        "number",
+        "1"
+      ],
+      "IPMT": [
+        "number",
+        "-10"
+      ],
+      "IRR": [
+        "number",
+        "0.10000000000000009"
+      ],
+      "ISBLANK": [
+        "boolean",
+        "FALSE"
+      ],
+      "ISERR": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISERROR": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISEVEN": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISLOGICAL": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISNA": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISNONTEXT": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISNUMBER": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISODD": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISOWEEKNUM": [
+        "number",
+        "1"
+      ],
+      "ISREF": [
+        "boolean",
+        "TRUE"
+      ],
+      "ISTEXT": [
+        "boolean",
+        "TRUE"
+      ],
+      "LARGE": [
+        "number",
+        "5"
+      ],
+      "LCM": [
+        "number",
+        "12"
+      ],
+      "LEFT": [
+        "text",
+        "000"
+      ],
+      "LEN": [
+        "number",
+        "2"
+      ],
+      "LET": [
+        "number",
+        "3.0000000000000004"
+      ],
+      "LN": [
+        "number",
+        "1"
+      ],
+      "LOG": [
+        "number",
+        "3"
+      ],
+      "LOG10": [
+        "number",
+        "2"
+      ],
+      "LOOKUP": [
+        "number",
+        "10"
+      ],
+      "LOWER": [
+        "text",
+        "abc"
+      ],
+      "MATCH": [
+        "number",
+        "1"
+      ],
+      "MAX": [
+        "number",
+        "3"
+      ],
+      "MAXIFS": [
+        "number",
+        "10"
+      ],
+      "MEDIAN": [
+        "number",
+        "3.5"
+      ],
+      "MID": [
+        "text",
+        "分公"
+      ],
+      "MIN": [
+        "number",
+        "1"
+      ],
+      "MINIFS": [
+        "number",
+        "-2"
+      ],
+      "MINUTE": [
+        "number",
+        "30"
+      ],
+      "MIRR": [
+        "number",
+        "0.10000000000000009"
+      ],
+      "MOD": [
+        "number",
+        "1"
+      ],
+      "MODE": [
+        "number",
+        "3"
+      ],
+      "MODE.SNGL": [
+        "number",
+        "3"
+      ],
+      "MONTH": [
+        "number",
+        "1"
+      ],
+      "MROUND": [
+        "number",
+        "3"
+      ],
+      "N": [
+        "number",
+        "1"
+      ],
+      "NA": [
+        "error",
+        "#N/A"
+      ],
+      "NETWORKDAYS": [
+        "number",
+        "5"
+      ],
+      "NETWORKDAYS.INTL": [
+        "number",
+        "6"
+      ],
+      "NOMINAL": [
+        "number",
+        "0.12000000000000011"
+      ],
+      "NORM.DIST": [
+        "number",
+        "0.5"
+      ],
+      "NORM.INV": [
+        "number",
+        "10"
+      ],
+      "NORM.S.DIST": [
+        "number",
+        "0.3989422804014327"
+      ],
+      "NORM.S.INV": [
+        "number",
+        "0"
+      ],
+      "NOT": [
+        "boolean",
+        "TRUE"
+      ],
+      "NOW": [
+        "boolean",
+        "TRUE"
+      ],
+      "NPER": [
+        "number",
+        "10"
+      ],
+      "NPV": [
+        "number",
+        "-1.2918958832001821e-14"
+      ],
+      "NUMBERVALUE": [
+        "number",
+        "1234.5"
+      ],
+      "ODD": [
+        "number",
+        "1"
+      ],
+      "OFFSET": [
+        "number",
+        "0.20000000000000001"
+      ],
+      "OR": [
+        "boolean",
+        "TRUE"
+      ],
+      "PDURATION": [
+        "number",
+        "1.9999999999999964"
+      ],
+      "PEARSON": [
+        "number",
+        "-1"
+      ],
+      "PERCENTILE": [
+        "number",
+        "2.25"
+      ],
+      "PERCENTILE.EXC": [
+        "number",
+        "1.75"
+      ],
+      "PERCENTILE.INC": [
+        "number",
+        "2.25"
+      ],
+      "PERMUT": [
+        "number",
+        "30"
+      ],
+      "PERMUTATIONA": [
+        "number",
+        "9"
+      ],
+      "PI": [
+        "number",
+        "3.1415926535897931"
+      ],
+      "PMT": [
+        "number",
+        "-57.619047619047628"
+      ],
+      "POWER": [
+        "number",
+        "1024"
+      ],
+      "PPMT": [
+        "number",
+        "-47.619047619047628"
+      ],
+      "PRODUCT": [
+        "number",
+        "720"
+      ],
+      "PROPER": [
+        "text",
+        "Hello World"
+      ],
+      "PV": [
+        "number",
+        "772.17349291848132"
+      ],
+      "QUARTILE": [
+        "number",
+        "2.25"
+      ],
+      "QUARTILE.EXC": [
+        "number",
+        "1.75"
+      ],
+      "QUARTILE.INC": [
+        "number",
+        "2.25"
+      ],
+      "QUOTIENT": [
+        "number",
+        "-2"
+      ],
+      "RADIANS": [
+        "number",
+        "3.1415926535897931"
+      ],
+      "RANK": [
+        "number",
+        "4"
+      ],
+      "RANK.AVG": [
+        "number",
+        "4"
+      ],
+      "RANK.EQ": [
+        "number",
+        "3"
+      ],
+      "RATE": [
+        "number",
+        "0.099999999999999298"
+      ],
+      "REPLACE": [
+        "text",
+        "0X123"
+      ],
+      "REPT": [
+        "text",
+        "审审审"
+      ],
+      "RIGHT": [
+        "text",
+        "分公司"
+      ],
+      "ROUND": [
+        "number",
+        "1.01"
+      ],
+      "ROUNDDOWN": [
+        "number",
+        "-1.25"
+      ],
+      "ROUNDUP": [
+        "number",
+        "-1.26"
+      ],
+      "ROW": [
+        "number",
+        "3"
+      ],
+      "ROWS": [
+        "number",
+        "6"
+      ],
+      "RRI": [
+        "number",
+        "0.10000000000000009"
+      ],
+      "RSQ": [
+        "number",
+        "1"
+      ],
+      "SEARCH": [
+        "number",
+        "2"
+      ],
+      "SECOND": [
+        "number",
+        "45"
+      ],
+      "SEQUENCE": [
+        "number",
+        "1"
+      ],
+      "SIGN": [
+        "number",
+        "-1"
+      ],
+      "SIN": [
+        "number",
+        "0"
+      ],
+      "SINH": [
+        "number",
+        "0"
+      ],
+      "SLN": [
+        "number",
+        "30"
+      ],
+      "SLOPE": [
+        "number",
+        "2"
+      ],
+      "SMALL": [
+        "number",
+        "2"
+      ],
+      "SORT": [
+        "number",
+        "1"
+      ],
+      "SQRT": [
+        "number",
+        "1.5"
+      ],
+      "SQRTPI": [
+        "number",
+        "1.7724538509055159"
+      ],
+      "STDEV": [
+        "number",
+        "1.8708286933869707"
+      ],
+      "STDEV.P": [
+        "number",
+        "1.707825127659933"
+      ],
+      "STDEV.S": [
+        "number",
+        "1.8708286933869707"
+      ],
+      "STDEVP": [
+        "number",
+        "1.707825127659933"
+      ],
+      "STEYX": [
+        "number",
+        "0"
+      ],
+      "SUBSTITUTE": [
+        "text",
+        "A-B-A"
+      ],
+      "SUM": [
+        "number",
+        "21"
+      ],
+      "SUMIF": [
+        "number",
+        "10.1"
+      ],
+      "SUMIFS": [
+        "number",
+        "8"
+      ],
+      "SUMPRODUCT": [
+        "number",
+        "24"
+      ],
+      "SUMSQ": [
+        "number",
+        "91"
+      ],
+      "SUMX2MY2": [
+        "number",
+        "-20"
+      ],
+      "SUMX2PY2": [
+        "number",
+        "30"
+      ],
+      "SUMXMY2": [
+        "number",
+        "8"
+      ],
+      "SWITCH": [
+        "text",
+        "乙"
+      ],
+      "SYD": [
+        "number",
+        "45"
+      ],
+      "T": [
+        "text",
+        ""
+      ],
+      "TAKE": [
+        "number",
+        "4"
+      ],
+      "TAN": [
+        "number",
+        "0"
+      ],
+      "TANH": [
+        "number",
+        "0"
+      ],
+      "TEXT": [
+        "text",
+        "2024-02-29"
+      ],
+      "TEXTAFTER": [
+        "text",
+        "c"
+      ],
+      "TEXTBEFORE": [
+        "text",
+        "a/b"
+      ],
+      "TEXTJOIN": [
+        "text",
+        "北京/分公司"
+      ],
+      "TEXTSPLIT": [
+        "text",
+        "甲"
+      ],
+      "TIME": [
+        "number",
+        "0.52083333333333337"
+      ],
+      "TIMEVALUE": [
+        "number",
+        "0.5"
+      ],
+      "TOCOL": [
+        "number",
+        "1"
+      ],
+      "TODAY": [
+        "boolean",
+        "TRUE"
+      ],
+      "TOROW": [
+        "number",
+        "1"
+      ],
+      "TRANSPOSE": [
+        "number",
+        "1"
+      ],
+      "TRIM": [
+        "text",
+        "科目 明细"
+      ],
+      "TRUE": [
+        "boolean",
+        "TRUE"
+      ],
+      "TRUNC": [
+        "number",
+        "-2.3399999999999999"
+      ],
+      "TYPE": [
+        "number",
+        "4"
+      ],
+      "UNICHAR": [
+        "text",
+        "中"
+      ],
+      "UNICODE": [
+        "number",
+        "20013"
+      ],
+      "UNIQUE": [
+        "number",
+        "1"
+      ],
+      "UPPER": [
+        "text",
+        "ABC"
+      ],
+      "VALUE": [
+        "number",
+        "1235"
+      ],
+      "VAR": [
+        "number",
+        "3.5"
+      ],
+      "VAR.P": [
+        "number",
+        "2.9166666666666665"
+      ],
+      "VAR.S": [
+        "number",
+        "3.5"
+      ],
+      "VARP": [
+        "number",
+        "2.9166666666666665"
+      ],
+      "VLOOKUP": [
+        "number",
+        "-2"
+      ],
+      "VSTACK": [
+        "number",
+        "1"
+      ],
+      "WEEKDAY": [
+        "number",
+        "1"
+      ],
+      "WEEKNUM": [
+        "number",
+        "1"
+      ],
+      "WORKDAY": [
+        "number",
+        "45299"
+      ],
+      "WORKDAY.INTL": [
+        "number",
+        "45297"
+      ],
+      "XIRR": [
+        "number",
+        "0.099999994039535522"
+      ],
+      "XLOOKUP": [
+        "text",
+        "上海"
+      ],
+      "XMATCH": [
+        "number",
+        "3"
+      ],
+      "XNPV": [
+        "number",
+        "-1.4210854715202004e-14"
+      ],
+      "XOR": [
+        "boolean",
+        "FALSE"
+      ],
+      "YEAR": [
+        "number",
+        "2024"
+      ],
+      "YEARFRAC": [
+        "number",
+        "1.0027397260273974"
+      ],
+      "numeric-text-range": [
+        "number",
+        "0"
+      ],
+      "numeric-text-count": [
+        "number",
+        "0"
+      ],
+      "explicit-text-number": [
+        "number",
+        "12.5"
+      ],
+      "leading-zero-identifier": [
+        "text",
+        "0012"
+      ],
+      "literal-text-amount": [
+        "number",
+        "13"
+      ],
+      "real-blank": [
+        "boolean",
+        "TRUE"
+      ],
+      "formula-empty-string": [
+        "boolean",
+        "FALSE"
+      ],
+      "count-both-empty": [
+        "number",
+        "2"
+      ],
+      "boolean-reference": [
+        "boolean",
+        "TRUE"
+      ],
+      "range-error": [
+        "error",
+        "#DIV/0!"
+      ],
+      "scalar-error": [
+        "error",
+        "#DIV/0!"
+      ],
+      "error-short-circuit": [
+        "number",
+        "17"
+      ],
+      "error-type": [
+        "number",
+        "2"
+      ],
+      "full-column-blanks": [
+        "number",
+        "1048574"
+      ],
+      "binary-lookup": [
+        "text",
+        "北京东"
+      ],
+      "cashflow-sign": [
+        "error",
+        "#NUM!"
+      ],
+      "february-yearfrac": [
+        "number",
+        "0.08611111111111111"
+      ],
+      "round-negative-half": [
+        "number",
+        "-1.3"
+      ],
+      "nonleap-february": [
+        "number",
+        "0.08611111111111111"
+      ],
+      "both-february-ends": [
+        "number",
+        "1"
+      ],
+      "ordinary-31st": [
+        "number",
+        "0.16666666666666666"
+      ],
+      "days360-february": [
+        "number",
+        "30"
+      ],
+      "reverse-yearfrac": [
+        "number",
+        "0.08611111111111111"
+      ],
+      "epoch-1904": [
+        "number",
+        "1462"
+      ],
+      "serial-59": [
+        "number",
+        "28"
+      ],
+      "serial-60": [
+        "number",
+        "29"
+      ],
+      "serial-61": [
+        "number",
+        "1"
+      ],
+      "year-zero": [
+        "number",
+        "1900"
+      ],
+      "leap-month-end": [
+        "number",
+        "45351"
+      ]
+    },
+    "1904": {
+      "epoch-1904": [
+        "number",
+        "0"
+      ],
+      "serial-59": [
+        "number",
+        "29"
+      ],
+      "serial-60": [
+        "number",
+        "1"
+      ],
+      "serial-61": [
+        "number",
+        "2"
+      ],
+      "year-zero": [
+        "number",
+        "1904"
+      ],
+      "leap-month-end": [
+        "number",
+        "43889"
+      ]
+    }
+  }
+}

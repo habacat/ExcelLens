@@ -326,6 +326,10 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 		if basis < 0 || basis > 4 {
 			return FormulaValue{}, errors.New("#NUM! YEARFRAC 基础无效")
 		}
+		if n.op == "YEARFRAC" && t.After(end) {
+			t, end = end, t
+			days = -days
+		}
 		numerator := days
 		denominator := int64(360)
 		if basis == 0 || basis == 4 {
@@ -345,7 +349,13 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 				if da == 31 || a.Month() == 2 && lastA {
 					da = 30
 				}
-				if db == 31 && da >= 30 || b.Month() == 2 && lastB && a.Month() == 2 && lastA {
+				// YEARFRAC evaluates a 31st against the original start day,
+				// before February's last day is adjusted to day 30.
+				startDay := da
+				if n.op == "YEARFRAC" {
+					startDay = a.Day()
+				}
+				if db == 31 && startDay >= 30 || b.Month() == 2 && lastB && a.Month() == 2 && lastA {
 					db = 30
 				}
 			}

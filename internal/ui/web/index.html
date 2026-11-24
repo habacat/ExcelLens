@@ -210,6 +210,7 @@
         <button id="bookmarkOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="标记和备注（Ctrl+Alt+B）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-flag"/></svg>标记</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
         <button id="snapshotsOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" title="比较保存过的分析结果"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-snapshot"/></svg>比较快照</button>
+        <button id="storageOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" aria-haspopup="dialog"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>本地数据</button>
         <button id="taskRecoveryOpenBtn" data-toolbar-priority="1" class="tool-button" type="button" aria-haspopup="dialog" title="继续中断的搜索、筛选和导出"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-history"/></svg>任务恢复</button>
       </div>
       <button id="ribbonMoreBtn" class="tool-button ribbon-more" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-controls="ribbonMoreMenu" title="更多命令"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-more"/></svg>更多</button>
@@ -254,7 +255,7 @@
     <div class="landing-shell">
       <div class="landing-topline">
         <span class="landing-product"><img src="/assets/icon.svg" width="24" height="24" alt="">ExcelLens</span>
-        <div class="landing-topright"><button id="homeExitBtn" class="icon-button" type="button" title="退出程序" aria-label="退出程序"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-power"/></svg></button></div>
+        <div class="landing-topright"><button id="storageHome" class="mini-button" type="button" aria-haspopup="dialog">本地数据</button><button id="homeExitBtn" class="icon-button" type="button" title="退出程序" aria-label="退出程序"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-power"/></svg></button></div>
       </div>
       <div class="landing-main">
         <div id="dropZone" class="landing-open-zone">
@@ -479,6 +480,7 @@
       <span id="calculatorSaveStatus" class="calculator-save-status" role="status" aria-live="polite"></span><button id="calculatorRecovery" class="calculator-notes-toggle" type="button">恢复</button><button id="calculatorNotes" class="calculator-notes-toggle" type="button" aria-pressed="false" title="备注列">备注</button><button id="calculatorMinimize" class="calculator-icon" type="button" title="收起" aria-label="收起">−</button>
       <button id="calculatorClose" class="calculator-icon" type="button" title="关闭" aria-label="关闭">×</button>
     </div>
+    <details class="calculator-compat"><summary>计算口径</summary><p>原生表格的文本金额不计入范围汇总。外部台账可计入合规文本金额。整行、整列取已用区域，财务迭代可能有尾差，≈ 表示近似值。</p></details>
     <div id="calculatorScroll" class="calculator-scroll" role="grid" aria-label="计算"><div class="calculator-columns" role="row"><span></span><span role="columnheader">公式</span><span role="columnheader">结果</span><span class="calculator-note-head" role="columnheader">备注</span></div><div id="calculatorRows" class="calculator-rows" role="rowgroup"></div></div>
   </aside>
 
@@ -794,6 +796,23 @@
     </div>
   </dialog>
 
+  <dialog id="storageDialog" class="float-dialog storage-dialog" aria-label="本地数据">
+    <form method="dialog" class="dialog-head"><div class="dialog-title">本地数据</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
+    <div class="dialog-body">
+      <table class="storage-usage"><thead><tr><th>数据</th><th>类别</th><th>占用空间</th></tr></thead><tbody id="storageRows"></tbody></table>
+      <details><summary>存储目录</summary><div id="storageRoots"></div></details>
+      <div class="storage-actions">
+        <button class="mini-button" data-storage="refresh" type="button">刷新</button>
+        <button class="mini-button" data-storage="clear-cache" type="button">清理历史索引</button>
+        <button class="mini-button" data-storage="clear-uploads" type="button">清理闲置上传副本</button>
+        <button class="mini-button" data-storage="migrate" type="button">迁入旧标记与布局</button>
+      </div>
+      <label for="storageDirectory">备份目录</label>
+      <div class="storage-actions"><input id="storageDirectory" class="field-control" type="text" placeholder="目录完整路径"><button class="mini-button" data-storage="backup" type="button">备份到此处</button><button class="mini-button" data-storage="restore" type="button">从此处迁入</button></div>
+      <div id="storageStatus" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
   <dialog id="bookmarkDialog" class="float-dialog bookmark-dialog" aria-label="标记">
     <form method="dialog" class="dialog-head"><div class="dialog-title">标记</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
@@ -1066,6 +1085,7 @@
   <script src="/assets/task-recovery.js"></script>
   <script src="/assets/session.js"></script>
   <script src="/assets/activity.js"></script>
+  <script src="/assets/grid-backdrop.js"></script>
   <script src="/assets/grid-borders.js"></script>
   <script src="/assets/recent.js"></script>
   <script src="/assets/multisort.js"></script>
@@ -1288,6 +1308,7 @@
   <script src="/assets/toolbar-settings.js"></script>
   <script src="/assets/command-palette.js"></script>
   <script src="/assets/viewport-cache.js"></script>
+  <script src="/assets/storage.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>
   <script src="/assets/analysis-numbers.js"></script>

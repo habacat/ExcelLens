@@ -158,6 +158,7 @@ test('the complete application boots with the formula table and one keyboard dis
   const {context,document}=setup(),extra=document.createElement('div');extra.content='token';document.querySelector=s=>s==='dialog:modal'?null:extra;document.querySelectorAll=()=>[];
   context.window.ExcelLensSession={ready:new Promise(()=>{})};context.ResizeObserver=class{observe(){}};context.Headers=Headers;context.URLSearchParams=URLSearchParams;
   vm.runInNewContext(read('formats.js'),context);document.getElementById('fileFormats').textContent=JSON.stringify({extensions:[],sources:{xlsx:{maxRows:1048576,styled:true}},clipboard:{rows:10,columns:5,cells:50,textBytes:10000,htmlBytes:10000},taskRecovery:{tasks:2}});
+  vm.runInNewContext(read('storage.js'),context);
   const app=read('app.js');for(const m of app.matchAll(/new window\.(ExcelLens\w+)/g))if(!context.window[m[1]])context.window[m[1]]=class{};
   context.window.ExcelLensFormulaInspector={FormulaInspector:class{}};
   assert.doesNotThrow(()=>vm.runInNewContext(app,context));assert.equal(document.handlers.keydown.length,1);

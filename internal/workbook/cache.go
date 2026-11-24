@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-// DataRoot is the only directory containing ExcelLens-owned persistent data.
+// DataRoot holds local indexes, uploads, exports and historical local records.
 // Source workbooks opened from a local path are never moved or modified.
 func DataRoot() string {
 	base, err := os.UserCacheDir()

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"excellens/internal/browserlease"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,9 +13,19 @@ import (
 	"sync"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"excellens/internal/workbook"
 )
+
+// Look up the tab's app in tests which manage its lifetime directly.
+func (a *App) sessionFor(id string) (*browserSession, error) {
+	s, err := a.acquireSession(id, "", sessionAccess{})
+	if err == nil {
+		a.releaseSession(s)
+	}
+	return s, err
+}
 
 func sessionCall(t *testing.T, a *App, session, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -277,6 +288,98 @@ func TestSwitchRetiresOnlyPreviousWorkbookJobs(t *testing.T) {
 		<-switched
 		if a.resolveReconcileBook(id) == nil {
 			t.Fatal("old workbook retirement released the new workbook's attachment")
+		}
+	})
+}
+
+func documentCall(a *App, id, page, path, generation string) *httptest.ResponseRecorder {
+	r := localTestConnection(httptest.NewRequest("POST", "/api/session/"+path, nil))
+	r.Header.Set("X-ExcelLens-Token", a.token)
+	r.Header.Set("X-ExcelLens-Session", id)
+	r.Header.Set("X-ExcelLens-Page", page)
+	r.Header.Set("X-ExcelLens-Generation", generation)
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, r)
+	return w
+}
+
+func TestSessionReaperReturnsFullCapacityWithoutAnotherRequest(t *testing.T) {
+	isolateTestStorage(t)
+	synctest.Test(t, func(t *testing.T) {
+		root, _ := New()
+		defer root.Close()
+		stop, tick := make(chan struct{}), make(chan time.Time)
+		go root.runSessionReaper(stop, tick)
+		defer close(stop)
+		var ids []string
+		page := randomID()
+		for i := 0; i < maxBrowserSessions; i++ {
+			id := randomID()
+			if got := documentCall(root, id, page, "attach", "1"); got.Code != 204 {
+				t.Fatal(got.Body)
+			}
+			ids = append(ids, id)
+		}
+		for _, id := range ids {
+			if got := documentCall(root, id, page, "detach", ""); got.Code != 204 {
+				t.Fatal(got.Body)
+			}
+		}
+		if got := documentCall(root, randomID(), page, "attach", "1"); got.Code != 429 {
+			t.Fatal(got.Code)
+		}
+		time.Sleep(browserlease.ReconnectGrace)
+		tick <- time.Now()
+		synctest.Wait()
+		if len(root.activeBrowserWorkbooks()) != 1 {
+			t.Fatal("closed tabs still retained")
+		}
+		if got := documentCall(root, ids[0], page, "heartbeat", ""); got.Code != 410 {
+			t.Fatal("late heartbeat resurrected tab", got.Code)
+		}
+		if got := documentCall(root, randomID(), page, "attach", "1"); got.Code != 204 {
+			t.Fatal(got.Body)
+		}
+	})
+}
+
+func TestSessionReloadFencesLateRequestsAndPinsInFlightWork(t *testing.T) {
+	isolateTestStorage(t)
+	synctest.Test(t, func(t *testing.T) {
+		root, _ := New()
+		defer root.Close()
+		id, first, second := randomID(), randomID(), randomID()
+		call := func(page, action, generation string, want int) {
+			t.Helper()
+			if got := documentCall(root, id, page, action, generation); got.Code != want {
+				t.Fatalf("%s: %d %s", action, got.Code, got.Body)
+			}
+		}
+		call(first, "attach", "1", 204)
+		s, err := root.acquireSession(id, "", sessionAccess{page: first, existingOnly: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		call(first, "detach", "", 204)
+		time.Sleep(browserlease.ReconnectGrace / 2)
+		call(second, "attach", "2", 204)
+		call(first, "detach", "", 204)
+		call(first, "attach", "1", 409)
+		call(first, "heartbeat", "", 409)
+		time.Sleep(browserlease.ReconnectGrace)
+		call(second, "heartbeat", "", 204)
+		if root.sessions[id] != s {
+			t.Fatal("reload replaced the tab")
+		}
+		time.Sleep(browserlease.SilenceLimit + time.Minute)
+		if root.sessions[id].lease.Expired(time.Now()) {
+			t.Fatal("in-flight request expired")
+		}
+		root.releaseSession(s)
+		time.Sleep(browserlease.SilenceLimit)
+		call(second, "heartbeat", "", 410)
+		if len(root.activeBrowserWorkbooks()) != 1 {
+			t.Fatal("silent tab retained")
 		}
 	})
 }

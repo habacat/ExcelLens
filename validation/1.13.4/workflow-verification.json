@@ -1,0 +1,86 @@
+{
+  "version": "1.13.4",
+  "scope": "Desktop application release with browser leases, native formula references and local data management",
+  "implementationVerification": {
+    "environment": "Windows amd64, Go 1.27.4, synthetic data and isolated Chromium",
+    "sessionLease": {
+      "maxTabs": 64,
+      "heartbeatSeconds": 30,
+      "reconnectSeconds": 45,
+      "silenceSeconds": 600,
+      "sweepSeconds": 10,
+      "checks": [
+        "容量用尽后无新请求仍回收",
+        "迟到注销和旧文档心跳",
+        "请求占用期间保留",
+        "后台页恢复与续租",
+        "连接尚未完成即关页"
+      ]
+    },
+    "isolatedChromium": {
+      "reloadAndLateClose": true,
+      "storageBackup": true,
+      "closedTabExpiredAfterMs": 56166,
+      "storageRestore": true,
+      "result": "PASS"
+    },
+    "nativeExcel": {
+      "application": "Microsoft Excel",
+      "version": "16.0",
+      "build": 20326,
+      "inputHashes": {
+        "cases.json": "6dbeae0bc504376737ca5efa34b836c2fec968fd64615e6106785463a2f74a79",
+        "sheet.xml": "d7dcbbb388e063ce749a1237d9a0eae5bd14e6980638f38a824ed321d1b6f314"
+      },
+      "functions": 243,
+      "boundaries": 23,
+      "resultsByDateSystem": {
+        "1900": 272,
+        "1904": 6
+      },
+      "declaredDifferences": [
+        "AVG",
+        "COUNTBLANK 整列已用范围",
+        "XLOOKUP 二分搜索模式"
+      ],
+      "xirrAbsoluteTolerance": 1e-08,
+      "source": "internal/server/testdata/calculator-native/excel.json"
+    },
+    "storage": [
+      "旧标记与布局复制、冲突和重试",
+      "未访问工作簿冻结设置的备份与三种缓存清理",
+      "编辑事务迁入后回读原值和修订值",
+      "确认的任务来源排除上传清理",
+      "损坏或冲突的备份未覆盖已有成果",
+      "首页备份及迁入"
+    ],
+    "commandLineRestoreAndRetry": "PASS",
+    "standardChecks": "PASS",
+    "raceChecks": "PASS",
+    "frontendTests": 563
+  },
+  "releaseVersionVerification": {
+    "isolatedChromium": {
+      "reloadAndLateClose": true,
+      "storageBackup": true,
+      "closedTabExpiredAfterMs": 56154,
+      "storageRestore": true,
+      "result": "PASS"
+    },
+    "nativeExcelReferenceReplay": {
+      "result": "PASS",
+      "dateSystems": {
+        "1900": 272,
+        "1904": 6
+      },
+      "httpCases": 278
+    },
+    "windowsStandard": {
+      "result": "PASS",
+      "go": "go1.27.4",
+      "frontendTests": 563
+    }
+  },
+  "manualDesktopAcceptance": false,
+  "nativeWPSComparison": false
+}

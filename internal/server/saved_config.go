@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"unicode/utf8"
+
+	"excellens/internal/localstore"
 )
 
 // Saved user configurations live in the config directory and never in cache
@@ -23,11 +25,11 @@ type savedConfigEnvelope struct {
 }
 
 func savedConfigPath(kind, name string) (string, error) {
-	root, err := os.UserConfigDir()
-	if err != nil || root == "" {
-		return "", errors.New("无法定位用户配置目录，设置尚未保存")
+	root, err := localstore.ConfigDir()
+	if err != nil {
+		return "", err
 	}
-	return filepath.Join(root, "ExcelLens", kind, name+".json"), nil
+	return filepath.Join(root, kind, name+".json"), nil
 }
 
 func decodeSavedConfig(data []byte, dst any) error {

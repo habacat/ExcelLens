@@ -1,0 +1,11 @@
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:G6"/>
+  <sheetData>
+    <row r="1"><c r="A1"><v>1</v></c><c r="B1" t="inlineStr"><is><t>北京</t></is></c><c r="C1"><v>0.1</v></c><c r="D1"><v>-100</v></c><c r="E1" t="inlineStr"><is><t>12.50</t></is></c><c r="F1" t="b"><v>1</v></c><c r="G1"><v>43831</v></c></row>
+    <row r="2"><c r="A2"><v>2</v></c><c r="B2" t="inlineStr"><is><t>上海</t></is></c><c r="C2"><v>0.2</v></c><c r="D2"><v>110</v></c><c r="E2" t="inlineStr"><is><t>0012</t></is></c><c r="G2"><v>44196</v></c></row>
+    <row r="3"><c r="A3"><v>3</v></c><c r="B3" t="inlineStr"><is><t>北京</t></is></c><c r="C3"><v>10</v></c><c r="F3" t="str"><f>""</f><v/></c></row>
+    <row r="4"><c r="A4"><v>4</v></c><c r="B4" t="inlineStr"><is><t>北京东</t></is></c><c r="C4"><v>-2</v></c></row>
+    <row r="5"><c r="A5"><v>5</v></c><c r="C5"><v>0.3</v></c></row>
+    <row r="6"><c r="A6"><v>6</v></c><c r="B6" t="inlineStr"><is><t>A*B</t></is></c><c r="C6" t="e"><f>1/0</f><v>#DIV/0!</v></c></row>
+  </sheetData>
+</worksheet>

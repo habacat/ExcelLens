@@ -28,7 +28,18 @@ func (a *App) handleCalculatorFunctions(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, map[string]any{"items": calculator.Functions()})
 }
 
-func formulaCellValue(cell workbook.CellData) (calculator.FormulaValue, error) {
+// Range summaries and element-wise functions use the same source eligibility.
+func formulaCellNumber(wb *workbook.Workbook, cell workbook.CellData) (*big.Rat, bool) {
+	if cell.Type != "" && cell.Type != "n" {
+		source, ok := formats.Lookup(wb.Format)
+		if !ok || !source.TextAmounts {
+			return nil, false
+		}
+	}
+	return calcCellNumber(cell)
+}
+
+func formulaCellValue(wb *workbook.Workbook, cell workbook.CellData) (calculator.FormulaValue, error) {
 	if cell.CacheMissing {
 		return calculator.FormulaValue{}, errors.New("#VALUE! 公式缺少保存结果")
 	}
@@ -50,7 +61,7 @@ func formulaCellValue(cell workbook.CellData) (calculator.FormulaValue, error) {
 		}
 	}
 	v := calculator.TextValue(cell.Raw)
-	if number, ok := calcCellNumber(cell); ok {
+	if number, ok := formulaCellNumber(wb, cell); ok {
 		v.NumericText = number
 	}
 	return v, nil
@@ -79,7 +90,7 @@ func visitFormulaRange(ctx context.Context, wb *workbook.Workbook, idx *workbook
 	})
 	return wb.VisitRowsContext(ctx, idx, positions, c1, c2, func(row workbook.RowData) error {
 		for _, cell := range row.Cells {
-			v, err := formulaCellValue(cell)
+			v, err := formulaCellValue(wb, cell)
 			if err != nil {
 				v = calculator.FormulaValue{Kind: "error", Text: err.Error()}
 			}
@@ -119,7 +130,7 @@ func formulaRangeMetadata(ctx context.Context, wb *workbook.Workbook, idx *workb
 		}
 		for _, cell := range rows[0].Cells {
 			if cell.Col == cc {
-				return formulaCellValue(cell)
+				return formulaCellValue(wb, cell)
 			}
 		}
 		return calculator.BlankValue(), nil
@@ -159,7 +170,7 @@ func loadFormulaRange(ctx context.Context, wb *workbook.Workbook, idx *workbook.
 	textBytes := 0
 	err := wb.VisitRowsContext(ctx, idx, positions, c1, c2, func(row workbook.RowData) error {
 		for _, cell := range row.Cells {
-			value, err := formulaCellValue(cell)
+			value, err := formulaCellValue(wb, cell)
 			if err != nil {
 				return err
 			}
@@ -267,7 +278,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 					if cell.Col != col {
 						continue
 					}
-					scalar, err = formulaCellValue(cell)
+					scalar, err = formulaCellValue(wb, cell)
 					if err != nil {
 						return finish(calculator.RangeValue{Sum: value, NonEmpty: 1, Fault: err})
 					}
@@ -277,7 +288,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 					if cell.Raw == "" {
 						break
 					}
-					v, ok := calcCellNumber(cell)
+					v, ok := formulaCellNumber(wb, cell)
 					if !ok {
 						return finish(calculator.RangeValue{Sum: value, Count: 0, NonEmpty: nonempty, Text: scalar.Kind == "text", Scalar: &scalar})
 					}
@@ -307,12 +318,9 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 					summaryErr = r.Context().Err()
 					return
 				}
-				c := calculatorCollector{sum: new(big.Rat), trackExtrema: true}
+				c := calculatorCollector{sum: new(big.Rat), trackExtrema: true, formulaBook: wb}
 				summaryErr = scanCalculatorSelection(r.Context(), wb, idx, nil, selectionStatRequest{Ranges: []selectionStatRect{{Start: start, End: end}}}, &c)
-				var fault error
-				if c.errors > 0 || c.missing > 0 {
-					fault = errors.New("#VALUE! 范围含错误值或缺少结果的公式")
-				}
+				fault := c.firstFault
 				summary = calculator.RangeValue{Sum: c.sum, Min: c.minimum, Max: c.maximum, Count: c.number, NonEmpty: c.nonEmpty, Fault: fault}
 			})
 			return summary, summaryErr
