@@ -38,7 +38,7 @@ func TestInitialPageClearlyExplainsHowToStart(t *testing.T) {
 	}
 	body := res.Body.String()
 	for _, required := range []string{
-		"浏览数据", "浏览Excel、CSV、TXT与SQLite", "选择文件",
+		"浏览数据", "选择数据文件", "连接在线数据库", `data-menu="workbookOpenMenu"`,
 		"全屏", "追踪引用", "追踪从属", "筛选条件", "冻结窗格",
 		"gridCanvas", "columnHeaders", "rowsLayer", "cellTooltip", "freezeTop", "freezeLeft",
 	} {

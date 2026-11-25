@@ -1,0 +1,84 @@
+.landing-database-button {
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--zone-ink);
+  font: 600 var(--fs-3)/1.4 var(--font-ui);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.landing-database-button:focus-visible { outline: 2px solid var(--zone-ink); outline-offset: 4px; }
+
+.database-dialog { width: min(660px, calc(100vw - 24px)); max-height: min(88dvh, 790px); }
+.database-dialog .dialog-title { margin: 0; }
+.database-body { padding-block: 16px; }
+.database-fields {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+.database-fields label { display: grid; gap: 4px; min-width: 0; color: var(--muted); font-size: var(--fs-2); }
+.database-fields :is(input, select) { width: 100%; min-width: 0; font-size: var(--fs-3); }
+.database-fields [name="port"] { font-variant-numeric: tabular-nums; }
+.database-options, .database-address, .database-advanced { grid-column: 1 / -1; }
+.database-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.database-options:has(#databaseProtocolField:not([hidden])) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.database-fields > label:has([name="database"]) { grid-column: 1 / -1; }
+.database-address { display: grid; grid-template-columns: minmax(0, 1fr) minmax(82px, 25%); gap: 12px; }
+.database-advanced { border-top: 1px solid var(--line-soft); padding-top: 9px; }
+.database-advanced summary { padding-block: 3px; color: var(--accent-strong); cursor: pointer; }
+.database-advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 9px; }
+.database-advanced-fields input[type="file"] { font-size: var(--fs-2); }
+
+.database-table-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.database-table-tools input { flex: 1; min-width: 100px; }
+#databaseSourceLabel { max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-2); }
+.database-table-wrap { max-height: min(43dvh, 340px); overflow: auto; border: 1px solid var(--line); border-radius: var(--r-2); }
+.database-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.database-table th {
+  position: sticky; top: 0; z-index: 1; background: var(--inset); color: var(--muted);
+  text-align: left; font-weight: 600; border-bottom: 1px solid var(--line-strong);
+}
+.database-table :is(th, td) { padding: 6px 8px; font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.database-table :is(th, td):first-child { width: 38px; text-align: center; }
+.database-table th:nth-child(3) { width: 28%; }
+.database-table th:last-child { width: 56px; }
+.database-table td { border-bottom: 1px solid var(--line-soft); }
+.database-table tr:last-child td { border-bottom: 0; }
+.database-table tbody tr:hover { background: var(--hover); }
+.database-table tbody tr.is-selected { background: var(--active); }
+.database-table tbody td:nth-child(2) { font-weight: 600; cursor: pointer; }
+.database-table tbody td:nth-child(n + 3) { color: var(--muted); }
+.database-table input { margin: 0; accent-color: var(--accent); vertical-align: middle; }
+.database-empty { margin: 0; padding: 20px 12px; text-align: center; color: var(--muted); }
+.database-table-footer, .database-paging { display: flex; align-items: center; gap: 8px; }
+.database-table-footer { justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: var(--fs-2); }
+.database-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 9px; padding: 10px var(--dialog-pad); border-top: 1px solid var(--line); }
+.database-feedback { min-width: 0; flex: 1 1 200px; align-self: center; }
+#databaseStatus { margin: 0; overflow-wrap: anywhere; font-size: var(--fs-2); color: var(--muted); }
+#databaseStatus.is-error { color: var(--danger); }
+#databaseProgress { display: block; width: 100%; height: 5px; margin-top: 6px; accent-color: var(--accent); }
+#databaseProgress[hidden] { display: none; }
+.database-actions { display: flex; flex: 0 0 auto; gap: 7px; justify-content: flex-end; align-items: center; margin-left: auto; }
+
+@media (max-width: 520px) {
+  .database-fields, .database-advanced-fields { grid-template-columns: minmax(0, 1fr); gap: 9px; }
+  .database-options, .database-options:has(#databaseProtocolField:not([hidden])) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .database-options:has(#databaseProtocolField:not([hidden])) > :last-child { grid-column: 1 / -1; }
+  .database-body { padding-block: 12px; }
+  .database-address { gap: 8px; }
+  .database-table-tools { align-items: stretch; flex-direction: column; gap: 5px; }
+  #databaseSourceLabel { max-width: 100%; }
+  .database-footer { padding-block: 8px; }
+  .database-feedback:has(p:empty):has(progress[hidden]) { display: none; }
+}

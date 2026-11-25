@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/assets/clipboard.css">
   <link rel="stylesheet" href="/assets/composition.css">
   <link rel="stylesheet" href="/assets/data-rules.css">
+  <link rel="stylesheet" href="/assets/online-database.css">
   <link rel="stylesheet" href="/assets/edit-copy.css">
   <link rel="stylesheet" href="/assets/field-picker.css">
   <link rel="stylesheet" href="/assets/named-views.css">
@@ -136,7 +137,7 @@
     </div>
     <div class="app-actions" role="toolbar" aria-label="功能区命令">
       <div id="ribbonHome" class="ribbon-panel" role="tabpanel" data-ribbon-panel="home" aria-labelledby="ribbonTabHome">
-        <button id="openBtn" data-toolbar-priority="0" class="tool-button" type="button" title="打开文件（Ctrl+O）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>打开</button>
+        <button id="openBtn" data-toolbar-priority="0" class="tool-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="workbookOpenMenu" data-menu="workbookOpenMenu"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>打开<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
         <button id="archiveBtn" data-toolbar-priority="2" class="tool-button" type="button" hidden title="压缩包里的其他文件"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>压缩包</button>
         <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="导出（Ctrl+Shift+E）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>导出</button>
         <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden title="在副本里修改，原文件不变"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg><span id="editCopyOpenLabel">编辑副本</span></button>
@@ -232,6 +233,10 @@
       </div>
     </div>
   </header>
+  <div id="workbookOpenMenu" class="menu" role="menu" aria-label="打开" hidden>
+    <button id="openLocalMenuBtn" type="button" role="menuitem">打开文件…<kbd>Ctrl+O</kbd></button>
+    <button id="openDatabaseBtn" type="button" role="menuitem" aria-haspopup="dialog" aria-controls="databaseDialog">在线数据库…</button>
+  </div>
   <div id="copyMenu" class="menu" role="menu" aria-label="复制" hidden>
     <button id="copySelectionBtn" type="button" role="menuitem">复制选区<kbd>Ctrl+C</kbd></button>
     <button id="copyPlainBtn" type="button" role="menuitem">复制为纯文本</button>
@@ -265,8 +270,9 @@
           </div>
           <div class="landing-content">
             <h1>浏览数据</h1>
-            <p class="landing-subline">浏览Excel、CSV、TXT与SQLite</p>
+            <p class="landing-subline">浏览 Excel、文本表格与数据库</p>
             <button id="chooseFileBtn" type="button" class="landing-open-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>选择数据文件<kbd>Ctrl+O</kbd></button>
+            <button id="openDatabaseHome" class="landing-database-button" type="button" aria-haspopup="dialog" aria-controls="databaseDialog">连接在线数据库</button>
             <div id="homeActivitySlot" class="home-activity-slot"></div>
             <div id="welcomeError" class="inline-error" hidden role="alert"></div>
           </div>
@@ -1358,6 +1364,68 @@
   <script src="/assets/storage.js"></script>
   <script src="/assets/grid-columns.js"></script>
   <script src="/assets/search-panel.js"></script>
+  <dialog id="databaseDialog" class="float-dialog database-dialog" aria-labelledby="databaseTitle">
+    <div class="dialog-head">
+      <h2 id="databaseTitle" class="dialog-title">在线数据库</h2>
+      <button id="databaseClose" type="button" class="dialog-close" aria-label="关闭"></button>
+    </div>
+    <div class="dialog-body database-body">
+      <form id="databaseConnectionForm" autocomplete="off">
+        <fieldset id="databaseConnectionFields" class="database-fields">
+          <legend class="sr-only">数据库连接</legend>
+          <div class="database-options">
+            <label>数据库类型<select name="engine" required></select></label>
+            <label id="databaseProtocolField" hidden>连接方式<select name="protocol" disabled></select></label>
+            <label>传输安全<select name="tls"><option value="verify">TLS（验证证书）</option><option value="plain">普通连接（无 TLS）</option></select></label>
+          </div>
+          <div class="database-address">
+            <label>主机名或 IP<input name="host" required autofocus maxlength="768" spellcheck="false" autocapitalize="none" placeholder="db.example.com"></label>
+            <label>端口<input name="port" type="number" min="1" max="65535" step="1" inputmode="numeric"></label>
+          </div>
+          <label><span id="databaseNameLabel">数据库</span><input name="database" maxlength="512" spellcheck="false" autocapitalize="none"></label>
+          <label>用户名<input name="user" required maxlength="512" spellcheck="false" autocapitalize="none"></label>
+          <label>密码<input name="password" type="password" maxlength="4096" autocomplete="off"></label>
+          <details class="database-advanced">
+            <summary>架构和证书</summary>
+            <div class="database-advanced-fields">
+              <label>架构筛选<input name="schema" maxlength="512" spellcheck="false" placeholder="留空显示可读架构"></label>
+              <label id="databaseCertificateField">自定义 CA（PEM）<input type="file" id="databaseCertificate" accept=".pem,.crt,.cer"></label>
+            </div>
+          </details>
+        </fieldset>
+      </form>
+      <div id="databaseCatalogue" hidden>
+        <div class="database-table-tools">
+          <input id="databaseTableSearch" type="search" placeholder="搜索表名或架构" aria-label="搜索表名或架构" autocomplete="off">
+          <span id="databaseSourceLabel"></span>
+        </div>
+        <div id="databaseTableScroll" class="database-table-wrap">
+          <table class="database-table" aria-label="可读取的数据表和视图">
+            <thead><tr><th scope="col"><span class="sr-only">选中</span></th><th scope="col">表名</th><th scope="col">架构</th><th scope="col">类型</th></tr></thead>
+            <tbody id="databaseTableRows"></tbody>
+          </table>
+          <p id="databaseTableEmpty" class="database-empty" hidden></p>
+        </div>
+        <div class="database-table-footer">
+          <span id="databaseSelection" aria-live="polite"></span>
+          <div id="databasePaging" class="database-paging" hidden><button id="databasePrev" class="mini-button" type="button">上一页</button><span id="databasePage"></span><button id="databaseNext" class="mini-button" type="button">下一页</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="database-footer">
+      <div class="database-feedback">
+        <p id="databaseStatus" role="status" aria-live="polite"></p>
+        <progress id="databaseProgress" aria-label="数据库读取进度" hidden></progress>
+      </div>
+      <div class="database-actions">
+        <button id="databaseBack" type="button" class="mini-button" hidden>返回连接</button>
+        <button id="databaseCancel" type="button" class="mini-button">取消</button>
+        <button id="databaseConnect" type="submit" form="databaseConnectionForm" class="primary-button compact">读取目录</button>
+        <button id="databaseImport" type="button" class="primary-button compact" hidden disabled>打开所选表</button>
+      </div>
+    </div>
+  </dialog>
+  <script src="/assets/online-database.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>
   <script src="/assets/analysis-numbers.js"></script>

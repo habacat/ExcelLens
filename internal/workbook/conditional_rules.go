@@ -358,6 +358,9 @@ func normalizeConditionalFormula(raw string) string {
 }
 
 func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, idx *SheetIndex) (*SourceConditionalFormats, error) {
+	if w.Format == "xlsb" {
+		return w.loadXLSBConditional(ctx, meta)
+	}
 	layout, err := w.SourceLayoutContext(ctx, meta, idx)
 	if err != nil {
 		return nil, err
@@ -473,6 +476,10 @@ func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, i
 		}
 		index.groups = append(index.groups, group)
 	}
+	return finishConditionalFormats(index, entries), nil
+}
+
+func finishConditionalFormats(index *SourceConditionalFormats, entries []conditionalRangeEntry) *SourceConditionalFormats {
 	sort.SliceStable(index.rules, func(i, j int) bool { return index.rules[i].source.Priority < index.rules[j].source.Priority })
 	for i := range index.rules {
 		rule := &index.rules[i]
@@ -501,7 +508,7 @@ func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, i
 	}
 	index.nodes, index.root = buildSourceRangeTree(entries)
 	index.bytes = conditionalIndexBytes(index)
-	return index, nil
+	return index
 }
 
 func conditionalIndexBytes(index *SourceConditionalFormats) int64 {

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"excellens/internal/formats"
 )
 
 // Image metadata requires the normal API token. A separate unpredictable
@@ -25,7 +27,7 @@ func (a *App) handleImages(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "尚未打开工作簿")
 		return
 	}
-	if wb.Format != "xlsx" {
+	if source, _ := formats.Lookup(wb.Format); !source.PictureMetadata {
 		writeJSON(w, map[string]any{"images": []any{}, "count": 0})
 		return
 	}

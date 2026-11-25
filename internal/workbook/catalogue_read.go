@@ -33,6 +33,13 @@ func (w *Workbook) ReadCatalogue(ctx context.Context) (Catalogue, error) {
 		if err := w.CheckSourceUnchanged(); err != nil {
 			return Catalogue{}, err
 		}
+		if w.Format == "xlsb" {
+			value, err := w.xlsbCatalogue(ctx, true)
+			if err != nil {
+				return Catalogue{}, err
+			}
+			return w.resolveCatalogue(ctx, value)
+		}
 		if w.source.xlsCatalogue == nil {
 			return Catalogue{}, errors.New("源适配器未提供名称目录，不能按其他格式推断")
 		}

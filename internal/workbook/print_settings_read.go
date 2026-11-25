@@ -30,7 +30,11 @@ func (w *Workbook) SourcePrintSettings(ctx context.Context, meta SheetMeta, idx 
 	state := sheetMetadataState[SourcePrintIndex]{&w.printMu, &w.printCache, &w.printLoading, &w.printClock, &w.printBytes}
 	return readSheetMetadata(ctx, meta.Path, state, sheetMetadataLimits{formats.PrintCacheBytes, formats.PrintCacheSheets}, (*SourcePrintIndex).BudgetBytes, w.CheckSourceUnchanged, func() (*SourcePrintIndex, error) {
 		b := newPrintMetadataBuilder(meta.Name, w.Format)
-		if w.source != nil {
+		if w.Format == "xlsb" {
+			if err := w.readXLSBPrintSettings(ctx, meta, b); err != nil {
+				return nil, err
+			}
+		} else if w.source != nil {
 			if err := w.readPrintNames(ctx, meta, nil, b); err != nil {
 				return nil, err
 			}

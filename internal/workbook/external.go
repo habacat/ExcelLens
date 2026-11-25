@@ -25,20 +25,22 @@ func SupportedDataExtension(ext string) bool {
 // SourceInfo is presentation metadata. No settings inferred from CSV/TXT may
 // change the original content; every imported value remains literal text.
 type SourceInfo struct {
-	TableHeader   *TextTableHeader `json:"tableHeader,omitempty"`
-	ArchiveName   string           `json:"archiveName,omitempty"`
-	ArchiveMember string           `json:"archiveMember,omitempty"`
-	ArchiveNotice string           `json:"archiveNotice,omitempty"`
-	Incomplete    bool             `json:"incomplete,omitempty"`
-	Format        string           `json:"format"`
-	Encoding      string           `json:"encoding,omitempty"`
-	Delimiter     string           `json:"delimiter,omitempty"`
-	Notice        string           `json:"notice,omitempty"`
-	ReadOnly      bool             `json:"readOnly"`
+	TableHeader        *TextTableHeader `json:"tableHeader,omitempty"`
+	ArchiveName        string           `json:"archiveName,omitempty"`
+	ArchiveMember      string           `json:"archiveMember,omitempty"`
+	ArchiveNotice      string           `json:"archiveNotice,omitempty"`
+	Incomplete         bool             `json:"incomplete,omitempty"`
+	Format             string           `json:"format"`
+	Encoding           string           `json:"encoding,omitempty"`
+	Delimiter          string           `json:"delimiter,omitempty"`
+	Notice             string           `json:"notice,omitempty"`
+	PresentationNotice string           `json:"presentationNotice,omitempty"`
+	ReadOnly           bool             `json:"readOnly"`
 }
 
 type externalSource struct {
 	ods               *odsBook
+	xlsb              *xlsbBook
 	html              *htmlStyleMetadata
 	htmlDefaultName   bool
 	format            string
@@ -68,6 +70,10 @@ func OpenDataFile(path string) (*Workbook, error) {
 		return openSQLiteWorkbook(path)
 	case ".xls":
 		return openXLSWorkbook(path)
+	case ".xlsb":
+		return openXLSB(path)
+	case formats.DatabaseSnapshotExtension:
+		return openDatabaseSnapshot(path)
 	default:
 		return nil, fmt.Errorf("不支持的文件类型 %q", filepath.Ext(path))
 	}
@@ -137,6 +143,9 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 	if w.source == nil {
 		return nil, errors.New("没有外部数据源")
 	}
+	if w.Format == "db-online" {
+		return nil, errors.New("数据库快照的行缓存不可用，请重新连接并读取数据表")
+	}
 	xmlPath, idxPath := w.cachePaths(meta.Path)
 	tmp, err := os.CreateTemp(w.CacheDir, ".import-*.rows")
 	if err != nil {
@@ -167,12 +176,15 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 		return nil
 	}
 	var catalogue *biffTableCapture
+	var xlsbData *xlsbSheetData
 	switch w.Format {
 	case "csv", "tsv", "txt":
 		err = w.streamTextRows(emit, progress)
 	case "xls":
 		catalogue = newBIFFTableCapture(meta)
 		err = w.streamXLSRows(meta, writer, cancel, progress, catalogue)
+	case "xlsb":
+		xlsbData, err = w.streamXLSBRows(meta, writer, cancel, progress)
 	case "xls-html":
 		err = w.streamHTMLXLSStyled(meta, func(fields []string, styles []int) error {
 			if cancel != nil {
@@ -222,33 +234,46 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 	if err = w.checkExternalUnchanged(); err != nil {
 		return nil, err
 	}
-	if catalogue != nil {
+	if catalogue != nil || xlsbData != nil {
 		if err = w.CheckSourceUnchanged(); err != nil {
+			return nil, err
+		}
+	}
+	if xlsbData != nil {
+		if err := w.saveXLSBSheetData(meta, xlsbData); err != nil {
 			return nil, err
 		}
 	}
 	if err = replaceFile(tmpName, xmlPath); err != nil {
 		return nil, err
 	}
-	idx := &SheetIndex{
-		SourceFormat: w.Format,
-		SheetPath:    meta.Path, XMLPath: xmlPath, IndexPath: idxPath,
-		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
-		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
-		SharedAnchors: make(map[string]SharedFormulaAnchor),
-	}
-	if err = writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
+	idx, err := w.publishExternalIndex(meta, xmlPath, idxPath, writer)
+	if err != nil {
 		return nil, err
 	}
-	w.indexMu.Lock()
-	w.indexes[meta.Path] = idx
-	w.indexMu.Unlock()
 	if catalogue != nil {
 		w.rememberBIFFCatalogue(meta, catalogue.finish())
 	}
 	if progress != nil {
 		progress(w.source.size, w.source.size, "只读索引建立完成")
 	}
+	return idx, nil
+}
+
+func (w *Workbook) publishExternalIndex(meta SheetMeta, rowsPath, idxPath string, writer *externalRowWriter) (*SheetIndex, error) {
+	idx := &SheetIndex{
+		SourceFormat: w.Format,
+		SheetPath:    meta.Path, XMLPath: rowsPath, IndexPath: idxPath,
+		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
+		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
+		SharedAnchors: make(map[string]SharedFormulaAnchor),
+	}
+	if err := writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
+		return nil, err
+	}
+	w.indexMu.Lock()
+	w.indexes[meta.Path] = idx
+	w.indexMu.Unlock()
 	return idx, nil
 }
 

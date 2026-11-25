@@ -1,0 +1,484 @@
+{
+  "result": "PASS",
+  "version": "1.17.0",
+  "platform": "Windows amd64, Go 1.27.4",
+  "method": "Three paired, sequential runs per scenario; the order is reversed in the second run. Each application cold index starts in a new cache directory; OS disk cache is left untouched. Warm time reopens the workbook and its index within the same process. Go heap is periodically sampled. Each run verifies cold and warm extents and the original input SHA-256, and reads end-cell values from both formats.",
+  "scenarios": {
+    "million": {
+      "origin": "Excel-generated pair",
+      "rows": 1000001,
+      "columns": 3,
+      "runs": {
+        "xlsb": [
+          {
+            "coldIndexFromStartMs": 4450,
+            "cols": 3,
+            "file": "million.xlsb",
+            "heapSamplePeakBytes": 22047328,
+            "hundredViewportsMs": 215,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 99,
+            "previewFromStartMs": 110,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "09a6dbd96e62eb4c6da47120b5b663ae3e7bf53c8d0ab6a0f0ee273e80323644",
+            "warmOpenIndexMs": 190
+          },
+          {
+            "coldIndexFromStartMs": 3599,
+            "cols": 3,
+            "file": "million.xlsb",
+            "heapSamplePeakBytes": 22514592,
+            "hundredViewportsMs": 102,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 77,
+            "previewFromStartMs": 86,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "09a6dbd96e62eb4c6da47120b5b663ae3e7bf53c8d0ab6a0f0ee273e80323644",
+            "warmOpenIndexMs": 101
+          },
+          {
+            "coldIndexFromStartMs": 2978,
+            "cols": 3,
+            "file": "million.xlsb",
+            "heapSamplePeakBytes": 22422760,
+            "hundredViewportsMs": 64,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 66,
+            "previewFromStartMs": 75,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "09a6dbd96e62eb4c6da47120b5b663ae3e7bf53c8d0ab6a0f0ee273e80323644",
+            "warmOpenIndexMs": 72
+          }
+        ],
+        "xlsx": [
+          {
+            "coldIndexFromStartMs": 9319,
+            "cols": 3,
+            "file": "million.xlsx",
+            "heapSamplePeakBytes": 53211888,
+            "hundredViewportsMs": 122,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 28,
+            "previewFromStartMs": 34,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "69b470aa428668559ef13abc1f89a6e37fa531e885dad6079ae8f186014de0db",
+            "warmOpenIndexMs": 103
+          },
+          {
+            "coldIndexFromStartMs": 8516,
+            "cols": 3,
+            "file": "million.xlsx",
+            "heapSamplePeakBytes": 53210864,
+            "hundredViewportsMs": 143,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 7,
+            "previewFromStartMs": 10,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "69b470aa428668559ef13abc1f89a6e37fa531e885dad6079ae8f186014de0db",
+            "warmOpenIndexMs": 139
+          },
+          {
+            "coldIndexFromStartMs": 6806,
+            "cols": 3,
+            "file": "million.xlsx",
+            "heapSamplePeakBytes": 43199672,
+            "hundredViewportsMs": 81,
+            "indexedRows": 1000001,
+            "lastRaw": "组26",
+            "openMs": 4,
+            "previewFromStartMs": 7,
+            "previewRows": 80,
+            "rows": 1000001,
+            "sourceSHA256": "69b470aa428668559ef13abc1f89a6e37fa531e885dad6079ae8f186014de0db",
+            "warmOpenIndexMs": 64
+          }
+        ]
+      },
+      "medians": {
+        "xlsb": {
+          "openMs": 77,
+          "previewFromStartMs": 86,
+          "coldIndexFromStartMs": 3599,
+          "warmOpenIndexMs": 101,
+          "hundredViewportsMs": 102,
+          "heapSamplePeakBytes": 22422760
+        },
+        "xlsx": {
+          "openMs": 7,
+          "previewFromStartMs": 10,
+          "coldIndexFromStartMs": 8516,
+          "warmOpenIndexMs": 103,
+          "hundredViewportsMs": 122,
+          "heapSamplePeakBytes": 53210864
+        }
+      }
+    },
+    "wide": {
+      "origin": "Excel-generated pair",
+      "rows": 9,
+      "columns": 16384,
+      "runs": {
+        "xlsb": [
+          {
+            "coldIndexFromStartMs": 162,
+            "cols": 16384,
+            "file": "wide.xlsb",
+            "heapSamplePeakBytes": 13777208,
+            "hundredViewportsMs": 289,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 6,
+            "previewFromStartMs": 38,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "801153654e0cc35ffd212017c13359ef4726bd2424e2fba64c93c447654172b9",
+            "warmOpenIndexMs": 2
+          },
+          {
+            "coldIndexFromStartMs": 151,
+            "cols": 16384,
+            "file": "wide.xlsb",
+            "heapSamplePeakBytes": 12755696,
+            "hundredViewportsMs": 294,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 7,
+            "previewFromStartMs": 39,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "801153654e0cc35ffd212017c13359ef4726bd2424e2fba64c93c447654172b9",
+            "warmOpenIndexMs": 3
+          },
+          {
+            "coldIndexFromStartMs": 153,
+            "cols": 16384,
+            "file": "wide.xlsb",
+            "heapSamplePeakBytes": 12718008,
+            "hundredViewportsMs": 284,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 6,
+            "previewFromStartMs": 40,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "801153654e0cc35ffd212017c13359ef4726bd2424e2fba64c93c447654172b9",
+            "warmOpenIndexMs": 2
+          }
+        ],
+        "xlsx": [
+          {
+            "coldIndexFromStartMs": 699,
+            "cols": 16384,
+            "file": "wide.xlsx",
+            "heapSamplePeakBytes": 10480088,
+            "hundredViewportsMs": 2684,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 2,
+            "previewFromStartMs": 514,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "5f45113651f4d2ded7d71916649b913981ed102170485efda61d17240c610ab2",
+            "warmOpenIndexMs": 3
+          },
+          {
+            "coldIndexFromStartMs": 809,
+            "cols": 16384,
+            "file": "wide.xlsx",
+            "heapSamplePeakBytes": 12697280,
+            "hundredViewportsMs": 1958,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 4,
+            "previewFromStartMs": 611,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "5f45113651f4d2ded7d71916649b913981ed102170485efda61d17240c610ab2",
+            "warmOpenIndexMs": 4
+          },
+          {
+            "coldIndexFromStartMs": 684,
+            "cols": 16384,
+            "file": "wide.xlsx",
+            "heapSamplePeakBytes": 11841704,
+            "hundredViewportsMs": 1806,
+            "indexedRows": 9,
+            "lastRaw": "终点",
+            "openMs": 3,
+            "previewFromStartMs": 511,
+            "previewRows": 9,
+            "rows": 9,
+            "sourceSHA256": "5f45113651f4d2ded7d71916649b913981ed102170485efda61d17240c610ab2",
+            "warmOpenIndexMs": 2
+          }
+        ]
+      },
+      "medians": {
+        "xlsb": {
+          "openMs": 6,
+          "previewFromStartMs": 39,
+          "coldIndexFromStartMs": 153,
+          "warmOpenIndexMs": 2,
+          "hundredViewportsMs": 289,
+          "heapSamplePeakBytes": 12755696
+        },
+        "xlsx": {
+          "openMs": 3,
+          "previewFromStartMs": 514,
+          "coldIndexFromStartMs": 699,
+          "warmOpenIndexMs": 3,
+          "hundredViewportsMs": 1958,
+          "heapSamplePeakBytes": 11841704
+        }
+      }
+    },
+    "styled": {
+      "origin": "Excel-generated pair",
+      "rows": 2048,
+      "columns": 64,
+      "runs": {
+        "xlsb": [
+          {
+            "coldIndexFromStartMs": 110,
+            "cols": 64,
+            "file": "styled.xlsb",
+            "heapSamplePeakBytes": 4389888,
+            "hundredViewportsMs": 475,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 6,
+            "previewFromStartMs": 17,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "e88b3a069e19892728d331a8eb87ccf0de83ca1c99d192fa0e4a136e6164c6d2",
+            "warmOpenIndexMs": 3
+          },
+          {
+            "coldIndexFromStartMs": 130,
+            "cols": 64,
+            "file": "styled.xlsb",
+            "heapSamplePeakBytes": 4256832,
+            "hundredViewportsMs": 477,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 19,
+            "previewFromStartMs": 29,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "e88b3a069e19892728d331a8eb87ccf0de83ca1c99d192fa0e4a136e6164c6d2",
+            "warmOpenIndexMs": 3
+          },
+          {
+            "coldIndexFromStartMs": 117,
+            "cols": 64,
+            "file": "styled.xlsb",
+            "heapSamplePeakBytes": 3976368,
+            "hundredViewportsMs": 462,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 6,
+            "previewFromStartMs": 16,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "e88b3a069e19892728d331a8eb87ccf0de83ca1c99d192fa0e4a136e6164c6d2",
+            "warmOpenIndexMs": 3
+          }
+        ],
+        "xlsx": [
+          {
+            "coldIndexFromStartMs": 269,
+            "cols": 64,
+            "file": "styled.xlsx",
+            "heapSamplePeakBytes": 3887104,
+            "hundredViewportsMs": 954,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 5,
+            "previewFromStartMs": 33,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "beaca134e331c03c10d12565707a2690c983d23c8f0f57de865f97b1ca923abd",
+            "warmOpenIndexMs": 7
+          },
+          {
+            "coldIndexFromStartMs": 209,
+            "cols": 64,
+            "file": "styled.xlsx",
+            "heapSamplePeakBytes": 4062152,
+            "hundredViewportsMs": 862,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 3,
+            "previewFromStartMs": 27,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "beaca134e331c03c10d12565707a2690c983d23c8f0f57de865f97b1ca923abd",
+            "warmOpenIndexMs": 5
+          },
+          {
+            "coldIndexFromStartMs": 263,
+            "cols": 64,
+            "file": "styled.xlsx",
+            "heapSamplePeakBytes": 3933528,
+            "hundredViewportsMs": 923,
+            "indexedRows": 2048,
+            "lastRaw": "8192",
+            "openMs": 19,
+            "previewFromStartMs": 48,
+            "previewRows": 80,
+            "rows": 2048,
+            "sourceSHA256": "beaca134e331c03c10d12565707a2690c983d23c8f0f57de865f97b1ca923abd",
+            "warmOpenIndexMs": 4
+          }
+        ]
+      },
+      "medians": {
+        "xlsb": {
+          "openMs": 6,
+          "previewFromStartMs": 17,
+          "coldIndexFromStartMs": 117,
+          "warmOpenIndexMs": 3,
+          "hundredViewportsMs": 475,
+          "heapSamplePeakBytes": 4256832
+        },
+        "xlsx": {
+          "openMs": 5,
+          "previewFromStartMs": 33,
+          "coldIndexFromStartMs": 263,
+          "warmOpenIndexMs": 5,
+          "hundredViewportsMs": 923,
+          "heapSamplePeakBytes": 3933528
+        }
+      }
+    },
+    "distinctSST": {
+      "origin": "Synthetic BIFF12 workbook with 250000 unique shared strings",
+      "rows": 250000,
+      "columns": 1,
+      "runs": {
+        "before": [
+          {
+            "coldIndexFromStartMs": 6998,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 23045576,
+            "hundredViewportsMs": 39,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 11,
+            "previewFromStartMs": 14,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 21
+          },
+          {
+            "coldIndexFromStartMs": 7061,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 23076296,
+            "hundredViewportsMs": 42,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 14,
+            "previewFromStartMs": 16,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 23
+          },
+          {
+            "coldIndexFromStartMs": 6015,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 23060152,
+            "hundredViewportsMs": 38,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 9,
+            "previewFromStartMs": 12,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 17
+          }
+        ],
+        "after": [
+          {
+            "coldIndexFromStartMs": 420,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 22253936,
+            "hundredViewportsMs": 40,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 11,
+            "previewFromStartMs": 12,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 19
+          },
+          {
+            "coldIndexFromStartMs": 419,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 21535720,
+            "hundredViewportsMs": 50,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 9,
+            "previewFromStartMs": 11,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 23
+          },
+          {
+            "coldIndexFromStartMs": 396,
+            "cols": 1,
+            "file": "distinct-shared-250k.xlsb",
+            "heapSamplePeakBytes": 22249128,
+            "hundredViewportsMs": 41,
+            "indexedRows": 250000,
+            "lastRaw": "Record-249999-ledger",
+            "openMs": 8,
+            "previewFromStartMs": 9,
+            "previewRows": 80,
+            "rows": 250000,
+            "sourceSHA256": "ec1fabc18b04381a402601dda021fa74d57f378d05f92c366f05e274edfdc166",
+            "warmOpenIndexMs": 17
+          }
+        ]
+      },
+      "medians": {
+        "before": {
+          "openMs": 11,
+          "previewFromStartMs": 14,
+          "coldIndexFromStartMs": 6998,
+          "warmOpenIndexMs": 21,
+          "hundredViewportsMs": 39,
+          "heapSamplePeakBytes": 23060152
+        },
+        "after": {
+          "openMs": 9,
+          "previewFromStartMs": 11,
+          "coldIndexFromStartMs": 419,
+          "warmOpenIndexMs": 19,
+          "hundredViewportsMs": 41,
+          "heapSamplePeakBytes": 22249128
+        }
+      }
+    }
+  }
+}

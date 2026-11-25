@@ -102,6 +102,9 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if st != nil {
 		size = st.Size()
 	}
+	if wb.Format == "db-online" {
+		size = wb.DatabaseSnapshotSize()
+	}
 	writeJSON(w, map[string]any{
 		"version":     buildinfo.Version,
 		"opened":      true,
@@ -169,7 +172,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	ext := strings.ToLower(filepath.Ext(h.Filename))
 	if !workbook.SupportedExtensions(ext) {
-		writeError(w, http.StatusBadRequest, "请选择受支持的数据文件或 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包")
+		writeError(w, http.StatusBadRequest, "请选择受支持的数据文件或压缩包")
 		return
 	}
 	a.cacheMu.RLock()

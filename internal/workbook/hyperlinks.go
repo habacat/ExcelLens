@@ -2,6 +2,7 @@ package workbook
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -309,6 +310,13 @@ func (w *Workbook) SheetHyperlinks(meta SheetMeta) (*SheetHyperlinkIndex, error)
 	if item, ok := w.linkCache[meta.Path]; ok {
 		return item, nil
 	}
+	if w.Format == "xlsb" {
+		result, err := w.xlsbHyperlinks(context.Background(), meta)
+		if err == nil {
+			w.storeHyperlinks(meta.Path, result)
+		}
+		return result, err
+	}
 	idx := w.GetCachedIndex(meta.Path)
 	if idx == nil {
 		return nil, errors.New("sheet index is not available")
@@ -370,17 +378,21 @@ func (w *Workbook) SheetHyperlinks(meta SheetMeta) (*SheetHyperlinkIndex, error)
 		if !ok {
 			continue
 		} // Untrusted/unsupported targets must never execute.
-		if r1 == r2 && c1 == c2 {
-			if result.single[r1] == nil {
-				result.single[r1] = make(map[int]CellHyperlink)
-			}
-			result.single[r1][c1] = link
-		} else {
-			result.ranges = append(result.ranges, hyperlinkRange{r1, r2, c1, c2, link})
-		}
+		result.add(r1, r2, c1, c2, link)
 	}
 	w.storeHyperlinks(meta.Path, result)
 	return result, nil
+}
+
+func (index *SheetHyperlinkIndex) add(r1, r2, c1, c2 int, link CellHyperlink) {
+	if r1 == r2 && c1 == c2 {
+		if index.single[r1] == nil {
+			index.single[r1] = make(map[int]CellHyperlink)
+		}
+		index.single[r1][c1] = link
+	} else {
+		index.ranges = append(index.ranges, hyperlinkRange{r1, r2, c1, c2, link})
+	}
 }
 
 func (w *Workbook) storeHyperlinks(key string, index *SheetHyperlinkIndex) {

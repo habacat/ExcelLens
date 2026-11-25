@@ -175,7 +175,7 @@ func TestAppendRejectsWrongBindingsInvalidCellsAndOversizedRecords(t *testing.T)
 		"missing check":   func(s []Source) { s[0].Check = nil },
 		"missing scan":    func(s []Source) { s[0].Scan = nil },
 		"missing field":   func(s []Source) { s[0].Fields = s[0].Fields[2:] },
-		"false format":    func(s []Source) { s[0].Format = "xlsb" },
+		"false format":    func(s []Source) { s[0].Format = "unsupported" },
 		"format capacity": func(s []Source) { s[0].MaxRow = formats.ExternalRows },
 		"negative total":  func(s []Source) { s[0].Rows = -1 },
 	} {

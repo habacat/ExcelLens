@@ -66,7 +66,7 @@ func (s *indexedStream) readWithOptions(w *Workbook, row, first, last int, selec
 	s.lastStart, s.hasLast = off.Start, true
 	data := s.block[off.Start-s.start : off.End-s.start]
 	if isExternalRows(s.idx.XMLPath) {
-		return w.decodeExternalRow(data, off.Number, first, last, selected, options.FormatValue, options.IncludeFormula)
+		return w.decodeExternalRow(data, off.Number, first, last, selected, options)
 	}
 	return w.fastDecodeXMLRowWithOptions(s.f, s.idx, row, first, last, selected, options, data)
 }

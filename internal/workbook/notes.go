@@ -109,6 +109,9 @@ func DecodeNotes(ctx context.Context, data []byte) ([]string, []SourceNote, erro
 	return authors, notes, nil
 }
 func (w *Workbook) SheetNotes(ctx context.Context, meta SheetMeta) ([]SourceNote, bool, error) {
+	if w.Format == "xlsb" {
+		return w.xlsbNotes(ctx, meta)
+	}
 	reader, err := w.openCatalogueReader(ctx)
 	if err != nil {
 		return nil, false, err

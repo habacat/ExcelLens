@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 )
 
 var ErrPreviewUnavailable = errors.New("preview unavailable")
@@ -44,6 +45,20 @@ func (w *Workbook) PreviewRows(ctx context.Context, meta SheetMeta, limit, colum
 	if w.source != nil {
 		if err := w.checkExternalUnchanged(); err != nil {
 			return nil, err
+		}
+		if w.Format == "xlsb" {
+			_, err := w.walkXLSBRows(meta, limit, columns, ctx.Done(), nil, func(number, style int, cells []externalCell) error {
+				r := RowData{Number: number, Style: style, Cells: make([]CellData, 0, len(cells))}
+				suffix := strconv.Itoa(number)
+				for _, cell := range cells {
+					r.Cells = append(r.Cells, w.externalCellValue(suffix, cell, true))
+				}
+				return appendRow(r)
+			})
+			if errors.Is(err, errPreviewDone) {
+				err = nil
+			}
+			return rows, err
 		}
 		number := 0
 		emitStyled := func(fields []string, styles []int) error {

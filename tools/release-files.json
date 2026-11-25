@@ -4,7 +4,7 @@
   "CONTRIBUTING.md",
   "SECURITY.md",
   "validation/{version}/workflow-verification.json",
-  "validation/{version}/scroll-render-comparison.json",
+  "validation/{version}/xlsb-performance.json",
   "validation/1.16.0/performance-baseline.json",
   "go.mod",
   "NOTICE.md",

@@ -31,6 +31,7 @@ type App struct {
 	workAdmission
 	queryController
 	workbookSession
+	databaseImportController
 	edits            editController
 	recoveryOnce     sync.Once
 	recoveryStore    *recovery.Store
@@ -240,6 +241,7 @@ func (a *App) Close() {
 	a.Shutdown()
 	a.cacheResetMu.Lock()
 	defer a.cacheResetMu.Unlock()
+	a.closeDatabaseImport()
 	a.closeBrowserSessions()
 	a.replaceWorkbook(nil)
 }

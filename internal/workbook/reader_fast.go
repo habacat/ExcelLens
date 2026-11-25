@@ -26,7 +26,7 @@ func (w *Workbook) fastReadRowAt(f *os.File, idx *SheetIndex, rowIndex, firstCol
 // OOXML constructs, preserving source fidelity over speed.
 func (w *Workbook) fastReadRowWithOptions(f *os.File, idx *SheetIndex, rowIndex, firstCol, lastCol int, selected map[int]struct{}, formatValue, includeFormula bool, reuse *[]byte) (RowData, error) {
 	if isExternalRows(idx.XMLPath) {
-		return w.readExternalRow(f, idx, rowIndex, firstCol, lastCol, selected, formatValue, includeFormula, reuse)
+		return w.readExternalRow(f, idx, rowIndex, firstCol, lastCol, selected, RowReadOptions{FormatValue: formatValue, IncludeFormula: includeFormula}, reuse)
 	}
 	if rowIndex < 0 || rowIndex >= idx.RowCount() {
 		return RowData{}, errors.New("row index out of range")

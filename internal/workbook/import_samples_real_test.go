@@ -110,7 +110,7 @@ func verifyProvidedImport(t *testing.T, variable string, rows, cols int, sourceS
 			t.Fatal(err)
 		}
 		position = offset.End
-		row, err := wb.decodeExternalRow(buffer[:size], offset.Number, 1, cols, nil, false, false)
+		row, err := wb.decodeExternalRow(buffer[:size], offset.Number, 1, cols, nil, RowReadOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

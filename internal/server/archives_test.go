@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,6 +98,68 @@ func awaitArchiveFixture(t *testing.T, app *App, archive string, member int, par
 		t.Fatalf("archive job %s: %s", response.Status, response.Error)
 	}
 	return response.Result
+}
+
+func TestRARWorkbookOpen(t *testing.T) {
+	path, err := filepath.Abs("../archives/testdata/rar5-solid.rar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"local", "upload"} {
+		t.Run(route, func(t *testing.T) {
+			isolateTestStorage(t)
+			app, err := New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer app.Close()
+
+			if route == "upload" {
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if uploaded := uploadArchiveFixture(t, app, "资料.RAR", raw); uploaded["archiveOnly"] != true {
+					t.Fatal(uploaded)
+				}
+			} else if err := app.OpenPath(path); err != nil {
+				t.Fatal(err)
+			}
+
+			summary := app.archiveSummary()
+			if summary["format"] != "RAR" || app.currentWorkbook() != nil {
+				t.Fatal(summary)
+			}
+			id := summary["id"].(string)
+			list := featureCall(t, app, "GET", "/api/archive/list?id="+id+"&q="+url.QueryEscape("明细"), "")
+			items := decodeResponse[struct {
+				Items []struct {
+					ID   int
+					Name string
+				}
+			}](t, list).Items
+			if len(items) != 1 || items[0].Name != "02-明细.csv" {
+				t.Fatal(items)
+			}
+			if result := awaitArchiveFixture(t, app, id, items[0].ID); result["opened"] != true {
+				t.Fatal(result)
+			}
+			wb := app.currentWorkbook()
+			if wb == nil || wb.SourceInfo.ArchiveMember != items[0].Name {
+				t.Fatal("workbook did not retain RAR provenance")
+			}
+			idx, err := wb.BuildIndex(wb.Sheets[0], nil, nil)
+			if err != nil || idx.MaxRow != 385 || idx.MaxCol != 2 {
+				t.Fatal(idx, err)
+			}
+			if id := cellValueServer(t, wb, idx, 385, 1); id != "000789" {
+				t.Fatalf("source identifier = %q, want leading zeros", id)
+			}
+			if amount := cellValueServer(t, wb, idx, 385, 2); amount != "6.75" {
+				t.Fatalf("source amount = %q", amount)
+			}
+		})
+	}
 }
 
 func TestTruncatedTARRecoveryNoticeIndexAndRecent(t *testing.T) {

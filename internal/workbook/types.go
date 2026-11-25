@@ -5,10 +5,11 @@ import "excellens/internal/searchresults"
 import "sync"
 
 type SheetMeta struct {
-	Name     string `json:"name"`
-	Path     string `json:"-"`
-	State    string `json:"state,omitempty"`
-	TabColor string `json:"tabColor,omitempty"`
+	Name       string `json:"name"`
+	Path       string `json:"-"`
+	State      string `json:"state,omitempty"`
+	TabColor   string `json:"tabColor,omitempty"`
+	SourceName string `json:"sourceName,omitempty"`
 }
 
 type Workbook struct {
@@ -145,14 +146,16 @@ type CellData struct {
 	Type       string `json:"type,omitempty"`
 	Style      int    `json:"style"`
 	// A draft can combine the target's visual XF with another number format.
-	DisplayNumFmt    *int                     `json:"displayNumFmt,omitempty"`
-	ValueColor       string                   `json:"valueColor,omitempty"`
-	CacheMissing     bool                     `json:"cacheMissing,omitempty"`
-	SharedFormula    bool                     `json:"sharedFormula,omitempty"`
-	Hyperlink        *CellHyperlink           `json:"hyperlink,omitempty"`
-	RichText         *RichText                `json:"richText,omitempty"`
-	Conditional      *ConditionalPresentation `json:"conditional,omitempty"`
-	PresentationOnly bool                     `json:"presentationOnly,omitempty"`
+	DisplayNumFmt      *int                     `json:"displayNumFmt,omitempty"`
+	ValueColor         string                   `json:"valueColor,omitempty"`
+	CacheMissing       bool                     `json:"cacheMissing,omitempty"`
+	SharedFormula      bool                     `json:"sharedFormula,omitempty"`
+	ArrayFormula       *CellMerge               `json:"arrayFormula,omitempty"`
+	ArrayFormulaMember bool                     `json:"arrayFormulaMember,omitempty"`
+	Hyperlink          *CellHyperlink           `json:"hyperlink,omitempty"`
+	RichText           *RichText                `json:"richText,omitempty"`
+	Conditional        *ConditionalPresentation `json:"conditional,omitempty"`
+	PresentationOnly   bool                     `json:"presentationOnly,omitempty"`
 }
 
 type SearchResult = searchresults.Hit

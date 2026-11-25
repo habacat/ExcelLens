@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
 
@@ -28,6 +29,7 @@ type recentEntry struct {
 	ArchiveChain   []archiveHop `json:"archiveChain,omitempty"`
 	ArchiveMember  string       `json:"archiveMember,omitempty"`
 	ArchivePartial bool         `json:"archivePartial,omitempty"`
+	Database       bool         `json:"database,omitempty"`
 	ID             string       `json:"id"`
 	Name           string       `json:"name"`
 	Path           string       `json:"path"`
@@ -131,6 +133,10 @@ func sortedRecents(items []recentEntry) {
 	})
 }
 
+func recentDatabase(item recentEntry) bool {
+	return item.Database && strings.EqualFold(filepath.Ext(item.Path), formats.DatabaseSnapshotExtension)
+}
+
 func (a *App) recordRecent(wb *workbook.Workbook) {
 	if wb == nil {
 		return
@@ -145,6 +151,9 @@ func (a *App) recordRecent(wb *workbook.Workbook) {
 		return
 	}
 	item := recentEntry{ID: id, Name: workbookDisplayName(wb), Path: p, Fingerprint: wb.Fingerprint, FileSize: st.Size(), SheetCount: len(wb.Sheets), OpenedAt: time.Now(), Available: true}
+	if wb.Format == "db-online" {
+		item.Database, item.FileSize = true, wb.DatabaseSnapshotSize()
+	}
 	a.archiveRecent(wb, &item)
 	recentStoreMu.Lock()
 	defer recentStoreMu.Unlock()
@@ -192,7 +201,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 			st, err := os.Stat(r.Items[i].Path)
-			r.Items[i].Available = err == nil && st.Mode().IsRegular() && strings.EqualFold(filepath.Ext(r.Items[i].Path), filepath.Ext(r.Items[i].Name))
+			r.Items[i].Available = err == nil && st.Mode().IsRegular() && (recentDatabase(r.Items[i]) || strings.EqualFold(filepath.Ext(r.Items[i].Path), filepath.Ext(r.Items[i].Name)))
 		}
 		sortedRecents(r.Items)
 		writeJSON(w, map[string]any{"items": r.Items})
@@ -246,7 +255,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, map[string]any{"pinned": pinned})
 		return
 	case "open":
-		if !workbook.SupportedExtensions(filepath.Ext(item.Path)) {
+		if !recentDatabase(item) && !workbook.SupportedExtensions(filepath.Ext(item.Path)) {
 			writeError(w, 400, "记录中的文件类型不受支持")
 			return
 		}
@@ -277,7 +286,11 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			writeError(w, 404, "刚打开的源文件已移动或删除，请重新选择")
 			return
 		}
-		writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "fileName": workbookDisplayName(wb), "fileSize": memberStat.Size(), "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo, "archive": a.archiveSummary()})
+		size := memberStat.Size()
+		if wb.Format == "db-online" {
+			size = wb.DatabaseSnapshotSize()
+		}
+		writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "fileName": workbookDisplayName(wb), "fileSize": size, "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo, "archive": a.archiveSummary()})
 		return
 	default:
 		writeError(w, 400, "不支持的历史记录操作")

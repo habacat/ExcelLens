@@ -1,9 +1,7 @@
 package workbook
 
-// Native external-row cache. CSV, TXT, SQLite and BIFF XLS are not Excel
-// worksheets and must not be inflated into OOXML or limited to 1,048,576 rows.
-// Records have length-checked, forward-only encoding and independently indexed
-// byte ranges for constant-memory viewport reads.
+// Native external-row cache. Adapters preserve their source limits and use
+// independently indexed, length-checked records for bounded viewport reads.
 
 import (
 	"bufio"
@@ -27,13 +25,17 @@ const (
 )
 
 type externalCell struct {
-	Col          int
-	Raw          string
-	Type         byte // 's' string, 'n' numeric, 'b' boolean, 'e' error
-	Style        int
-	Formula      string // optional, includes leading '='
-	HasFormula   bool
-	CacheMissing bool
+	Col                int
+	Raw                string
+	Type               byte // 's' string, 'n' numeric, 'b' boolean, 'e' error
+	Style              int
+	Formula            string // optional, includes leading '='
+	HasFormula         bool
+	CacheMissing       bool
+	SharedFormula      bool
+	ArrayFormula       *CellMerge
+	ArrayFormulaMember bool
+	Rich               []byte // optional XLSB payload in ELNROW02 flag bit 2
 }
 
 type externalRowWriter struct {
@@ -67,6 +69,10 @@ func (w *externalRowWriter) uvar(v uint64) error {
 	return w.bytes(b[:n])
 }
 func (w *externalRowWriter) begin(count, cols int) (int64, error) {
+	return w.beginStyled(count, cols, 0)
+}
+
+func (w *externalRowWriter) beginStyled(count, cols, style int) (int64, error) {
 	if w.rows >= maxExternalRows {
 		return 0, fmt.Errorf("数据超过 %d 行的索引安全上限，请分批查看", maxExternalRows)
 	}
@@ -77,8 +83,17 @@ func (w *externalRowWriter) begin(count, cols int) (int64, error) {
 		return 0, fmt.Errorf("第 %d 行非空列数量过大", w.rows+1)
 	}
 	start := w.count
-	if err := w.uvar(uint64(count)); err != nil {
+	header := count
+	if style != 0 {
+		header |= 1 << 15
+	}
+	if err := w.uvar(uint64(header)); err != nil {
 		return 0, err
+	}
+	if style != 0 {
+		if err := w.uvar(uint64(style)); err != nil {
+			return 0, err
+		}
 	}
 	w.rows++
 	if cols > w.cols {
@@ -107,6 +122,18 @@ func (w *externalRowWriter) cell(c externalCell) error {
 	if c.CacheMissing {
 		flags |= 2
 	}
+	if len(c.Rich) != 0 {
+		flags |= 4
+	}
+	if c.SharedFormula {
+		flags |= 8
+	}
+	if c.ArrayFormulaMember {
+		flags |= 16
+	}
+	if c.ArrayFormula != nil {
+		flags |= 32
+	}
 	if err := w.bytes([]byte{kind, flags}); err != nil {
 		return err
 	}
@@ -126,6 +153,20 @@ func (w *externalRowWriter) cell(c externalCell) error {
 		if err := w.str(c.Formula); err != nil {
 			return err
 		}
+	}
+	if len(c.Rich) != 0 {
+		if err := w.uvar(uint64(len(c.Rich))); err != nil {
+			return err
+		}
+		if err := w.bytes(c.Rich); err != nil {
+			return err
+		}
+	}
+	if c.ArrayFormula != nil {
+		if err := w.uvar(uint64(c.ArrayFormula.EndRow)); err != nil {
+			return err
+		}
+		return w.uvar(uint64(c.ArrayFormula.EndCol))
 	}
 	return nil
 }
@@ -175,19 +216,27 @@ func (w *externalRowWriter) row(fields []string) error {
 	return w.complete(start)
 }
 func (w *externalRowWriter) cells(cells []externalCell, cols int) error {
+	return w.cellsWithStyle(cells, cols, 0)
+}
+
+func storedExternalCell(c externalCell) bool {
+	return c.Raw != "" || c.HasFormula || c.Style != 0 || c.Type == 'S' || c.Type == 't' || c.Type == 'z' || c.Type == '0'
+}
+
+func (w *externalRowWriter) cellsWithStyle(cells []externalCell, cols, style int) error {
 	count := 0
 	for _, c := range cells {
-		if c.Raw != "" || c.HasFormula || c.Style != 0 {
+		if storedExternalCell(c) {
 			count++
 		}
 	}
-	start, err := w.begin(count, cols)
+	start, err := w.beginStyled(count, cols, style)
 	if err != nil {
 		return err
 	}
 	prev := 0
 	for _, c := range cells {
-		if c.Raw == "" && !c.HasFormula && c.Style == 0 {
+		if !storedExternalCell(c) {
 			continue
 		}
 		if c.Col <= prev {
@@ -238,10 +287,11 @@ var nativeColumnNames = func() [16385]string {
 	return names
 }()
 
-func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selected map[int]struct{}, formatValue, includeFormula bool) (RowData, error) {
+func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selected map[int]struct{}, options RowReadOptions) (RowData, error) {
 	if w.source != nil && w.source.ods != nil {
-		return w.decodeODS(data, number, first, last, selected, formatValue, includeFormula)
+		return w.decodeODS(data, number, first, last, selected, options.FormatValue, options.IncludeFormula)
 	}
+	options = prepareRichRead(options)
 	res := RowData{Number: number}
 	rowSuffix := strconv.Itoa(number)
 	p := 0
@@ -259,6 +309,14 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 	count, err := get()
 	if err != nil {
 		return res, err
+	}
+	if count&(1<<15) != 0 && w.Format == "xlsb" {
+		count &^= 1 << 15
+		style, err := get()
+		if err != nil || style >= uint64(len(w.Styles)) {
+			return res, errors.New("XLSB 行缓存样式索引无效")
+		}
+		res.Style = int(style)
 	}
 	if count > 16384 {
 		return res, errors.New("外部行缓存列数损坏")
@@ -308,10 +366,31 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 			if fsize > maxExternalCell || fsize > uint64(len(data)-p) {
 				return res, errors.New("外部行缓存公式长度损坏")
 			}
-			if includeFormula {
+			if options.IncludeFormula {
 				formula = string(data[p : p+int(fsize)])
 			}
 			p += int(fsize)
+		}
+		var richData []byte
+		if flags&4 != 0 {
+			rsize, err := get()
+			if err != nil {
+				return res, err
+			}
+			if w.Format != "xlsb" || rsize < 1 || rsize > 4*formats.MaxCellRichRuns+1 || rsize > uint64(len(data)-p) {
+				return res, errors.New("外部行缓存富文本长度无效")
+			}
+			richData = data[p : p+int(rsize)]
+			p += int(rsize)
+		}
+		var array *CellMerge
+		if flags&32 != 0 {
+			r, e1 := get()
+			c, e2 := get()
+			if e1 != nil || e2 != nil || w.Format != "xlsb" || r < uint64(number) || r > formats.ExcelRows || c < col || c > formats.ExcelColumns {
+				return res, errors.New("XLSB 行缓存的数组公式范围无效")
+			}
+			array = &CellMerge{Row: number, Col: int(col), EndRow: int(r), EndCol: int(c)}
 		}
 		if int(col) < first || int(col) > last {
 			continue
@@ -322,30 +401,17 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 			}
 		}
 		raw := string(data[rawStart : rawStart+int(size)])
-		display := raw
-		if formatValue && kind == 'n' {
-			display = w.formatNumeric(raw, int(style))
-		}
-		typ := "inlineStr"
-		switch kind {
-		case 'n':
-			typ = "n"
-		case 'b':
-			typ = "b"
-		case 'e':
-			typ = "e"
-		}
-		c := CellData{Col: int(col), Ref: nativeColumnNames[col] + rowSuffix, Raw: raw, Display: display, Type: typ, Style: int(style), HasFormula: flags&1 != 0, Formula: formula, CacheMissing: flags&2 != 0}
-		if formatValue && kind == 'n' {
-			c.ValueColor = w.numericTextColor(raw, int(style))
-		}
-		if kind == 'b' {
-			if raw == "1" {
-				c.Raw = "TRUE"
-				c.Display = "TRUE"
-			} else if raw == "0" {
-				c.Raw = "FALSE"
-				c.Display = "FALSE"
+		c := w.externalCellValue(rowSuffix, externalCell{Col: int(col), Raw: raw, Style: int(style), Type: kind,
+			HasFormula: flags&1 != 0, Formula: formula, CacheMissing: flags&2 != 0, SharedFormula: flags&8 != 0,
+			ArrayFormula: array, ArrayFormulaMember: flags&16 != 0}, options.FormatValue)
+		if options.RichText && len(richData) != 0 {
+			if options.richBudget.admit(len(richData)) {
+				c.RichText, err = w.xlsbRichPresentation(raw, richData)
+				if err != nil {
+					return res, err
+				}
+			} else {
+				c.RichText = &RichText{Notice: "本次读取的富文本超过呈现容量"}
 			}
 		}
 		res.Cells = append(res.Cells, c)
@@ -355,7 +421,48 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 	}
 	return res, nil
 }
-func (w *Workbook) readExternalRow(f *os.File, idx *SheetIndex, rowIndex, first, last int, selected map[int]struct{}, formatValue, includeFormula bool, reuse *[]byte) (RowData, error) {
+
+func (w *Workbook) externalCellValue(rowSuffix string, value externalCell, formatValue bool) CellData {
+	c := CellData{Col: value.Col, Ref: nativeColumnNames[value.Col] + rowSuffix, Raw: value.Raw, Display: value.Raw,
+		Style: value.Style, Formula: value.Formula, HasFormula: value.HasFormula, CacheMissing: value.CacheMissing, SharedFormula: value.SharedFormula,
+		ArrayFormula: value.ArrayFormula, ArrayFormulaMember: value.ArrayFormulaMember}
+	switch value.Type {
+	case 'n':
+		c.Type = "n"
+		if formatValue {
+			c.Display = w.formatNumeric(c.Raw, c.Style)
+			c.ValueColor = w.numericTextColor(c.Raw, c.Style)
+		}
+	case 'b':
+		c.Type = "b"
+		switch c.Raw {
+		case "1":
+			c.Raw, c.Display = "TRUE", "TRUE"
+		case "0":
+			c.Raw, c.Display = "FALSE", "FALSE"
+		}
+	case 'e':
+		c.Type = "e"
+	case 'z':
+	case 'S':
+		c.Type = "s"
+	case 'F':
+		c.Type = "str"
+	case '0':
+		c.SourceType, c.Display = "null", "[NULL]"
+	case 'x':
+		c.Type, c.SourceType = "inlineStr", "binary"
+	case 'd':
+		c.Type, c.SourceType = "d", "date"
+	default:
+		c.Type = "inlineStr"
+		if w.Format == "db-online" {
+			c.SourceType = "string"
+		}
+	}
+	return c
+}
+func (w *Workbook) readExternalRow(f *os.File, idx *SheetIndex, rowIndex, first, last int, selected map[int]struct{}, options RowReadOptions, reuse *[]byte) (RowData, error) {
 	if rowIndex < 0 || rowIndex >= idx.RowCount() {
 		return RowData{}, errors.New("行索引超出范围")
 	}
@@ -371,6 +478,6 @@ func (w *Workbook) readExternalRow(f *os.File, idx *SheetIndex, rowIndex, first,
 	if _, err := f.ReadAt(b, off.Start); err != nil {
 		return RowData{}, err
 	}
-	return w.decodeExternalRow(b, off.Number, first, last, selected, formatValue, includeFormula)
+	return w.decodeExternalRow(b, off.Number, first, last, selected, options)
 }
 func isExternalRows(path string) bool { return strings.HasSuffix(path, ".rows") }

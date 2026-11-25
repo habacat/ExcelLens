@@ -2,6 +2,12 @@
 
 ## 接续入口
 
+1.17.0 支持 XLSB 原生只读、RAR4／RAR5、主流在线数据库的本机表格快照，并更新解压与 Go 基础依赖。XLSB 与 RAR 共用原工作簿模型和磁盘索引。固定协议由数据库类型确定，Oracle 和 ClickHouse 保留连接方式选择。
+
+[本版说明](../releases/1.17.0.md) · [工作流核验](../../validation/1.17.0/workflow-verification.json) · [XLSB 性能](../../validation/1.17.0/xlsb-performance.json)
+
+## 1.16.1 历史记录
+
 1.16.1 优先提交可见区域的真实单元格，读取进度位于状态栏。性能验收包含同机同文件三轮对照及运动中的单元格点击。[本版说明](../releases/1.16.1.md) · [工作流收据](../../validation/1.16.1/workflow-verification.json) · [滚动对照](../../validation/1.16.1/scroll-render-comparison.json)
 
 ## 1.16.0 历史记录

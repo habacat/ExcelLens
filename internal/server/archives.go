@@ -66,12 +66,21 @@ func decorateArchiveWorkbook(wb *workbook.Workbook, view *archiveView, member ar
 
 func (a *App) closeArchive() {
 	a.archiveMu.Lock()
+	view, job := a.detachArchiveLocked()
+	a.archiveMu.Unlock()
+	finishClosedArchive(view, job)
+}
+
+func (a *App) detachArchiveLocked() (*archiveView, *archiveTask) {
 	view, job := a.archiveView, a.archiveTask
 	a.archiveView, a.archiveTask = nil, nil
 	if job != nil {
 		job.cancel()
 	}
-	a.archiveMu.Unlock()
+	return view, job
+}
+
+func finishClosedArchive(view *archiveView, job *archiveTask) {
 	if job != nil {
 		<-job.done
 	}

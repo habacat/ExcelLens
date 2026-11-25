@@ -1,6 +1,7 @@
 package workbook
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -101,6 +102,19 @@ func compressHiddenColumns(hidden []bool) []HiddenColumnRange {
 // SourceHiddenColumns returns the *source* visibility, not the user's local
 // overrides. External text/SQLite data has no hidden-column metadata.
 func (w *Workbook) SourceHiddenColumns(meta SheetMeta, idx *SheetIndex) ([]HiddenColumnRange, error) {
+	if w.Format == "xlsb" {
+		data, err := w.xlsbSheetMeta(context.Background(), meta)
+		if err != nil {
+			return nil, err
+		}
+		hidden := make([]bool, 16385)
+		for _, c := range data.Layout.ColStates {
+			for at := c.Min; at <= c.Max; at++ {
+				hidden[at] = c.Hidden || c.ZeroSize
+			}
+		}
+		return compressHiddenColumns(hidden), nil
+	}
 	if w.Format == "xls" {
 		return w.xlsHiddenColumns(meta)
 	}

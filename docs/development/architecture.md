@@ -12,6 +12,7 @@ internal/formats           格式支持名单、源类型语义、容量和显�
 internal/valueconv         显式日期/时间解析；只处理调用方给出的短文本
 internal/sourceview        声明式来源范围、筛选/排序和显隐设置；不读工作簿
 internal/workbook          格式适配、源值/布局、索引、缓存与查询
+internal/onlinedb          数据库协议、只读目录、逐行类型转换
 internal/archives          容器目录、按需提取、完整性及缓存固定
 internal/analysis          精确十进制、透视、独立分析工作区
 internal/calculator        有类型的公式语义与运算
@@ -56,6 +57,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
 | workbook | fileidentity、formats、searchdsl、sourceview、searchresults |
+| onlinedb | formats |
 | savedconfig | Go 标准库 |
 | transferjobs | localstore、savedconfig |
 | searchresults | formats、separated |
@@ -93,6 +95,10 @@ tools/qa                   专项回归、可选性能和私有样本检查
 原生文件打开入口先分配独立会话，该会话的首次 API 调用再读取文件。网页等待任务由当前文档的 `activity.js` 持有。一次任务可以连续跨过传输、解析、索引和显示阶段，轮询、取消和迟到响应均使用原任务句柄。已有进度区可接入同一指示器，空闲文档不订阅其他页的任务。`motion.css` 负责控件与弹层的时序，网格坐标和大小直接更新。
 
 工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。快速跨表搜索由 searchservice 限制在两个在途工作表内，全量查询沿源表顺序流式生成结果。searchresults 通过 workbook 的临时文件配额分配磁盘，查询完成后支持只读分页与导出。关闭结果会等待已开始的读取。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
+
+`workbook/xlsb*.go` 以 MS-XLSB 规范解码 OPC 工作簿内的 BIFF12。表内数据顺序写入 `ELNROW02`，富文本、共享公式状态、数组锚点及行样式使用 XLSB 独立缓存域。全量共享字符串以磁盘偏移读取，前缀预览单独限读所需字符串。工作表边扫边保存布局及规则记录，同一张表的构建受公共索引门控，异表可并行构建并复用已确认的共享字符串缓存。XLSB 缓存域为 `xlsb-biff12-v3`，早期开发缓存可随未使用缓存清理。
+
+`onlinedb` 负责专用驱动、TLS、目录绑定、引擎标识符及源值转换，`server/database.go` 管理本机页面任务和取消。所选表以查询结果为单位顺序写进 `workbook/database_snapshot.go` 的 `ELNROW02` 行缓存，完整读取后才提交清单并切换工作簿。清单只保留时间与源表标识，连接参数不进入快照。快照按普通工作簿读入虚拟网格和下游查询，已有本机快照可从历史直接重读。
 
 界面的 A1 坐标转换由 `cell-address.js` 提供，调用方传入来源容量。命令检索、键盘选择及可用性判断由 `command-palette.js` 管理，操作回调由应用装配。视口的覆盖范围、字节估计和缓存淘汰由 `viewport-cache.js` 管理。网格请求直接持有写入或复用的条目，缓存总量由同一组件维护。
 

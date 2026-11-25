@@ -12,7 +12,12 @@ import (
 func (w *Workbook) readPrintNames(ctx context.Context, meta SheetMeta, reader *catalogueReader, b *printMetadataBuilder) error {
 	var names Catalogue
 	var err error
-	if w.source != nil {
+	if w.Format == "xlsb" {
+		names, err = w.xlsbCatalogue(ctx, false)
+		if err != nil {
+			return err
+		}
+	} else if w.source != nil {
 		if w.source.xlsCatalogue == nil {
 			b.value.NamesComplete = false
 			b.notice("源适配器未提供完整打印名称，不能推断默认打印范围")

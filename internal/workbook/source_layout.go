@@ -25,6 +25,8 @@ type SourceLayout struct {
 	DefaultRow                 float64           `json:"defaultRow,omitempty"`
 	DefaultCol                 float64           `json:"defaultCol,omitempty"`
 	GridLines                  *bool             `json:"gridLines,omitempty"`
+	FrozenRows                 int               `json:"frozenRows,omitempty"`
+	FrozenCols                 int               `json:"frozenCols,omitempty"`
 	RowStates                  []SourceAxisRange `json:"rowStates,omitempty"`
 	ColStates                  []SourceAxisRange `json:"colStates,omitempty"`
 	ZeroHeight                 bool              `json:"zeroHeight,omitempty"`
@@ -190,6 +192,13 @@ func (w *Workbook) SourceLayoutContext(ctx context.Context, meta SheetMeta, idx 
 	}
 	if w.Format == "ods" && idx != nil && idx.odsLayout != nil {
 		return *idx.odsLayout, nil
+	}
+	if w.Format == "xlsb" {
+		data, err := w.xlsbSheetMeta(ctx, meta)
+		if err != nil {
+			return SourceLayout{}, err
+		}
+		return data.Layout, nil
 	}
 	if w.Format == "xls" && w.source == nil {
 		return SourceLayout{}, nil

@@ -71,7 +71,7 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 			}
 			offset += size
 		}
-		row, err := w.decodeExternalRow(rowBytes, off.Number, 1, 16384, nil, true, true)
+		row, err := w.decodeExternalRow(rowBytes, off.Number, 1, 16384, nil, RowReadOptions{FormatValue: true, IncludeFormula: true})
 		if err != nil {
 			return state, fmt.Errorf("第 %d 行：%w", off.Number, err)
 		}

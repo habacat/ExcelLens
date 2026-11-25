@@ -25,6 +25,7 @@ func (a *App) ClearAllCaches() (string, error) {
 	if root.restoreState.pending() {
 		return "", errors.New("请先完成恢复事务")
 	}
+	root.closeDatabaseImport()
 	dir := workbook.CacheRoot()
 	keep, err := root.cacheSourceProtection(dir)
 	if err != nil {
@@ -95,6 +96,9 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 	}
 	sources = append(sources, taskPaths...)
 	for _, wb := range root.referencedWorkbooks() {
+		if wb.Format == "db-online" {
+			continue // A database snapshot is derived cache, not a source file.
+		}
 		path := wb.Path
 		if wb.ArchiveOrigin != nil {
 			path = wb.ArchiveOrigin.Path

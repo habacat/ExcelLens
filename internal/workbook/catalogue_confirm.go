@@ -16,7 +16,7 @@ func (w *Workbook) ConfirmCatalogue(ctx context.Context, meta SheetMeta, idx *Sh
 	}
 	capability, ok := formats.Lookup(w.Format)
 	actual, found := w.FindSheet(meta.Name)
-	if !ok || !capability.CatalogueMetadata || (w.source != nil && w.Format != "xls") || !found || actual.Path != meta.Path {
+	if !ok || !capability.CatalogueMetadata || (w.source != nil && w.Format != "xls" && w.Format != "xlsb") || !found || actual.Path != meta.Path {
 		return Catalogue{}, errors.New("此来源尚未支持按工作表确认表对象")
 	}
 	if idx == nil || idx.SheetPath != meta.Path || w.GetCachedIndex(meta.Path) != idx {
@@ -24,6 +24,9 @@ func (w *Workbook) ConfirmCatalogue(ctx context.Context, meta SheetMeta, idx *Sh
 	}
 	if err := w.CheckSourceUnchanged(); err != nil {
 		return Catalogue{}, err
+	}
+	if w.Format == "xlsb" {
+		return w.confirmXLSBCatalogue(ctx, meta)
 	}
 	if w.source != nil {
 		entry, err := w.loadCatalogueEntry(ctx, meta, func() (worksheetCatalogueEntry, error) {

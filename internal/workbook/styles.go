@@ -355,6 +355,10 @@ func (w *Workbook) readStyles(f *zip.File) error {
 	if err := xml.NewDecoder(io.LimitReader(r, maxMetadataPart+1)).Decode(&sx); err != nil {
 		return err
 	}
+	return w.applyStyleTable(sx)
+}
+
+func (w *Workbook) applyStyleTable(sx stylesXML) error {
 	normalFontID := 0
 	for _, style := range sx.CellStyles {
 		if style.BuiltinID != nil && *style.BuiltinID == 0 && style.XfID >= 0 && style.XfID < len(sx.CellStyleXfs) {

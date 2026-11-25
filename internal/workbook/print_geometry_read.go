@@ -33,7 +33,11 @@ func (w *Workbook) SourcePrintGeometry(ctx context.Context, meta SheetMeta, idx 
 	state := sheetMetadataState[SourcePrintGeometryIndex]{&w.printGeometryMu, &w.printGeometryCache, &w.printGeometryLoading, &w.printGeometryClock, &w.printGeometryBytes}
 	return readSheetMetadata(ctx, meta.Path, state, sheetMetadataLimits{formats.PrintGeometryCacheBytes, formats.PrintGeometryCacheSheets}, (*SourcePrintGeometryIndex).BudgetBytes, w.CheckSourceUnchanged, func() (*SourcePrintGeometryIndex, error) {
 		b := newPrintGeometryBuilder(meta.Name, w.Format, w.normalFont.FontName, w.normalDigitWidth())
-		if w.source != nil {
+		if w.Format == "xlsb" {
+			if err := w.readXLSBPrintGeometry(ctx, meta, b); err != nil {
+				return nil, err
+			}
+		} else if w.source != nil {
 			if err := w.readBIFFPrintGeometry(ctx, meta, b, progress); err != nil {
 				return nil, err
 			}

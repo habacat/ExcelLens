@@ -159,6 +159,9 @@ func Open(ctx context.Context, path, displayName string) (*Archive, error) {
 		for i, entry := range a.s.File {
 			a.add(entry.Name, int64(min(entry.UncompressedSize, uint64(MaxMemberBytes)+1)), 0, i, 0, entry.CRC32, entry.FileInfo().Mode().IsRegular())
 		}
+	case ".rar":
+		a.Format = "RAR"
+		err = a.listRAR(ctx)
 	case ".tar":
 		a.Format, a.tarFile = "TAR", f
 		err = a.listTar(ctx)
@@ -574,6 +577,14 @@ func (a *Archive) extractMember(ctx context.Context, m Member, progress Progress
 	var src io.Reader
 	var closer io.Closer
 	var err error
+	if a.s != nil || a.Format == "RAR" {
+		select {
+		case decodeSlots <- struct{}{}:
+			defer func() { <-decodeSlots }()
+		case <-ctx.Done():
+			return "", m, ctx.Err()
+		}
+	}
 	switch {
 	case a.z != nil:
 		closer, err = a.z.File[m.index].Open()
@@ -581,12 +592,6 @@ func (a *Archive) extractMember(ctx context.Context, m Member, progress Progress
 			src = closer.(io.Reader)
 		}
 	case a.s != nil:
-		select {
-		case decodeSlots <- struct{}{}:
-			defer func() { <-decodeSlots }()
-		case <-ctx.Done():
-			return "", m, ctx.Err()
-		}
 		if progress != nil {
 			progress(0, m.Size, "正在定位 7z 数据流（固实压缩包需顺序解码）")
 		}
@@ -604,6 +609,8 @@ func (a *Archive) extractMember(ctx context.Context, m Member, progress Progress
 		if err == nil {
 			src = closer.(io.Reader)
 		}
+	case a.Format == "RAR":
+		src, closer, err = a.openRARMember(ctx, m, progress)
 	case a.tarFile != nil:
 		src = io.NewSectionReader(a.tarFile, m.offset, m.Size)
 	default:
@@ -618,6 +625,9 @@ func (a *Archive) extractMember(ctx context.Context, m Member, progress Progress
 		defer closer.Close()
 	}
 	path, err := a.cacheStream(ctx, key, src, MaxMemberBytes, m.Size, m.crc, progress)
+	if a.Format == "RAR" {
+		err = rarReadError(err)
+	}
 	return path, m, err
 }
 

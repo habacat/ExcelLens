@@ -134,7 +134,7 @@ func (w *Workbook) readRowFromFileWithOptions(f *os.File, idx *SheetIndex, rowIn
 	options = prepareRichRead(options)
 	if isExternalRows(idx.XMLPath) {
 		var reuse []byte
-		return w.readExternalRow(f, idx, rowIndex, firstCol, lastCol, selected, options.FormatValue, options.IncludeFormula, &reuse)
+		return w.readExternalRow(f, idx, rowIndex, firstCol, lastCol, selected, options, &reuse)
 	}
 	if rowIndex < 0 || rowIndex >= idx.RowCount() {
 		return RowData{}, errors.New("行索引超出范围")

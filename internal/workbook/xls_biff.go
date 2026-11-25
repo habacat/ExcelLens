@@ -873,7 +873,6 @@ func decodeBIFFFormula(tokens []byte, row, col int) string {
 		return v, true
 	}
 	fail := func() string { return fmt.Sprintf("[BIFF公式令牌未支持: %X]", tokens) }
-	binaryOps := map[byte]string{3: "+", 4: "-", 5: "*", 6: "/", 7: "^", 8: "&", 9: "<", 10: "<=", 11: "=", 12: ">=", 13: ">", 14: "<>", 15: " ", 16: ",", 17: ":"}
 	for p := 0; p < len(tokens); {
 		if len(stack) > 0 {
 			work += len(stack[len(stack)-1])
@@ -891,7 +890,8 @@ func decodeBIFFFormula(tokens []byte, row, col int) string {
 			kind -= 0x20
 		}
 		p++
-		if op, ok := binaryOps[kind]; ok {
+		if kind >= 3 && kind <= 17 {
+			op := excelBinaryOperators[kind-3]
 			right, ok := take()
 			if !ok {
 				return fail()
@@ -1045,6 +1045,8 @@ func decodeBIFFFormula(tokens []byte, row, col int) string {
 	}
 	return "=" + stack[0]
 }
+
+var excelBinaryOperators = [...]string{"+", "-", "*", "/", "^", "&", "<", "<=", "=", ">=", ">", "<>", " ", ",", ":"}
 
 // RgceLoc stores coordinates even when its flags request relative display.
 // RgceLocRel (the N variants) stores signed offsets for relative components;

@@ -14,8 +14,19 @@ const (
 	BIFFFormulaWork    = 1_000_000
 	ExternalRows       = 1_000_000_000
 	// Large mode is based on indexed records, not a sparse sheet's last row.
-	LargeDataRows        = 5_000_000
-	MaxUploadBytes int64 = 1 << 40
+	LargeDataRows                   = 5_000_000
+	MaxUploadBytes            int64 = 1 << 40
+	RARDirectoryReadBytes     int64 = 16 << 20
+	RARDecodeDictionaryBytes  int64 = 128 << 20
+	XLSBRecordBytes                 = 64 << 20
+	XLSBSharedStringBytes           = 8 << 30
+	DatabaseRequestBytes            = 96 << 10
+	DatabaseCertificateBytes        = 64 << 10
+	DatabaseCatalogueEntries        = 5000
+	DatabaseSelectedTables          = 32
+	DatabaseSnapshotBytes     int64 = 8 << 30
+	DatabaseCellBytes               = 8 << 20
+	DatabaseSnapshotExtension       = ".elndb" // Internal manifest, excluded from file pickers and uploads.
 	// Shared process budget for temporary query runs and retained row orders.
 	QuickSearchHits          = 500
 	SearchPageRows           = 100
@@ -233,6 +244,7 @@ type Source struct {
 	CatalogueMetadata   bool   `json:"catalogueMetadata"`
 	DataRuleMetadata    bool   `json:"dataRuleMetadata"`
 	NoteMetadata        bool   `json:"noteMetadata"`
+	PictureMetadata     bool   `json:"pictureMetadata"`
 	PrintMetadata       bool   `json:"printMetadata"`
 	TextClustering      bool   `json:"textClustering"`
 }
@@ -244,7 +256,8 @@ type entry struct {
 }
 
 var registry = []entry{
-	{Source{ID: "xlsx", MaxRows: ExcelRows, MaxColumns: ExcelColumns, Styled: true, ConditionalMetadata: true, CatalogueMetadata: true, DataRuleMetadata: true, NoteMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xlsx", ".xlsm"}, false},
+	{Source{ID: "xlsx", MaxRows: ExcelRows, MaxColumns: ExcelColumns, Styled: true, ConditionalMetadata: true, CatalogueMetadata: true, DataRuleMetadata: true, NoteMetadata: true, PictureMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xlsx", ".xlsm"}, false},
+	{Source{ID: "xlsb", MaxRows: ExcelRows, MaxColumns: ExcelColumns, Styled: true, ConditionalMetadata: true, CatalogueMetadata: true, DataRuleMetadata: true, NoteMetadata: true, PictureMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xlsb"}, false},
 	{Source{ID: "xls", MaxRows: BIFFRows, MaxColumns: BIFFColumns, Styled: true, CatalogueMetadata: true, DataRuleMetadata: true, PrintMetadata: true, TextClustering: true}, []string{".xls"}, false},
 	{Source{ID: "xls-html", MaxRows: ExternalRows, MaxColumns: ExcelColumns, Styled: true, TextAmounts: true, TextClustering: true}, nil, false},
 	{Source{ID: "ods", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextClustering: true}, []string{".ods"}, false},
@@ -252,7 +265,8 @@ var registry = []entry{
 	{Source{ID: "tsv", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true, TextClustering: true}, []string{".tsv"}, false},
 	{Source{ID: "txt", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true, TextClustering: true}, []string{".txt"}, false},
 	{Source{ID: "sqlite", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextAmounts: true}, []string{".db", ".sqlite", ".sqlite3"}, false},
-	{Source{ID: "archive"}, []string{".zip", ".tar", ".gz", ".tgz", ".7z", ".bz2", ".tbz", ".tbz2", ".xz", ".txz"}, true},
+	{Source{ID: "db-online", MaxRows: ExternalRows, MaxColumns: ExcelColumns, TextClustering: true}, nil, false},
+	{Source{ID: "archive"}, []string{".zip", ".tar", ".gz", ".tgz", ".7z", ".rar", ".bz2", ".tbz", ".tbz2", ".xz", ".txz"}, true},
 }
 
 // Lookup accepts adapter IDs, plus the legacy xlsm ID used by clients.

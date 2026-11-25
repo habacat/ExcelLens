@@ -1,0 +1,39 @@
+{
+  "version": "1.17.0",
+  "scope": "Format and database workflows",
+  "xlsb": {
+    "result": "PASS",
+    "fixtures": "Two Excel-generated XLSB/XLSX pairs using the 1900 and 1904 date systems",
+    "verified": [
+      "visible and very hidden sheets",
+      "raw text, numeric, Boolean, date and error values",
+      "shared, array, cross-sheet and table formulas and cached results",
+      "rich text, fills, borders, themes and conditional-format declarations",
+      "freeze and merge geometry, source row and column state",
+      "notes, links, embedded image, defined names, validations and print geometry",
+      "HTTP search, sorted filter with source coordinates, exact summary, cross-format reconciliation and export read-back",
+      "unsupported formula notice and preserved cache, truncation rejects index publication",
+      "sequential and random shared-string pages preserve cached rich text",
+      "source SHA-256 unchanged"
+    ],
+    "testNames": ["TestXLSBExcelPair", "TestXLSBExcelReadOnlyWorkflow", "TestXLSBUnknownFormulaKeepsCacheAndTruncatedPartDoesNotPublish", "TestXLSBSharedStringPagesPreserveValuesAcrossSequentialAndRandomReads"]
+  },
+  "rar": {
+    "result": "PASS",
+    "verified": ["RAR4, RAR5 stored and solid archives", "local and uploaded archive paths", "Unicode name", "selection-only extraction", "cancellation, retry and checksum", "encrypted, split and damaged input errors", "original archive unchanged"]
+  },
+  "onlineDatabase": {
+    "workflowPassed": ["PostgreSQL 18.1 (plain and verified TLS, rejected untrusted certificate and accepted custom CA)", "MariaDB 11.4.10", "MySQL Community 8.4.10"],
+    "workflowChecks": ["real read-only accounts", "table and view discovery", "precision and types", "cancellation and failed selection preserve previous workbook", "statistics and JSONL", "offline reopening of recent snapshot", "credentials excluded from snapshot and history"],
+    "driverSmokePassed": ["ClickHouse HTTPS public catalogue and typed data stream", "ClickHouse Native TLS public catalogue and typed data stream"],
+    "valueConversionPassed": ["SQL Server TDS UNIQUEIDENTIFIER and BIT", "Oracle inline BLOB, CLOB, DATE and local time zone timestamp", "MySQL exact unsigned BIGINT"],
+    "realServerNotRun": ["Oracle", "SQL Server"]
+  },
+  "interface": {
+    "result": "PASS",
+    "method": "Isolated automated headless Chromium",
+    "viewportWidths": [1440, 390],
+    "verified": ["home and Open menu", "single fixed protocol hidden from view and Tab order", "Oracle and ClickHouse connection choices", "independent TLS and default ports", "selection preserved while filtering", "workbook displayed in standard virtualized grid", "password cleared after close"],
+    "manualDesktop": "NOT_RUN"
+  }
+}

@@ -267,7 +267,8 @@
 
   function renderSourceIntegrity() {
     const notice = $("sourceIntegrityNotice");
-    notice.textContent = S.source.archiveNotice || (S.source.incomplete ? S.source.notice || "当前数据为不完整片段，不能代表全量账目。" : "");
+    const integrity = S.source.archiveNotice || (S.source.incomplete ? S.source.notice || "当前数据为不完整片段，不能代表全量账目。" : "");
+    notice.textContent = [integrity, S.source.presentationNotice].filter(Boolean).join('；');
     notice.hidden = !notice.textContent;
   }
 
@@ -544,7 +545,7 @@
         button.style.setProperty("--sheet-tab-color", sheet.tabColor);
       }
       button.textContent = sheet.name;
-      button.title = sheet.name + (sheet.state && sheet.state !== "visible" ? "（隐藏工作表）" : "");
+      button.title = (sheet.sourceName || sheet.name) + (sheet.state && sheet.state !== "visible" ? "（隐藏工作表）" : "");
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", S.sheet === sheet.name ? "true" : "false");
       button.addEventListener("click", () => selectSheetTab(sheet.name));
@@ -726,7 +727,7 @@
     if (!file) return;
     await window.ExcelLensWorkbookReady;
     if (S.opening) return;
-    if (!fileFormats.supports(file.name)) { toast("支持表格、台账及 ZIP、7z、TAR、GZ、BZ2、XZ 压缩包",'warning'); return; }
+    if (!fileFormats.supports(file.name)) { toast("请选择受支持的数据文件或压缩包",'warning'); return; }
     return openWorkbook(activity => window.ExcelLensTransport.upload(file,activity,fmtBytes), file.name, file.size).catch(error => toast(error.message,'error'));
   }
 
@@ -4055,7 +4056,8 @@
   // including the names these commands had before.
   const {buttonCommand, CommandPalette} = window.ExcelLensCommands;
   const ACTIONS = [
-    buttonCommand('打开文件','openBtn','工作簿 选择 文件','Ctrl+O'),
+    buttonCommand('打开文件','openLocalMenuBtn','工作簿 选择 文件','Ctrl+O'),
+    buttonCommand('连接在线数据库','openDatabaseBtn','数据库 MySQL PostgreSQL Oracle SQL Server ClickHouse'),
     buttonCommand('搜索','searchOpenBtn','查找公式或值 查找 公式 值','Ctrl+F'),
     buttonCommand('筛选','filterOpenBtn','自动筛选 表头 下拉','Ctrl+Shift+L'),
     buttonCommand('清除筛选','clearFilterBtn','清除 筛选 恢复 原序'),
@@ -4311,7 +4313,15 @@
     window.addEventListener("excellens:session-expired", event => { setStatus(event.detail); toast(event.detail, "warning"); });
     document.addEventListener('toolbar-setting-error', event => toast(event.detail, 'error'));
     commandPalette.bind();
-    $("openBtn").addEventListener("click", chooseFile);
+    $("openLocalMenuBtn").addEventListener("click", chooseFile);
+    const databasePanel = new window.ExcelLensDatabasePanel({api, onOpened:async result=>{
+      const current = await api('/api/status');
+      if (!current.opened || current.workbookKey !== result.workbookKey) throw new Error('工作簿已切换');
+      await acceptOpenedWorkbook(current);
+    }});
+    for (const id of ['openDatabaseBtn','openDatabaseHome']) {
+      $(id).addEventListener('click', () => { if (canOpenWorkbook('连接数据库')) void databasePanel.open(); });
+    }
     $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});
     $("chooseFileBtn").addEventListener("click", chooseFile);
     $("fileInput").addEventListener("change", event => {

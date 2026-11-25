@@ -13,7 +13,7 @@ func TestEntryPointsAgreeOnExtensions(t *testing.T) {
 		}
 		seen[ext] = true
 	}
-	for _, ext := range []string{".xlsb", ".exe", "xlsx", "", ".html"} {
+	for _, ext := range []string{".exe", "xlsx", "", ".html"} {
 		if Supported(ext) {
 			t.Fatalf("unexpected support for %q", ext)
 		}
@@ -26,7 +26,7 @@ func TestEntryPointsAgreeOnExtensions(t *testing.T) {
 		t.Fatal("native and browser file filters differ")
 	}
 	copy := Extensions()
-	copy[0] = ".xlsb"
+	copy[0] = ".xlsx-test"
 	if Supported(copy[0]) {
 		t.Fatal("caller changed the registry")
 	}
@@ -39,7 +39,7 @@ func TestExternalBillionRowCapacityKeepsNativeExcelCeilings(t *testing.T) {
 			t.Fatal(id, source)
 		}
 	}
-	for id, want := range map[string]int{"xlsx": 1_048_576, "xlsm": 1_048_576, "xls": 65_536} {
+	for id, want := range map[string]int{"xlsx": ExcelRows, "xlsm": ExcelRows, "xlsb": ExcelRows, "xls": BIFFRows} {
 		source, _ := Lookup(id)
 		if source.MaxRows != want {
 			t.Fatal(id, source.MaxRows)

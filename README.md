@@ -1,4 +1,4 @@
-# ExcelLens 1.16.1
+# ExcelLens 1.17.0
 
 ExcelLens 是面向高性能阅读设计的 Windows 表格与数据查看工具。它适合打开大型明细表、财务台账和数据库导出文件，在同一个界面里完成浏览、查找、核对与分析。
 
@@ -6,7 +6,7 @@ ExcelLens 是面向高性能阅读设计的 Windows 表格与数据查看工具�
 
 通过预检的 CSV、TSV、XLSX 和 XLSM 可在原工作表布局内编辑副本。在网格里可拖动填充柄、从 Excel 或另一标签页粘贴公式和合并区域，也可复制整张工作表。在表尾追加明细时，计算列和汇总行随之更新。透视布局支持多值汇总、标签和日期筛选、日期分组及关联图表刷新。修改可撤销、重做，并保存为独立文件。 [编辑副本](docs/user/editing.md)
 
-1.16.1 优化大表的纵向、横向和反向滚动。已缓存单元格可直接阅读和选取，跳到尚未读取的位置时显示当前主题的底色。[本版说明](docs/releases/1.16.1.md)
+1.17.0 支持原生只读打开 XLSB、从 RAR 中选择表格，以及在同一工作簿网格中读取在线数据库的表和视图。[本版说明](docs/releases/1.17.0.md)
 
 ## 下载与使用
 
@@ -41,12 +41,14 @@ ExcelLens 把文件索引、数据读取和界面绘制分开处理。界面加�
 
 | 格式 | 内容 |
 | --- | --- |
-| XLSX、XLSM | Excel工作簿 |
+| XLSX、XLSM、XLSB | Excel 工作簿，XLSB 支持原生只读 |
 | ODS | OpenDocument 电子表格，支持按源坐标只读核查 |
 | XLS | Excel 97–2003工作簿、Office/WPS导出的HTML表格 |
 | CSV、TSV、TXT | 分隔文本和数据库导出报表 |
 | SQLite | 数据库中的表 |
-| ZIP、7z、TAR、GZ、BZ2、XZ | 打开压缩包后选择其中的文件 |
+| ZIP、7z、RAR、TAR、GZ、BZ2、XZ | 打开压缩包后选择其中的文件 |
+
+通过「打开 → 在线数据库」可连接 MySQL、MariaDB、PostgreSQL、Oracle、SQL Server 和 ClickHouse。所选表或视图在同一个工作簿网格中打开。 [连接和读取说明](docs/user/formats.md#在线数据库)
 
 各格式的读取、布局和导出说明见[格式说明](docs/user/formats.md)。
 

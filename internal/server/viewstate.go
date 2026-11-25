@@ -57,6 +57,14 @@ func nativeFrozenPane(wb *workbook.Workbook, meta workbook.SheetMeta) freezeSett
 	if idx == nil {
 		return freezeSettings{}
 	}
+	if wb.Format == "xlsb" {
+		layout, err := wb.SourceLayout(meta, idx)
+		freeze := freezeSettings{Rows: layout.FrozenRows, Cols: layout.FrozenCols}
+		if err == nil && validateFreeze(freeze) {
+			return freeze
+		}
+		return freezeSettings{}
+	}
 	f, err := os.Open(idx.XMLPath)
 	if err != nil {
 		return freezeSettings{}

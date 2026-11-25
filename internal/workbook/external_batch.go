@@ -65,7 +65,7 @@ func (w *Workbook) readIndexedBatchWithOptions(ctx context.Context, f *os.File, 
 			var row RowData
 			var err error
 			if isExternalRows(idx.XMLPath) {
-				row, err = w.decodeExternalRow(block[off.Start-base:off.End-base], off.Number, first, last, selected, options.FormatValue, options.IncludeFormula)
+				row, err = w.decodeExternalRow(block[off.Start-base:off.End-base], off.Number, first, last, selected, options)
 			} else {
 				row, err = w.fastDecodeXMLRowWithOptions(f, idx, indices[i], first, last, selected, options, block[off.Start-base:off.End-base])
 			}

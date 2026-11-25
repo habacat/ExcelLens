@@ -220,11 +220,18 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 				}
 				continue
 			}
-			if opts.Mode == "formula" && c.HasFormula {
+			if opts.Mode == "formula" && c.HasFormula && !c.ArrayFormulaMember {
 				if !strings.HasPrefix(c.Formula, "=") || strings.TrimSpace(strings.TrimPrefix(c.Formula, "=")) == "" {
 					return fmt.Errorf("%s!%s 的公式原文无法可靠还原，请改用缓存值导出", s.Sheet.Name, c.Ref)
 				}
 				f := strings.TrimPrefix(c.Formula, "=")
+				formulaAttrs := ""
+				if array := c.ArrayFormula; array != nil {
+					if row.Number != outRow || col != c.Col || array.EndRow > s.LastRow || array.EndRow > formats.ExcelRows || array.EndCol > s.LastCol || s.Filtered {
+						return fmt.Errorf("%s!%s 的数组范围超出导出区域，请改用缓存值导出", s.Sheet.Name, c.Ref)
+					}
+					formulaAttrs = fmt.Sprintf(` t="array" ref="%s:%s%d"`, ref, workbook.ColumnName(array.EndCol), array.EndRow)
+				}
 				kind := ""
 				cache := c.Raw
 				if c.Type == "e" {
@@ -238,7 +245,7 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 				} else if c.Type == "str" || c.Type == "s" || c.Type == "inlineStr" {
 					kind = ` t="str"`
 				}
-				if _, err := fmt.Fprintf(out, `<c r="%s"%s%s><f>%s</f>`, ref, style, kind, xmlText(f)); err != nil {
+				if _, err := fmt.Fprintf(out, `<c r="%s"%s%s><f%s>%s</f>`, ref, style, kind, formulaAttrs, xmlText(f)); err != nil {
 					return err
 				}
 				if !c.CacheMissing {

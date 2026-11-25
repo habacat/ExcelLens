@@ -197,6 +197,9 @@ func (w *Workbook) CheckSourceUnchanged() error {
 		if err := w.checkExternalUnchanged(); err != nil {
 			return err
 		}
+		if w.Format == "db-online" {
+			return w.verifyDatabaseSnapshot()
+		}
 		// Explicit source binding must also detect same-size rewrites with a
 		// restored timestamp. Reliable Windows revision stamps use the existing
 		// bounded fingerprint memo; other cases verify the full content hash.

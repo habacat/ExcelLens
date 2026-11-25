@@ -8,6 +8,7 @@ package workbook
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -271,9 +272,18 @@ func (w *Workbook) loadSheetImages(meta SheetMeta) ([]EmbeddedImage, error) {
 	if idx == nil {
 		return nil, errors.New("工作表尚未建立索引")
 	}
-	ids, err := referencedDrawingIDs(idx.XMLPath)
-	if err != nil {
-		return nil, err
+	var ids map[string]bool
+	if w.Format == "xlsb" {
+		source, err := w.xlsbSheetMeta(context.Background(), meta)
+		if err != nil {
+			return nil, err
+		}
+		ids = map[string]bool{source.Drawing: source.Drawing != ""}
+	} else {
+		ids, err = referencedDrawingIDs(idx.XMLPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	all := make([]EmbeddedImage, 0)
 	// Relationship order is not defined, but the XML drawing sequence is.

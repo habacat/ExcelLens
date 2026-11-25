@@ -44,6 +44,12 @@ func (w *Workbook) cacheDataRulesLocked(key string, index *SourceDataRuleIndex) 
 
 func (w *Workbook) loadDataRules(ctx context.Context, meta SheetMeta, idx *SheetIndex, source formats.Source, progress func(int64, int64, string)) (*SourceDataRuleIndex, error) {
 	b := newDataRuleBuilder(source)
+	if w.Format == "xlsb" {
+		if err := w.xlsbDataRules(ctx, meta, b); err != nil {
+			return nil, err
+		}
+		return b.finish(), nil
+	}
 	if w.source != nil {
 		if err := w.readBIFFDataRules(ctx, meta, b, progress); err != nil {
 			return nil, err
