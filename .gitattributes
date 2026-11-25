@@ -9,3 +9,4 @@ validation/** -text
 *.gz -text
 *.bz2 -text
 *.xz -text
+internal/workbook/testdata/xlsb-excel/*.xls? -text

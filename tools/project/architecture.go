@@ -30,7 +30,7 @@ var allowedInternalImports = map[string][]string{
 	"fileidentity":  {},
 	"instance":      {},
 	"filelock":      {},
-	"localstore":    {"filelock"},
+	"localstore":    {"filelock", "formats"},
 	"onlinedb":      {"formats"},
 	"opc":           {},
 	"printing":      {"workbook", "formats"},

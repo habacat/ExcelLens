@@ -1,3 +1,4 @@
+.landing-source-actions { display: flex; flex-wrap: wrap; column-gap: 18px; }
 .landing-database-button {
   margin-top: 10px;
   min-height: 32px;
@@ -67,6 +68,21 @@
 #databaseProgress { display: block; width: 100%; height: 5px; margin-top: 6px; accent-color: var(--accent); }
 #databaseProgress[hidden] { display: none; }
 .database-actions { display: flex; flex: 0 0 auto; gap: 7px; justify-content: flex-end; align-items: center; margin-left: auto; }
+.database-snapshots-list { display: grid; }
+.database-snapshot-entry {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding-block: 9px; border-bottom: 1px solid var(--line-soft);
+}
+.database-snapshot-entry:first-child { padding-top: 0; }
+.database-snapshot-entry:last-child { border-bottom: 0; padding-bottom: 0; }
+.database-snapshot-identity { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.database-snapshot-identity strong { display: block; font-size: var(--fs-3); }
+.database-snapshot-identity small { color: var(--muted); font-size: var(--fs-2); }
+.database-snapshot-entry .database-actions { margin-left: 0; }
+.database-feedback-text { margin: 0; color: var(--muted); overflow-wrap: anywhere; font-size: var(--fs-2); }
+.database-feedback-text.is-error { color: var(--danger); }
+.database-progress { width: 100%; height: 5px; accent-color: var(--accent); }
+#retainDatabaseSnapshot { margin-inline-start: 8px; }
 
 @media (max-width: 520px) {
   .database-fields, .database-advanced-fields { grid-template-columns: minmax(0, 1fr); gap: 9px; }

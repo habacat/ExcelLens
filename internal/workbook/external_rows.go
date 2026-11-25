@@ -47,7 +47,11 @@ type externalRowWriter struct {
 }
 
 func newExternalRowWriter(f *os.File) (*externalRowWriter, error) {
-	w := &externalRowWriter{out: bufio.NewWriterSize(f, 1<<20), offsets: rowOffsetBuilder{rows: make([]RowOffset, 0, 4096), dir: filepath.Dir(f.Name())}}
+	return newExternalRowWriterTo(f, filepath.Dir(f.Name()))
+}
+
+func newExternalRowWriterTo(out io.Writer, dir string) (*externalRowWriter, error) {
+	w := &externalRowWriter{out: bufio.NewWriterSize(out, 1<<20), offsets: rowOffsetBuilder{rows: make([]RowOffset, 0, 4096), dir: dir}}
 	if err := w.bytes([]byte(nativeRowMagic)); err != nil {
 		return nil, err
 	}

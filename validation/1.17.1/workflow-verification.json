@@ -1,0 +1,35 @@
+{
+  "version": "1.17.1",
+  "scope": "Database snapshot retention and reproducible Excel XLSB verification",
+  "databaseSnapshots": {
+    "result": "PASS",
+    "verified": [
+      "per-workbook, unused, and all-cache cleanup preserve captured rows and indexes",
+      "ordinary search caches are removable independently of snapshot source files",
+      "legacy retention is repeatable and keeps the original bytes",
+      "encrypted backup migrates into another data root and reopens exact cells offline",
+      "reopen, explicit verification, and explicit source binding reject same-size rewrites of either data part with restored modification time",
+      "staged captures stay out of inventory before publication"
+    ],
+    "testNames": ["TestDatabaseSnapshotSurvivesCacheClearsAndEncryptedMigration", "TestOldDatabaseSnapshotRemainsProtectedAndCanBeSealed"],
+    "diskIndexProbe": {"records": 262161, "offsetsMapped": true, "exactTailValues": true, "bothIndependentDigestsMatch": true},
+    "realServerRetested": ["PostgreSQL 18.1 with an isolated read-only account and TLS validation"],
+    "tableConsistency": "Each table is captured independently"
+  },
+  "xlsb": {
+    "result": "PASS",
+    "fixtureDateSystems": [1900, 1904],
+    "fixtureCount": 4,
+    "fixtureManifest": "internal/workbook/testdata/xlsb-excel/SHA256SUMS",
+    "regeneratedUsingExcel": true,
+    "sourceArchiveOfflineFixtureRun": true,
+    "externalFixtureVariableRequired": false,
+    "testNames": ["TestXLSBExcelPair", "TestXLSBExcelReadOnlyWorkflow"]
+  },
+  "interface": {
+    "automatedSnapshotNavigation": "PASS",
+    "method": "Isolated headless Chromium backed by PostgreSQL, before the query cache directory isolation",
+    "narrowViewportPixels": 390,
+    "manualDesktop": "NOT_RUN"
+  }
+}

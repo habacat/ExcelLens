@@ -68,15 +68,23 @@ type Config struct {
 	CA       string `json:"ca"`
 }
 
+type Source struct {
+	Engine, Protocol, Host, Database, TLS string
+	Port                                  int
+}
+
 type Connection struct {
 	db           *sql.DB
 	engine       Engine
+	source       Source
 	database     string
 	schema       string
 	withDatabase bool
 }
 
 func (c *Connection) Close() error { return c.db.Close() }
+
+func (c *Connection) Source() Source { return c.source }
 
 func (c *Connection) Label() string {
 	if c.database == "" {
@@ -94,7 +102,12 @@ func Open(ctx context.Context, cfg Config) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn := &Connection{engine: engine, database: cfg.Database, schema: cfg.Schema, withDatabase: cfg.Database != ""}
+	database := cfg.Database
+	if database == "" && engine.ID == "postgres" {
+		database = "postgres"
+	}
+	conn := &Connection{engine: engine, database: database, schema: cfg.Schema, withDatabase: cfg.Database != "",
+		source: Source{Engine: engine.ID, Protocol: proto.ID, Host: cfg.Host, Port: cfg.Port, Database: database, TLS: cfg.TLS}}
 	conn.db, err = openDriver(cfg, proto, tlsConfig)
 	if err != nil {
 		return nil, databaseError(err, "无法初始化数据库连接")

@@ -3,6 +3,7 @@ package workbook
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -12,12 +13,12 @@ import (
 	"testing"
 )
 
-// The native QA script makes both files in one Excel session, from the same
-// in-memory workbook. Private fixtures and any Excel author metadata stay local.
+// The QA script generates each pair in Excel and removes machine metadata.
 func TestXLSBExcelPair(t *testing.T) {
 	dir := os.Getenv("EXCELLENS_XLSB_EXCEL_PAIRS")
 	if dir == "" {
-		t.Skip("set EXCELLENS_XLSB_EXCEL_PAIRS to the Excel-generated fixture directory")
+		dir = filepath.Join("testdata", "xlsb-excel")
+		verifyXLSBExcelFixtures(t, dir)
 	}
 	cache := t.TempDir()
 	t.Setenv("LOCALAPPDATA", cache)
@@ -123,6 +124,30 @@ func TestXLSBExcelPair(t *testing.T) {
 				t.Fatal("source XLSB changed", err)
 			}
 		})
+	}
+}
+
+func verifyXLSBExcelFixtures(t *testing.T, dir string) {
+	t.Helper()
+	sums, err := os.ReadFile(filepath.Join(dir, "SHA256SUMS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := map[string]bool{"fidelity2.xlsb": true, "fidelity2.xlsx": true, "fidelity1904.xlsb": true, "fidelity1904.xlsx": true}
+	for _, line := range strings.Split(strings.TrimSpace(string(sums)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || !expected[fields[1]] {
+			t.Fatalf("unexpected native fixture receipt %q", line)
+		}
+		name, digest := fields[1], fields[0]
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil || fmt.Sprintf("%x", sha256.Sum256(data)) != digest {
+			t.Fatalf("native fixture %s does not match its fixed digest: %v", name, err)
+		}
+		delete(expected, name)
+	}
+	if len(expected) != 0 {
+		t.Fatalf("native fixture receipts missing: %v", expected)
 	}
 }
 

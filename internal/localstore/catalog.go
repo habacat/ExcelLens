@@ -10,6 +10,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 func ConfigDir() (string, error) {
@@ -34,6 +36,7 @@ type group struct {
 func (r Roots) groups() []group {
 	rows := []group{
 		{"工作簿索引", "可重建缓存", "local", []string{"cache"}, false},
+		{"数据库快照", "审计来源", "local", []string{formats.DatabaseSnapshotDirectory}, true},
 		{"上传副本", "来源副本", "local", []string{"temp"}, true},
 		{"导出文件", "工作成果", "local", []string{"exports"}, true},
 		{"计算历史", "工作成果", "local", []string{"calculator"}, true},
@@ -111,6 +114,10 @@ func (r Roots) walk(ctx context.Context, g group, forBackup bool, visit func(*os
 			}
 			if err := ctx.Err(); err != nil {
 				return err
+			}
+			if part == formats.DatabaseSnapshotDirectory && entry.IsDir() &&
+				strings.HasPrefix(entry.Name(), ".snapshot-") && strings.HasSuffix(entry.Name(), ".tmp") {
+				return fs.SkipDir
 			}
 			if forBackup && name != part {
 				base := entry.Name()

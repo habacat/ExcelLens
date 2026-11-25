@@ -21,7 +21,7 @@ import (
 func TestXLSBExcelReadOnlyWorkflow(t *testing.T) {
 	dir := os.Getenv("EXCELLENS_XLSB_EXCEL_PAIRS")
 	if dir == "" {
-		t.Skip("set EXCELLENS_XLSB_EXCEL_PAIRS to the Excel-generated fixture directory")
+		dir = filepath.Join("..", "workbook", "testdata", "xlsb-excel")
 	}
 	isolateTestStorage(t)
 	path := filepath.Join(dir, "fidelity2.xlsb")

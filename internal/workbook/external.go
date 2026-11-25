@@ -25,22 +25,24 @@ func SupportedDataExtension(ext string) bool {
 // SourceInfo is presentation metadata. No settings inferred from CSV/TXT may
 // change the original content; every imported value remains literal text.
 type SourceInfo struct {
-	TableHeader        *TextTableHeader `json:"tableHeader,omitempty"`
-	ArchiveName        string           `json:"archiveName,omitempty"`
-	ArchiveMember      string           `json:"archiveMember,omitempty"`
-	ArchiveNotice      string           `json:"archiveNotice,omitempty"`
-	Incomplete         bool             `json:"incomplete,omitempty"`
-	Format             string           `json:"format"`
-	Encoding           string           `json:"encoding,omitempty"`
-	Delimiter          string           `json:"delimiter,omitempty"`
-	Notice             string           `json:"notice,omitempty"`
-	PresentationNotice string           `json:"presentationNotice,omitempty"`
-	ReadOnly           bool             `json:"readOnly"`
+	TableHeader        *TextTableHeader      `json:"tableHeader,omitempty"`
+	ArchiveName        string                `json:"archiveName,omitempty"`
+	ArchiveMember      string                `json:"archiveMember,omitempty"`
+	ArchiveNotice      string                `json:"archiveNotice,omitempty"`
+	Incomplete         bool                  `json:"incomplete,omitempty"`
+	Format             string                `json:"format"`
+	Encoding           string                `json:"encoding,omitempty"`
+	Delimiter          string                `json:"delimiter,omitempty"`
+	Notice             string                `json:"notice,omitempty"`
+	PresentationNotice string                `json:"presentationNotice,omitempty"`
+	DatabaseSnapshot   *DatabaseSnapshotInfo `json:"databaseSnapshot,omitempty"`
+	ReadOnly           bool                  `json:"readOnly"`
 }
 
 type externalSource struct {
 	ods               *odsBook
 	xlsb              *xlsbBook
+	database          *databaseSource
 	html              *htmlStyleMetadata
 	htmlDefaultName   bool
 	format            string
@@ -144,7 +146,7 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 		return nil, errors.New("没有外部数据源")
 	}
 	if w.Format == "db-online" {
-		return nil, errors.New("数据库快照的行缓存不可用，请重新连接并读取数据表")
+		return nil, errors.New("数据库快照的行文件或索引不可用，请从快照列表核验")
 	}
 	xmlPath, idxPath := w.cachePaths(meta.Path)
 	tmp, err := os.CreateTemp(w.CacheDir, ".import-*.rows")
@@ -261,13 +263,8 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 }
 
 func (w *Workbook) publishExternalIndex(meta SheetMeta, rowsPath, idxPath string, writer *externalRowWriter) (*SheetIndex, error) {
-	idx := &SheetIndex{
-		SourceFormat: w.Format,
-		SheetPath:    meta.Path, XMLPath: rowsPath, IndexPath: idxPath,
-		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
-		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
-		SharedAnchors: make(map[string]SharedFormulaAnchor),
-	}
+	idx := externalSheetIndex(meta, rowsPath, idxPath, writer)
+	idx.SourceFormat = w.Format
 	if err := writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
 		return nil, err
 	}
@@ -275,6 +272,15 @@ func (w *Workbook) publishExternalIndex(meta SheetMeta, rowsPath, idxPath string
 	w.indexes[meta.Path] = idx
 	w.indexMu.Unlock()
 	return idx, nil
+}
+
+func externalSheetIndex(meta SheetMeta, rowsPath, idxPath string, writer *externalRowWriter) *SheetIndex {
+	return &SheetIndex{
+		SheetPath: meta.Path, XMLPath: rowsPath, IndexPath: idxPath,
+		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
+		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
+		SharedAnchors: make(map[string]SharedFormulaAnchor),
+	}
 }
 
 // Previous XML materialization was replaced by native .rows storage in

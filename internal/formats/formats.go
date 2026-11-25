@@ -26,6 +26,8 @@ const (
 	DatabaseSelectedTables          = 32
 	DatabaseSnapshotBytes     int64 = 8 << 30
 	DatabaseCellBytes               = 8 << 20
+	DatabaseManifestBytes           = 32 << 20
+	DatabaseSnapshotDirectory       = "database-snapshots"
 	DatabaseSnapshotExtension       = ".elndb" // Internal manifest, excluded from file pickers and uploads.
 	// Shared process budget for temporary query runs and retained row orders.
 	QuickSearchHits          = 500

@@ -97,6 +97,10 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"version": buildinfo.Version, "opened": false, "error": startupError, "archive": a.archiveSummary()})
 		return
 	}
+	a.writeWorkbookStatus(w, wb)
+}
+
+func (a *App) writeWorkbookStatus(w http.ResponseWriter, wb *workbook.Workbook) {
 	st, _ := os.Stat(wb.Path)
 	var size int64
 	if st != nil {

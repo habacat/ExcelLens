@@ -137,6 +137,15 @@ func recentDatabase(item recentEntry) bool {
 	return item.Database && strings.EqualFold(filepath.Ext(item.Path), formats.DatabaseSnapshotExtension)
 }
 
+func recentDatabasePath(item recentEntry) string {
+	if retained := workbook.DatabaseSnapshotPath(item.Fingerprint); retained != "" {
+		if _, err := os.Lstat(retained); !errors.Is(err, os.ErrNotExist) {
+			return retained
+		}
+	}
+	return item.Path
+}
+
 func (a *App) recordRecent(wb *workbook.Workbook) {
 	if wb == nil {
 		return
@@ -195,6 +204,11 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		r := snapshotRecents()
 		for i := range r.Items {
+			if recentDatabase(r.Items[i]) {
+				st, err := os.Stat(recentDatabasePath(r.Items[i]))
+				r.Items[i].Available = err == nil && st.Mode().IsRegular()
+				continue
+			}
 			if r.Items[i].ArchivePath != "" {
 				st, err := os.Stat(r.Items[i].ArchivePath)
 				r.Items[i].Available = err == nil && st.Mode().IsRegular()
@@ -260,6 +274,15 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		checkPath := item.Path
+		if recentDatabase(item) {
+			wb, err := a.openDatabaseSnapshot(req.Context(), recentDatabasePath(item), item.Fingerprint)
+			if err != nil {
+				writeError(w, 400, fmt.Sprintf("无法打开数据库快照：%v", err))
+				return
+			}
+			a.writeWorkbookStatus(w, wb)
+			return
+		}
 		if item.ArchivePath != "" {
 			checkPath = item.ArchivePath
 		}
@@ -286,11 +309,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			writeError(w, 404, "刚打开的源文件已移动或删除，请重新选择")
 			return
 		}
-		size := memberStat.Size()
-		if wb.Format == "db-online" {
-			size = wb.DatabaseSnapshotSize()
-		}
-		writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "fileName": workbookDisplayName(wb), "fileSize": size, "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo, "archive": a.archiveSummary()})
+		writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "fileName": workbookDisplayName(wb), "fileSize": memberStat.Size(), "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo, "archive": a.archiveSummary()})
 		return
 	default:
 		writeError(w, 400, "不支持的历史记录操作")

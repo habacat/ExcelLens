@@ -268,8 +268,10 @@
   function renderSourceIntegrity() {
     const notice = $("sourceIntegrityNotice");
     const integrity = S.source.archiveNotice || (S.source.incomplete ? S.source.notice || "当前数据为不完整片段，不能代表全量账目。" : "");
-    notice.textContent = [integrity, S.source.presentationNotice].filter(Boolean).join('；');
-    notice.hidden = !notice.textContent;
+    const message = [integrity, S.source.presentationNotice].filter(Boolean).join('；');
+    $("sourceIntegrityMessage").textContent = message;
+    $("retainDatabaseSnapshot").hidden = !S.source.databaseSnapshot?.legacy || S.source.databaseSnapshot.retained;
+    notice.hidden = !message;
   }
 
   function showWorkspace() {
@@ -712,6 +714,7 @@
       await activity?.paintIfDue?.();
       return true;
     } catch (error) {
+      if (!current()) return false;
       $("welcomeError").textContent = error.message;
       $("welcomeError").hidden = false;
       setStatus("打开失败");
@@ -4058,6 +4061,7 @@
   const ACTIONS = [
     buttonCommand('打开文件','openLocalMenuBtn','工作簿 选择 文件','Ctrl+O'),
     buttonCommand('连接在线数据库','openDatabaseBtn','数据库 MySQL PostgreSQL Oracle SQL Server ClickHouse'),
+    buttonCommand('数据库快照','databaseSnapshotsBtn','固化 保存 核验 数据库'),
     buttonCommand('搜索','searchOpenBtn','查找公式或值 查找 公式 值','Ctrl+F'),
     buttonCommand('筛选','filterOpenBtn','自动筛选 表头 下拉','Ctrl+Shift+L'),
     buttonCommand('清除筛选','clearFilterBtn','清除 筛选 恢复 原序'),
@@ -4322,6 +4326,14 @@
     for (const id of ['openDatabaseBtn','openDatabaseHome']) {
       $(id).addEventListener('click', () => { if (canOpenWorkbook('连接数据库')) void databasePanel.open(); });
     }
+    const databaseSnapshots = new window.ExcelLensDatabaseSnapshots({
+      api, fmtBytes, openWorkbook,
+      onRetained: key => { if (S.workbookKey === key) $('retainDatabaseSnapshot').hidden = true; }
+    });
+    for (const id of ['databaseSnapshotsBtn', 'databaseSnapshotsHome']) {
+      $(id).addEventListener('click', () => databaseSnapshots.show());
+    }
+    $('retainDatabaseSnapshot').addEventListener('click', () => databaseSnapshots.show(S.workbookKey));
     $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});
     $("chooseFileBtn").addEventListener("click", chooseFile);
     $("fileInput").addEventListener("change", event => {

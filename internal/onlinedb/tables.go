@@ -25,6 +25,17 @@ type Catalogue struct {
 	Truncated bool    `json:"truncated,omitempty"`
 }
 
+type Column struct {
+	Name, Type       string
+	Nullable         *bool
+	Precision, Scale *int64
+}
+
+type ReadDefinition struct {
+	Query   string
+	Columns []Column
+}
+
 func (c *Connection) Tables(ctx context.Context) (Catalogue, error) {
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
@@ -130,10 +141,21 @@ func (c *Connection) quote(name string) string {
 // ReadTable streams the column names first, then one row at a time. Only
 // identifiers discovered in the current catalogue are passed by the caller.
 func (c *Connection) ReadTable(ctx context.Context, table TableRef, emit func([]Value) error) error {
+	return c.StreamTable(ctx, table, func(def ReadDefinition) error {
+		header := make([]Value, len(def.Columns))
+		for i, col := range def.Columns {
+			header[i] = Value{Kind: Text, Raw: col.Name}
+		}
+		return emit(header)
+	}, emit)
+}
+
+func (c *Connection) StreamTable(ctx context.Context, table TableRef, begin func(ReadDefinition) error, emit func([]Value) error) error {
 	if !validIdentifier(table.Schema) || !validIdentifier(table.Name) {
 		return errors.New("表或架构名称无效")
 	}
-	rows, err := c.db.QueryContext(c.readContext(ctx), "SELECT * FROM "+c.quote(table.Schema)+"."+c.quote(table.Name))
+	query := "SELECT * FROM " + c.quote(table.Schema) + "." + c.quote(table.Name)
+	rows, err := c.db.QueryContext(c.readContext(ctx), query)
 	if err != nil {
 		return databaseError(err, "无法读取该表，请核对数据表权限或重新连接")
 	}
@@ -143,15 +165,23 @@ func (c *Connection) ReadTable(ctx context.Context, table TableRef, emit func([]
 		return errors.New("数据表的列定义无法读取或超出列数容量")
 	}
 	values := make([]Value, len(columns))
+	def := ReadDefinition{Query: query, Columns: make([]Column, len(columns))}
 	kinds := make([]columnKind, len(columns))
 	raw := make([]any, len(columns))
 	targets := make([]any, len(columns))
 	for i, column := range columns {
 		targets[i] = &raw[i]
-		values[i] = Value{Kind: Text, Raw: column.Name()}
-		kinds[i] = databaseColumnKind(c.engine.ID, column.DatabaseTypeName())
+		item := Column{Name: column.Name(), Type: column.DatabaseTypeName()}
+		if v, ok := column.Nullable(); ok {
+			item.Nullable = &v
+		}
+		if p, s, ok := column.DecimalSize(); ok {
+			item.Precision, item.Scale = &p, &s
+		}
+		def.Columns[i] = item
+		kinds[i] = databaseColumnKind(c.engine.ID, item.Type)
 	}
-	if err := emit(values); err != nil {
+	if err := begin(def); err != nil {
 		return err
 	}
 	row := 1

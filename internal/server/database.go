@@ -239,29 +239,28 @@ func (a *App) runDatabaseImport(ctx context.Context, job *databaseImportJob, req
 		selected = append(selected, workbook.DatabaseSnapshotTable{Schema: table.Schema, Name: table.Name, Kind: table.Kind})
 		delete(available, ref)
 	}
-	a.cacheMu.RLock()
-	snapshot, err := workbook.StartDatabaseSnapshot(connection.Label(), selected)
+	source := connection.Source()
+	snapshot, err := workbook.StartDatabaseSnapshot(connection.Label(), workbook.DatabaseSnapshotSource{
+		Engine: source.Engine, Protocol: source.Protocol, Host: source.Host, Port: source.Port,
+		Database: source.Database, TLS: source.TLS,
+	}, selected)
 	if err != nil {
-		a.cacheMu.RUnlock()
 		return err
 	}
-	wb := snapshot.Workbook()
-	release := a.pinWorkbooks(wb)
-	a.cacheMu.RUnlock()
-	defer release()
-	installed := false
-	defer func() {
-		if !installed {
-			snapshot.Discard()
-		}
-	}()
+	defer snapshot.Discard()
 	for i, ref := range request.Tables {
 		job.mu.Lock()
 		job.progress.Status, job.progress.Table, job.progress.Name, job.progress.Rows = "reading", i+1, ref.Schema+"."+ref.Name, 0
 		job.mu.Unlock()
-		stream := func(yield func([]workbook.DatabaseCell) error) error {
+		stream := func(begin func(workbook.DatabaseTableDefinition) error, yield func([]workbook.DatabaseCell) error) error {
 			var converted []workbook.DatabaseCell
-			return connection.ReadTable(ctx, ref, func(row []onlinedb.Value) error {
+			return connection.StreamTable(ctx, ref, func(read onlinedb.ReadDefinition) error {
+				def := workbook.DatabaseTableDefinition{Query: read.Query, Ordering: "unspecified", Columns: make([]workbook.DatabaseColumn, len(read.Columns))}
+				for i, col := range read.Columns {
+					def.Columns[i] = workbook.DatabaseColumn{Name: col.Name, Type: col.Type, Nullable: col.Nullable, Precision: col.Precision, Scale: col.Scale}
+				}
+				return begin(def)
+			}, func(row []onlinedb.Value) error {
 				if len(converted) != len(row) {
 					converted = make([]workbook.DatabaseCell, len(row))
 				}
@@ -286,17 +285,30 @@ func (a *App) runDatabaseImport(ctx context.Context, job *databaseImportJob, req
 	}
 	job.progress.Status = "opening"
 	job.mu.Unlock()
-	if err := snapshot.Commit(); err != nil {
+	root := a.rootApp()
+	// Full cache reset and restore can cancel or gate imports. Do not wait
+	// for this lock while the reset is joining the import from another page.
+	if !root.cacheResetMu.TryRLock() {
+		return errors.New("本地数据管理正在进行，数据库快照尚未保存")
+	}
+	defer root.cacheResetMu.RUnlock()
+	if root.restoreState.pending() {
+		return errors.New("请先完成恢复事务")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	wb, err := snapshot.Commit(ctx)
+	if err != nil {
 		return err
 	}
 	a.archiveMu.Lock()
 	if a.archiveView != expectedArchive || !a.installWorkbook(wb, expected, true) {
 		a.archiveMu.Unlock()
-		return errors.New("工作簿已切换，本次数据库读取已结束")
+		return errors.New("快照已保存到「数据库快照」。当前工作簿已切换")
 	}
 	view, archiveJob := a.detachArchiveLocked()
 	a.archiveMu.Unlock()
-	installed = true
 	finishClosedArchive(view, archiveJob)
 	a.recordRecent(wb)
 	job.mu.Lock()

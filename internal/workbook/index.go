@@ -247,13 +247,33 @@ func saveIndex(idx *SheetIndex) error {
 // A spill file belongs only to the writer. Publish an index for readers after
 // replacing the checksummed file and obtaining its final read-only mapping.
 func writeIndex(idx *SheetIndex, count int, spill *os.File) error {
+	if err := writeIndexFile(idx, count, spill, nil); err != nil {
+		return err
+	}
+	if count > MaxResidentRowOffsets {
+		rows, err := mapIndexRows(idx.IndexPath, indexRowsStart(idx.Dimension), count)
+		if err != nil {
+			return err
+		}
+		idx.RowIndex = rows
+	}
+	return nil
+}
+
+// A snapshot digests the exact encoded bytes, including the CRC footer.
+// It maps indexes only from their final directory after publication.
+func writeIndexFile(idx *SheetIndex, count int, spill *os.File, digest io.Writer) error {
 	tmp, err := os.CreateTemp(filepathDir(idx.IndexPath), ".rows-*.idx")
 	if err != nil {
 		return err
 	}
 	name := tmp.Name()
 	defer os.Remove(name)
-	bw := bufio.NewWriterSize(tmp, 1<<20)
+	var out io.Writer = tmp
+	if digest != nil {
+		out = io.MultiWriter(tmp, digest)
+	}
+	bw := bufio.NewWriterSize(out, 1<<20)
 	checksum := crc32.NewIEEE()
 	payload := io.MultiWriter(bw, checksum)
 	fail := func(e error) error { _ = tmp.Close(); return e }
@@ -327,13 +347,6 @@ func writeIndex(idx *SheetIndex, count int, spill *os.File) error {
 	}
 	if err := replaceFile(name, idx.IndexPath); err != nil {
 		return err
-	}
-	if count > MaxResidentRowOffsets {
-		rows, err := mapIndexRows(idx.IndexPath, indexRowsStart(idx.Dimension), count)
-		if err != nil {
-			return err
-		}
-		idx.RowIndex = rows
 	}
 	return nil
 }

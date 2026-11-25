@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
+	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
 
@@ -71,6 +72,16 @@ func locatedSource(source checkpoint.Source) (checkpoint.Source, error) {
 		}
 		source.Path = loc.current(source.Path)
 		source.Book = bookIDAt(source.Fingerprint, source.Path)
+	} else if filepath.Ext(source.Path) == formats.DatabaseSnapshotExtension &&
+		filepath.Base(filepath.Dir(source.Path)) == source.Fingerprint {
+		// A retained snapshot's manifest and parts migrate together under the
+		// same digest. Rebase its managed path after importing a backup.
+		if candidate := workbook.DatabaseSnapshotPath(source.Fingerprint); candidate != "" {
+			if st, err := os.Lstat(candidate); err == nil && st.Mode().IsRegular() {
+				source.Path = candidate
+				source.Book = bookIDAt(source.Fingerprint, candidate)
+			}
+		}
 	}
 	return source, nil
 }

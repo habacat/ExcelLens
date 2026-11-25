@@ -236,6 +236,7 @@
   <div id="workbookOpenMenu" class="menu" role="menu" aria-label="打开" hidden>
     <button id="openLocalMenuBtn" type="button" role="menuitem">打开文件…<kbd>Ctrl+O</kbd></button>
     <button id="openDatabaseBtn" type="button" role="menuitem" aria-haspopup="dialog" aria-controls="databaseDialog">在线数据库…</button>
+    <button id="databaseSnapshotsBtn" type="button" role="menuitem" aria-haspopup="dialog" aria-controls="databaseSnapshotsDialog">数据库快照…</button>
   </div>
   <div id="copyMenu" class="menu" role="menu" aria-label="复制" hidden>
     <button id="copySelectionBtn" type="button" role="menuitem">复制选区<kbd>Ctrl+C</kbd></button>
@@ -251,7 +252,10 @@
   <div id="toolbarLayoutMenu" class="menu" role="menu" aria-label="工具栏布局" hidden>
     <button id="toolbarLayoutToggle" type="button" role="menuitemcheckbox" aria-checked="false">选项卡布局</button>
   </div>
-  <div id="sourceIntegrityNotice" class="source-integrity-notice" role="status" hidden></div>
+  <div id="sourceIntegrityNotice" class="source-integrity-notice" hidden>
+    <span id="sourceIntegrityMessage" role="status"></span>
+    <button id="retainDatabaseSnapshot" type="button" class="mini-button" aria-haspopup="dialog" aria-controls="databaseSnapshotsDialog" hidden>保存旧快照</button>
+  </div>
 
   <input id="fileInput" type="file" accept="__FILE_ACCEPT__" hidden>
   <script id="fileFormats" type="application/json">__FILE_FORMATS__</script>
@@ -272,7 +276,10 @@
             <h1>浏览数据</h1>
             <p class="landing-subline">浏览 Excel、文本表格与数据库</p>
             <button id="chooseFileBtn" type="button" class="landing-open-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>选择数据文件<kbd>Ctrl+O</kbd></button>
-            <button id="openDatabaseHome" class="landing-database-button" type="button" aria-haspopup="dialog" aria-controls="databaseDialog">连接在线数据库</button>
+            <div class="landing-source-actions">
+              <button id="openDatabaseHome" class="landing-database-button" type="button" aria-haspopup="dialog" aria-controls="databaseDialog">连接在线数据库</button>
+              <button id="databaseSnapshotsHome" class="landing-database-button" type="button" aria-haspopup="dialog" aria-controls="databaseSnapshotsDialog">数据库快照</button>
+            </div>
             <div id="homeActivitySlot" class="home-activity-slot"></div>
             <div id="welcomeError" class="inline-error" hidden role="alert"></div>
           </div>
@@ -1421,11 +1428,28 @@
         <button id="databaseBack" type="button" class="mini-button" hidden>返回连接</button>
         <button id="databaseCancel" type="button" class="mini-button">取消</button>
         <button id="databaseConnect" type="submit" form="databaseConnectionForm" class="primary-button compact">读取目录</button>
-        <button id="databaseImport" type="button" class="primary-button compact" hidden disabled>打开所选表</button>
+        <button id="databaseImport" type="button" class="primary-button compact" hidden disabled>保存并打开</button>
       </div>
     </div>
   </dialog>
+  <dialog id="databaseSnapshotsDialog" class="float-dialog database-dialog" aria-labelledby="databaseSnapshotsTitle">
+    <div class="dialog-head">
+      <h2 id="databaseSnapshotsTitle" class="dialog-title">数据库快照</h2>
+      <button id="databaseSnapshotsClose" type="button" class="dialog-close" aria-label="关闭"></button>
+    </div>
+    <div class="dialog-body database-body">
+      <div id="databaseSnapshotsList" class="database-snapshots-list"></div>
+    </div>
+    <div class="database-footer">
+      <div class="database-feedback">
+        <p id="databaseSnapshotsStatus" class="database-feedback-text" role="status"></p>
+        <progress id="databaseSnapshotsProgress" class="database-progress" aria-label="快照操作进度" hidden></progress>
+      </div>
+      <button id="databaseSnapshotsCancel" class="mini-button" type="button">关闭</button>
+    </div>
+  </dialog>
   <script src="/assets/online-database.js"></script>
+  <script src="/assets/database-snapshots.js"></script>
   <script src="/assets/app.js"></script>
   <script src="/assets/analytics-templates.js"></script>
   <script src="/assets/analysis-numbers.js"></script>

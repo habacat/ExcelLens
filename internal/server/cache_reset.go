@@ -96,9 +96,6 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 	}
 	sources = append(sources, taskPaths...)
 	for _, wb := range root.referencedWorkbooks() {
-		if wb.Format == "db-online" {
-			continue // A database snapshot is derived cache, not a source file.
-		}
 		path := wb.Path
 		if wb.ArchiveOrigin != nil {
 			path = wb.ArchiveOrigin.Path
@@ -112,7 +109,32 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 		}
 		tab.archiveMu.Unlock()
 	}
-	return protectedCacheSources(dir, sources)
+	keep, err := protectedCacheSources(dir, sources)
+	if err != nil {
+		return nil, err
+	}
+	// Keep complete legacy snapshot directories, even when closed or damaged.
+	// The manifest, rows, and indexes are all original capture bytes.
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return keep, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !disposableCacheGroup(entry.Name()) {
+			continue
+		}
+		has, err := workbook.HasLegacyDatabaseSnapshot(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			return nil, err
+		}
+		if has {
+			keep[cachePathKey(entry.Name())] = true
+		}
+	}
+	return keep, nil
 }
 
 // A local file can itself have been opened from below the cache directory.

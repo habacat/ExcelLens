@@ -4,6 +4,7 @@ import (
 	"excellens/internal/fileidentity"
 
 	"archive/zip"
+	"context"
 	"crypto/sha1"
 	"encoding/xml"
 	"errors"
@@ -160,6 +161,9 @@ func (w *Workbook) GetCachedIndex(sheetPath string) *SheetIndex {
 	if w.source != nil && w.checkExternalUnchanged() != nil {
 		return nil
 	}
+	if w.Format == "db-online" && !w.databasePartsUnchanged(sheetPath) {
+		return nil
+	}
 	w.indexMu.RLock()
 	idx := w.indexes[sheetPath]
 	w.indexMu.RUnlock()
@@ -198,7 +202,10 @@ func (w *Workbook) CheckSourceUnchanged() error {
 			return err
 		}
 		if w.Format == "db-online" {
-			return w.verifyDatabaseSnapshot()
+			if w.source.database.manifest.Version == 1 {
+				return w.checkLegacyDatabaseManifest()
+			}
+			return w.VerifyDatabaseSnapshot(context.Background())
 		}
 		// Explicit source binding must also detect same-size rewrites with a
 		// restored timestamp. Reliable Windows revision stamps use the existing
@@ -233,7 +240,12 @@ func (w *Workbook) cachePaths(sheetPath string) (string, string) {
 		base += fmt.Sprintf("-biff%d", biffRowReaderVersion)
 	}
 	if w.source != nil {
-		return filepath.Join(w.CacheDir, base+".rows"), filepath.Join(w.CacheDir, base+".idx")
+		dir := w.CacheDir
+		if w.Format == "db-online" {
+			// Its rows and index are captured source data stored with the manifest.
+			dir = filepath.Dir(w.Path)
+		}
+		return filepath.Join(dir, base+".rows"), filepath.Join(dir, base+".idx")
 	}
 	return filepath.Join(w.CacheDir, base+".xml"), filepath.Join(w.CacheDir, base+".idx")
 }
