@@ -2,6 +2,10 @@
 
 ## 接续入口
 
+1.16.1 优先提交可见区域的真实单元格，读取进度位于状态栏。性能验收包含同机同文件三轮对照及运动中的单元格点击。[本版说明](../releases/1.16.1.md) · [工作流收据](../../validation/1.16.1/workflow-verification.json) · [滚动对照](../../validation/1.16.1/scroll-render-comparison.json)
+
+## 1.16.0 历史记录
+
 1.16.0 已完成传输历史修复、跨页结果保护、启动异步恢复、全量搜索和发行基准。当前验证包含无头浏览器、Windows 标准和竞态检查，以及有界规模实测。[版本说明](../releases/1.16.0.md) · [工作流收据](../../validation/1.16.0/workflow-verification.json) · [性能基准](../../validation/1.16.0/performance-baseline.json)
 
 ## 1.15.0 历史记录

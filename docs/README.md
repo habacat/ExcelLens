@@ -70,6 +70,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.16.1.md](releases/1.16.1.md) | 滚动中的真实文字、样式和点击定位，以及冷跳转和三轮性能对照 |
 | [releases/1.16.0.md](releases/1.16.0.md) | 全量搜索、传输历史修复、启动恢复进度与发行性能基准 |
 | [releases/1.15.0.md](releases/1.15.0.md) | 受限恢复、后台任务管理、磁盘空间核验及前端优化 |
 | [releases/1.14.0.md](releases/1.14.0.md) | 跨电脑来源重定位、加密备份、事务迁入与后台任务 |

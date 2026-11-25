@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const context={window:{},clearTimeout};for(const name of ['richtext','clipboard','freeze'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+name+'.js','utf8'),context);
+const context={window:{},clearTimeout,AbortController};for(const name of ['richtext','clipboard','freeze'])vm.runInNewContext(fs.readFileSync(__dirname+'/'+name+'.js','utf8'),context);
 context.window.ExcelLensClipboard.configure({rows:10,columns:10,cells:100,textBytes:10000,htmlBytes:20000});
 const rich=context.window.ExcelLensRichText,limits={cellRuns:4096,viewRuns:8192};
 const cell={type:'inlineStr',raw:'中😀<&\n尾',display:'中😀<&\n尾',richText:{runs:[{end:3,font:{bold:false,underline:'none',strike:false}},{end:7,font:{color:'#1255AA',vertical:'subscript',name:'";><img src=x onerror=1>'}}]}};
@@ -30,11 +30,15 @@ test('clipboard rejects entire oversized UTF8 source or escaped HTML before publ
   assert.throws(()=>clip.build(payload,[],true,'',limits,{textBytes:10000,htmlBytes:150}),/HTML超过/);
   const value=clip.build(payload,[],true,'',limits,{textBytes:10000,htmlBytes:10000});assert.equal(value.text,clip.tsvCell(cell.raw));
 });
-test('frozen cache uses measured bytes, preserves newest oversized tile, rejects late aborted fetch and resets accounting',async()=>{
+test('frozen cache uses measured bytes, retains its budget across an oversized tile, rejects late aborted fetch and resets accounting',async()=>{
   const Frozen=context.window.ExcelLensFrozenPanes,cache=new Frozen({cacheBudget:100,estimateBytes:tile=>tile.bytes,state:{frozenCellMap:new Map()}});
   cache.cachePart('a',{bytes:80});cache.cachePart('b',{bytes:80});assert.equal(cache.cache.size,1);assert.equal(cache.cacheBytes,80);
   cache.cachePart('b',{bytes:20});cache.cachePart('c',{bytes:30});assert.equal(cache.cacheBytes,50);
-  cache.cachePart('giant',{bytes:200});assert.equal(cache.cache.size,1);assert.equal(cache.cacheBytes,200);
-  cache.o.api=async()=>({bytes:50});await cache.fetchPart('late',new URLSearchParams(),{aborted:true});assert.equal(cache.cache.size,1);assert.equal(cache.cacheBytes,200);
-  context.document={getElementById:()=>({style:{},replaceChildren(){}})};cache.reset();assert.equal(cache.cacheBytes,0);assert.equal(cache.cacheSizes.size,0);
+  cache.cachePart('giant',{bytes:200});assert.equal(cache.cache.size,2);assert.equal(cache.cacheBytes,50);
+  let deliver,signal;
+  cache.o.api=(_,options)=>{signal=options.signal;return new Promise(ok=>{deliver=ok;});};
+  const pending=cache.fetchPart('left',new URLSearchParams(),{});
+  context.document={getElementById:()=>({style:{},replaceChildren(){}})};
+  cache.reset();assert.ok(signal.aborted);deliver({bytes:50});await pending;
+  assert.equal(cache.cache.size,0);assert.equal(cache.cacheBytes,0);assert.equal(cache.cacheSizes.size,0);
 });

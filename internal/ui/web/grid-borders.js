@@ -4,12 +4,16 @@
 (() => {
   'use strict';
   const ranks={double:6,solid:5,dashed:4,dotted:3,groove:2,ridge:2};
+  const weights=new Map();
   const score=value=>{
     if(!value)return 0;
+    if(weights.has(value))return weights.get(value);
     const parts=String(value).split(/\s+/);
     const width=parseFloat(parts[0])||0.5;
     const kind=parts.find(p=>p in ranks)||'solid';
-    return width*100+(ranks[kind]||1);
+    const result=width*100+(ranks[kind]||1);
+    if(weights.size>=512)weights.clear();weights.set(value,result);
+    return result;
   };
   // Equal-weight borders prefer the current cell's right/bottom edge. This
   // makes the result stable independently of source array iteration order.
@@ -22,14 +26,15 @@
   }
   // A long merge can adjoin short cells with different edge styles. Only
   // inspect the rendered band, and coalesce consecutive identical strokes.
-  function runs(first,last,visibleEnd,next,styleAt,fallback) {
+  function runs(first,last,visibleEnd,next,styleAt,fallback,visibleStart=first) {
     const parts=[];
     function add(start,end,style) {
       if (start>=end) return;
       if (parts.length && parts.at(-1).style===style) parts.at(-1).end=end;
       else parts.push({start,end,style});
     }
-    let index=first;
+    let index=Math.max(first,Math.min(last+1,visibleStart));
+    add(first,index,fallback);
     while (index<=last && index<=visibleEnd) {
       const following=Math.min(last+1,next(index+1)||last+1);
       add(index,following,styleAt(index));

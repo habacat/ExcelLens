@@ -143,7 +143,7 @@ test('a sparse tile cannot cover columns inside its bounds that were never fetch
   assert.equal(v.viewportCoversVisible(tile,request),false);
   assert.equal(v.viewportCoversRequest(tile,request),false);
   assert.equal(v.viewportCoversVisible(tile,{...request,visibleColEnd:1}),true);
-  assert.equal(v.viewportHasHeadroom(tile,{...request,visibleColEnd:1},8,3),false);
+  assert.equal(v.viewportHasHeadroom(tile,{...request,visibleColEnd:1,leadRow:4,leadCol:2}),false);
 });
 
 test('changing the frozen prefix preserves the active source cell and rebases its next move',async()=>{

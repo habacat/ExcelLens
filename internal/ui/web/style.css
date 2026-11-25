@@ -555,6 +555,8 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .sheet-tab.has-tab-color:hover { background: color-mix(in srgb, var(--sheet-tab-color) 22%, var(--surface)); }
 .sheet-tab.has-tab-color.active { border-top-color: var(--sheet-tab-color); box-shadow: inset 0 -2px 0 var(--sheet-tab-color); background: color-mix(in srgb, var(--sheet-tab-color) 8%, var(--surface)); }
 .status-strip { display: flex; min-width: 0; align-items: center; gap: 12px; padding: 0 8px 0 10px; color: var(--muted); font-size: var(--fs-2); }
+#viewportActivitySlot .activity-label { display: inline; }
+#viewportActivitySlot:not(:has(.tab-activity:not([hidden]))) { display: none; }
 .status-strip :is(#gridStatus, #selectionStatus) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-strip .quick-stats { min-width: 0; overflow: hidden; }
 .quick-stats-options { width: 22px; height: 20px; }
@@ -668,7 +670,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .grid-row.active-row .row-head { font-weight: 700; }
 .grid-row.whole-row-selected .grid-cell { background-image: linear-gradient(color-mix(in srgb, var(--selection-color) 15%, transparent), color-mix(in srgb, var(--selection-color) 15%, transparent)) !important; }
 .row-head:hover { background: color-mix(in srgb, var(--selection-color) 14%, var(--grid-head)); color: var(--ink); cursor: row-resize; }
-.grid-cell { position: absolute; top: 0; height: var(--row-height); display: flex; align-items: center; overflow: hidden; padding: 0 7px; border-left: 0; border-top: 0; border-right: .4px solid var(--grid-line-color); border-bottom: .4px solid var(--grid-line-color); color: var(--xl-color, var(--cell-ink)); background-color: var(--xl-fill, transparent); font-size: 11px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; cursor: cell; pointer-events: auto; user-select: none; }
+.grid-cell { position: absolute; top: 0; height: var(--row-height); display: flex; align-items: center; overflow: hidden; padding: 0 7px; border-left: 0; border-top: 0; border-right: .4px solid var(--grid-line-color); border-bottom: .4px solid var(--grid-line-color); color: var(--xl-color, var(--cell-ink)); background-color: var(--xl-fill, var(--grid-paper)); font-size: 11px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; cursor: cell; pointer-events: auto; user-select: none; }
 .grid-cell:hover { background-image: linear-gradient(var(--cell-hover), var(--cell-hover)); }
 .grid-cell.formula-cell { color: var(--xl-color, var(--cell-formula-ink)); }
 .grid-cell.selected { z-index: 3; outline: 2px solid var(--selection-color); outline-offset: -2px; background-image: linear-gradient(var(--selection-active-fill), var(--selection-active-fill)) !important; color: var(--xl-color, var(--ink)); }
@@ -711,6 +713,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .freeze-left { bottom: var(--grid-h-scrollbar, 0px); z-index: 16; border-right: 2px solid var(--grid-freeze-line); }
 .freeze-corner { z-index: 18; border-right: 2px solid var(--grid-freeze-line); border-bottom: 2px solid var(--grid-freeze-line); }
 .freeze-header { top: 0; z-index: 20; border-right: 2px solid var(--grid-freeze-line); border-bottom: 1px solid var(--grid-head-line); background: var(--grid-head); }
+.freeze-top, .freeze-left { background-color: color-mix(in srgb, var(--grid-paper) 50%, var(--grid-head)); }
 .pinned-cell { position: absolute; background-color: var(--xl-fill, var(--grid-paper)); border-bottom: .4px solid var(--grid-line-color); }
 .pinned-cell.formula-cell { color: var(--xl-color, var(--cell-formula-ink)); }
 .pinned-cell.selected { background-image: linear-gradient(var(--selection-active-fill), var(--selection-active-fill)); }
@@ -735,7 +738,9 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
   background: var(--selection-color, #109968); border: 0; box-shadow: inset 0 0 0 1px var(--grid-paper);
 }
 /* Viewport-only lightweight placeholder during a cold, far-away scroll. */
-.viewport-fallback { position: absolute; inset: 0; z-index: 9; pointer-events: none; contain: strict; }
+.grid-canvas[data-viewport] { background-color: color-mix(in srgb, var(--grid-paper) 50%, var(--grid-head)); }
+.viewport-surface { position: absolute; inset: 0; overflow: clip; pointer-events: none; }
+.viewport-fallback { position: absolute; left: 0; top: 0; pointer-events: none; contain: strict; }
 .grid-cell.audit-marked::after { content: ""; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 10px 10px 0; border-color: transparent var(--mark) transparent transparent; pointer-events: none; z-index: 5; }
 /* Handles never animate the scroll-positioned cells themselves. */
 .column-resize-grip, .row-resize-grip { position: absolute; pointer-events: auto; z-index: 9; touch-action: none; user-select: none; }

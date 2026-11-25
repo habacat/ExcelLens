@@ -311,6 +311,7 @@
       <select id="editGridList" class="edit-grid-list" aria-label="单元格允许的值" size="5" hidden></select>
       <div id="grid" class="grid-scroll" tabindex="0" aria-label="Excel 工作表">
         <div id="gridCanvas" class="grid-canvas">
+          <div id="viewportFallback" class="viewport-surface" aria-hidden="true" hidden></div>
           <div id="columnHeaders" class="column-headers"></div>
           <div id="rowsLayer" class="rows-layer"></div>
         </div>
@@ -326,7 +327,6 @@
         <div id="picturePane-corner" class="picture-pane"></div>
       </div>
       <div id="resizeGuide" class="resize-guide" hidden></div>
-      <canvas id="viewportFallback" class="viewport-fallback" hidden aria-hidden="true"></canvas>
       <div id="indexOverlay" class="index-overlay" hidden>
         <div class="index-card">
           <div id="indexTitle" class="index-title">正在准备工作表</div>
@@ -418,6 +418,7 @@
         <button id="sheetNextBtn" class="sheet-edge-button" type="button" aria-label="向右翻工作表" title="后面的工作表"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-right"/></svg></button>
       </div>
       <div class="status-strip">
+        <span id="viewportActivitySlot" class="activity-slot"></span>
         <span id="gridStatus">未选择工作表</span>
         <span id="largeDataStatus" class="large-data-status" hidden>超大数据模式</span>
         <span id="freezeStatus" class="freeze-status" hidden></span>
@@ -1351,6 +1352,7 @@
   <script src="/assets/toolbar-settings.js"></script>
   <script src="/assets/command-palette.js"></script>
   <script src="/assets/viewport-cache.js"></script>
+  <script src="/assets/viewport-scheduler.js"></script>
   <script src="/assets/transport.js"></script>
   <script src="/assets/background-tasks.js"></script>
   <script src="/assets/storage.js"></script>

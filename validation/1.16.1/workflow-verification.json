@@ -1,0 +1,335 @@
+{
+  "version": "1.16.1",
+  "result": "PASS",
+  "candidateExecutableSHA256": "f57f3cc64418bd74b2e1fb0bc155ed499f10ef5eb2b4605a9da1a09bb29919a4",
+  "previousReleaseTag": "v1.16.0",
+  "previousPublicCommit": "4f74c39b41488ed3c348d7a6c46eee005d5cf690",
+  "baselineProbeCommit": "54c6f93df87abfaeb96326236dd1ffa4a64cb46a",
+  "sourceSHA256": "f640cb677db5aa6e20b32b0c0a0ba7749be5773e937be72df5bbfa39a75e0675",
+  "browser": "Chrome/158.0.8127.88",
+  "roundsPerVersion": 3,
+  "zoom": [
+    100,
+    125
+  ],
+  "comparisonSHA256": "e7c0fc15331d4714746cf8569f02ef8eac122142f9bfa73dd9b2c56b7cec7028",
+  "checkedEmbeddedAssets": {
+    "v1.16.0": {
+      "assets": 148,
+      "binarySha256": "6c4e05fb57e9ee77950e27f255a87917e9e45c7422f6c9fe9494fd501dbf558b"
+    },
+    "v1.16.1": {
+      "assets": 149,
+      "binarySha256": "f57f3cc64418bd74b2e1fb0bc155ed499f10ef5eb2b4605a9da1a09bb29919a4"
+    }
+  },
+  "previousUnreleasedCandidate": {
+    "executableSHA256": "e06b75953e7ae724087a80fd1b5f3e2942ddfe8e1fe862e85dd92b080da460cf",
+    "phases": {
+      "normal": {
+        "completeContentPct": 100,
+        "correctStylePct": 99.992,
+        "whitePct": 0,
+        "fps": 77.172,
+        "medianSessionP95Ms": 24.2,
+        "medianSessionP99Ms": 28.1,
+        "medianSettleMs": 2.8
+      },
+      "fastVertical": {
+        "completeContentPct": 11.392,
+        "correctStylePct": 98.86,
+        "whitePct": 0.225,
+        "fps": 47.092,
+        "medianSessionP95Ms": 34.75,
+        "medianSessionP99Ms": 62,
+        "medianSettleMs": 199.5
+      },
+      "fastHorizontal": {
+        "completeContentPct": 52.532,
+        "correctStylePct": 99.271,
+        "whitePct": 0,
+        "fps": 35.828,
+        "medianSessionP95Ms": 59.3,
+        "medianSessionP99Ms": 69.2,
+        "medianSettleMs": 128.75
+      },
+      "reverse": {
+        "completeContentPct": 7.018,
+        "correctStylePct": 99.357,
+        "whitePct": 0.215,
+        "fps": 48.274,
+        "medianSessionP95Ms": 38.55,
+        "medianSessionP99Ms": 48.9,
+        "medianSettleMs": 351.6
+      },
+      "jump": {
+        "completeContentPct": null,
+        "correctStylePct": 0,
+        "whitePct": 0,
+        "fps": null,
+        "medianSessionP95Ms": null,
+        "medianSessionP99Ms": null,
+        "medianSettleMs": 266.45
+      }
+    }
+  },
+  "finalPhases": {
+    "normal": {
+      "completeContentPct": 100,
+      "correctStylePct": 99.992,
+      "whitePct": 0,
+      "fps": 58.808,
+      "medianSessionP95Ms": 31.5,
+      "medianSessionP99Ms": 41.7,
+      "medianSettleMs": 2.55
+    },
+    "fastVertical": {
+      "completeContentPct": 100,
+      "correctStylePct": 99.416,
+      "whitePct": 0,
+      "fps": 24.663,
+      "medianSessionP95Ms": 62.3,
+      "medianSessionP99Ms": 65.85,
+      "medianSettleMs": 49.35
+    },
+    "fastHorizontal": {
+      "completeContentPct": 90.625,
+      "correctStylePct": 99.9,
+      "whitePct": 0,
+      "fps": 21.857,
+      "medianSessionP95Ms": 86.75,
+      "medianSessionP99Ms": 86.75,
+      "medianSettleMs": 41.85
+    },
+    "reverse": {
+      "completeContentPct": 81.69,
+      "correctStylePct": 94.441,
+      "whitePct": 0,
+      "fps": 15.49,
+      "medianSessionP95Ms": 104.25,
+      "medianSessionP99Ms": 104.25,
+      "medianSettleMs": 108.85
+    },
+    "jump": {
+      "completeContentPct": null,
+      "correctStylePct": 0,
+      "whitePct": 0,
+      "fps": null,
+      "medianSessionP95Ms": null,
+      "medianSessionP99Ms": null,
+      "medianSettleMs": 323.45
+    }
+  },
+  "browserSuites": {
+    "grid-seam": {
+      "cases": 24,
+      "sha256": "37e7527f67bc7a69ad991c5b3d2c47c31cf36c69275642cfaabfe0c8dfc90604"
+    },
+    "row-visibility": {
+      "cases": 9,
+      "sha256": "2a71cc0f891d0801b34ecfa1a06ec798ac564fc94a6c656b26ca7b56071d5294"
+    },
+    "conditional": {
+      "cases": 5,
+      "sha256": "9717eda5a202d415f6bc273a48a9399dad207685748c01c19d689d5c4ddaa36a"
+    },
+    "richtext": {
+      "cases": 5,
+      "sha256": "29fce2bf09db016d300aa05ecbb29e3750706aaa8890cdee722abb646e5f5fe2"
+    },
+    "edit-toolbar": {
+      "cases": 65,
+      "sha256": "a077e8529a2f9fffdc888f83d32fc689a355a1c79a71661ce612d820fb5432e0"
+    },
+    "merged-crosshair": {
+      "cases": 23
+    },
+    "scroll-state": {
+      "rounds": [
+        {
+          "result": "PASS",
+          "cold": [
+            {
+              "preset": "off",
+              "expected": "249,251,250",
+              "observed": "250,251,250",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            },
+            {
+              "preset": "navy",
+              "expected": "36,49,64",
+              "observed": "36,49,64",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            }
+          ],
+          "hits": [
+            {
+              "direction": 1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C64",
+              "ref": "C64",
+              "expectedValue": "64003",
+              "value": "64003",
+              "target": "grid-cell",
+              "x": 241,
+              "y": 789.75,
+              "scrollTop": 840,
+              "selected": "C64",
+              "bar": "64003"
+            },
+            {
+              "direction": -1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C154",
+              "expectedValue": "154003",
+              "target": "rows-layer",
+              "x": 241,
+              "y": 283.20001220703125,
+              "scrollTop": 3492,
+              "selected": "C154",
+              "bar": "154003"
+            }
+          ],
+          "anchor": [
+            "AR50",
+            "50044"
+          ],
+          "maxNodes": 1393,
+          "revision": 1,
+          "sourceSHA256": "4a8a242962166fb0c2a1931e731d465d13a9614bdb4f8c6f77b257784ffba8dc",
+          "sourceUnchanged": true,
+          "errors": []
+        },
+        {
+          "result": "PASS",
+          "cold": [
+            {
+              "preset": "off",
+              "expected": "249,251,250",
+              "observed": "250,251,250",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            },
+            {
+              "preset": "navy",
+              "expected": "36,49,64",
+              "observed": "36,49,64",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            }
+          ],
+          "hits": [
+            {
+              "direction": 1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C59",
+              "expectedValue": "59003",
+              "target": "rows-layer",
+              "x": 241,
+              "y": 789.75,
+              "scrollTop": 725,
+              "selected": "C59",
+              "bar": "59003"
+            },
+            {
+              "direction": -1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C161",
+              "ref": "C161",
+              "expectedValue": "161003",
+              "value": "161003",
+              "target": "grid-cell active-column",
+              "x": 241,
+              "y": 283.20001220703125,
+              "scrollTop": 3656,
+              "selected": "C161",
+              "bar": "161003"
+            }
+          ],
+          "anchor": [
+            "AR50",
+            "50044"
+          ],
+          "maxNodes": 1393,
+          "revision": 1,
+          "sourceSHA256": "4a8a242962166fb0c2a1931e731d465d13a9614bdb4f8c6f77b257784ffba8dc",
+          "sourceUnchanged": true,
+          "errors": []
+        },
+        {
+          "result": "PASS",
+          "cold": [
+            {
+              "preset": "off",
+              "expected": "249,251,250",
+              "observed": "250,251,250",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            },
+            {
+              "preset": "navy",
+              "expected": "36,49,64",
+              "observed": "36,49,64",
+              "matchingPoints": 9,
+              "statusBelowGrid": true,
+              "unknownPressPreservedSelection": true
+            }
+          ],
+          "hits": [
+            {
+              "direction": 1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C58",
+              "expectedValue": "58003",
+              "target": "rows-layer",
+              "x": 241,
+              "y": 789.75,
+              "scrollTop": 690,
+              "selected": "C58",
+              "bar": "58003"
+            },
+            {
+              "direction": -1,
+              "trusted": true,
+              "moving": true,
+              "expected": "C165",
+              "ref": "C165",
+              "expectedValue": "165003",
+              "value": "165003",
+              "target": "grid-cell active-column",
+              "x": 241,
+              "y": 283.20001220703125,
+              "scrollTop": 3760,
+              "selected": "C165",
+              "bar": "165003"
+            }
+          ],
+          "anchor": [
+            "AR50",
+            "50044"
+          ],
+          "maxNodes": 1393,
+          "revision": 1,
+          "sourceSHA256": "4a8a242962166fb0c2a1931e731d465d13a9614bdb4f8c6f77b257784ffba8dc",
+          "sourceUnchanged": true,
+          "errors": []
+        }
+      ],
+      "cachedBeforeMountedHits": 3
+    }
+  },
+  "desktopManualAcceptance": false,
+  "operationNotes": "Trusted Chromium mouse presses during forward and reverse scroll select the expected source address and displayed value. All tests used isolated profiles."
+}

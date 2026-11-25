@@ -33,5 +33,35 @@
       return {top,left:x};
     }
   }
+  class ScrollMotion {
+    constructor(){this.readMs=35;this.renderMs=12;this.reset();}
+    reset(){this.x=this.y=this.time=null;this.vx=this.vy=this.dx=this.dy=0;}
+    sample(x,y,time){
+      const dt=time-this.time;
+      this.dx=this.x===null?0:x-this.x;this.dy=this.y===null?0:y-this.y;
+      if(this.time!==null && dt>0 && dt<280){
+        const velocity=(delta,prior)=>{
+          const instant=delta/Math.max(4,dt);
+          return Math.sign(instant)===Math.sign(prior)?instant*.65+prior*.35:instant;
+        };
+        this.vx=velocity(this.dx,this.vx);this.vy=velocity(this.dy,this.vy);
+      }else{this.vx=this.vy=0;}
+      this.x=x;this.y=y;this.time=time;
+    }
+    observe(kind,ms){
+      const key=kind==='read'?'readMs':'renderMs';
+      this[key]=this[key]*.75+Math.max(1,Math.min(600,ms))*.25;
+    }
+    predict(width,height,time){
+      const moving=this.time!==null && time-this.time<300;
+      const horizon=Math.min(450,Math.max(65,this.readMs+this.renderMs*2+48));
+      const axis=(size,speed)=>{
+        const lead=Math.min(size*3,Math.abs(speed)*(horizon+120)+(speed?size*.9:0));
+        return [size*.65+(speed<0?lead:0),size*.65+(speed>0?lead:0)];
+      };
+      return {x:axis(width,moving?this.vx:0),y:axis(height,moving?this.vy:0)};
+    }
+  }
+  VirtualScroll.Motion=ScrollMotion;
   window.ExcelLensVirtualScroll=VirtualScroll;
 })();

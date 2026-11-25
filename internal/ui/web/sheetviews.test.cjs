@@ -87,7 +87,7 @@ test('first-tile failures propagate during a sheet handoff while ordinary scroll
   const start=source.indexOf('  async function loadViewport('),end=source.indexOf('  function resetGridDOM(',start);
   for(const strict of [false,true]){
     let retries=0;const S={sheet:'A',sheetEpoch:1,indexReady:true,viewportRequest:0,viewportRetryAttempt:0,window:null};
-    const ctx={S,AbortController,URLSearchParams,viewportKey:()=>'',getViewportRequest:()=>({displayStart:1,displayEnd:20,limit:20,startCol:1,cols:4}),viewportHasHeadroom:()=>false,cachedViewport:()=>null,viewportCoversVisible:()=>false,updateViewportLoading(){},api:async()=>{throw Error('first tile failed');},clearTimeout(){},setTimeout(){retries++;return 1;}};
+    const ctx={S,gridWork:null,foregroundLookups:0,viewport:{viewportHasHeadroom:()=>false},getViewportRequest:()=>({displayStart:1,displayEnd:20,limit:20,startCol:1,cols:4}),projectViewport:()=>null,viewportCoversVisible:()=>false,planViewport:async()=>{throw Error('first tile failed');},clearTimeout(){},setTimeout(){retries++;return 1;}};
     vm.runInNewContext(source.slice(start,end)+';this.load=loadViewport;',ctx);
     if(strict)await assert.rejects(ctx.load(true,1,true),/first tile failed/);else await ctx.load(false,1);
     assert.equal(retries,strict?0:1);assert.equal(S.window,null);

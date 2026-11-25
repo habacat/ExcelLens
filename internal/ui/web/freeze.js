@@ -9,6 +9,7 @@
       this.o = o;
       this.key = '';
       this.cache = new Map();
+      this.partReads=new Map();
       this.cells = new Map();
       this.cacheSizes = new Map();this.cacheBytes=0;
       this.timer = 0;
@@ -34,9 +35,10 @@
     }
     reset({preserveDOM = false} = {}) {
       ++this.serial;
-      clearTimeout(this.timer);
+      clearTimeout(this.timer);this.timer=0;this.force=false;
       this.abort?.abort(); this.abort = null;
       this.pending = null;
+      this.stopParts();this.coverage=null;
       this.key = '';
       this.cache.clear();
       this.cacheSizes.clear();this.cacheBytes=0;
@@ -61,26 +63,61 @@
     }
     schedule(force = false) {
       if (!this.o.state.indexReady) return;
-      // The main viewport controls which data band to fetch. Refresh frozen
-      // panes as soon as the main band is committed, not 42 ms after the last
-      // scroll event (which may never occur during continuous touchpad input).
-      clearTimeout(this.timer);
-      this.timer = setTimeout(() => this.refresh(force).catch(err => {
-        if (err?.name !== 'AbortError') this.o.onError(err);
-      }), 0);
+      this.force||=force;
+      if(this.timer)return;
+      this.timer=setTimeout(()=>{
+        this.timer=0;const refresh=this.force;this.force=false;
+        this.refresh(refresh).catch(err=>{if(err?.name!=='AbortError')this.o.onError(err);});
+      },0);
     }
-    async fetchPart(name, params, signal) {
-      const key = `${name}|${params.toString()}`;
-      if (this.cache.has(key)) {const data=this.cache.get(key);this.cache.delete(key);this.cache.set(key,data);return data;}
-      const data = await this.o.api(`/api/sheet?${params}`, {signal});
-      if(signal.aborted)return data;
-      this.cachePart(key,data);
-      return data;
+    stopParts(){
+      for(const part of this.partReads.values())part.controller.abort();
+      this.partReads.clear();
+    }
+    fetchPart(name,params,request){
+      const key=name+'|'+params;
+      const live=this.partReads.get(name);
+      if(live?.key===key)return live.promise;
+      live?.controller.abort();this.partReads.delete(name);
+      if(this.cache.has(key)){const data=this.cache.get(key);this.cache.delete(key);this.cache.set(key,data);return data;}
+      const cached=this.o.cachedPart?.(name,params,request);
+      if(cached)return cached;
+      const controller=new AbortController(),part={key,controller};
+      this.partReads.set(name,part);
+      part.promise=this.readPart(params,request,controller.signal).then(data=>{
+        if(!controller.signal.aborted)this.cachePart(key,data);
+        return data;
+      }).finally(()=>{if(this.partReads.get(name)===part)this.partReads.delete(name);});
+      return part.promise;
+    }
+    async readPart(params,request,signal){
+      // A very wide or short-row display can span multiple HTTP windows.
+      const rows=Number(params.get('limit')),cols=Number(params.get('cols'));
+      if(rows<=150&&cols<=80)return this.o.api('/api/sheet?'+params,{signal,activity:false});
+      const selected=params.get('columns')?.split(',').map(Number);
+      const firstCol=Number(params.get('col')),merged=[],basedOnOffset=params.has('offset');
+      let meta;
+      for(let ro=0;ro<rows;ro+=150){
+        const byRow=new Map();
+        for(let co=0;co<cols;co+=80){
+          const page=new URLSearchParams(params),count=Math.min(80,cols-co);
+          page.set('col',selected?.[co]??firstCol+co);page.set('cols',count);page.set('limit',Math.min(150,rows-ro));
+          if(selected)page.set('columns',selected.slice(co,co+count).join(','));
+          if(basedOnOffset)page.set('offset',Number(params.get('offset'))+ro);
+          else if(ro)page.set('row',request.rowOrder?.advance(Number(params.get('row')),ro)||Number(params.get('row'))+ro);
+          const data=await this.o.api('/api/sheet?'+page,{signal,activity:false});
+          meta||=data;
+          for(const row of data.rows){const previous=byRow.get(row.number);if(previous)previous.cells.push(...row.cells);else byRow.set(row.number,{...row,cells:[...row.cells]});}
+        }
+        merged.push(...byRow.values());
+      }
+      return {...meta,startCol:firstCol,colCount:cols,columns:selected,rows:merged};
     }
     cachePart(key,data){
       if(this.cacheSizes.has(key))this.cacheBytes-=this.cacheSizes.get(key);
-      this.cache.delete(key);
+      this.cache.delete(key);this.cacheSizes.delete(key);
       const bytes=this.o.estimateBytes?.(data)||0;
+      if(bytes>(this.o.cacheBudget??Infinity))return;
       this.cache.set(key, data);
       this.cacheSizes.set(key,bytes);this.cacheBytes+=bytes;
       while(this.cache.size>1&&(this.cache.size>48||this.cacheBytes>(this.o.cacheBudget??Infinity))){
@@ -97,7 +134,8 @@
       const {rows: nr, cols: nc} = this.effective();
       const ids = ['freezeTop','freezeLeft','freezeCorner','freezeHeader','freezeRowHeads'];
       if (!nr && !nc) {
-        this.cells.clear();
+        if(!this.base&&!this.pending&&!this.cells.size&&!this.key)return;
+        this.coverage=null;this.stopParts();this.cells.clear();
         ++this.serial;
         this.abort?.abort();this.abort=null;this.pending=null;
         this.key = '';
@@ -110,21 +148,22 @@
       const req = getRequest();
       const topCol = Math.max(1, req.startCol);
       const viewId=s.rowView?.id||'';
-      const partsKey = [s.sheet, s.sheetEpoch, s.filtered, s.filterId, viewId, rowHead, nr, nc, req.displayStart, req.displayEnd, topCol, req.cols, req.selectedCols?.join(',')||'', req.filtered?req.offset:req.row].join('|');
-      if (!force && partsKey === this.key) { this.followScroll(); return; }
+      const partsKey = [s.sheet, s.sheetEpoch, req.context, s.filtered, s.filterId, viewId, rowHead, nr, nc, req.displayStart, req.displayEnd, topCol, req.cols, req.selectedCols?.join(',')||'', req.filtered?req.offset:req.row].join('|');
+      const coverageKey=[s.sheetEpoch,req.context,s.filterId,viewId,rowHead,nr,nc].join('|');
+      if (!force && (partsKey === this.key || this.coverage?.key===coverageKey && window.ExcelLensViewport.viewportCoversVisible(this.coverage.bounds,req))) { this.followScroll(); return; }
       if (this.pending?.key === partsKey && !this.pending.abort.signal.aborted) return this.pending.promise;
       const ticket = ++this.serial;
-      this.abort?.abort();
+      this.abort?.abort(); // invalidate the previous composite, keeping unchanged part reads
       const abort = new AbortController();
       this.abort = abort;
       const build = (init) => new URLSearchParams({sheet:s.sheet,rowWindow:'1',...(viewId?{viewId,filterId:s.filtered?s.filterId:'',pinnedThroughRow:String(nr)}:{}), ...init});
       const jobs = [];
-      if (nr && nc) jobs.push(this.fetchPart('corner', build({row:'1',limit:String(nr),col:'1',cols:String(nc)}), abort.signal));
+      if (nr && nc) jobs.push(this.fetchPart('corner', build({row:'1',limit:String(nr),col:'1',cols:String(nc)}), req));
       else jobs.push(Promise.resolve(null));
       if (nr) {
         const params=build({row:'1',limit:String(nr),col:String(topCol),cols:String(req.cols)});
         if(req.selectedCols)params.set('columns',req.selectedCols.join(','));
-        jobs.push(this.fetchPart('top',params,abort.signal));
+        jobs.push(this.fetchPart('top',params,req));
       } else jobs.push(Promise.resolve(null));
       if (nc) {
         const params = build({limit:String(req.limit),col:'1',cols:String(nc)});
@@ -134,7 +173,7 @@
           params.set('filterId',s.filterId);
           if (nr) params.set('excludeThroughRow',String(nr));
         } else params.set('row',String(req.row));
-        jobs.push(this.fetchPart('left', params, abort.signal));
+        jobs.push(this.fetchPart('left',params,req));
       } else jobs.push(Promise.resolve(null));
       const pending={key:partsKey,abort,promise:null};
       this.pending=pending;
@@ -146,8 +185,9 @@
       const now = getRequest();
       // Never let a frozen response for an off-screen position overwrite
       // panes after a rapid scroll or a return to an earlier position.
-      if (now.visibleStart < req.displayStart || now.visibleEnd > req.displayEnd ||
-          now.visibleColStart < req.visibleColStart || now.visibleColEnd > req.visibleColEnd) return;
+      const bounds={...req,endCol:req.selectedCols?.at(-1)??req.startCol+req.cols-1,columns:req.selectedCols};
+      if(!window.ExcelLensViewport.viewportCoversVisible(bounds,now)){this.schedule();return;}
+      this.coverage={key:coverageKey,bounds};
       this.key = partsKey;
       this.o.beforePaint?.([...(corner?.rows||[]),...(top?.rows||[]),...(left?.rows||[])]);
       this.base = {left:grid.scrollLeft,top:this.o.getVirtualScrollTop()};
@@ -302,7 +342,7 @@
       this.o.onRender();
       } catch(error) {
         if(abort.signal.aborted||ticket!==this.serial)return;
-        abort.abort();
+        abort.abort();this.stopParts();
         throw error;
       } finally {
         if(this.pending===pending)this.pending=null;

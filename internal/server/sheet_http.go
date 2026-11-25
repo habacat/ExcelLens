@@ -219,7 +219,8 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
 		return
 	}
-	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
+	query := r.URL.Query()
+	meta, ok := wb.FindSheet(query.Get("sheet"))
 	if !ok {
 		writeError(w, http.StatusNotFound, "找不到指定工作表")
 		return
@@ -231,12 +232,12 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "工作表索引尚未建立")
 		return
 	}
-	offset := parseIntDefault(r.URL.Query().Get("offset"), 0)
-	limit := clamp(parseIntDefault(r.URL.Query().Get("limit"), 100), 1, 150)
-	startCol := clamp(parseIntDefault(r.URL.Query().Get("col"), 1), 1, 16384)
-	colCount := clamp(parseIntDefault(r.URL.Query().Get("cols"), 24), 1, 80)
+	offset := parseIntDefault(query.Get("offset"), 0)
+	limit := clamp(parseIntDefault(query.Get("limit"), 100), 1, 150)
+	startCol := clamp(parseIntDefault(query.Get("col"), 1), 1, 16384)
+	colCount := clamp(parseIntDefault(query.Get("cols"), 24), 1, 80)
 	var sparseCols []int
-	if value := r.URL.Query().Get("columns"); value != "" {
+	if value := query.Get("columns"); value != "" {
 		parts := strings.Split(value, ",")
 		if len(parts) > 80 {
 			writeError(w, 400, "可视列数量超限")
@@ -260,9 +261,9 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		colCount = len(sparseCols)
 	}
 	var filtered *FilterResult
-	filterID := strings.TrimSpace(r.URL.Query().Get("filterId"))
+	filterID := strings.TrimSpace(query.Get("filterId"))
 	var visible *sheetRowView
-	if viewID := r.URL.Query().Get("viewId"); viewID != "" {
+	if viewID := query.Get("viewId"); viewID != "" {
 		var err error
 		visible, err = a.rowViewSnapshot(viewID, wb, idx, meta.Path, filterID)
 		if err != nil {
@@ -272,9 +273,9 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		defer visible.close()
 	}
 	pinnedThrough := 0
-	if r.URL.Query().Has("pinnedThroughRow") {
-		value, err := strconv.Atoi(r.URL.Query().Get("pinnedThroughRow"))
-		if visible == nil || err != nil || value < 1 || value > 30 || parseIntDefault(r.URL.Query().Get("excludeThroughRow"), 0) != 0 {
+	if query.Has("pinnedThroughRow") {
+		value, err := strconv.Atoi(query.Get("pinnedThroughRow"))
+		if visible == nil || err != nil || value < 1 || value > 30 || parseIntDefault(query.Get("excludeThroughRow"), 0) != 0 {
 			writeError(w, 400, "冻结源行范围或可见行视图无效")
 			return
 		}
@@ -292,9 +293,9 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	var rowView selectionRowView
 	if filtered != nil || visible != nil {
 		// Frozen title rows stay visible above the filtered scrollable body.
-		through := clamp(parseIntDefault(r.URL.Query().Get("excludeThroughRow"), 0), 0, 30)
-		if visible != nil && r.URL.Query().Has("excludeThroughRow") {
-			value, err := strconv.Atoi(r.URL.Query().Get("excludeThroughRow"))
+		through := clamp(parseIntDefault(query.Get("excludeThroughRow"), 0), 0, 30)
+		if visible != nil && query.Has("excludeThroughRow") {
+			value, err := strconv.Atoi(query.Get("excludeThroughRow"))
 			if err != nil || value < 0 || value > 30 {
 				writeError(w, 400, "冻结行参数无效")
 				return
@@ -312,7 +313,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	if pinnedThrough > 0 {
 		totalRows = rowView.sourceRangeCount(1, pinnedThrough)
 	}
-	if rowStr := r.URL.Query().Get("row"); rowStr != "" {
+	if rowStr := query.Get("row"); rowStr != "" {
 		rowNum := clamp(parseIntDefault(rowStr, 1), 1, workbook.MaxRowsForIndex(idx))
 		if filtered == nil && visible == nil {
 			offset = idx.FindRowOffset(rowNum)
@@ -337,13 +338,13 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	var rows []workbook.RowData
 	var err error
-	readOptions := workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: r.URL.Query().Get("conditional") != "0"}
+	readOptions := workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: query.Get("conditional") != "0"}
 	if visible != nil {
 		var numbers []int
 		if pinnedThrough > 0 {
 			first := 1
-			if r.URL.Query().Has("row") {
-				value, parseErr := strconv.Atoi(r.URL.Query().Get("row"))
+			if query.Has("row") {
+				value, parseErr := strconv.Atoi(query.Get("row"))
 				if parseErr != nil || value < 1 || value > pinnedThrough {
 					writeError(w, 400, "冻结源行起点无效")
 					return
@@ -352,8 +353,8 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 			}
 			offset = rowView.sourceRangeCount(1, first-1)
 			numbers = rowView.appendSourceRange(make([]int, 0, min(limit, pinnedThrough)), first, min(limit, rowView.sourceRangeCount(first, pinnedThrough)))
-		} else if filterID == "" && r.URL.Query().Get("rowWindow") == "1" {
-			first := clamp(parseIntDefault(r.URL.Query().Get("row"), 1), 1, workbook.MaxRowsForIndex(idx))
+		} else if filterID == "" && query.Get("rowWindow") == "1" {
+			first := clamp(parseIntDefault(query.Get("row"), 1), 1, workbook.MaxRowsForIndex(idx))
 			numbers = rowView.sourceWindow(first, limit)
 		} else {
 			numbers, err = rowView.numbersPage(offset, end-offset)
@@ -365,8 +366,8 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 			}
 			rows, err = wb.ReadRowsByNumbersWithOptionsContext(r.Context(), idx, numbers, startCol, lastCol, readOptions)
 		}
-	} else if filtered == nil && r.URL.Query().Get("rowWindow") == "1" {
-		firstRow := clamp(parseIntDefault(r.URL.Query().Get("row"), 1), 1, workbook.MaxRowsForIndex(idx))
+	} else if filtered == nil && query.Get("rowWindow") == "1" {
+		firstRow := clamp(parseIntDefault(query.Get("row"), 1), 1, workbook.MaxRowsForIndex(idx))
 		numbers := make([]int, 0, limit)
 		for number := firstRow; number <= min(idx.MaxRow, firstRow+limit-1); number++ {
 			numbers = append(numbers, number)
@@ -405,11 +406,17 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "读取单元格失败："+err.Error())
 		return
 	}
+	if r.Context().Err() != nil {
+		return
+	}
 	// Hyperlinks are metadata, not cell values. Decode them lazily and
 	// decorate only the current viewport; failures must not hide sheet data.
 	linkError := ""
 	if err := wb.DecorateHyperlinks(meta, rows, sparseCols, startCol, lastCol); err != nil {
 		linkError = err.Error()
+	}
+	if r.Context().Err() != nil {
+		return
 	}
 	payload := map[string]any{
 		"hyperlinkError": linkError,
@@ -426,7 +433,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	if pinnedThrough > 0 {
 		payload["pinnedThroughRow"] = pinnedThrough
 	}
-	if r.URL.Query().Get("compact") == "1" {
+	if query.Get("compact") == "1" {
 		payload["rows"] = packViewportRows(rows)
 		payload["compact"] = 1
 	}

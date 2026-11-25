@@ -59,7 +59,7 @@
     return raw!==''&&!numeric.test(raw.trim());
   }
   class Presenter{
-    constructor(options){this.o=options;this.measure=null;this.widths=new Map();this.richWidths=new WeakMap();this.numberWidths=new WeakMap();this.numberMeasures=new Map();this.richPlan=null;}
+    constructor(options){this.o=options;this.measure=null;this.widths=new Map();this.richWidths=new WeakMap();this.numberWidths=new WeakMap();this.numberMeasures=new Map();this.hashWidths=new Map();this.templates=new Map();this.richPlan=null;}
     prepare(rows){
       this.richPlan=new WeakMap();let remaining=this.o.richLimits?.viewRuns||0;
       for(const row of rows||[])for(const cell of row.cells||[]){
@@ -69,7 +69,13 @@
       }
     }
     allowed(cell){return (!cell?.richText&&!window.ExcelLensConditional?.needsInline(cell,this.style(cell)))||!this.richPlan||this.richPlan.get(cell)===true;}
-    paintKey(){const s=this.o.state;return [s.showStyles,s.showFormulas,s.fontOverride,this.o.scale()].join('|');}
+    paintKey(){
+      const s=this.o.state,scale=this.o.scale(),p=this.paintState;
+      if(!p||p.styles!==s.showStyles||p.formulas!==s.showFormulas||p.font!==s.fontOverride||p.scale!==scale){
+        this.paintState={styles:s.showStyles,formulas:s.showFormulas,font:s.fontOverride,scale,key:[s.showStyles,s.showFormulas,s.fontOverride,scale].join('|')};
+      }
+      return this.paintState.key;
+    }
     needsPaint(node,cell,row){return node._xlPaintKey!==this.paintKey()||node._xlRichAllowed!==this.allowed(cell)||node._xlRowPresentationNotice!==(row?.presentationNotice||'');}
     value(cell){
       const s=this.o.state,text=value(cell,s.showFormulas,s.showStyles);
@@ -82,7 +88,34 @@
       return pattern.replace(/y+|m+|d+/g,t=>fields[t]??t)+parts[4];
     }
     style(cell,rowStyle=0){const s=this.o.state;return window.ExcelLensConditional?.visual(cell,s.styles,rowStyle,s.showStyles)??(s.showStyles?s.styles?.[Number(cell?.style??rowStyle)||0]:null);}
+    create(cell,row,rowNumber,col){
+      const s=this.o.state,filter=s.autoFilter;
+      const ordinary=!cell?.richText&&!cell?.conditional&&!cell?.hyperlink&&!row?.presentationNotice&&
+        !(filter&&rowNumber===filter.row&&col>=filter.startCol&&col<=filter.endCol);
+      const key=ordinary?[this.paintKey(),cell?.style??row?.style??0,cell?1:0,cell?.hasFormula?1:0,
+        cell?.type==='n'||(!cell?.type&&cell?.raw&&Number.isFinite(Number(cell.raw)))?1:0,cell?.valueColor||''].join('|'):null;
+      if(this.templatePalette!==s.styles){this.templates.clear();this.templatePalette=s.styles;}
+      const saved=key&&this.templates.get(key);
+      if(saved){
+        const node=saved.node.cloneNode(false);
+        node._xlPaintKey=saved.paintKey;node._xlRowStyle=row?.style||0;node._xlModel=cell||null;
+        node._xlRichAllowed=true;node._xlRowPresentationNotice='';
+        node.textContent=this.value(cell);
+        return node;
+      }
+      const node=document.createElement('div');node.className='grid-cell';
+      // Filter controls need their actual address while painting.
+      node.dataset.row=String(rowNumber);node.dataset.col=String(col);
+      this.paint(node,cell,row);
+      if(key&&node.cloneNode&&!node.childElementCount&&!node.title&&node._xlRichAllowed){
+        const template=node.cloneNode(false);
+        if(this.templates.size>=384)this.templates.clear();
+        this.templates.set(key,{node:template,paintKey:node._xlPaintKey});
+      }
+      return node;
+    }
     paint(node,cell,row){
+      const fresh=node._xlPaintKey===undefined;
       if(node._xlNumericOriginal)node.title=node._xlNumericOriginalTitle||'';
       node._xlNumericOriginal=node._xlNumericSpan=null;
       const s=this.o.state;node._xlModel=cell||null;node._xlRowStyle=row?.style||0;
@@ -90,18 +123,19 @@
       node._xlRowPresentationNotice=row?.presentationNotice||'';
       if(node._xlRichNotice){node.title='';node._xlRichNotice='';}
       if(node._xlPresentationNotice){node.title='';node._xlPresentationNotice='';}
-      node._xlRichNode=null;node.classList.remove('rich-text-cell','rich-text-notice');
+      node._xlRichNode=null;if(!fresh)node.classList.remove('rich-text-cell','rich-text-notice');
       if(node._xlOverflowSpan){node._xlOverflowSpan=null;node.classList.remove('cell-overflow');node.style.removeProperty('--overflow-width');}
-      for(const name of ['formula-cell','hyperlink-cell','formula-view-cell','auto-filter-header'])node.classList.remove(name);
+      if(!fresh)node.classList.remove('formula-cell','hyperlink-cell','formula-view-cell','auto-filter-header');
       node.textContent=this.value(cell);
       if(cell){const styled=cell.style==null&&row?.style?{...cell,style:row.style}:cell;this.o.applyStyle(node,styled);
         if(cell.hasFormula)node.classList.add('formula-cell');
         if(cell.hyperlink)node.classList.add('hyperlink-cell');
         if(s.showFormulas&&cell.hasFormula)node.classList.add('formula-view-cell');
       }else if(row?.style)this.o.applyStyle(node,{style:row.style});
-      if(s.showStyles&&!(s.showFormulas&&cell?.hasFormula))window.ExcelLensRichText?.paint(node,cell,this.style(cell,row?.style)||{},
+      const base=this.style(cell,row?.style)||{};
+      if(s.showStyles&&(cell?.richText||window.ExcelLensConditional?.needsInline(cell,base))&&!(s.showFormulas&&cell?.hasFormula))window.ExcelLensRichText?.paint(node,cell,base,
         {limits:this.o.richLimits,allowed:this.allowed(cell),fontOverride:s.fontOverride,fontStack:this.o.fontStack,scale:this.o.scale()});
-      window.ExcelLensConditional?.notice(node,cell,row,s.showStyles,this.style(cell,row?.style));
+      if(!fresh||cell?.conditional||row?.presentationNotice||/Accounting$/.test(base.underlineStyle||''))window.ExcelLensConditional?.notice(node,cell,row,s.showStyles,base);
       const r=Number(node.dataset.row),c=Number(node.dataset.col),filter=s.autoFilter;
       if(filter&&r===filter.row&&c>=filter.startCol&&c<=filter.endCol){
         node.classList.add('auto-filter-header');const button=document.createElement('button');button.type='button';
@@ -109,6 +143,7 @@
         button.textContent='▾';button.title=this.o.colName(c)+' 列：筛选菜单';button.setAttribute('aria-label',button.title);button.disabled=!s.indexReady;node.appendChild(button);
       }
     }
+    measureFont(font){if(this.currentFont!==font){this.measure.font=font;this.currentFont=font;}}
     spillWidth(cell,values,layouts,position,rowStyle=0,row=0){
       const s=this.o.state;if(!isText(cell)||s.showFormulas)return 0;
       const text=value(cell,false,s.showStyles);if(!text||/[\r\n]/.test(text))return 0;
@@ -133,33 +168,41 @@
           if(Number.isFinite(needed))window.ExcelLensRichText.eachPart(rich,(part,run)=>{
             run=window.ExcelLensRichText.overlayFont(run,overlay);
             const raised=['superscript','subscript'].includes(run.vertical||style?.fontVertical),size=(run.size||style?.fontSize||8.25)*(raised ? .65 : 1);
-            this.measure.font=((run.italic??style?.italic)?'italic ':'')+((run.bold??style?.bold)?'700 ':'')+(size*4/3*this.o.scale())+'px '+this.o.fontStack(s.fontOverride||run.name||style?.fontName||'Segoe UI');
+            this.measureFont(((run.italic??style?.italic)?'italic ':'')+((run.bold??style?.bold)?'700 ':'')+(size*4/3*this.o.scale())+'px '+this.o.fontStack(s.fontOverride||run.name||style?.fontName||'Segoe UI'));
             needed+=this.measure.measureText(part).width;
           });
           this.richWidths.set(cell.richText,{font:fontKey,text,width:needed});
         }
-      }else if(needed===undefined){this.measure.font=font;needed=text.length>2048?Infinity:this.measure.measureText(prefix).width+14;this.widths.set(key,needed);if(this.widths.size>2048)this.widths.delete(this.widths.keys().next().value);}
+      }else if(needed===undefined){this.measureFont(font);needed=text.length>2048?Infinity:this.measure.measureText(prefix).width+14;this.widths.set(key,needed);if(this.widths.size>2048)this.widths.delete(this.widths.keys().next().value);}
       if(needed<=current.width-2)return 0;
       let available=current.width;
       for(let i=position+1;i<layouts.length;i++){if(occupied(values?.[layouts[i].col])||(row&&this.o.merge?.(row,layouts[i].col)))break;available+=layouts[i].width;if(available>=needed)break;}
       return available>current.width+1?Math.max(current.width,Math.min(available-6,needed)):0;
     }
+    numberMetrics(cell,rowStyle){
+      const s=this.o.state;
+      if(!cell||cell.cacheMissing||s.showFormulas&&cell.hasFormula||!((!cell.type||cell.type==='n')&&numeric.test(String(cell.raw??'').trim())||cell.type==='d'))return null;
+      const text=this.value(cell),style=this.style(cell,rowStyle)||{};
+      if(!text||style.wrap)return null;
+      if(!this.measure){const canvas=typeof document!=='undefined'?document.createElement('canvas'):null;this.measure=canvas?.getContext?.('2d');}if(!this.measure)return null;
+      const raised=['superscript','subscript'].includes(cell.conditional?.style?.font?.vertical||style.fontVertical),font=(style.italic?'italic ':'')+(style.bold?'700 ':'')+((style.fontSize||8.25)*(raised ? .65 : 1)*4/3*this.o.scale())+'px '+this.o.fontStack(s.fontOverride||style.fontName||'Segoe UI');
+      let measured=this.numberWidths.get(cell);if(!measured||measured.text!==text||measured.font!==font){const key=text.length<=256?font+'\0'+text:null;measured=key&&this.numberMeasures.get(key);if(!measured){this.measureFont(font);let hash=this.hashWidths.get(font);
+          if(hash===undefined){hash=this.measure.measureText('#').width;if(this.hashWidths.size>=128)this.hashWidths.clear();this.hashWidths.set(font,hash);}
+          measured={text,font,width:this.measure.measureText(text).width,hash};if(key){if(this.numberMeasures.size>=512)this.numberMeasures.delete(this.numberMeasures.keys().next().value);this.numberMeasures.set(key,measured);}}this.numberWidths.set(cell,measured);}
+      return measured;
+    }
     fitNumber(node,cell,width,padding){
       const restore=()=>{if(node._xlNumericSpan){node._xlNumericSpan.replaceWith(node._xlNumericOriginal);node.title=node._xlNumericOriginalTitle||'';node._xlNumericOriginal=node._xlNumericSpan=null;}return false;};
-      const s=this.o.state;
-      if(!cell||cell.cacheMissing||s.showFormulas&&cell.hasFormula||!((!cell.type||cell.type==='n')&&numeric.test(String(cell.raw??'').trim())||cell.type==='d'))return restore();
-      const text=this.value(cell),style=this.style(cell,node._xlRowStyle)||{};
-      if(!text||style.wrap)return restore();
-      if(!this.measure){const canvas=typeof document!=='undefined'?document.createElement('canvas'):null;this.measure=canvas?.getContext?.('2d');}if(!this.measure)return restore();
-      const raised=['superscript','subscript'].includes(cell.conditional?.style?.font?.vertical||style.fontVertical),font=(style.italic?'italic ':'')+(style.bold?'700 ':'')+((style.fontSize||8.25)*(raised ? .65 : 1)*4/3*this.o.scale())+'px '+this.o.fontStack(s.fontOverride||style.fontName||'Segoe UI');
-      let measured=this.numberWidths.get(cell);if(!measured||measured.text!==text||measured.font!==font){const key=text.length<=256?font+'\0'+text:null;measured=key&&this.numberMeasures.get(key);if(!measured){this.measure.font=font;measured={text,font,width:this.measure.measureText(text).width,hash:this.measure.measureText('#').width};if(key){if(this.numberMeasures.size>=512)this.numberMeasures.delete(this.numberMeasures.keys().next().value);this.numberMeasures.set(key,measured);}}this.numberWidths.set(cell,measured);}
+      const measured=this.numberMetrics(cell,node._xlRowStyle);
+      if(!measured)return restore();
+      const {text,font}=measured,s=this.o.state;
       padding=padding??(this.o.numericPadding?this.o.numericPadding(node):node.classList.contains('auto-filter-header')?32:14);const available=Math.max(0,width-padding);
       if(!(width>0)||!Number.isFinite(measured.width)||measured.width<=available+.25)return restore();
       if(!node._xlNumericSpan){const original=node._xlRichNode||[...node.childNodes].find(n=>n.nodeType===3);if(!original)return false;const span=document.createElement('span');span.className='cell-number-overflow';node._xlNumericOriginal=original;node._xlNumericOriginalTitle=node.title||'';node._xlNumericSpan=span;original.replaceWith(span);}
       let fitted='';
       if(text===String(cell.raw) && !cell.conditional?.display && !(cell.displayNumFmt??s.styles?.[cell.style]?.numFmtId)) {
         if(measured.fitWidth!==available) {
-          this.measure.font=font;
+          this.measureFont(font);
           measured.fitted=fitGeneralNumber(text, candidate=>this.measure.measureText(candidate).width<=available+.25);
           measured.fitWidth=available;
         }

@@ -1,90 +1,201 @@
-// Developer-only Chrome DevTools Protocol scroll regression harness.
-// Uses an about:blank page with mocked local APIs: browser administrator rules
-// in some CI containers block loopback and file:// navigation.
-// Node is NOT part of the Windows viewer's runtime dependencies.
-const fs=require('fs');
-const path=require('path');
-const PORT=Number(process.env.CHROME_PORT||9224);
-const ROOT=path.resolve(__dirname,'../../internal/ui/web')+path.sep;
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-(async()=>{
- const pages=await(await fetch(`http://127.0.0.1:${PORT}/json`)).json();
- const target=pages.find(p=>p.type==='page');
- if(!target) throw Error('No Chrome page target');
- const ws=new WebSocket(target.webSocketDebuggerUrl);
- await new Promise((ok,fail)=>{ws.addEventListener('open',ok,{once:true});ws.addEventListener('error',fail,{once:true});});
- let seq=1;const tasks=new Map();
- ws.addEventListener('message',evt=>{let d;try{d=JSON.parse(evt.data);}catch{return;}const p=tasks.get(d.id);if(!p)return;clearTimeout(p.timer);tasks.delete(d.id);d.error?p.reject(Error(d.error.message)):p.resolve(d.result);});
- function cdp(method,params={}){const id=seq++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{if(tasks.has(id)){tasks.delete(id);reject(Error(method+' timed out'));}},15000);tasks.set(id,{resolve,reject,timer});ws.send(JSON.stringify({id,method,params}));});}
- async function evaluate(expression){const out=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(out.exceptionDetails)throw Error(out.exceptionDetails.text+' '+JSON.stringify(out.exceptionDetails.exception));return out.result.value;}
- async function waitFor(check,limit=18000){const start=Date.now();while(Date.now()-start<limit){const v=await evaluate(check);if(v)return v;await sleep(120);}throw Error('waitFor timeout: '+check+' '+JSON.stringify(await evaluate('document.querySelector("#globalStatus")?.textContent')));}
- async function shot(name){const r=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('/tmp/'+name+'.png',Buffer.from(r.data,'base64'));}
- await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Emulation.setDeviceMetricsOverride',{width:Number(process.env.QA_WIDTH||1600),height:Number(process.env.QA_HEIGHT||900),deviceScaleFactor:1,mobile:false});
- await cdp('Page.navigate',{url:'about:blank'});
- let html=require('./project_config.cjs').index();
- const css=fs.readFileSync(ROOT+'style.css','utf8');
- html=html.replace(/<link rel="stylesheet" href="\/assets\/style.css">/,'<style>'+css+'</style>');
- html=html.replace(/<script src="\/assets\/(?:clipboard|geometry|freeze|autofilter|export|bookmarks|profile|app).js"><\/script>/g,'');
- await evaluate('document.open();document.write('+JSON.stringify(html)+');document.close();true');
- const mockScript=`(()=>{const sleep=ms=>new Promise(r=>setTimeout(r,ms));let calls=0;
- const addr=(c)=>{let v='';while(c>0){c--;v=String.fromCharCode(65+c%26)+v;c=Math.floor(c/26);}return v;};
- const styles=Array.from({length:12},(_,i)=>({background:i%5===0?'#fff0db':(i%3===0?'#e4f0fa':''),color:i%4===0?'#164c7d':'',bold:i%7===0}));
- window.__mock={get calls(){return calls;},delay:75,failNext:false};
- window.fetch=async(url,options={})=>{
-  const u=new URL(url,'http://mock.local');const name=u.pathname;calls++;
-  await sleep(name==='/api/sheet' ? window.__mock.delay+(calls%4===0?75:0) : 2);
-  if(options.signal?.aborted) throw new DOMException('The operation was aborted.','AbortError');
-  if(name==='/api/sheet' && window.__mock.failNext){window.__mock.failNext=false;return new Response(JSON.stringify({error:'test-only transient error'}),{status:503});}
-  let data={};
-  if(name==='/api/status') data={opened:true,fileName:'UI-Performance-Test.xlsm',fileSize:133337593,sheetCount:2,activeTab:0,sheets:[{name:'Dense Large Sheet',path:'sheet1.xml',state:'visible'},{name:'Extra Sheet',path:'sheet2.xml',state:'visible'}]};
-  else if(name==='/api/styles') data={styles};
-  else if(name==='/api/bookmarks') data={version:1,items:[]};
-  else if(name==='/api/view') data={rows:2,cols:1};
-  else if(name==='/api/layout') data={rows:{},cols:{}};
-  else if(name==='/api/index/start') data={ready:true,dimension:'A1:IV120000',maxRow:120000,maxCol:256,totalRows:120000};
-  else if(name==='/api/search/history') data={history:[]};
-  else if(name==='/api/filter/distinct') data={values:[{value:'Value 1:1',count:1},{value:'Value 2:1',count:1},{value:'Value 3:1',count:1}],truncated:false};
-  else if(name==='/api/sheet') {
-   const startCol=Number(u.searchParams.get('col')||1),cols=Number(u.searchParams.get('cols')||24),limit=Number(u.searchParams.get('limit')||100);
-   const start=Number(u.searchParams.get('row')||0)||Number(u.searchParams.get('offset')||0)+1;
-   const rows=[];
-   for(let n=start;n<Math.min(120001,start+limit);n++){
-    const cells=[];
-    for(let c=startCol;c<startCol+cols;c++){
-     if(c%11===0)continue;
-     const formula=(c%7===0),txt=formula?('='+addr(Math.max(1,c-1))+n+'*1.18'):('Value '+n+':'+c);
-     cells.push({ref:addr(c)+n,col:c,raw:formula?'100':'Value '+n+':'+c,display:formula?String(Math.round((n+c)*1.18)):'Value '+n+':'+c,formula:formula?txt:'',style:(n+c)%12,hasFormula:formula});
-    }
-    rows.push({number:n,cells,style:n%3===0?1:0});
-   }
-   data={sheet:'Dense Large Sheet',dimension:'A1:IV120000',offset:start-1,limit,totalRows:120000,
-    totalRowsOriginal:120000,filtered:false,filterId:'',maxRow:120000,maxCol:256,startCol,colCount:cols,rows};
+// Run against an independently built tools/uiprobe. All inputs use the real scrollport and /api/sheet.
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+const {launch}=require('./browser_harness.cjs');
+const os=require('node:os'),{execFileSync}=require('node:child_process');
+const {fixture,colors,border}=require('./scroll_fixture.cjs');
+const out=path.resolve(process.argv[2]||'artifacts/qa/scroll-render.json');
+const file=path.join(path.dirname(out),'scroll-fixture.xlsx');
+const retainedProfiles=[];
+const quantile=(list,p)=>list.slice().sort((a,b)=>a-b)[Math.max(0,Math.ceil(list.length*p)-1)];
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const settled='window.ExcelLensPerformance?.().hasVisibleCoverage && !window.ExcelLensPerformance().sheetLoading && window.scrollQA?.correct()';
+function instruments(){
+  const g=document.getElementById('grid'),id=n=>document.getElementById(n);
+  const el=ref=>document.querySelector('#rowsLayer .grid-cell[data-ref="'+ref+'"]');
+  const a=el('A1').getBoundingClientRect(),grid=g.getBoundingClientRect();
+  // The generated workbook uses constant column widths / row heights. Calibrate cumulative
+  // snapped edges over several rows and columns, independently of the viewport cache.
+  const scale=parseInt(id('zoomValue').textContent)/100;
+  const dx=Math.round((el('I1').getBoundingClientRect().left-a.left)/(8*scale))*scale;
+  const dy=Math.round((el('A17').getBoundingClientRect().top-a.top)/(16*scale))*scale;
+  const box={x:Math.ceil(a.left),y:Math.ceil(a.top),right:Math.floor(grid.left+g.clientWidth),bottom:Math.floor(grid.top+g.clientHeight)};
+  const stamp=document.createElement('canvas');stamp.width=stamp.height=8;
+  stamp.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;z-index:2147483647;pointer-events:none';
+  document.body.append(stamp);
+  const ctx=stamp.getContext('2d'),q={box,stamp,events:[],calls:0,cancels:0};
+  // The baseline calls find on foreground misses in its DOM window. New builds
+  // expose the equivalent foreground projection counters, including joined tiles.
+  if(window.ExcelLensPerformance().foregroundLookups===undefined){
+    const proto=window.ExcelLensViewport.TileCache.prototype,find=proto.find;
+    q.lookups=q.hits=0;
+    proto.find=function(...args){const hit=find.apply(this,args);q.lookups++;q.hits+=Number(!!hit);return hit;};
   }
-  return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
- };
-})()`;
- await evaluate(mockScript);
- for(const module of ['recent.js','multisort.js','selectionstats.js','inspect.js'])await evaluate(fs.readFileSync(ROOT+module,'utf8'));
- await evaluate(fs.readFileSync(ROOT+'clipboard.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'geometry.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'freeze.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'autofilter.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'export.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'bookmarks.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'profile.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'cell-address.js','utf8'));
- await evaluate(fs.readFileSync(ROOT+'formula_inspector.js','utf8'));
- for(const asset of ['viewport-cache.js','command-palette.js','app.js']) await evaluate(fs.readFileSync(ROOT+asset,'utf8'));
- console.log('loaded scripts');
- await waitFor('document.querySelector("#globalStatus")?.textContent.includes("已打开")');
- console.log('initial',await evaluate('window.ExcelLensPerformance()'));
- const measurements=[];
- for(let i=0;i<8;i++){
-  await evaluate(`document.querySelector('#grid').scrollTo({top:${(i+1)*420},left:${(i+1)*320}})`);
-  await sleep(250);
-  measurements.push(await evaluate('window.ExcelLensPerformance()'));
- }
- console.log('samples',measurements.map(m=>({ms:m.lastMs,reused:m.reusedRows,created:m.createdCells,nodes:m.visibleNodes,valid:m.hasVisibleCoverage})));
- console.log('summary',{avg:measurements.reduce((s,m)=>s+m.lastMs,0)/measurements.length,max:Math.max(...measurements.map(m=>m.lastMs))});
- ws.close();
-})().catch(err=>{console.error(err);process.exitCode=1;});
+  q.correct=()=>{
+    let complete=true;
+    for(const u of [.035,.52,.965])for(const v of [.045,.57,.96]){
+      const x=box.x+(box.right-box.x)*u,y=box.y+(box.bottom-box.y)*v;
+      const c=Math.floor((x-a.left+g.scrollLeft)/dx)+1,r=Math.floor((y-a.top+g.scrollTop)/dy)+1;
+      // Cumulative snapped edges can differ by a pixel from the calibrated slope.
+      const xf=(x-a.left+g.scrollLeft)%dx,yf=(y-a.top+g.scrollTop)%dy;
+      if(Math.min(xf,dx-xf,yf,dy-yf)<1.5)continue;
+      let node=document.elementFromPoint(x,y)?.closest('.grid-cell');
+      const mr=r%41===1?r-1:r,merged=(c===8||c===9)&&mr>0&&mr%41===0;
+      const rr=merged?mr:r,cc=merged?8:c;
+      if(!node){complete=false;continue;}
+      if(+node.dataset.row!==rr||+node.dataset.col!==cc||node.textContent!==(cc===31?rr+':'+cc:String(rr*1000+cc))){
+        throw Error('Wrong displayed coordinate or value '+JSON.stringify({rr,cc,actual:node.dataset.ref,text:node.textContent,dx,dy,x,y}));
+      }
+    }
+    return complete;
+  };
+  q.mark=(phase)=>{
+    const id=q.events.length+1;ctx.fillStyle='rgb('+(id&255)+','+(id>>8&255)+',73)';ctx.fillRect(0,0,8,8);
+    q.events.push({id,phase,x:g.scrollLeft,y:g.scrollTop});
+  };
+  window.scrollQA=q;
+}
+async function drive(){
+  const q=window.scrollQA,g=document.getElementById('grid'),raf=()=>new Promise(requestAnimationFrame);
+  const result=[];
+  // Distances per wall-clock second are fixed even on a dropped frame.
+  const phases=[['normal',700,0,740],['fastVertical',850,0,5400],['fastHorizontal',750,4600,0],['reverse',800,-3800,-4400],['jump',1,2700,19000]];
+  for(const [phase,duration,deltaX,deltaY] of phases){
+    let time=await raf(),start=time,last=time,intervals=[],covered=0,cacheReady=0,frames=0,memory=0,nodes=0,bytes=0,lastInput=0,callsAtInput=q.calls;
+    const counters=()=>{const m=window.ExcelLensPerformance();return [m.foregroundLookups??q.lookups,m.foregroundHits??q.hits];};
+    const [queries,hits]=counters();
+    const fromX=g.scrollLeft,fromY=g.scrollTop,firstCalls=q.calls,firstCancels=q.cancels;
+    do{
+      time=await raf();intervals.push(time-last);last=time;
+      if(frames){const ok=q.correct();covered+=Number(ok);cacheReady+=Number(ok&&q.calls===callsAtInput);}
+      callsAtInput=q.calls;
+      const t=Math.min(1,(time-start)/duration);
+      g.scrollTo(fromX+Math.round(deltaX*t),fromY+Math.round(deltaY*t));lastInput=performance.now();q.mark(phase);
+      frames++;
+      const perf=window.ExcelLensPerformance();nodes=Math.max(nodes,perf.visibleNodes);bytes=Math.max(bytes,perf.bufferedApproxBytes);
+      memory=Math.max(memory,performance.memory?.usedJSHeapSize||0);
+    }while(time-start<duration);
+    const deadline=lastInput+12000;
+    while(!q.correct()||!window.ExcelLensPerformance().hasVisibleCoverage){
+      if(performance.now()>deadline)throw Error('Final source coordinates/content did not settle: '+phase+' '+g.scrollLeft+','+g.scrollTop+' '+JSON.stringify({perf:window.ExcelLensPerformance(),mismatch:q.mismatch}));
+      await raf();
+    }
+    const latency=performance.now()-lastInput;
+    const [queriesEnd,hitsEnd]=counters();
+    result.push({phase,foregroundLookups:queriesEnd-queries,foregroundHits:hitsEnd-hits,frames,checked:frames-1,covered,cacheReady,intervals,settleMs:latency,heapBytes:memory,nodes,cacheBytes:bytes,
+      requests:q.calls-firstCalls,cancels:q.cancels-firstCancels,end:[g.scrollLeft,g.scrollTop]});
+    await raf();await raf();
+  }
+  return {result,events:q.events,box:q.box};
+}
+async function imageData(encoded){
+  const img=new Image();img.src='data:image/png;base64,'+encoded;await img.decode();
+  const ctx=new OffscreenCanvas(img.width,img.height).getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+  return ctx;
+}
+async function comparePixels(before,after,rect,palette){
+  const a=(await window.scrollImage(before)).getImageData(rect.x,rect.y,rect.right-rect.x,rect.bottom-rect.y).data;
+  const b=(await window.scrollImage(after)).getImageData(rect.x,rect.y,rect.right-rect.x,rect.bottom-rect.y).data;
+  const styles=new Set(palette.map(s=>parseInt(s,16))),paper=0xffffff;
+  let eligible=0,correct=0,white=0;
+  for(let i=0;i<b.length;i+=4){
+    const reference=b[i]*65536+b[i+1]*256+b[i+2];
+    if(!styles.has(reference))continue; // exact settled source fill / border pixels, excluding text and antialiasing
+    eligible++;const observed=a[i]*65536+a[i+1]*256+a[i+2];
+    if(observed===reference)correct++;
+    if(observed===paper)white++;
+  }
+  return {eligible,correct,white};
+}
+async function workingSetPeaks(h){
+  const {webSocketDebuggerUrl}=await(await fetch(h.debugEndpoint+'/json/version')).json();
+  const socket=new WebSocket(webSocketDebuggerUrl);
+  try{
+    await new Promise((ok,no)=>{socket.onopen=ok;socket.onerror=no;});
+    const pending=new Promise((ok,no)=>{const timeout=setTimeout(()=>no(Error('Chrome process inventory timed out')),5000);socket.onmessage=e=>{
+      const m=JSON.parse(e.data);if(m.id!==1)return;clearTimeout(timeout);m.error?no(Error(m.error.message)):ok(m.result.processInfo);};});
+    socket.send(JSON.stringify({id:1,method:'SystemInfo.getProcessInfo'}));
+    const ids=(await pending).filter(p=>p.type==='renderer').map(p=>p.id);
+    const all=[h.servicePID,...ids];assert.ok(ids.length&&all.every(Number.isSafeInteger));
+    let peaks;
+    if(process.platform==='win32'){
+      const cmd='Get-Process -Id '+all.join(',')+' | Select-Object Id,PeakWorkingSet64 | ConvertTo-Json -Compress';
+      peaks=new Map(JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',cmd],{windowsHide:true,encoding:'utf8'})).map(x=>[x.Id,x.PeakWorkingSet64]));
+    }else peaks=new Map(all.map(id=>[id,Number(/VmHWM:\s*(\d+)/.exec(fs.readFileSync('/proc/'+id+'/status','utf8'))[1])*1024]));
+    return {serviceBytes:peaks.get(h.servicePID),largestRendererBytes:Math.max(...ids.map(id=>peaks.get(id)))};
+  }finally{socket.close();}
+}
+async function measure(zoom,visual){
+  const errors=[],h=await launch({errors,launchFile:file}),p=h.page;
+  const frames=[];
+  try{
+    await p.call('Emulation.setDeviceMetricsOverride',{width:1120,height:780,deviceScaleFactor:1,mobile:false});
+    await p.wait('window.ExcelLensPerformance?.().hasVisibleCoverage&&!window.ExcelLensPerformance().sheetLoading');
+    if(zoom!==100){await p.run(target=>{while(parseInt(document.getElementById('zoomValue').textContent)<target)document.getElementById('zoomInBtn').click();},zoom);await p.wait("document.getElementById('zoomValue').textContent==='"+zoom+"%' && window.ExcelLensPerformance().hasVisibleCoverage");}
+    await p.run(instruments);
+    await p.wait(settled);
+    const actualZoom=await p.evaluate("document.getElementById('zoomValue').textContent");
+    await p.call('Network.enable');
+    const requests=new Set(),net={calls:0,cancels:0};
+    const onEvent=({data})=>{
+      const m=JSON.parse(data),v=m.params;
+      if(m.method==='Network.requestWillBeSent'&&new URL(v.request.url).pathname==='/api/sheet'){
+        requests.add(v.requestId);net.calls++;
+      }else if(m.method==='Network.loadingFailed'&&requests.delete(v.requestId)&&v.canceled)net.cancels++;
+      else if(m.method==='Network.loadingFinished')requests.delete(v.requestId);
+      else if(m.method==='Page.screencastFrame'){
+        frames.push(v.data);p.call('Page.screencastFrameAck',{sessionId:v.sessionId}).catch(()=>{});
+      }
+    };
+    p.socket.addEventListener('message',onEvent);
+    // This hook observes the same public transport in both builds, including changes of direction.
+    await p.evaluate(`(()=>{const real=window.fetch;window.fetch=function(url,opt){if(new URL(url,location.href).pathname==='/api/sheet'){scrollQA.calls++;opt?.signal?.addEventListener('abort',()=>scrollQA.cancels++,{once:true});}return real.apply(this,arguments);};true;})()`);
+    if(visual)await p.call('Page.startScreencast',{format:'png',everyNthFrame:1});
+    const trace=await p.run(drive);
+    if(visual)await p.call('Page.stopScreencast');
+    p.socket.removeEventListener('message',onEvent);
+    assert.deepEqual(errors,[]);
+    if(!visual)return {zoom:actualZoom,browser:(await p.call('Browser.getVersion')).product,workingSetPeak:await workingSetPeaks(h),network:net,phases:trace.result.map(({intervals,...r})=>({...r,fps:1000*intervals.length/intervals.reduce((s,x)=>s+x,0),p95:quantile(intervals,.95),p99:quantile(intervals,.99)}))};
+    await p.evaluate('window.scrollImage='+imageData.toString()+';true');
+    const byPhase=new Map();
+    for(const encoded of frames){
+      const id=await p.run(async data=>{const px=(await window.scrollImage(data)).getImageData(3,3,1,1).data;return px[2]===73?px[0]+256*px[1]:0;},encoded);
+      if(!id)continue;
+      const point=trace.events[id-1];if(!point)continue;
+      if(!byPhase.has(point.phase))byPhase.set(point.phase,new Map());
+      const group=byPhase.get(point.phase);if(!group.has(id))group.set(id,{point,encoded});
+    }
+    const pixels=[];
+    for(const {phase} of trace.result){
+      const group=[...(byPhase.get(phase)?.values()||[])];assert.ok(group.length,'No composited sample for '+phase);
+      for(const index of new Set([0,Math.floor((group.length-1)/3),Math.floor((group.length-1)*2/3),group.length-1])){
+        const {point,encoded}=group[index];
+        await p.run(({x,y})=>document.getElementById('grid').scrollTo(x,y),point);
+        await p.wait(settled);await p.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+        const ref=await p.call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        const sample=await p.run(comparePixels,encoded,ref.data,trace.box,[...colors,border]);
+        assert.ok(sample.eligible>(trace.box.right-trace.box.x)*(trace.box.bottom-trace.box.y)*.64,'Insufficient source-style reference pixels '+JSON.stringify(point));
+        pixels.push({...point,...sample});
+      }
+    }
+    return {zoom:actualZoom,rect:trace.box,pixels};
+  }finally{
+    try{await h.close();}catch(error){
+      if(process.platform!=='win32'||!['EPERM','EBUSY','ENOTEMPTY'].includes(error.code))throw error;
+      retainedProfiles.push({profile:path.basename(h.storage),code:error.code});
+    }
+  }
+}
+(async()=>{
+  fs.mkdirSync(path.dirname(out),{recursive:true});
+  const source=fixture();if(!fs.existsSync(file))fs.writeFileSync(file,source);assert.equal(hash(fs.readFileSync(file)),hash(source));
+  const report={retainedProfiles,cpu:os.cpus()[0].model,ram:os.totalmem(),size:[1120,780],sourceSHA256:hash(source),executableSHA256:hash(fs.readFileSync(process.env.QA_UIPROBE||'artifacts/qa/uiprobe.exe')),platform:process.platform,node:process.version,rounds:[]};
+  for(let i=0;i<Number(process.env.SCROLL_ROUNDS||3);i++){
+    const round={timing:[],visual:[]};report.rounds.push(round);
+    for(const zoom of [100,125])for(const visual of [false,true]){
+      const data=await measure(zoom,visual);round[visual?'visual':'timing'].push(data);
+      fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n');console.log('round',i+1,data.zoom,visual?'pixels':'timing');
+    }
+  }
+  assert.equal(hash(fs.readFileSync(file)),report.sourceSHA256);
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -20,10 +20,9 @@
   const setVirtualScrollTop = (logical) => { $('grid').scrollTop = scrollTopToPhysical(logical); };
   const BASE_COL = 132;
   const HEADER_BASE = 27;
-  // A deliberately narrow cushion: the Go fast-row reader supplies adjacent
-  // tiles quickly, without materializing dozens of invisible columns/rows.
-  const OVERSCAN_ROWS = 18;
-  const OVERSCAN_COLS = 4;
+  const motion = new window.ExcelLensVirtualScroll.Motion();
+  const DOM_MARGIN_BUDGET = 2600;
+  const PREFETCH_CELL_BUDGET = 12000;
   // Include a small band of cells on either side of the visible area so a
   // long string can originate off-screen and still spill over blank cells.
   // The bounded request remains independent of the full worksheet width.
@@ -32,7 +31,10 @@
   const MAX_COLS_PER_REQUEST = 80;
   const VIEWPORT_CACHE_BUDGET = 24 * 1024 * 1024;
   const viewport = window.ExcelLensViewport;
-  const tiles = new viewport.TileCache(VIEWPORT_CACHE_BUDGET);
+  const tiles = new viewport.TileCache(VIEWPORT_CACHE_BUDGET,32);
+  const scheduler = new window.ExcelLensViewportScheduler(readViewportTile);
+  let bytesPerCell=240, columnVisibility=null, columnVisibilityKey='';
+  let foregroundLookups=0, foregroundHits=0;
 
   const geometry = new window.ExcelLensGeometry(fileFormats.maxRows,fileFormats.maxColumns);
   const mergedCells = new window.ExcelLensMergedCells(fileFormats.maxRows,fileFormats.maxColumns);
@@ -55,13 +57,10 @@
     viewportRequest: 0,
     navigationTicket:0,
     navigationAbort:null,
-    viewportAbort: null,
-    viewportTimer: 0,
     viewportFrame: 0,
     fallbackFrame: 0,
     viewportActivity: null,
     viewportForce: false,
-    viewportPending: null,
     viewportRetryTimer: 0,
     viewportRetryAttempt: 0,
     viewportData: null,
@@ -403,7 +402,21 @@
   const STYLE_ALIGN = {left:"flex-start", center:"center", right:"flex-end", justify:"space-between", distributed:"space-around", centerContinuous:"center"};
   const STYLE_VERTICAL = {top:"flex-start", center:"center", bottom:"flex-end"};
 
-  function applyCellStyle(node, cell) {
+  // Cache the style declarations of fresh cells. Existing nodes can also be repainted
+  // by edit/print callers; preserve their geometry and other inline declarations.
+  const cellStyleCache=new Map();
+  function applyCellStyle(node,cell){
+    if(!cell||node.style.cssText||cell.conditional){writeCellStyle(node,cell);return;}
+    const numeric=cell.type==='n'||(!cell.type&&cell.raw&&Number.isFinite(Number(cell.raw)));
+    const key=[cell.style||0,S.showStyles,S.zoom,S.fontOverride,cell.valueColor||'',Boolean(numeric)].join('|');
+    let css=cellStyleCache.get(key);
+    if(css===undefined){
+      writeCellStyle(node,cell);css=node.style.cssText;
+      if(cellStyleCache.size>=512)cellStyleCache.clear();
+      cellStyleCache.set(key,css);
+    }else if(css)node.style.cssText=css;
+  }
+  function writeCellStyle(node, cell) {
     const p = node.style;
     // Recycled nodes can move from a conditional/explicit property to its
     // absence or false. Reset presentation only; keep geometry and seams.
@@ -436,15 +449,15 @@
   // Excel style may specify its *left* or *top* border: that color still wins
   // over the faint default line, without drawing a second stroke.
   const visualForBorder=(cell,row)=>S.showStyles?(window.ExcelLensConditional?.visual(cell,S.styles,row?.style)??S.styles[Number(cell?.style??row?.style)||0]??{}):{};
-  function mergedVisualBorder(own,range){
-    const at=(r,c)=>visualForBorder(S.cellMap.get(colName(c)+r)||S.frozenCellMap.get(colName(c)+r));
+  function mergedVisualBorder(own,range,models=S.cellMap){
+    const at=(r,c)=>visualForBorder(models.get(colName(c)+r)||S.frozenCellMap.get(colName(c)+r));
     const tr=at(range.row,range.endCol),bl=at(range.endRow,range.col),br=at(range.endRow,range.endCol);
     // XLS/XLSX may put the perimeter on styled covered cells rather than the
     // anchor. Read the outer corners; never turn interior edges into seams.
     return {...own,borderTop:own.borderTop||tr.borderTop,borderLeft:own.borderLeft||bl.borderLeft,borderRight:tr.borderRight||br.borderRight||own.borderRight,borderBottom:bl.borderBottom||br.borderBottom||own.borderBottom};
   }
   function updateSharedBorders(node,cell,row,rightCell,rightRow,belowCell,belowRow,edge={}){
-    const r=Number(node.dataset.row),c=Number(node.dataset.col),merge=activeMerge(r,c),anchor=merge&&merge.row===r&&merge.col===c;
+    const r=Number(node.dataset.row),c=Number(node.dataset.col),merge=edge.mergeFree?null:activeMerge(r,c),anchor=merge&&merge.row===r&&merge.col===c;
     if (merge && !anchor) return;
     const borders=window.ExcelLensGridBorders;
     if (!S.showStyles) {
@@ -454,18 +467,28 @@
       if (node._xlOuterTop) { node.style.removeProperty('border-top'); node._xlOuterTop=''; }
       return;
     }
-    const own=anchor?mergedVisualBorder(visualForBorder(cell,row),merge):visualForBorder(cell,row);
+    if(edge.mergeFree&&edge.nextCol&&belowRow&&!edge.outerTop&&!edge.outerLeft){
+      const own=visualForBorder(cell,row),right=visualForBorder(rightCell,rightRow),below=visualForBorder(belowCell,belowRow);
+      const x=borders.choose(own.borderRight,right.borderLeft)||(own.background||right.background?'0px':'');
+      const y=borders.choose(own.borderBottom,below.borderTop)||(own.background||below.background?'0px':'');
+      borders.paint(node,'right',x,rowTop,y);borders.paint(node,'bottom',y,colLeft,x);
+      if(node._xlOuterLeft){node.style.removeProperty('border-left');node._xlOuterLeft='';}
+      if(node._xlOuterTop){node.style.removeProperty('border-top');node._xlOuterTop='';}
+      return;
+    }
+    const models=edge.cellMap||S.cellMap;
+    const own=anchor?mergedVisualBorder(visualForBorder(cell,row),merge,models):visualForBorder(cell,row);
     const endRow=merge?.endRow??r,endCol=merge?.endCol??c;
     const rightCol=anchor ? (edge.columns?.find(col=>col>endCol) ?? endCol+1) : (edge.nextCol||c+1);
     const under=!anchor&&belowRow ? belowRow.number : (nextVisibleRow(endRow+1)||endRow+1);
     const opposite=(nr,nc,data,direct)=>{
-      const range=activeMerge(nr,nc);
+      const range=edge.mergeFree?null:activeMerge(nr,nc);
       if (!range && direct!==undefined) return visualForBorder(direct,data);
       const row=range?.row??nr,col=range?.col??nc,ref=colName(col)+row;
       const record=data?.number===row ? data : edge.rows?.get(row);
-      const model=(row===nr&&col===nc?direct:null)||S.cellMap.get(ref)||S.frozenCellMap.get(ref)||record?.cells?.find(cell=>cell.col===col);
+      const model=(row===nr&&col===nc?direct:null)||models.get(ref)||S.frozenCellMap.get(ref)||record?.cells?.find(cell=>cell.col===col);
       const visual=visualForBorder(model,record);
-      return range?mergedVisualBorder(visual,range):visual;
+      return range?mergedVisualBorder(visual,range,models):visual;
     };
     // Always paint an interior seam on the trailing edge of its predecessor.
     // Painting inside the next merge's leading edge shifts it a device pixel.
@@ -479,8 +502,8 @@
     const bottomAt=cc=>seam(own.borderBottom,opposite(under,cc,
       belowRow,cc===c?directBelow:undefined),'borderTop');
     const fallback=own.background?'0px':'';
-    const right=endRow===r?rightAt(r):borders.runs(r,endRow,edge.lastRow??endRow,nextVisibleRow,rightAt,own.borderRight||fallback);
-    const bottom=endCol===c?bottomAt(c):borders.runs(c,endCol,edge.columns?.at(-1)??endCol,i=>i,bottomAt,own.borderBottom||fallback);
+    const right=endRow===r?rightAt(r):borders.runs(r,endRow,edge.lastRow??endRow,nextVisibleRow,rightAt,own.borderRight||fallback,edge.firstRow);
+    const bottom=endCol===c?bottomAt(c):borders.runs(c,endCol,edge.columns?.at(-1)??endCol,i=>i,bottomAt,own.borderBottom||fallback,edge.columns?.[0]);
     const left=edge.outerLeft&&colLeft(c)===0?own.borderLeft||'':'';
     const top=edge.outerTop?own.borderTop||'':'';
     borders.paint(node,'right',right,rowTop,top||bottom);
@@ -1270,121 +1293,250 @@
   // Data fetching and DOM painting deliberately use separate generations. A
   // request for a scrolled-away tile must never replace the tile under the
   // user's CURRENT viewport (including after scrolling back while it is pending).
-  function getViewportRequest() {
-    const grid=$('grid');
-    const hh=headerHeight();
-    const pinned=frozenPanes?.effective()||{rows:0,cols:0};
+  function columnOrder(){
+    if(!S.hiddenColumns.size)return null;
+    const key=geometry.cols.version+'|'+S.maxCol;
+    if(columnVisibilityKey!==key){
+      const ranges=[];
+      for(const col of [...S.hiddenColumns].filter(c=>c<=S.maxCol).sort((a,b)=>a-b)){
+        const last=ranges.at(-1);
+        if(last?.max===col-1)last.max=col;else ranges.push({min:col,max:col});
+      }
+      columnVisibility=new window.ExcelLensRowVisibility(S.maxCol,ranges);columnVisibilityKey=key;
+    }
+    return columnVisibility;
+  }
+  function viewportContext(){
+    return JSON.stringify([S.book,S.workbookKey,S.sheet,editCopy?.grid.active?editCopy.data?.document?.revision??0:null]);
+  }
+  // Ranks count visible rows/columns; HTTP receives source coordinates or sorted offsets.
+  function viewportBand(base,r1,r2,c1,c2){
+    const {rowOrder,colOrder,rowCount,colCount}=base;
+    r1=Math.max(1,Math.min(rowCount||1,r1));r2=Math.max(r1,Math.min(rowCount||1,r2));
+    c1=Math.max(1,Math.min(colCount||1,c1));c2=Math.max(c1,Math.min(colCount||1,c2));
+    const displayStart=rowOrder?.at(r1-1)||r1,displayEnd=rowCount?(rowOrder?.at(r2-1)||r2):displayStart-1;
+    const selectedCols=colOrder?Array.from({length:c2-c1+1},(_,i)=>colOrder.at(c1+i-1)||1):null;
+    return {...base,r1,r2,c1,c2,displayStart,displayEnd,row:displayStart,offset:r1-1,limit:r2-r1+1,
+      startCol:selectedCols?.[0]||c1,cols:c2-c1+1,selectedCols};
+  }
+  function getViewportRequest(){
+    const grid=$('grid'),pinned=frozenPanes?.effective()||{rows:0,cols:0};
+    const w=Math.max(1,grid.clientWidth-ROW_HEAD),h=Math.max(1,grid.clientHeight-headerHeight());
+    const top=getVirtualScrollTop(),left=grid.scrollLeft,ph=sourceRowTop(pinned.rows+1),pw=colLeft(pinned.cols+1);
     if(S.filtered)S.filterTotal=filteredBodyCount();
-    const visibleRow=S.filtered?Math.max(1,rowAtOffset(getVirtualScrollTop())+pinned.rows):Math.max(1,nextVisibleRow(rowAtOffset(getVirtualScrollTop()+sourceRowTop(pinned.rows+1))));
-    const visibleStart=S.filtered?rowAtOffset(getVirtualScrollTop()):visibleRow;
-    const visibleEnd=S.filtered?Math.min(S.filterTotal,rowAtOffset(getVirtualScrollTop()+Math.max(1,grid.clientHeight-hh))+pinned.rows+2):Math.min(S.maxRow,advanceVisibleRow(rowAtOffset(getVirtualScrollTop()+Math.max(1,grid.clientHeight-hh)),2)||previousVisibleRow(S.maxRow));
-    let visibleColStart=Math.max(1,colAtOffset(grid.scrollLeft)+pinned.cols);
-    let visibleColEnd=Math.min(S.maxCol,
-      colAtOffset(grid.scrollLeft+Math.max(1,grid.clientWidth-ROW_HEAD))+pinned.cols+2);
-    let selectedCols=null;
-    if(S.hiddenColumns.size){
-      visibleColStart=nextVisibleColumn(visibleColStart);
-      visibleColEnd=previousVisibleColumn(visibleColEnd);
-      if(visibleColEnd<visibleColStart || S.hiddenColumns.has(visibleColStart)){
-        // An all-hidden sheet still has row headers; one dummy column keeps the
-        // API shape valid without accidentally drawing a hidden column.
-        visibleColStart=1;visibleColEnd=0;selectedCols=[1];
-      }else{
-        let first=visibleColStart;
-        for(let n=0;n<TEXT_SPILL_LOOKAHEAD;n++){
-          const previous=previousVisibleColumn(first-1);
-          if(!previous)break;
-          first=previous;
+    const rowOrder=S.filtered?null:S.rowVisibility,colOrder=columnOrder();
+    const rowCount=S.filtered?S.filterTotal:visibleSourceCount(1,S.maxRow),colCount=colOrder?colOrder.length:S.maxCol;
+    const rowRank=px=>{const row=rowAtOffset(px);return Math.min(rowCount||1,rowOrder?rowOrder.before(row)+1:row);};
+    const colRank=px=>{const col=colAtOffset(px);return Math.min(colCount||1,colOrder?colOrder.before(col)+1:col);};
+    const y0=top+(S.filtered?0:ph),y1=top+h-(S.filtered?ph:0),x0=left+pw,x1=left+w;
+    const v1=rowRank(y0),v2=Math.max(v1,rowRank(y1-0.01)),u1=colRank(x0),u2=Math.max(u1,colRank(x1-0.01));
+    const visibleStart=rowOrder?.at(v1-1)||v1,visibleEnd=rowCount?(rowOrder?.at(v2-1)||v2):0;
+    const visibleColStart=colOrder?.at(u1-1)||u1,visibleColEnd=colCount?(colOrder?.at(u2-1)||u2):0;
+    const position={x:left,y:top,physical:grid.scrollTop,w:w+ROW_HEAD,h:h+headerHeight(),pinned,ph,pw};
+    const base={position,book:S.book,workbookKey:S.workbookKey,sheet:S.sheet,context:viewportContext(),filtered:S.filtered,filterId:S.filtered?S.filterId:'',viewId:S.rowView?.id||'',
+      excludeThroughRow:S.filtered?pinned.rows:undefined,rowOrder,colOrder,rowCount,colCount,visibleStart,visibleEnd,visibleColStart,visibleColEnd};
+    // Mount a small aligned band. Include the off-screen text origin on the left.
+    // Spend optional margins only after the real viewport and its spill dependencies fit.
+    const rowStep=Math.max(1,Math.min(4,Math.floor((DOM_MARGIN_BUDGET/(u2-u1+TEXT_SPILL_LOOKAHEAD+6)-(v2-v1+1))/3)));
+    const r1=Math.floor((v1-1)/rowStep)*rowStep+1-rowStep,r2=Math.ceil(v2/rowStep)*rowStep+rowStep;
+    const now=performance.now(),lead=motion.predict(w,h,now);
+    // Start staging while the leading edge still has real, interactive DOM.
+    // A thumb jump gives its destination priority over the transient velocity.
+    const moving=motion.time!==null&&now-motion.time<280&&Math.abs(motion.dx)<w*1.5&&Math.abs(motion.dy)<h*1.5;
+    const vx=moving?motion.vx:0,vy=moving?motion.vy:0,renderHorizon=Math.max(48,Math.min(220,motion.renderMs+36));
+    const colLead=Math.min(w*.4,Math.abs(vx)*Math.min(72,renderHorizon));
+    const mountRank=Math.max(1,Math.min(Math.floor((u1-1)/4)*4-1,colRank(x0-(vx<0?colLead:0))));
+    const mountEnd=Math.max(Math.ceil(u2/4)*4+3,colRank(x1+(vx>0?colLead:0)));
+    const cellRoom=Math.max(0,Math.floor(DOM_MARGIN_BUDGET/(mountEnd-mountRank+1))-(r2-r1+1));
+    const rowLead=Math.min(h*.55,Math.abs(vy)*Math.min(72,renderHorizon));
+    const mountR1=Math.min(r1,Math.max(r1-cellRoom,rowRank(y0-(vy<0?rowLead:0))));
+    const mountR2=Math.max(r2,Math.min(r2+cellRoom,rowRank(y1+(vy>0?rowLead:0))));
+    const req=viewportBand(base,mountR1,mountR2,mountRank-TEXT_SPILL_LOOKAHEAD,mountEnd);
+    req.mountColStart=colOrder?.at(mountRank-1)||mountRank;
+    req.visibleRanks=[v1,v2,u1,u2];
+    const aheadR=vy>0?v2+.6*(req.r2-v2):v1-.6*(v1-req.r1);
+    const aheadC=vx>0?u2+.6*(req.c2-u2):u1-.6*(u1-mountRank);
+    const headRow=Math.max(1,Math.round(aheadR)),headCol=Math.max(1,Math.round(aheadC));
+    req.leadRow=rowOrder?.at(headRow-1)||headRow;req.leadCol=colOrder?.at(headCol-1)||headCol;
+    req.prediction=[rowRank(y0-lead.y[0]),rowRank(y1+lead.y[1]),colRank(x0-lead.x[0]),colRank(x1+lead.x[1])];
+    req.tileRows=Math.min(96,Math.max(32,Math.ceil(h/Math.max(10,rowHeight())/16)*32));
+    req.tileCols=Math.min(48,Math.max(16,Math.ceil(w/Math.max(16,colWidth())/12)*16));
+    while(req.tileRows*req.tileCols*bytesPerCell>VIEWPORT_CACHE_BUDGET/8&&req.tileRows>4)req.tileRows=Math.ceil(req.tileRows/2);
+    return req;
+  }
+  const {viewportCoversVisible,sameViewportRows}=viewport;
+  const estimateViewportBytes=viewport.estimateViewportBytes;
+  const viewportKey=request=>viewport.viewportKey(S.sheetEpoch,request);
+  const windowContains=request=>viewportCoversVisible(S.window,request);
+  // Keep a long merge's off-screen anchor and perimeter as sparse points. Never
+  // enlarge the mounted rectangle to encompass the entire merged range.
+  function mergeParts(req){
+    if(req.mergeParts)return req.mergeParts;
+    const groups=new Map(),anchors=new Map(),right=req.selectedCols?.at(-1)??req.startCol+req.cols-1;
+    if(!req.filtered&&mergedCells.root){
+      for(const m of mergedCells.intersect(req.displayStart,req.displayEnd,req.mountColStart,right)){
+        if(!activeMerge(m.row,m.col)||S.hiddenColumns.has(m.col))continue;
+        if(m.row<req.displayStart||m.col<req.startCol){
+          if(!anchors.has(m.row))anchors.set(m.row,[]);
+          anchors.get(m.row).push(m.col);
         }
-        selectedCols=[];
-        let after=0;
-        for(let col=first;col<=S.maxCol&&selectedCols.length<MAX_COLS_PER_REQUEST;col++){
-          if(S.hiddenColumns.has(col))continue;
-          selectedCols.push(col);
-          if(col>visibleColEnd && ++after>=TEXT_SPILL_LOOKAHEAD)break;
+        for(const r of [m.row,m.endRow])for(const c of [m.col,m.endCol]){
+          if(!rowVisible(r)||S.hiddenColumns.has(c)||r>=req.displayStart&&r<=req.displayEnd&&c>=req.startCol&&c<=right)continue;
+          if(!groups.has(r))groups.set(r,new Set());
+          groups.get(r).add(c);
         }
       }
     }
-    const visibleRows=Math.max(1,S.filtered?visibleEnd-visibleStart+1:visibleSourceCount(visibleStart,visibleEnd));
-    const visibleCols=Math.max(1,visibleColEnd-visibleColStart+1);
-    const limit=Math.max(1,Math.min(MAX_ROWS_PER_REQUEST,visibleRows+OVERSCAN_ROWS*2));
-    const startCol=selectedCols?selectedCols[0]:Math.max(1,
-      Math.floor((visibleColStart-TEXT_SPILL_LOOKAHEAD-1)/2)*2+1);
-    const cols=selectedCols?selectedCols.length:Math.max(1,Math.min(MAX_COLS_PER_REQUEST,
-      visibleCols+TEXT_SPILL_LOOKAHEAD*2,S.maxCol-startCol+1));
-    const shared={limit,cols,startCol,selectedCols,visibleStart,visibleEnd,visibleColStart,visibleColEnd,viewId:S.rowView?.id||''};
-    if(S.filtered){
-      const offset=Math.max(0,visibleStart-1-OVERSCAN_ROWS);
-      const alignedOffset=Math.floor(offset/4)*4;
-      return {...shared,filtered:true,filterId:S.filterId,excludeThroughRow:pinned.rows,offset:alignedOffset,
-        displayStart:alignedOffset+1,displayEnd:Math.min(S.filterTotal,alignedOffset+limit)};
+    const parts=[];
+    for(const [row,set] of groups){
+      const columns=[...set].sort((a,b)=>a-b);
+      for(let i=0;i<columns.length;i+=MAX_COLS_PER_REQUEST){
+        const selectedCols=columns.slice(i,i+MAX_COLS_PER_REQUEST);
+        parts.push({...req,displayStart:row,displayEnd:row,row,limit:1,startCol:selectedCols[0],cols:selectedCols.length,selectedCols});
+      }
     }
-    const startRow=S.rowVisibility?(advanceVisibleRow(visibleRow,-OVERSCAN_ROWS)||nextVisibleRow(1)||1):Math.max(1,Math.floor((visibleRow-OVERSCAN_ROWS-1)/4)*4+1);
-    return {...shared,filtered:false,filterId:'',row:startRow,
-      displayStart:startRow,displayEnd:Math.min(S.maxRow,S.rowVisibility?(advanceVisibleRow(startRow,limit-1)||previousVisibleRow(S.maxRow)):startRow+limit-1)};
+    req.mergeParts={anchors,parts};return req.mergeParts;
+  }
+  function projectViewport(request,received){
+    const visuals=Array.from({length:request.rowCount?request.limit:0},(_,i)=>request.rowOrder?.at(request.r1+i-1)||request.r1+i);
+    const entry=tiles.project(request,visuals,received);
+    if(!entry)return null;
+    entry.bounds.startCol=Math.max(entry.bounds.startCol,request.mountColStart);
+    const {parts,anchors}=mergeParts(request);
+    if(parts.length){
+      const lookup=tiles.reader(request,received),rows=new Map(entry.data.rows.map(r=>[r.number,r]));
+      for(const part of parts)for(const col of part.selectedCols){
+        const sampled=lookup(part.row,col);
+        if(!sampled)return null;
+        let row=rows.get(part.row);
+        if(!row){row={...sampled.row,number:part.row,cells:[]};rows.set(part.row,row);}
+        if(sampled.cell)row.cells.push(sampled.cell);
+      }
+      entry.data.rows=[...rows.values()];entry.data.anchors=anchors;
+    }
+    return entry;
   }
 
-  const {viewportCoversVisible, sameViewportRows} = viewport;
-  const estimateViewportBytes = viewport.estimateViewportBytes;
-  const viewportKey = request => viewport.viewportKey(S.sheetEpoch,request);
-  const windowContains = request => viewport.viewportCoversRequest(S.window,request);
-  const viewportHasHeadroom = (bounds,request) => viewport.viewportHasHeadroom(
-    bounds,request,request.filtered ? S.filterTotal : S.maxRow,S.maxCol);
-  const cachedViewport = request => tiles.find(viewportKey(request),request);
-
-  // The fallback is rendered in a single viewport-sized Canvas, never a
-  // millions-of-cells DOM. It shows gridlines/row labels only where the
-  // real data window has not arrived. Existing cells are not covered.
-  function paintViewportFallback(request) {
-    const canvas=$("viewportFallback");
-    if(!canvas)return;
-    if(!request){
-      cancelAnimationFrame(S.fallbackFrame);S.fallbackFrame=0;
-      S.viewportActivity?.end();S.viewportActivity=null;
-      canvas.hidden=true;return;
+  function planViewport(request,needCurrent){
+    const {tileRows,tileCols,prediction:[pr1,pr2,pc1,pc2]}=request;
+    const current=[],predicted=[],resident=[];
+    const first=(rank,step)=>Math.floor((Math.max(1,rank)-1)/step)*step+1;
+    const currentMinR=first(request.r1,tileRows),currentMinC=first(request.c1,tileCols);
+    const available=(r,c)=>r>=currentMinR&&r<=request.r2&&c>=currentMinC&&c<=request.c2;
+    const add=(list,r,c)=>{
+      const band=viewportBand(request,r,r+tileRows-1,c,c+tileCols-1),key=viewportKey(band);
+      const hit=tiles.find(key,band);
+      if(hit){if(list===current)resident.push(hit);}else list.push({key,request:band,sheet:S.sheet,epoch:S.sheetEpoch});
+    };
+    if(needCurrent){
+      for(const band of mergeParts(request).parts){
+        const key=viewportKey(band),hit=tiles.find(key,band);
+        if(hit)resident.push(hit);else current.push({key,request:band,sheet:S.sheet,epoch:S.sheetEpoch});
+      }
+      for(let r=currentMinR;r<=request.r2;r+=tileRows)for(let c=currentMinC;c<=request.c2;c+=tileCols)add(current,r,c);
     }
-    // Fill genuinely missing tiles with a restrained grid in the very next
-    // animation frame. Waiting for the HTTP response caused a full white
-    // rectangle on fast scroll / thumb dragging. Suppress only the *spinner*
-    // for short requests; placeholders must never contain guessed cell values.
-    S.viewportActivity ||= window.ExcelLensActivity?.begin('正在读取可见区域');
-    if(S.fallbackFrame)return;
-    S.fallbackFrame=requestAnimationFrame(()=>{
-      S.fallbackFrame=0;
-      if(!S.indexReady || !S.sheet){canvas.hidden=true;return;}
-      const req=getViewportRequest();
-      const bounds=sameViewportRows(S.window,req)?S.window:null;
-      if(viewportCoversVisible(bounds,req)){canvas.hidden=true;return;}
-      const grid=$("grid"),hh=headerHeight();
-      const w=Math.max(1,grid.clientWidth),h=Math.max(1,grid.clientHeight);
-      const scale=Math.min(2,window.devicePixelRatio||1);
-      const pw=Math.round(w*scale),ph=Math.round(h*scale);
-      if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}
-      canvas.style.width=w+"px";canvas.style.height=h+"px";
-      canvas.hidden=false;
-      const ctx=canvas.getContext("2d",{alpha:true});
-      if(!ctx)return;
-      ctx.setTransform(scale,0,0,scale,0,0);
-      ctx.clearRect(0,0,w,h);
-      const pinned=frozenPanes.effective();
-      const top=Math.max(hh+sourceRowTop(pinned.rows+1),hh);
-      const left=Math.max(ROW_HEAD+colLeft(pinned.cols+1),ROW_HEAD);
-      const minVisual=Math.max(1,rowAtOffset(getVirtualScrollTop()));
-      const maxVisual=Math.min(S.filtered?S.filterTotal:S.maxRow,rowAtOffset(getVirtualScrollTop()+h)+4);
-      const colsToPaint=req.selectedCols||Array.from({length:Math.min(85,S.maxCol)},(_,i)=>i+Math.max(1,colAtOffset(grid.scrollLeft)));
-      const bufferedColumns=bounds?.columns?(bounds.columnSet||(bounds.columnSet=new Set(bounds.columns))):null;
-
-      window.ExcelLensGridBackdrop.paintMissing({ctx,bounds,pinned,top,left,minVisual,maxVisual,colsToPaint,bufferedColumns,
-        grid,w,h,hh,rowHead:ROW_HEAD,state:S,scrollTop:getVirtualScrollTop(),sourceRowTop,colWidth,colLeft,rowHeight,rowTop,nextVisibleRow,rowVisible});
-    });
+    if(!needCurrent&&motion.time!==null){
+      for(let r=currentMinR;r<=request.r2;r+=tileRows)for(let c=currentMinC;c<=request.c2;c+=tileCols)add(predicted,r,c);
+    }
+    const cap=Math.min(PREFETCH_CELL_BUDGET,Math.floor(VIEWPORT_CACHE_BUDGET/4/bytesPerCell));
+    const candidates=[];
+    for(let r=first(pr1,tileRows);r<=pr2;r+=tileRows)for(let c=first(pc1,tileCols);c<=pc2;c+=tileCols){
+      if(!available(r,c))candidates.push({r,c,d:Math.abs(r-(motion.vy<0?request.r1:request.r2))/tileRows+Math.abs(c-(motion.vx<0?request.c1:request.c2))/tileCols});
+    }
+    candidates.sort((a,b)=>a.d-b.d);
+    const allowance=Math.max(0,Math.floor(cap/(tileRows*tileCols))-predicted.length);
+    for(const {r,c} of candidates.slice(0,allowance))add(predicted,r,c);
+    return scheduler.plan(current,predicted.slice(0,Math.floor(cap/(tileRows*tileCols)))).then(results=>resident.concat(results.filter(Boolean)));
   }
 
-  function updateViewportLoading() {
-    const request = S.indexReady && S.sheet ? getViewportRequest() : null;
-    const missing = request && !viewportCoversVisible(S.window,request);
-    paintViewportFallback(missing ? request : null);
-    // Keep the existing data DOM visible until new data is ready. It may still
-    // overlap the moving viewport, which prevents white flashes on rapid scroll.
+  let fallbackPalette=null;
+  function canvasTheme(){
+    const root=document.documentElement,key=root.getAttribute('data-reading-preset')||'';
+    if(fallbackPalette?.key===key)return fallbackPalette;
+    const css=getComputedStyle(root),color=name=>css.getPropertyValue(name).trim();
+    const paper=color('--grid-paper'),surface=color('--grid-head');
+    return fallbackPalette={key,paper,surface,neutral:'color-mix(in srgb, '+paper+' 50%, '+surface+')',
+      line:color('--grid-line-color'),muted:color('--grid-head-ink'),tableHead:color('--grid-accent-soft'),band:color('--grid-band'),dark:root.getAttribute('data-reading-tone')==='dark'};
+  }
+  // Each bitmap belongs to a fixed rectangle of logical worksheet pixels.
+  // Reversing can reuse both its native-pixel image and the interactive DOM.
+  const styleTiles=new Map();
+  let styleIdentity='';
+  function paintViewportFallback(req){
+    const host=$('viewportFallback');
+    if(!req){
+      cancelAnimationFrame(S.fallbackFrame);S.fallbackFrame=0;styleTiles.clear();styleIdentity='';
+      S.viewportActivity?.end();S.viewportActivity=null;host.replaceChildren();host.hidden=true;return;
+    }
+    if(viewportCoversVisible(S.window,req)){S.viewportActivity?.end();S.viewportActivity=null;}
+    else S.viewportActivity||=window.ExcelLensActivity?.begin('正在读取可见区域',{slot:'viewportActivitySlot'});
+    const {x,y,w:vw,h:vh,physical,pinned,ph,pw}=req.position;
+    if(!vw||!vh)return;
+    const theme=canvasTheme(),hh=headerHeight();
+    const cap=4*1024*1024,ratio=Math.min(2,window.devicePixelRatio||1,Math.sqrt(cap*.48/(vw*vh)));
+    const pixelW=Math.max(1,Math.ceil(vw*ratio/3)),pixelH=Math.max(1,Math.ceil(vh*ratio/3));
+    const tw=pixelW/ratio,th=pixelH/ratio,slots=Math.max(1,Math.min(48,Math.floor(cap/(pixelW*pixelH))));
+    const identity=[req.context,req.filterId,req.viewId,req.excludeThroughRow,S.zoom,geometry.version,S.showStyles,S.sourceGridLines,
+      S.textHeaderRevision,theme.key,ROW_HEAD,pw,ph,ratio,pixelW,pixelH].join('|');
+    if(styleIdentity!==identity){styleTiles.clear();host.replaceChildren();styleIdentity=identity;}
+    const lead=motion.predict(vw,vh,performance.now());
+    const firstX=Math.floor(x/tw),firstY=Math.floor(y/th),endX=Math.floor((x+vw-.01)/tw),endY=Math.floor((y+vh-.01)/th);
+    const fromX=Math.max(0,Math.floor((x-Math.min(vw*1.5,lead.x[0]))/tw)),toX=Math.floor((x+vw+Math.min(vw*1.5,lead.x[1]))/tw);
+    const fromY=Math.max(0,Math.floor((y-Math.min(vh*2,lead.y[0]))/th)),toY=Math.floor((y+vh+Math.min(vh*2,lead.y[1]))/th);
+    const desired=[];
+    for(let ty=fromY;ty<=toY;ty++)for(let tx=fromX;tx<=toX;tx++){
+      const dx=Math.max(firstX-tx,0,tx-endX),dy=Math.max(firstY-ty,0,ty-endY);
+      const behindX=motion.vx>0?tx<firstX:motion.vx<0&&tx>endX,behindY=motion.vy>0?ty<firstY:motion.vy<0&&ty>endY;
+      desired.push({tx,ty,key:tx+','+ty,visible:!dx&&!dy,d:dx*dx+dy*dy+(behindX?dx:0)+(behindY?dy:0)});
+    }
+    desired.sort((a,b)=>a.d-b.d);desired.length=Math.min(slots,desired.length);
+    const wanted=new Set(desired.map(t=>t.key)),spares=[];
+    for(const [key,tile] of styleTiles){
+      if(!wanted.has(key)){styleTiles.delete(key);tile.canvas.remove();spares.push(tile.canvas);}
+      else if(virtualScroll.scale!==1)tile.canvas.style.top=virtualScroll.rowPosition(tile.y,physical)+'px';
+    }
+    const started=performance.now(),lookup=tiles.reader(req),offset=S.filtered?ph:0;
+    const styleFor=({cell,row},c,r)=>{
+      const data=editCopy?.grid.active&&row?editCopy.grid.project(S.sheet,colName(c)+row.number,cell):cell;
+      if(!theme.dark&&row&&window.ExcelLensTableHeaders.isTable(S.autoFilter)){
+        if(row.number===S.autoFilter.row)return {background:theme.tableHead};
+        if(row.number>S.autoFilter.row&&(r-S.autoFilter.row)%2===0)return {background:theme.band};
+      }
+      return visualForBorder(data,row);
+    };
+    let deferred=false;
+    for(const {key,tx,ty,visible} of desired){
+      const old=styleTiles.get(key);
+      if(old&&!old.dirty)continue;
+      if(!visible&&performance.now()-started>=6){deferred=true;break;}
+      const left=tx*tw,top=ty*th,canvas=old?.canvas||spares.pop()||document.createElement('canvas');
+      if(canvas.width!==pixelW)canvas.width=pixelW;
+      if(canvas.height!==pixelH)canvas.height=pixelH;
+      const ctx=canvas.getContext('2d',{alpha:true});
+      if(!ctx)continue;
+      ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,tw,th);
+      if(!old){
+        canvas.className='viewport-fallback';canvas.style.width=tw+'px';canvas.style.height=th+'px';
+        canvas.style.left=left+'px';canvas.style.top=virtualScroll.rowPosition(top,physical)+'px';
+      }
+      const minVisual=rowAtOffset(Math.max(0,top-hh-offset)),maxVisual=Math.min(S.filtered?S.filterTotal:S.maxRow,rowAtOffset(top+th-hh-offset));
+      const firstCol=Math.max(1,colAtOffset(Math.max(0,left-ROW_HEAD))),lastCol=Math.min(S.maxCol,colAtOffset(left+tw-ROW_HEAD));
+      const colsToPaint=[];
+      for(let c=req.colOrder?.next(firstCol)??firstCol;c&&c<=lastCol;c=req.colOrder?req.colOrder.next(c+1):c+1)colsToPaint.push(c);
+      window.ExcelLensGridBackdrop.paintMissing({ctx,pinned,top:Math.max(0,hh+ph-top),left:Math.max(0,ROW_HEAD+pw-left),
+        minVisual,maxVisual,colsToPaint,scrollLeft:left,w:tw,h:th,hh,rowHead:ROW_HEAD,state:S,scrollTop:top,
+        sourceRowTop,colWidth,colLeft,rowHeight,rowTop,nextVisibleRow,rowVisible,lookup,mergeAt:activeMerge,theme,styleFor});
+      if(!old)host.append(canvas);
+      styleTiles.set(key,{canvas,y:top,minVisual,maxVisual,firstCol,lastCol,dirty:false});
+    }
+    host.hidden=false;
+    if(deferred)scheduleStylePaint();
+  }
+  function updateViewportLoading(){
+    paintViewportFallback(S.indexReady&&S.sheet?(lastViewportDemand||getViewportRequest()):null);
+  }
+  function scheduleStylePaint(){
+    if(!S.fallbackFrame)S.fallbackFrame=requestAnimationFrame(()=>{S.fallbackFrame=0;updateViewportLoading();});
   }
 
   function invalidateViewport({preserveDOM=false}={}) {
@@ -1394,13 +1546,11 @@
     S.viewportFrame = 0;
     paintViewportFallback(null);
     S.viewportForce = false;
-    clearTimeout(S.viewportTimer);
-    S.viewportPending?.controller.abort();
+    cancelGridWork();rowPool.clear();poolCells=0;cellStyleCache.clear();finishedCells.clear();
+    scheduler.reset();motion.reset();columnVisibilityKey='';lastViewportDemand=null;
     clearTimeout(S.viewportRetryTimer);
     S.viewportRetryTimer = 0;
     S.viewportRetryAttempt = 0;
-    S.viewportPending = null;
-    S.viewportAbort = null;
     ++S.viewportRequest;
     S.viewportData = null;
     tiles.clear();
@@ -1408,28 +1558,115 @@
     if(!preserveDOM)resetGridDOM();
   }
 
-  function applyViewport(entry) {
-    clearTimeout(S.viewportRetryTimer);
-    S.viewportRetryTimer = 0;
-    S.viewportRetryAttempt = 0;
-    S.window = entry.bounds;
-    S.viewportData = entry;
-    if (entry.request.filtered) S.filterTotal = entry.data.totalRows;
-    renderGrid(entry.data,entry.request);
-    if(entry.request.filtered)syncFilteredSelection(entry.request.excludeThroughRow);
-    frozenPanes.schedule();
-    // New/reused main cells are already decorated by renderGrid. A second
-    // document-wide query here would add avoidable work to every scroll.
-    updateViewportLoading();
+  function publishViewport(entry){
+    S.window=entry.bounds;S.viewportData=entry;
+    clearTimeout(S.viewportRetryTimer);S.viewportRetryTimer=0;S.viewportRetryAttempt=0;
+    if(entry.request.filtered){S.filterTotal=entry.data.totalRows;syncFilteredSelection(entry.request.excludeThroughRow);}
+    if(S.freeze.rows||S.freeze.cols||frozenPanes.base)frozenPanes.schedule();
+    scheduleStylePaint();
+  }
+  let gridWork=null,lastViewportDemand=null;
+  function cancelGridWork(){
+    if(!gridWork)return;
+    cancelAnimationFrame(gridWork.frame);gridWork.resolve();gridWork=null;
+  }
+  function applyViewport(entry,sliced,urgent=false){
+    cancelGridWork();
+    if(!sliced||editCopy?.grid.active){
+      renderGrid(entry.data,entry.request);publishViewport(entry);return;
+    }
+    // Keep the committed coordinate maps and DOM live while staging new cells.
+    // A new sheet, revision, explicit navigation or disjoint jump supersedes this job.
+    if(urgent){
+      // Drop only coordinates outside both the current view and its spill/merge
+      // dependencies before publishing strips. A superseded job cannot accumulate
+      // offscreen nodes or hold the old coverage window beyond the retained rows.
+      const demand=entry.request;
+      const keep=viewportBand(demand,demand.r1-6,demand.r2+6,demand.c1-4,demand.c2+4);
+      const {displayStart,displayEnd,startCol}=keep,endCol=keep.selectedCols?.at(-1)??startCol+keep.cols-1;
+      for(const [v,row] of S.renderedRows){
+        const anchors=entry.data.anchors?.get(v);
+        if((v<displayStart||v>displayEnd)&&!anchors){
+          retireRow(row);S.renderedRows.delete(v);S.rowNumberByVisual.delete(v);
+          for(const node of row._xlCells.values())S.cellMap.delete(node.dataset.ref);
+          continue;
+        }
+        for(const [col,node] of row._xlCells){
+          if(col>=startCol&&col<=endCol||anchors?.includes(col))continue;
+          node.remove();row._xlCells.delete(col);S.cellMap.delete(node.dataset.ref);
+        }
+      }
+      if(S.window)S.window={...S.window,displayStart:Math.max(displayStart,S.window.displayStart),
+        displayEnd:Math.min(displayEnd,S.window.displayEnd),startCol:Math.max(S.window.startCol,startCol),endCol:Math.min(S.window.endCol,endCol)};
+    }
+    const iterator=gridSteps(entry.data,entry.request,true,urgent?24:6,urgent);
+    let resolve,reject;
+    const promise=new Promise((ok,fail)=>{resolve=ok;reject=fail;});
+    const job={entry,resolve,promise,frame:0,queued:false,step};gridWork=job;
+    function step(){
+      if(gridWork!==job)return;
+      try{
+        const latest=lastViewportDemand||entry.request,b=entry.bounds;
+        if(!sameViewportRows(b,latest)||b.displayEnd<latest.visibleStart||b.displayStart>latest.visibleEnd||
+          b.endCol<latest.visibleColStart||b.startCol>latest.visibleColEnd){
+          cancelGridWork();scheduleViewport();return;
+        }
+        if(!iterator.next().done){
+          // Yield input and paint between short batches. Chromium can use spare time
+          // before the next vsync; a slow worksheet need not wait a full frame per row.
+          if(!job.queued){
+            job.queued=true;
+            const resume=()=>{job.queued=false;step();};
+            if(window.scheduler?.postTask)window.scheduler.postTask(resume,{priority:'user-visible'}).catch(reject);
+            else job.frame=requestAnimationFrame(resume);
+          }
+          return;
+        }
+        gridWork=null;publishViewport(entry);resolve();
+        if(!viewportCoversVisible(b,latest))scheduleViewport();
+      }catch(error){gridWork=null;reject(error);}
+    }
+    step();return promise;
   }
 
   // One animation-frame coalescing, NOT a trailing-edge debounce: continuous
   // high-frequency wheel/touchpad input must never postpone the network call.
+  // A cached leading strip can be mounted during the native scroll event. Read
+  // its real source cells before scheduling distant work. Limit synchronous work
+  // to adjacent windows; a jump or a slow, complex row uses the sliced path.
+  function mountCachedLeadingEdge(request){
+    if(!S.window||!sameViewportRows(S.window,request)||editCopy?.grid.active)return false;
+    if(gridWork&&viewportCoversVisible(gridWork.entry.bounds,request)){
+      if(!viewportCoversVisible(S.window,request)){gridWork.step();}
+      return true;
+    }
+    const [v1,v2,u1,u2]=request.visibleRanks;
+    const prior=S.viewportData?.request;
+    if(!prior||Math.abs(motion.dy)>request.position.h*1.5||Math.abs(motion.dx)>request.position.w*1.5)return false;
+    const from=Math.max(1,u1-(motion.vx<0?2:1));
+    const core=viewportBand(request,v1-(motion.vy<0?4:1),v2+(motion.vy>0?4:1),from-TEXT_SPILL_LOOKAHEAD,u2+(motion.vx>0?2:1));
+    core.mountColStart=request.colOrder?.at(from-1)||from;
+    foregroundLookups++;
+    const entry=projectViewport(core);
+    if(!entry)return false;
+    foregroundHits++;
+    applyViewport(entry,true,true)?.catch(error=>toast(error.message,'error'));
+    return true;
+  }
   function scheduleViewport(force = false) {
 	if(S.previewOnly){scheduleInitialPreview();return;}
     if (!S.indexReady || !S.sheet) return;
     S.viewportForce ||= force;
-    updateViewportLoading();
+    const target=lastViewportDemand=getViewportRequest();
+    if(!S.viewportForce){
+      const covered=viewportCoversVisible(S.window,target);
+      if(covered ? gridWork||viewport.viewportHasHeadroom(S.window,target) : mountCachedLeadingEdge(target)){
+        planViewport(target,false);paintViewportFallback(target);return;
+      }
+      // Start the next strip while the leading cells are still visible. Work on
+      // an already covered viewport uses the short, interruptible render slices.
+    }
+    paintViewportFallback(target);
     if (S.viewportFrame) return;
     S.viewportFrame = requestAnimationFrame(() => {
       S.viewportFrame = 0;
@@ -1439,101 +1676,58 @@
     });
   }
 
-  async function loadViewport(force = false, expectedEpoch = S.sheetEpoch, strict = false) {
-    if (!S.indexReady || !S.sheet || expectedEpoch !== S.sheetEpoch) return;
-    const request = getViewportRequest();
-    if (!force && viewportHasHeadroom(S.window,request)) {
-      // A previously started off-screen response must not overwrite this view.
-      if (S.viewportPending && !viewportCoversVisible(S.viewportPending.bounds,request)) {
-        S.viewportPending.controller.abort();
-        S.viewportPending = null;
-        ++S.viewportRequest;
-      }
-      updateViewportLoading();
-      return;
-    }
-
-    const cached = cachedViewport(request);
-    if (cached) {
-      if (S.viewportData !== cached) applyViewport(cached);
-      return;
-    }
-
-    // A pending request which already covers the visible target is useful;
-    // aborting it on every scroll would starve heavy sheets indefinitely.
-    if (S.viewportPending && viewportCoversVisible(S.viewportPending.bounds,request)) {
-      updateViewportLoading();
-      return S.viewportPending.promise;
-    }
-    if (S.viewportPending) {
-      S.viewportPending.controller.abort();
-      S.viewportPending = null;
-      ++S.viewportRequest;
-    }
-    const controller = new AbortController();
-    const ticket = ++S.viewportRequest;
-    const key = viewportKey(request);
-    const params = new URLSearchParams({
-      sheet:S.sheet,limit:String(request.limit),col:String(request.startCol),cols:String(request.cols),compact:"1",rowWindow:"1"
-    });
-    if (request.selectedCols)params.set("columns",request.selectedCols.join(","));
+  async function readViewportTile(job,signal){
+    const request=job.request, t=performance.now();
+    const params=new URLSearchParams({sheet:job.sheet,limit:request.limit,col:request.startCol,cols:request.cols,compact:'1',rowWindow:'1'});
+    if(request.selectedCols)params.set('columns',request.selectedCols.join(','));
     if(request.viewId)params.set('viewId',request.viewId);
-    if (request.filtered) {
-      params.set("offset",String(request.offset));
-      params.set("filterId",S.filterId);
-      params.set("excludeThroughRow",String(request.excludeThroughRow));
-    } else params.set("row",String(request.row));
-    const pending = {controller,request,bounds:{
-      filtered:request.filtered, filterId:request.filterId,viewId:request.viewId||'',excludeThroughRow:request.excludeThroughRow,
-      displayStart:request.displayStart,displayEnd:request.displayEnd,
-      startCol:request.startCol,endCol:request.selectedCols?.at(-1)??Math.min(16384,request.startCol+request.cols-1),
-      columns:request.selectedCols
-    }};
-    S.viewportPending = pending;
-    S.viewportAbort = controller;
-    updateViewportLoading();
-    pending.promise = (async () => {
-      let failed = false;
-      try {
-        const data = await api('/api/sheet?'+params.toString(),{signal:controller.signal,activity:false});
-        if (controller.signal.aborted || ticket !== S.viewportRequest || expectedEpoch !== S.sheetEpoch) return;
-        const entry = tiles.store(key,data,request);
-        const latest = getViewportRequest();
-        // CRITICAL: never paint a response that cannot cover the viewport at
-        // the moment it arrives. A scrolled-back user otherwise sees blanks.
-        if (viewportCoversVisible(entry.bounds,latest)) {
-          applyViewport(entry);
-        }
-      } catch (error) {
-        if (error.name !== 'AbortError' && expectedEpoch === S.sheetEpoch) {
-          failed = true;
-          // A sheet handoff must never unlock the previous sheet's DOM after
-          // a failed first tile. Ordinary same-sheet scrolling keeps retries.
-          if(strict)throw error;
-          // Do not strand a stationary viewport on a transient read/network
-          // failure. Retry twice with a bounded backoff, then surface the
-          // actionable error. Cancelled/stale requests are never retried.
-          if (++S.viewportRetryAttempt <= 2) {
-            clearTimeout(S.viewportRetryTimer);
-            S.viewportRetryTimer = setTimeout(() => {
-              S.viewportRetryTimer = 0;
-              if (expectedEpoch === S.sheetEpoch && S.indexReady &&
-                  !viewportCoversVisible(S.window,getViewportRequest())) scheduleViewport(true);
-            }, S.viewportRetryAttempt * 160);
-          } else throw error;
-        }
-      } finally {
-        if (S.viewportPending === pending) S.viewportPending = null;
-        if (S.viewportAbort === controller) S.viewportAbort = null;
-        if (expectedEpoch === S.sheetEpoch) {
-          updateViewportLoading();
-          // The user may have scrolled while decoding the payload. Re-evaluate
-          // the current position even if no more scroll events will arrive.
-          if (!failed && !viewportCoversVisible(S.window,getViewportRequest())) scheduleViewport();
-        }
+    if(request.filtered){
+      params.set('offset',request.offset);params.set('filterId',request.filterId);params.set('excludeThroughRow',request.excludeThroughRow);
+    }else params.set('row',request.row);
+    const data=await api('/api/sheet?'+params,{signal,activity:false});
+    if(signal.aborted||job.epoch!==S.sheetEpoch||request.context!==viewportContext())return;
+    if(data.sheet!==job.sheet||(data.viewId||'')!==request.viewId||(data.filterId||'')!==request.filterId)throw Error('工作表视口已变化，请重新读取');
+    if(!job.foreground && estimateViewportBytes(data)>VIEWPORT_CACHE_BUDGET/4)return;
+    const entry=tiles.store(job.key,data,request);
+    bytesPerCell=bytesPerCell*.75+Math.max(64,entry.bytes/(request.cols*request.limit))*.25;
+    motion.observe('read',performance.now()-t);
+    const b=entry.bounds;
+    for(const tile of styleTiles.values())if(b.displayEnd>=tile.minVisual&&b.displayStart<=tile.maxVisual&&b.endCol>=tile.firstCol&&b.startCol<=tile.lastCol)tile.dirty=true;
+    scheduleStylePaint();
+    return entry;
+  }
+
+  async function loadViewport(force=false,expectedEpoch=S.sheetEpoch,strict=false){
+    if(!S.indexReady||!S.sheet||expectedEpoch!==S.sheetEpoch)return;
+    const request=lastViewportDemand=getViewportRequest(),ticket=S.viewportRequest;
+    if(!force&&viewport.viewportHasHeadroom(S.window,request)){planViewport(request,false);updateViewportLoading();return;}
+    if(!force&&gridWork&&viewportCoversVisible(gridWork.entry.bounds,request))return gridWork.promise;
+    let entry=projectViewport(request);
+    foregroundLookups++;
+    if(entry){foregroundHits++;planViewport(request,false);}
+    else{
+      let received;
+      try{received=await planViewport(request,true);}
+      catch(error){
+        if(ticket!==S.viewportRequest||expectedEpoch!==S.sheetEpoch||error.name==='AbortError')return;
+        if(strict)throw error;
+        if(!S.viewportRetryTimer && ++S.viewportRetryAttempt<=2){
+          S.viewportRetryTimer=setTimeout(()=>{S.viewportRetryTimer=0;scheduleViewport(true);},S.viewportRetryAttempt*160);
+        }else if(!S.viewportRetryTimer)throw error;
+        return;
       }
-    })();
-    return pending.promise;
+      if(ticket!==S.viewportRequest||expectedEpoch!==S.sheetEpoch||!S.indexReady)return;
+      const latest=getViewportRequest();
+      if(!force&&viewport.viewportHasHeadroom(S.window,latest))return;
+      entry=projectViewport(latest,received);
+      if(!entry){scheduleViewport();return;}
+    }
+    if(!force&&gridWork){
+      const b=gridWork.entry.bounds;
+      if(sameViewportRows(b,request)&&b.displayEnd>=request.visibleStart&&b.displayStart<=request.visibleEnd&&
+        b.endCol>=request.visibleColStart&&b.startCol<=request.visibleColEnd)return gridWork.promise;
+    }
+    return applyViewport(entry,!force&&!strict);
   }
 
   // Row/column nodes are recycled across overlapping tiles. Under continuous
@@ -1627,14 +1821,12 @@
   function makeGridCell(cellData, rowData, rowNumber, visual, layout, byColumn, columnLayouts, position) {
     const {col, letter, left, width} = layout;
     const ref = `${letter}${rowNumber}`;
-    const cell = document.createElement("div");
-    cell.className = "grid-cell";
+    const cell=cellPresenter.create(cellData,rowData,rowNumber,col);
     cell.dataset.ref = ref;
     cell.dataset.row = String(rowNumber);
     cell.dataset.col = String(col);
     cell.dataset.visualIndex = String(visual);
     updateGridCellGeometry(cell,layout);
-    cellPresenter.paint(cell,cellData,rowData);
     // The custom hover inspector reads S.cellMap; native titles duplicate
     // enormous formulas in DOM attributes and can cause slow hover reflow.
     return cell;
@@ -1803,8 +1995,27 @@
     selectionInspector?.decorateCell(cell,ref,S.sheet);
   }
 
-  function renderGrid(data, request) {
-    const started = performance.now();
+  const finishedCells=new Map();
+  let finishedCellContext='';
+  const rowPool=new Map();
+  let poolCells=0;
+  function retireRow(row){
+    row.remove();
+    const cells=row._xlCells.size;
+    if(!cells||row._xlSheetEpoch!==S.sheetEpoch||cells>384||row._xlHeavy)return;
+    const visual=Number(row.dataset.visualIndex),old=rowPool.get(visual);
+    if(old)poolCells-=old._xlCells.size;
+    rowPool.delete(visual);rowPool.set(visual,row);poolCells+=cells;
+    while(poolCells>384){const [k,r]=rowPool.entries().next().value;rowPool.delete(k);poolCells-=r._xlCells.size;}
+  }
+  function renderGrid(data,request){
+    const interrupted=Boolean(gridWork);
+    cancelGridWork();const steps=gridSteps(data,request,false);steps.next();
+    if(interrupted)scheduleViewport();
+  }
+  function* gridSteps(data, request, sliced, sliceBudget=sliced?6:0,retain=false) {
+    const started=performance.now();let sliceStart=started,cpuMs=0;
+    const initialDecor=S.decorVersion;
     cellPresenter.prepare(data.rows);
     if (data.hyperlinkError && S.linkErrorSheet !== S.sheet) {
       S.linkErrorSheet = S.sheet;
@@ -1820,8 +2031,11 @@
     // and immediately reading clientWidth forced a synchronous layout on
     // every tile commit, even when the entire workbook size was unchanged.
     const pinnedHeight=S.filtered?sourceRowTop(frozenPanes.effective().rows+1):0;
-    const canvasWidth=`${Math.max(width,grid.clientWidth)}px`;
-    const canvasHeight=`${physicalCanvasHeight(height,grid)}px`;
+    const measured=sliced?request.position:null;
+    const canvasWidth=`${Math.max(width,measured?.w??grid.clientWidth)}px`;
+    const canvasHeight=`${measured?virtualScroll.configure(height,measured.h):physicalCanvasHeight(height,grid)}px`;
+    S.virtualScrollScale=virtualScroll.scale;
+    if(canvas.hasAttribute('data-viewport')!==S.indexReady)canvas.toggleAttribute('data-viewport',S.indexReady);
     if(canvas.style.width!==canvasWidth)canvas.style.width=canvasWidth;
     if(canvas.style.height!==canvasHeight)canvas.style.height=canvasHeight;
     if(canvas.style.getPropertyValue('--canvas-width')!==canvasWidth)
@@ -1831,25 +2045,25 @@
       Array.from({length:data.colCount},(_,i)=>data.startCol+i);
     const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col)),focus=crosshairCell();
     const headerKey=`${visibleColumns.join(',')}|${S.zoom}|${geometry.version}|${window.devicePixelRatio}|${S.indexReady}|${S.textHeaderRevision}|${ROW_HEAD}|${S.sheetEpoch}`;
-    if (S.renderedHeadersKey !== headerKey) {
+    const commitHeaders=()=>{if (S.renderedHeadersKey !== headerKey) {
       renderColumnHeaders(visibleColumns,width,focus);
       S.renderedHeadersKey = headerKey;
-    }
-    syncTableColumnHeaders();
+    }};
     const rowDataByNumber = new Map();
     const visualRows = new Map();
     if (S.filtered) data.rows.forEach((row,i) => visualRows.set(request.displayStart+i,row));
     else for (const row of data.rows) rowDataByNumber.set(row.number,row);
 
-    S.cellMap.clear();
-    for(const row of data.rows)for(const cell of row.cells||[])S.cellMap.set(`${colName(cell.col)}${row.number}`,cell);
-    S.rowNumberByVisual.clear();
+    const models=new Map(),rowNumbers=new Map();
+    for(const row of data.rows)for(const cell of row.cells||[])models.set(`${colName(cell.col)}${row.number}`,cell);
     const previous = S.renderedRows;
-    const next = new Map();
+    const next=retain?new Map(previous):new Map();
     const newNodes = document.createDocumentFragment();
     const firstVisual = request.displayStart;
     const lastVisual = S.filtered ? Math.min(data.totalRows,request.displayStart+data.rows.length-1) : Math.min(S.maxRow,request.displayEnd);
     let reusedRows=0, createdRows=0, createdCells=0;
+    let liveRoom=sliced&&sameViewportRows(S.window,request)?DOM_MARGIN_BUDGET:0;
+    if(liveRoom)for(const row of previous.values())liveRoom-=row._xlCells.size;
     const lastCol=(columns.at(-1)||data.startCol)+1;
     // The canvas owns the full horizontal scroll size, not each physical row.
     // A 16,384-column workbook can have a >2-million-pixel canvas; giving
@@ -1859,23 +2073,50 @@
     const rowPaintWidth = `${ROW_HEAD + colLeft(lastCol)}px`;
     // Geometry is invariant across all rows in this viewport. Previously each
     // cell recalculated sparse column offsets (binary search) and labels.
-    const columnLayouts = [];
-    for (const col of visibleColumns) {
-      columnLayouts.push({col,letter:colName(col),left:ROW_HEAD+colLeft(col),width:colWidth(col)});
-    }
-    const renderedColumnSet=new Set(visibleColumns),replacedRows=[];
+    const layoutFor=col=>({col,letter:colName(col),left:ROW_HEAD+colLeft(col),width:colWidth(col)});
+    const bodyLayouts=visibleColumns.map(layoutFor);
+    const layoutVersion=geometry.version+'|'+S.zoom+'|'+(window.devicePixelRatio||1);
+    const paintKey=cellPresenter.paintKey(),cellContext=[S.sheetEpoch,layoutVersion,paintKey,ROW_HEAD,S.source?.format].join('|');
+    if(cellContext!==finishedCellContext){finishedCells.clear();finishedCellContext=cellContext;}
+    const numericPadding=S.showStyles&&fileFormats.source(S.source?.format).styled?5*scale():14;
+    const extraMarks=!!(S.range||S.multiRanges?.length||selectedColumnSpan()||S.traceRefs.length||
+      S.searchHitMap?.get(S.sheet)?.size||bookmarkCenter?.keys?.size||formulaInspector?.active||
+      selectionInspector?.hits?.size||editCopy?.grid.active);
+    const mountStart=request.mountColStart??visibleColumns[0],mountLeft=ROW_HEAD+colLeft(mountStart||1);
+    const replacedRows=[],updates=[];
     const reusable=S.reusableSheetRows,restoring=Boolean(reusable&&S.reusableSheetData===data);
     S.reusableSheetRows=null;S.reusableSheetData=null;
     const rowsLayer=$('rowsLayer');
-    const physicalScroll=grid.scrollTop;
-    for (let visual=firstVisual;visual<=lastVisual;visual=S.filtered?visual+1:(nextVisibleRow(visual+1)||Infinity)) {
+    const physicalScroll=measured?.physical??grid.scrollTop;
+    const visuals=[...(data.anchors?.keys()||[])].filter(r=>r<firstVisual);
+    for(let r=firstVisual;r<=lastVisual;r=S.filtered?r+1:(nextVisibleRow(r+1)||Infinity))visuals.push(r);
+    if(sliced){
+      const priority=v=>{
+        if(v<firstVisual)return -3;
+        if(v>=request.visibleStart&&v<=request.visibleEnd){
+          const row=previous.get(v);
+          return !row||!row._xlCells.has(request.visibleColStart)||!row._xlCells.has(request.visibleColEnd)?0:2;
+        }
+        return (motion.vy<0?v<request.visibleStart:v>request.visibleEnd)?1:3;
+      };
+      const order=new Map(visuals.map(v=>[v,priority(v)]));
+      visuals.sort((a,b)=>order.get(a)-order.get(b)||(motion.vy>0?b-a:a-b));
+    }
+    for(const visual of visuals){
+      const extra=data.anchors?.get(visual);
+      const columnLayouts=extra?[...extra.filter(c=>visual<firstVisual||c<data.startCol).sort((a,b)=>a-b).map(layoutFor),...(visual<firstVisual?[]:bodyLayouts)]:bodyLayouts;
       if(!S.filtered&&!rowVisible(visual))continue;
       const rowData = S.filtered ? visualRows.get(visual) : rowDataByNumber.get(visual);
       if (S.filtered && !rowData) continue;
       const rowNumber = rowData?.number || visual;
-      S.rowNumberByVisual.set(visual,rowNumber);
+      rowNumbers.set(visual,rowNumber);
       const oldRow=previous.get(visual),savedRow=reusable?.get(visual);
-      let row = savedRow || oldRow;
+      let row=savedRow||oldRow;
+      const pooled=!row&&rowPool.get(visual);
+      if(pooled){
+        rowPool.delete(visual);poolCells-=pooled._xlCells.size;
+        if(pooled.dataset.row===String(rowNumber)){row=pooled;row._xlDecorVersion=-1;newNodes.appendChild(row);}
+      }
       if(savedRow&&savedRow.dataset.row===String(rowNumber)){
         savedRow._xlSheetEpoch=S.sheetEpoch;savedRow._xlDecorVersion=-1;
         if(savedRow.parentElement!==rowsLayer)newNodes.appendChild(savedRow);
@@ -1920,29 +2161,69 @@
       row.classList.toggle('table-band',window.ExcelLensTableHeaders.isTable(S.autoFilter)&&rowNumber>S.autoFilter.row&&(visual-S.autoFilter.row)%2===0);
       // Sparse payloads use a compact plain object: fewer temporary Map and
       // arrow-function allocations when a tile contains thousands of cells.
-      const byColumn=Object.create(null);
-      for (const c of rowData?.cells||[]) byColumn[c.col]=c;
+      let byColumn=viewport.rowColumns(rowData)||{};
+      if(editCopy?.grid.active)byColumn={...byColumn};
       if (editCopy?.grid.active) for (const {col,letter} of columnLayouts) byColumn[col]=editCopy.grid.project(S.sheet,letter+rowNumber,byColumn[col]);
       const belowRow=S.filtered?visualRows.get(visual+1):rowDataByNumber.get(nextVisibleRow(rowNumber+1));
-      const belowColumns=Object.create(null);
-      for(const c of belowRow?.cells||[])belowColumns[c.col]=c;
+      const belowColumns=viewport.rowColumns(belowRow)||{};
       const redecorate = row._xlDecorVersion !== S.decorVersion;
       const newCells=document.createDocumentFragment();
-      const cells=row._xlCells;
+      const cells=retain?new Map(row._xlCells):new Map(),remove=[];
+      const stableRows=row._xlBelow===belowRow?.number&&row._xlLayoutVersion===layoutVersion&&!editCopy?.grid.active;
+      const stableColumns=row._xlGridKey===headerKey;
+      const mergeFree=S.filtered||!mergedCells.root||!mergedCells.intersect(rowNumber,belowRow?.number||rowNumber+1,bodyLayouts[0]?.col||1,lastCol).length;
+      row._xlHeavy=Boolean(rowData?.cells?.some(c=>c.richText||c.conditional||(c.raw?.length||0)+(c.display?.length||0)+(c.formula?.length||0)>512));
       for(let layoutIndex=0;layoutIndex<columnLayouts.length;layoutIndex++) {
+        if(sliced&&columnLayouts.length>48&&(layoutIndex&7)===0&&performance.now()-sliceStart>=sliceBudget){
+          cpuMs+=performance.now()-sliceStart;yield;sliceStart=performance.now();
+        }
         const layout=columnLayouts[layoutIndex];
         const col=layout.col;
         const cellData=byColumn[col];
         const ref=`${layout.letter}${rowNumber}`;
-        let cell=cells.get(col);
+        if(col<mountStart){
+          // Keep the source model for selection and neighbouring seams. Only attach
+          // the off-screen origin if its actual merge or measured text reaches the band.
+          const merge=activeMerge(rowNumber,col);
+          if(!(merge?.row===rowNumber&&merge.col===col&&merge.endCol>=mountStart)&&
+            !(cellData&&layout.left+cellPresenter.spillWidth(cellData,byColumn,columnLayouts,layoutIndex,rowData?.style,rowNumber)>mountLeft))continue;
+        }
+        let cell=row._xlCells.get(col);
+        if(cell)cells.set(col,cell);
+        const nextCol=columnLayouts[layoutIndex+1]?.col;
+        if(sliced&&cell&&stableRows&&!redecorate&&!cellData?.richText&&!cellData?.conditional&&
+          cell._xlRowPresentationNotice===(rowData?.presentationNotice||'')&&cell._xlRowStyle===(rowData?.style||0)&&
+          cell._xlModel===(cellData??null)&&(mergeFree||!activeMerge(rowNumber,col)&&!activeMerge(rowNumber,nextCol||col+1)&&!activeMerge(belowRow?.number||rowNumber+1,col))){
+          const interior=layoutIndex>0&&cell._xlNextCol===nextCol&&cell._xlColumnLeft===layout.left&&cell._xlColumnWidth===layout.width;
+          if(stableColumns||interior&&!window.ExcelLensCellView.isText(cellData))continue;
+        }
         const replaced=Boolean(cell && (!sameRenderedCell(cell._xlModel,cellData)||cell._xlRowStyle!==(rowData?.style||0)||cellPresenter.needsPaint(cell,cellData,rowData)));
         if(replaced){
           // A tile can be re-fetched after a filter/sheet/row-content change.
           // Reused coordinates must not retain old text, style or spill state.
           const fresh=makeGridCell(cellData,rowData,rowNumber,visual,layout,byColumn,columnLayouts,layoutIndex);
-          cell.replaceWith(fresh);cells.set(col,fresh);cell=fresh;createdCells++;
+          remove.push(cell);newCells.appendChild(fresh);cells.set(col,fresh);cell=fresh;createdCells++;
         }
-        const needsDecoration = !cell || replaced || redecorate;
+        const fresh=!cell||replaced,needsDecoration=fresh||redecorate;
+        let templateKey=null,cloned=false;
+        if(!cell&&mergeFree&&belowRow&&nextCol&&cellData&&(!cellData.type||cellData.type==='n')&&
+          !cellData.conditional&&!cellData.richText&&!cellData.hyperlink&&!cellData.cacheMissing&&
+          !byColumn[nextCol]?.conditional&&!belowColumns[col]?.conditional&&!rowData?.presentationNotice&&
+          !S.showFormulas&&!editCopy?.grid.active&&rowNumber!==S.autoFilter?.row){
+          const metric=cellPresenter.numberMetrics(cellData,rowData?.style);
+          if(metric&&metric.width<=layout.width-numericPadding+.25){
+            const outerLeft=layoutIndex===0&&col>1&&layout.left===ROW_HEAD;
+            templateKey=[cellData.style??rowData?.style??0,cellData.valueColor||'',!!cellData.hasFormula,
+              byColumn[nextCol]?.style??rowData?.style??0,belowColumns[col]?.style??belowRow.style??0,rowTop(visual)===0,outerLeft].join('|');
+            const saved=finishedCells.get(templateKey);
+            if(saved){
+              cell=saved.node.cloneNode(false);cell.textContent=metric.text;cell.dataset.ref=ref;
+              cell.dataset.row=String(rowNumber);cell.dataset.col=String(col);cell.dataset.visualIndex=String(visual);
+              Object.assign(cell,saved.metadata,{_xlModel:cellData,_xlRowStyle:rowData?.style||0});
+              cells.set(col,cell);newCells.appendChild(cell);createdCells++;cloned=true;
+            }
+          }
+        }
         if (!cell) {
           cell=makeGridCell(cellData,rowData,rowNumber,visual,layout,byColumn,columnLayouts,layoutIndex);
           cells.set(col,cell);
@@ -1951,9 +2232,9 @@
         }
         // Resolve borders using the source styles of BOTH adjacent cells.
         updateGridCellGeometry(cell,layout);
-        const nextCol=columnLayouts[layoutIndex+1]?.col;
-        updateSharedBorders(cell,cellData,rowData,nextCol?byColumn[nextCol]:null,rowData,
-          belowColumns[col],belowRow,{nextCol,columns:visibleColumns,lastRow:lastVisual,rows:rowDataByNumber,outerLeft:layoutIndex===0&&col>1,outerTop:rowTop(visual)===0});
+        cell._xlNextCol=nextCol;
+        if(!cloned)updateSharedBorders(cell,cellData,rowData,nextCol?byColumn[nextCol]:null,rowData,
+          belowColumns[col],belowRow,{nextCol,mergeFree,columns:visibleColumns,firstRow:firstVisual,lastRow:lastVisual,rows:rowDataByNumber,cellMap:models,outerLeft:layoutIndex===0&&col>1,outerTop:rowTop(visual)===0});
         // For column A, the row header is the single owner of A's left edge.
         if(layoutIndex===0&&col===1){
           const border=visualForBorder(cellData,rowData).borderLeft||'';
@@ -1963,26 +2244,86 @@
         }
         // Resolve the full merged width before fitting a source number. Text
         // spilling also depends on the current row's neighboring cells.
-        decorateMergedCell(cell,rowNumber,col,focus);
-        if((!restoring||!savedRow||replaced)&&(cellData||cell._xlOverflowSpan||cell._xlNumericSpan))
+        if(!mergeFree||cell._xlMerge||cell._xlCovered)decorateMergedCell(cell,rowNumber,col,focus);
+        // A new numeric cell admitted to the template cache already passed the
+        // exact font/width check and cannot spill text into its neighbour.
+        if(!templateKey&&(!restoring||!savedRow||replaced)&&(cellData||cell._xlOverflowSpan||cell._xlNumericSpan))
           extendTextIntoBlanks(cell,cellData,byColumn,columnLayouts,layoutIndex);
-        if (needsDecoration) decorateGridCell(cell,rowNumber,col,ref,focus);
+        if(templateKey&&!cloned&&!cell.childElementCount&&!cell.title){
+          const metadata={};
+          for(const key of ['_xlColumnLeft','_xlColumnWidth','_xlPaintKey','_xlRichAllowed','_xlRowPresentationNotice',
+            '_xlborderRight','_xlborderBottom','_xlOuterLeft','_xlOuterTop','_xlNextCol'])metadata[key]=cell[key];
+          if(finishedCells.size>=1024)finishedCells.clear();
+          finishedCells.set(templateKey,{node:cell.cloneNode(false),metadata});
+        }
+        if(fresh&&!extraMarks){
+          if(S.selected?.ref===ref)cell.classList.add('selected');
+          if(focus?.col===col)cell.classList.add('active-column');
+        }else if(needsDecoration)decorateGridCell(cell,rowNumber,col,ref,focus);
       }
-      row._xlDecorVersion = S.decorVersion;
-      if(newCells.childNodes.length)row.appendChild(newCells);
-      for(const [col,cell] of cells) {
-        if(!renderedColumnSet.has(col)) {cell.remove();cells.delete(col);}
+      if(!oldRow&&newCells.childNodes.length)row.appendChild(newCells);
+      for(const [col,cell] of row._xlCells)if(!cells.has(col))remove.push(cell);
+      // Expose completed additions with their original model now. Existing rows
+      // and columns remain interactive until the final rectangle is committed.
+      // A superseding scroll reuses these exact nodes. No partial removal can
+      // invalidate the last published coverage rectangle.
+      if(sliced&&liveRoom>0&&(!oldRow||row===oldRow)){
+        const additions=[];
+        for(const [col,node] of cells)if(!oldRow||!oldRow._xlCells.has(col))additions.push([col,node]);
+        if(additions.length&&additions.length<=liveRoom){
+          liveRoom-=additions.length;
+          if(!oldRow){if(virtualScroll.scale!==1)row.style.top=virtualScroll.rowPosition(logicalTop,S.renderedScrollTop)+'px';rowsLayer.append(row);previous.set(visual,row);}
+          const ready=document.createDocumentFragment();
+          for(const [col,node] of additions){
+            if(node.parentNode!==row)ready.appendChild(node);
+            row._xlCells.set(col,node);
+            if(node._xlModel)S.cellMap.set(node.dataset.ref,node._xlModel);
+          }
+          if(ready.childNodes.length)row.appendChild(ready);
+          S.rowNumberByVisual.set(visual,rowNumber);
+        }
       }
+      updates.push({row,cells,newCells,remove,below:belowRow?.number});
       next.set(visual,row);
+      const spent=sliced?performance.now()-sliceStart:0;
+      if(sliced&&(spent>=sliceBudget||spent>=3&&navigator.scheduling?.isInputPending?.({includeContinuous:true}))){
+        cpuMs+=performance.now()-sliceStart;yield; sliceStart=performance.now();
+      }
     }
+    commitHeaders();
+    for(const {row,cells,newCells,remove,below} of updates){
+      if(newCells.childNodes.length)row.appendChild(newCells);
+      for(const cell of remove)if(cell.parentNode===row)cell.remove();
+      row._xlCells=cells;row._xlGridKey=headerKey;row._xlBelow=below;row._xlLayoutVersion=layoutVersion;row._xlDecorVersion=initialDecor;
+    }
+    if(retain){
+      for(const [visual,row] of next){
+        if(!rowNumbers.has(visual))rowNumbers.set(visual,Number(row.dataset.row));
+        for(const node of row._xlCells.values())if(node._xlModel&&!models.has(node.dataset.ref))models.set(node.dataset.ref,node._xlModel);
+      }
+    }
+    S.cellMap=models;S.rowNumberByVisual=rowNumbers;
     // Append first, remove stale nodes second: no frame ever contains a cleared
     // grid while the next buffered viewport is being reconciled.
     rowsLayer.appendChild(newNodes);
     for(const row of replacedRows)row.remove();
-    for(const [visual,row] of previous) if(!next.has(visual)) row.remove();
+    for(const [visual,row] of previous) if(!next.has(visual))retireRow(row);
     S.renderedRows=next;
     S.renderedScrollTop=physicalScroll;
-    if(S.selected||S.range||S.multiRanges?.length)paintRangeFrames();
+    if(sliced)followGridScroll();
+    if(!sliced)syncTableColumnHeaders();
+    if(sliced&&S.decorVersion!==initialDecor){
+      const current=crosshairCell();
+      for(const row of next.values()){
+        const number=Number(row.dataset.row);
+        row.classList.toggle('active-row',number===current?.row);
+        for(const [col,node] of row._xlCells){
+          decorateMergedCell(node,number,col,current);decorateGridCell(node,number,col,node.dataset.ref,current);
+        }
+        row._xlDecorVersion=S.decorVersion;
+      }
+    }
+    if(S.selected||S.range||S.multiRanges?.length){if(sliced)scheduleRangeFrames();else paintRangeFrames();}
     const hasVisibleRows=S.filtered ? data.rows.length>0 : visibleSourceCount(1,S.maxRow)>0;
     $("gridEmpty").hidden=hasVisibleRows;
     if(!hasVisibleRows) $("gridEmpty").textContent=S.filtered?"没有可见的筛选记录；可在「行与大纲」中显示全部":"没有可见行；可在「行与大纲」中显示全部";
@@ -1991,7 +2332,8 @@
     traceUI?.refreshPulse();
     updateSearchNavButtons();
     S.renderMetrics={commits:S.renderMetrics.commits+1,reusedRows,createdRows,createdCells,
-      lastMs:Math.round((performance.now()-started)*100)/100};
+      lastMs:Math.round((cpuMs+performance.now()-sliceStart)*100)/100};
+    motion.observe('render',performance.now()-started);
   }
 
   function renderColumnHeaders(columns, width, focus) {
@@ -2059,6 +2401,7 @@
   // columns/rows involved in this change. Range selection is bounded by the
   // selected rectangle and the existing virtual viewport.
   function applySelectionClasses() {
+    ++S.decorVersion;
     selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
     const old=S.lastHighlight;
     const focus=crosshairCell(),selectedRow=focus?.row||0,selectedCol=focus?.col||0;
@@ -2888,10 +3231,11 @@
 
   function syncTableColumnHeaders() {
     const config=S.autoFilter;
-    const pinned=frozenPanes?.effective().rows||0;
-    const bottom=config?sourceRowTop(config.row+1)-sourceRowTop(pinned+1):0;
-    const sticky=window.ExcelLensTableHeaders.useStickyLabels(config,getVirtualScrollTop(),bottom,pinned);
-    $('grid').parentElement.classList.toggle('table-header-scrolled',sticky);
+    const host=$('grid').parentElement;
+    if(config){
+      const pinned=frozenPanes?.effective().rows||0;
+      host.classList.toggle('table-header-scrolled',window.ExcelLensTableHeaders.useStickyLabels(config,getVirtualScrollTop(),sourceRowTop(config.row+1)-sourceRowTop(pinned+1),pinned));
+    }else if(host.classList.contains('table-header-scrolled'))host.classList.remove('table-header-scrolled');
     syncGridBackdrop();
   }
 
@@ -3395,7 +3739,18 @@
   function renderGridFromCurrentWindow() {
     // Always re-render from the complete cached payload. Reconstructing a
     // viewport from the DOM loses off-screen values and can cause blank bands.
-    if (!S.viewportData||!sameViewportRows(S.viewportData.bounds,getViewportRequest())) return;
+    const entry=S.viewportData;if(!entry)return;
+    const current=getViewportRequest();
+    if(!sameViewportRows(entry.bounds,current)){
+      const prior=entry.request;
+      if(prior.book!==S.book||prior.workbookKey!==S.workbookKey||prior.sheet!==S.sheet||
+        !sameViewportRows({...entry.bounds,context:current.context},current))return;
+      // Reproject the immutable source cells immediately on an edit revision change.
+      scheduler.reset();++S.viewportRequest;tiles.clear();
+      const request={...prior,context:current.context},bounds={...entry.bounds,context:current.context};
+      S.viewportData={...entry,request,bounds};S.window=bounds;
+      tiles.store(viewportKey(request),entry.data,request);
+    }
     renderGrid(S.viewportData.data,S.viewportData.request);
   }
 
@@ -3613,35 +3968,66 @@
 
   // Drag-to-select is deliberately visual only. Selection never writes to Excel.
   let dragAnchor=null,dragMoved=false,dragBase=[],suppressGridClick=false;
-  let dragFrame=0,dragPending=null;
+  let dragFrame=0,dragPending=null,scrollPress=null;
   function flushRangeDrag(){
     dragFrame=0;
     const pending=dragPending;dragPending=null;
     if(!pending||!dragAnchor)return;
     if(!dragMoved){
       dragMoved=true;
-      selectCell(cellAt(dragAnchor.row,dragAnchor.col),dragAnchor.row,dragAnchor.col,dragAnchor.ref,dragAnchor.visual);
+      selectCell(dragAnchor.cell||cellAt(dragAnchor.row,dragAnchor.col),dragAnchor.row,dragAnchor.col,dragAnchor.ref,dragAnchor.visual,false,false,dragAnchor.crosshair);
     }
     S.multiRanges=dragBase;
     extendRange(dragAnchor,pending.row,pending.col,pending.visual);
   }
+  // A styled tile may be on screen one frame before its interactive DOM.
+  // Resolve a body press against the same snapped edges and source data as
+  // the renderer. A missing tile has no known cell to select.
+  function cachedBodyPress(event){
+    if(!['rowsLayer','gridCanvas','viewportFallback','grid'].includes(event.target.id))return null;
+    const grid=$('grid'),rect=grid.getBoundingClientRect(),request=getViewportRequest();
+    const {pw,ph}=request.position;
+    const localX=event.clientX-rect.left-grid.clientLeft-ROW_HEAD;
+    const localY=event.clientY-rect.top-grid.clientTop-headerHeight();
+    if(localX<pw||localY<ph||localX+ROW_HEAD>=grid.clientWidth||localY+headerHeight()>=grid.clientHeight)return null;
+    const hit=tiles.sourceAtPoint(request,{x:request.position.x+localX,y:request.position.y+localY-(S.filtered?ph:0),
+      lastRow:S.filtered?S.filterTotal:S.maxRow,lastCol:S.maxCol,rowTop,colLeft,mergeAt:activeMerge});
+    if(hit)hit.ref=colName(hit.col)+hit.row;
+    return hit;
+  }
   function beginRangeDrag(event){
+    scrollPress=null;
     if(event.button!==0||!S.indexReady||event.target.closest('.column-filter,.auto-filter-button,.column-resize-grip'))return;
     const cell=event.target.closest?.('.grid-cell');
-    const parsed=parseRef(cell?.dataset.ref);
+    const readingPress=event.pointerType==='mouse'&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&
+      !editCopy?.grid.active&&!calculator?.picking&&!S.sheetLoadingEpoch&&event.target.closest('#grid');
+    const cached=!cell&&readingPress?cachedBodyPress(event):null;
+    const parsed=cached||parseRef(cell?.dataset.ref);
     if(!parsed)return;
     hideCellMenu();
     $('cellTooltip').hidden=true;
-    dragAnchor={...parsed,visual:Number(cell.dataset.visualIndex)||parsed.row};
+    dragAnchor={row:parsed.row,col:parsed.col,ref:parsed.ref,visual:cached?.visual||Number(cell?.dataset.visualIndex)||parsed.row,
+      cell:cached?.cell||cell?._xlModel,crosshair:cached?.crosshair,
+      clientX:event.clientX,clientY:event.clientY};
     dragBase=(event.ctrlKey||event.metaKey)?window.ExcelLensMultiSelection.areas(S,true):
       (event.shiftKey?S.multiRanges.slice():[]);
     if(dragBase.length>=window.ExcelLensMultiSelection.LIMIT){dragAnchor=null;toast('最多同时选择256处区域','warning');return;}
     dragPending=null;
     if(dragFrame){cancelAnimationFrame(dragFrame);dragFrame=0}
     dragMoved=false;
+    // During native scrolling the release can land on a different row or the
+    // common rows layer. Bind a plain mouse selection to the source actually
+    // pressed. Activating a link still requires a click on the original cell.
+    if(readingPress){
+      if(cached)selectCell(cached.cell,cached.row,cached.col,cached.ref,cached.visual,false,false,cached.crosshair);
+      else selectWithModifiers(cell._xlModel||cellAt(parsed.row,parsed.col),dragAnchor,event);
+      scrollPress={ref:parsed.ref,epoch:S.sheetEpoch,context:viewportContext(),view:S.rowView?.id,filter:S.filterId};
+      $('grid').focus({preventScroll:true});
+    }
   }
   function updateRangeDrag(event){
     if(!dragAnchor||!(event.buttons&1))return;
+    if(!dragMoved&&event.clientX===dragAnchor.clientX&&event.clientY===dragAnchor.clientY)return;
     const cell=event.target.closest?.('.grid-cell');
     const target=parseRef(cell?.dataset.ref);
     if(!target||(target.row===dragAnchor.row&&target.col===dragAnchor.col))return;
@@ -3660,6 +4046,7 @@
       suppressGridClick=true;
       setTimeout(()=>{suppressGridClick=false},0);
     }
+    if(dragMoved||event?.type==='pointercancel')scrollPress=null;
     dragAnchor=null;dragBase=[];
   }
 
@@ -4040,7 +4427,9 @@
       followGridScroll();
       syncTableColumnHeaders();
       frozenPanes?.followScroll();
+      if(S.freeze.rows||S.freeze.cols)frozenPanes.schedule();
       if(hoverRef||!$("cellTooltip").hidden){$("cellTooltip").hidden = true;hoverRef = "";}
+      motion.sample($('grid').scrollLeft,getVirtualScrollTop(),performance.now());
       scheduleViewport(false);
     }, { passive: true });
     $("grid").addEventListener("click", event => {
@@ -4058,8 +4447,10 @@
       const parsed = parseRef(ref);
       if (!parsed) return;
       const visual=Number(cell.dataset.visualIndex);
-      const dataCell=cellAt(parsed.row,parsed.col);
-      selectWithModifiers(dataCell,{...parsed,visual},event);
+      const dataCell=cellAt(parsed.row,parsed.col),pressed=scrollPress;scrollPress=null;
+      if(pressed&&event.detail){
+        if(pressed.epoch!==S.sheetEpoch||pressed.context!==viewportContext()||pressed.view!==S.rowView?.id||pressed.filter!==S.filterId||pressed.ref!==ref)return;
+      }else selectWithModifiers(dataCell,{...parsed,visual},event);
       const calculating=calculator?.captureCell(parsed.ref,event);
       if (!calculator?.picking && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && dataCell.hyperlink) {
         followCellHyperlink(dataCell.hyperlink).catch(error=>toast(error.message,'error'));
@@ -4195,6 +4586,7 @@
 
   }
 
+  document.addEventListener('excellens:readingchange',scheduleStylePaint);
   readingMode=new window.ExcelLensReadingMode({button:$('readingModeBtn'),panel:$('readingModePanel'),veil:$('readingVeil'),textureToggle:$('gridTextureToggle'),onTextureChange:syncGridBackdrop});
   highlightMode=new window.ExcelLensHighlightMode({toggle:$('crosshairToggle'),button:$('crosshairColorBtn'),panel:$('crosshairPanel'),onChange:applySelectionClasses});
   recentManager=new window.ExcelLensRecentWorkbooks({api,toast,open:item=>openWorkbook(() =>
@@ -4361,7 +4753,16 @@
     beforePaint:rows=>frozenPresenter.prepare(rows),
     paintCell:frozenPresenter.paint.bind(frozenPresenter),extendTextIntoBlanks:frozenPresenter.overflow.bind(frozenPresenter),
     projectCell:(ref,cell)=>editCopy?.grid.active ? editCopy.grid.project(S.sheet,ref,cell) : cell,
-    estimateBytes:estimateViewportBytes,cacheBudget:VIEWPORT_CACHE_BUDGET,
+    cachedPart:(name,params,base)=>{
+      if(name!=='left'&&base.filtered)return null;
+      const first=Number(params.get('col')),count=Number(params.get('cols'));
+      const columns=params.get('columns')?.split(',').map(Number)||Array.from({length:count},(_,i)=>first+i);
+      const visuals=name==='left'?Array.from({length:base.rowCount?base.limit:0},(_,i)=>base.rowOrder?.at(base.r1+i-1)||base.r1+i):
+        Array.from({length:Number(params.get('limit'))},(_,i)=>i+1).filter(rowVisible);
+      const band={...base,displayStart:visuals[0]||1,displayEnd:visuals.at(-1)||0,startCol:first,cols:count,selectedCols:columns};
+      return tiles.project(band,visuals)?.data;
+    },
+    estimateBytes:estimateViewportBytes,cacheBudget:VIEWPORT_CACHE_BUDGET/4,
     decorateMergedCell,
     decorateColumnHeader:decorateTableColumnHeader,
     isBookmarked:(sheet,ref)=>Boolean(bookmarkCenter?.has(sheet,ref)),
@@ -4432,7 +4833,8 @@
     cachedSheetViews:S.sheetViews.size,
     cachedSheetBytes:S.sheetViewsBytes,
     sheetLoading:Boolean(S.sheetLoadingEpoch),
-    hasPendingRequest:Boolean(S.viewportPending),
+    hasPendingRequest:scheduler.active.size>0,
+    foregroundHits,foregroundLookups,requests:{...scheduler.stats},
     hasVisibleCoverage:S.indexReady && viewportCoversVisible(S.window,getViewportRequest())
   });
   window.addEventListener('excellens:analysis-navigate', event => {

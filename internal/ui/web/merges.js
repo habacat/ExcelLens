@@ -28,6 +28,16 @@
       };
       return find(this.root);
     }
+    intersect(top,bottom,left,right){
+      const ranges=[];
+      function visit(node){
+        if(!node||node.max<top||node.firstRow>bottom||node.lastCol<left||node.firstCol>right)return;
+        const m=node.range;
+        if(m.row<=bottom&&m.endRow>=top&&m.col<=right&&m.endCol>=left)ranges.push(m);
+        visit(node.left);visit(node.right);
+      }
+      visit(this.root);return ranges;
+    }
     // A merged DOM cell owns the value and selection. Only the reading
     // crosshair follows the underlying row and column hit by the pointer.
     pointerCell(event,colLeft,rowTop) {

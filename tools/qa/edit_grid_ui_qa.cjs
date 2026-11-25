@@ -90,10 +90,22 @@ async function main() {
     const resize = ([width, deviceScaleFactor]) => p.call('Emulation.setDeviceMetricsOverride',
       {width, height: 780, deviceScaleFactor, mobile: false});
     await resize(sizes[0]);
+    // Compare the same idle controls. Changing a reading preset animates their
+    // borders; a screenshot taken mid-transition is not the settled palette.
+    async function settledGeometry(){
+      await p.call('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});
+      await p.run(async()=>{
+        document.activeElement?.blur();
+        await new Promise(requestAnimationFrame);
+        const fields=['nameBox','formulaText','editGridFormula','fontSelect','editGridKind'];
+        await Promise.allSettled(fields.flatMap(id=>document.getElementById(id).getAnimations()).map(a=>a.finished));
+      });
+      return p.run(geometry);
+    }
     const reading = new Map();
     for (const preset of presets) {
       await palette(preset);
-      reading.set(preset, await p.run(geometry));
+      reading.set(preset,await settledGeometry());
     }
     await palette('off');
     await p.click('#editCopyOpen');
@@ -106,7 +118,7 @@ async function main() {
       for (const size of sizes) {
         await resize(size);
         await p.evaluate(frames);
-        const ui = await p.run(geometry);
+        const ui=await settledGeometry();
         const context = preset + ' at ' + size.join('×');
         const normal = reading.get(preset);
         assert.deepEqual(ui.field, normal.field, context);

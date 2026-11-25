@@ -74,7 +74,7 @@ test('conditional font properties override rich runs and derived display never r
 });
 
 test('actual style painter clears recycled conditional fills, font flags and number-format color',()=>{
-  const h=setup(),app=read('app.js'),start=app.indexOf('  function applyCellStyle('),end=app.indexOf('  // Each seam',start);
+  const h=setup(),app=read('app.js'),start=app.indexOf('  const cellStyleCache='),end=app.indexOf('  // Each seam',start);
   Object.assign(h.sandbox,{S:h.state,cellPresenter:h.presenter,highlightMode:null,STYLE_ALIGN:{left:'flex-start'},STYLE_VERTICAL:{top:'flex-start'},applyDisplayFont:(node,name)=>{node.style.fontFamily=name;}});
   vm.runInNewContext(app.slice(start,end)+';this.paintStyle=applyCellStyle;',h.sandbox);h.options.applyStyle=h.sandbox.paintStyle;
   const node=h.node(),on={raw:'1',display:'1',style:0,valueColor:'#008800',conditional:{style:{font:{}},visual:{bold:true,italic:true,background:'#FFFF00',color:'#FF0033'},valueColor:''}};

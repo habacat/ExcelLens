@@ -21,7 +21,7 @@ test('identical frozen refreshes share the active read during a warm sheet hando
 });
 test('a superseded frozen read does not turn a current sheet into a read failure',async()=>{
   const h=fixture(),first=h.pending(h.panes.refresh(true));await tick();h.move();const second=h.pending(h.panes.refresh());
-  try{await first;assert(h.calls.slice(0,3).every(call=>call.signal.aborted));assert(h.calls.slice(3).every(call=>!call.signal.aborted));assert.equal(h.state.frozenCellMap.size,0);}
+  try{await first;assert.equal(h.calls.length,4);assert.deepEqual(h.calls.map(call=>call.signal.aborted),[false,false,true,false],'vertical motion shares the unchanged corner and top');assert.equal(h.state.frozenCellMap.size,0);}
   finally{h.panes.reset();await Promise.allSettled([first,second]);}
 });
 test('disabling effective frozen panes cancels an in-flight frozen read',async()=>{
@@ -31,5 +31,5 @@ test('disabling effective frozen panes cancels an in-flight frozen read',async()
 });
 test('a current frozen read still propagates genuine source failures',async()=>{
   const h=fixture(),reading=h.pending(h.panes.refresh(true));h.calls[0].reject(Error('source CRC mismatch'));
-  await assert.rejects(reading,/source CRC mismatch/);assert(h.calls.every(call=>call.signal.aborted),'A failed part releases its sibling reads');h.panes.reset();
+  await assert.rejects(reading,/source CRC mismatch/);assert(h.calls.slice(1).every(call=>call.signal.aborted),'A failed part releases its sibling reads');h.panes.reset();
 });
