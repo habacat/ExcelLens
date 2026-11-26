@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"excellens/internal/browserlease"
+	"excellens/internal/localstore"
 	"excellens/internal/recovery"
 	"excellens/internal/transferjobs"
 	"excellens/internal/workbook"
@@ -102,8 +103,22 @@ func New() (*App, error) {
 	} else if pending {
 		a.restoreState.set(errors.New("检测到未完成的恢复事务"))
 		a.restoreState.startup = true
+	} else {
+		recoverSnapshotStages(roots)
 	}
 	return a, nil
+}
+
+func recoverSnapshotStages(roots localstore.Roots) {
+	stages, err := roots.SnapshotStages(context.Background(), true)
+	if err != nil {
+		log.Printf("检查数据库快照暂存：%v", err)
+	}
+	for _, stage := range stages {
+		if stage.Error != "" {
+			log.Printf("保留数据库快照暂存 %s：%s", stage.Name, stage.Error)
+		}
+	}
 }
 
 func newApp() (*App, error) {

@@ -49,7 +49,7 @@ var allowedInternalImports = map[string][]string{
 	"tray":          {"branding", "formats", "workbook", "buildinfo"},
 	"ui":            {"formats", "buildinfo"},
 	"valueconv":     {},
-	"workbook":      {"searchresults", "fileidentity", "formats", "searchdsl", "sourceview"},
+	"workbook":      {"searchresults", "fileidentity", "formats", "localstore", "searchdsl", "sourceview"},
 }
 
 var allowedCommandImports = map[string][]string{

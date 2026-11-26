@@ -141,8 +141,10 @@ func (a *App) newBrowserSession(launchPath string) (*browserSession, error) {
 	child.edits.revision = a.edits.revision
 	routes := child.routes()
 	if launchPath != "" {
+		child.launchPath = launchPath
 		next := routes
 		open := sync.OnceFunc(func() {
+			defer func() { child.mu.Lock(); child.launchPath = ""; child.mu.Unlock() }()
 			if err := child.OpenPath(launchPath); err != nil {
 				child.mu.Lock()
 				child.startupError = err.Error()
@@ -285,6 +287,10 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 		}
 		if r.URL.Path == "/api/background" {
 			a.handleBackground(w, r)
+			return
+		}
+		if r.URL.Path == "/api/database/snapshots/removal" {
+			a.handleSnapshotRemoval(w, r)
 			return
 		}
 		if r.URL.Path == "/api/storage/jobs" {

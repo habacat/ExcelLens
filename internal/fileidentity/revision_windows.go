@@ -29,21 +29,36 @@ func Open(path string) (*os.File, bool, error) {
 	return f, false, err
 }
 
+type basicFileInfo struct {
+	Created, Accessed, Written, Changed int64
+	Attributes, Padding                 uint32
+}
+
+func basicInfo(f *os.File) (basicFileInfo, bool) {
+	defer runtime.KeepAlive(f)
+	var basic basicFileInfo
+	ok, _, _ := fingerprintGetFileInformation.Call(f.Fd(), 0, uintptr(unsafe.Pointer(&basic)), unsafe.Sizeof(basic))
+	return basic, ok != 0 && basic.Changed > 0 && basic.Written > 0
+}
+
+// ChangeHint detects metadata changes even on volumes without a readable USN.
+// It is not sufficient to key the content digest memo.
+func ChangeHint(f *os.File, _ os.FileInfo) int64 {
+	basic, _ := basicInfo(f)
+	return basic.Changed
+}
+
 func Revision(f *os.File, info os.FileInfo) (Stamp, bool) {
 	defer runtime.KeepAlive(f)
-	var basic struct {
-		Created, Accessed, Written, Changed int64
-		Attributes, Padding                 uint32
+	basic, valid := basicInfo(f)
+	if !valid {
+		return Stamp{}, false
 	}
 	var id struct {
 		Volume uint64
 		ID     [16]byte
 	}
-	ok, _, _ := fingerprintGetFileInformation.Call(f.Fd(), 0, uintptr(unsafe.Pointer(&basic)), unsafe.Sizeof(basic))
-	if ok == 0 || basic.Changed <= 0 || basic.Written <= 0 {
-		return Stamp{}, false
-	}
-	ok, _, _ = fingerprintGetFileInformation.Call(f.Fd(), 18, uintptr(unsafe.Pointer(&id)), unsafe.Sizeof(id))
+	ok, _, _ := fingerprintGetFileInformation.Call(f.Fd(), 18, uintptr(unsafe.Pointer(&id)), unsafe.Sizeof(id))
 	if ok == 0 || id.ID == [16]byte{} {
 		return Stamp{}, false
 	}

@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"excellens/internal/formats"
+	"excellens/internal/localstore"
 )
 
 const databaseSnapshotFile = "snapshot" + formats.DatabaseSnapshotExtension
@@ -87,8 +88,9 @@ type DatabaseCell struct {
 }
 
 type databaseSource struct {
-	manifest databaseManifest
-	parts    map[string][2]os.FileInfo
+	manifest     databaseManifest
+	manifestPart databaseVerifiedPart
+	parts        map[string]*databaseSheetParts
 }
 
 // DatabaseSnapshot streams files into an unpublished sibling directory. Once
@@ -99,6 +101,7 @@ type DatabaseSnapshot struct {
 	next      int
 	bytes     int64
 	committed bool
+	cleanup   func() error
 }
 
 func DatabaseSnapshotRoot() string {
@@ -135,16 +138,17 @@ func startDatabaseSnapshot(meta databaseManifest) (*DatabaseSnapshot, error) {
 	if st, err := os.Lstat(root); err != nil || !st.IsDir() {
 		return nil, errors.New("数据库快照目录不是普通目录")
 	}
-	dir, err := os.MkdirTemp(root, ".snapshot-*.tmp")
+	dir, cleanup, err := localstore.NewSnapshotStage(root)
 	if err != nil {
 		return nil, err
 	}
-	return &DatabaseSnapshot{workbook: databaseWorkbook(meta, "", dir), manifest: meta}, nil
+	return &DatabaseSnapshot{workbook: databaseWorkbook(meta, "", dir), manifest: meta, cleanup: cleanup}, nil
 }
 
 func (d *DatabaseSnapshot) Discard() {
-	if !d.committed {
-		_ = os.RemoveAll(filepath.Dir(d.workbook.Path))
+	if d.cleanup != nil {
+		_ = d.cleanup()
+		d.cleanup = nil
 	}
 }
 
@@ -268,11 +272,41 @@ func (d *DatabaseSnapshot) Commit(ctx context.Context) (*Workbook, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	// Seal only the files we just created in the unpublished directory.
+	for _, sheet := range d.workbook.Sheets {
+		rows, index := d.workbook.cachePaths(sheet.Path)
+		for _, path := range []string{rows, index} {
+			if err := os.Chmod(path, 0400); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := os.Chmod(d.workbook.Path, 0400); err != nil {
+		return nil, err
+	}
+	st, err := os.Lstat(d.workbook.Path)
+	if err != nil {
+		return nil, err
+	}
+	// Detach the published metadata from the writer and caller-owned table slices.
+	var sealed databaseManifest
+	if err := json.Unmarshal(data, &sealed); err != nil {
+		return nil, err
+	}
+	wb, err := prepareDatabaseWorkbook(ctx, sealed, key, filepath.Dir(d.workbook.Path), st)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err := os.Rename(filepath.Dir(d.workbook.Path), target); err != nil {
 		return nil, err
 	}
 	d.committed = true
-	return loadDatabaseSnapshot(context.Background(), filepath.Join(target, databaseSnapshotFile), false)
+	d.Discard()
+	wb.Path = filepath.Join(target, databaseSnapshotFile)
+	return wb, nil
 }
 
 func databaseWorkbook(meta databaseManifest, key, dir string) *Workbook {

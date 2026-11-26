@@ -1,0 +1,41 @@
+{
+  "version": "1.17.2",
+  "result": "PASS",
+  "scope": "Database snapshot management, evidence and home-page copy",
+  "platform": "Windows amd64, Go 1.27.4",
+  "data": "Synthetic retained snapshots and isolated application storage",
+  "goTests": [
+    "TestDatabaseSnapshotManagementChecksReferencesAtConfirmation",
+    "TestDatabaseSnapshotSurvivesCacheClearsAndEncryptedMigration",
+    "TestOldDatabaseSnapshotRemainsProtectedAndCanBeSealed",
+    "TestReconcileRecordBundlesCapturedInputsAndCompleteFilteredEvidence",
+    "TestSnapshotStagesRecoverKilledWriterOnly"
+  ],
+  "storage": [
+    "Measured snapshot bytes include the manifest, row data and index",
+    "A new open reference after preview, a recoverable task, a saved recipe and an exported reconciliation result block removal",
+    "An unreadable reference catalogue or an unexpected sibling file prevents deletion",
+    "Operator confirmation removes an unreferenced snapshot",
+    "Killing the helper process releases the stage lease; active and unmarked staging directories are preserved",
+    "Encrypted restore reopens the original values and installs read-only snapshot files",
+    "The grid, explicit verification, open and evidence export reject same-length changes with restored modification time"
+  ],
+  "interface": {
+    "method": "Isolated headless Chromium with the application service",
+    "checks": [
+      "Three home menu entries and keyboard activation",
+      "Grid cell copy followed by mouse-drag selection and native Ctrl+C of home menu text",
+      "Independent and combined source, table, date and size filters, plus a capacity reminder",
+      "Table selection shows SQL, field definitions and part digests",
+      "Downloaded JSON bytes hash to the manifest SHA-256",
+      "Narrow evidence layout and cancelled or confirmed deletion"
+    ],
+    "narrowViewportPixels": 390
+  },
+  "limits": {
+    "liveProductionDatabase": "NOT_RUN",
+    "manualDesktop": "NOT_RUN",
+    "physicalPowerLoss": "NOT_RUN",
+    "referenceCoverage": "Application-managed source bindings and identifiable local output records"
+  }
+}

@@ -646,6 +646,15 @@ func (s *Store) checkpoint(path string, v *state) error {
 	return err
 }
 func (s *Store) List(kind string) ([]Entry, error) {
+	return s.list(kind, 50)
+}
+
+// ListAll includes older journals when checking durable source references.
+func (s *Store) ListAll(kind string) ([]Entry, error) {
+	return s.list(kind, 0)
+}
+
+func (s *Store) list(kind string, limit int) ([]Entry, error) {
 	if kind != "calculator" && kind != "analysis" {
 		return nil, errors.New("恢复类型无效")
 	}
@@ -688,14 +697,17 @@ func (s *Store) List(kind string) ([]Entry, error) {
 				continue
 			}
 			info, e := entry.Info()
-			if e != nil || info.Size() < 8 {
+			if e != nil && limit == 0 {
+				return nil, e
+			}
+			if e != nil || (limit != 0 && info.Size() < 8) {
 				continue
 			}
 			result = append(result, Entry{Owner: owner, Kind: kind, Updated: info.ModTime().UTC(), Bytes: info.Size(), Backup: backup})
 		}
 		sort.Slice(result, func(i, j int) bool { return result[i].Updated.After(result[j].Updated) })
-		if len(result) > 50 {
-			result = result[:50]
+		if limit > 0 && len(result) > limit {
+			result = result[:limit]
 		}
 		if err == io.EOF {
 			break

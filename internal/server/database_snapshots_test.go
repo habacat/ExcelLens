@@ -151,6 +151,15 @@ func TestDatabaseSnapshotSurvivesCacheClearsAndEncryptedMigration(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
+		if st.Mode().Perm()&0222 != 0 {
+			t.Fatal("restored evidence is writable", part.path)
+		}
+		if err := os.Chmod(part.path, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := after.CachedIndexForRead(ctx, after.Sheets[0].Path); err != nil {
+			t.Fatal("metadata-only change rejected", err)
+		}
 		// Modify a byte without changing file length, then move mtime back.
 		f, err := os.OpenFile(part.path, os.O_RDWR, 0)
 		if err != nil {
@@ -162,7 +171,11 @@ func TestDatabaseSnapshotSurvivesCacheClearsAndEncryptedMigration(t *testing.T) 
 		if err != nil || closeErr != nil || os.Chtimes(part.path, st.ModTime(), st.ModTime()) != nil {
 			t.Fatal(err, closeErr)
 		}
-		for _, action := range []string{"open", "verify"} {
+		grid := analysisRequest(t, app, "GET", "/api/sheet?sheet=claims&row=2&cols=2", "")
+		if grid.Code != http.StatusConflict || !strings.Contains(grid.Body.String(), "摘要不匹配") {
+			t.Fatalf("grid accepted changed part: %d %s", grid.Code, grid.Body.String())
+		}
+		for _, action := range []string{"open", "verify", "export"} {
 			res := reconcilePost(t, app, databaseSnapshotsAPI, map[string]string{"action": action, "key": wb.Fingerprint})
 			if res.Code != http.StatusConflict || !strings.Contains(res.Body.String(), "摘要不匹配") || app.currentWorkbook() != after {
 				t.Fatalf("%s accepted a same-size rewrite: %d %s", action, res.Code, res.Body.String())

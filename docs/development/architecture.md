@@ -56,7 +56,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | opc | Go 标准库 |
 | separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
-| workbook | fileidentity、formats、searchdsl、sourceview、searchresults |
+| workbook | fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
 | onlinedb | formats |
 | savedconfig | Go 标准库 |
 | transferjobs | localstore、savedconfig |
@@ -98,7 +98,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 `workbook/xlsb*.go` 以 MS-XLSB 规范解码 OPC 工作簿内的 BIFF12。表内数据顺序写入 `ELNROW02`，富文本、共享公式状态、数组锚点及行样式使用 XLSB 独立缓存域。全量共享字符串以磁盘偏移读取，前缀预览单独限读所需字符串。工作表边扫边保存布局及规则记录，同一张表的构建受公共索引门控，异表可并行构建并复用已确认的共享字符串缓存。XLSB 缓存域为 `xlsb-biff12-v3`，早期开发缓存可随未使用缓存清理。
 
-`onlinedb` 负责专用驱动、TLS、目录绑定、字段定义、引擎标识符及源值转换。`server/database.go` 管理本机页面任务和取消。所选表顺序写入 `ELNROW02` 行文件和原生磁盘索引，边写边计算两个 SHA-256。v2 清单包含无凭据的来源标识、每表时间、字段、记录数和查询口径。清单摘要给完整快照目录命名，目录随即原子发布到本地数据的 `database-snapshots` 分组。该分组进入现有流式备份与恢复，未完成的暂存目录被跳过。新旧快照都把原始行与索引保存在清单旁边，搜索与查询结果使用 `CacheRoot()` 下单独派生的工作簿缓存键。打开、独立核验和显式来源绑定校验内容摘要，滚动复用已打开的索引。旧版依然可离线读，保存副本时标出摘要和来源元数据的边界。
+`onlinedb` 负责专用驱动、TLS、目录绑定、字段定义、引擎标识符及源值转换。`server/database.go` 管理本机页面任务和取消。所选表顺序写入 `ELNROW02` 行文件和原生磁盘索引，边写边计算两个 SHA-256。v2 清单包含无凭据的来源标识、每表时间、字段、记录数和查询口径。清单摘要给完整快照目录命名，目录随即原子发布到本地数据的 `database-snapshots` 分组。该分组进入现有流式备份与恢复。采集和删除暂存使用与备份相同的所有权标记和进程锁机制，单列统计占用。启动时只回收可证实的遗留暂存。新旧快照都把原始行与索引保存在清单旁边，搜索与查询结果使用 `CacheRoot()` 下单独派生的工作簿缓存键。打开、单独核验、采集记录导出和显式来源绑定校验摘要。网格按清单及当前表部件检查修订，修订变化时重验对应文件。删除确认在本机请求与数据管理排他区内重新核对已登记成果和来源租约，原子移出目录后释放空间。旧版依然可离线读，保存副本时标出摘要和来源元数据的边界。
 
 界面的 A1 坐标转换由 `cell-address.js` 提供，调用方传入来源容量。命令检索、键盘选择及可用性判断由 `command-palette.js` 管理，操作回调由应用装配。视口的覆盖范围、字节估计和缓存淘汰由 `viewport-cache.js` 管理。网格请求直接持有写入或复用的条目，缓存总量由同一组件维护。
 

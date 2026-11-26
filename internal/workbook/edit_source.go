@@ -78,6 +78,13 @@ func openSourceFile(path string, maxBytes int64) (*EditSourceFile, error) {
 // SourceFileSHA256 binds the exact input bytes to the opened workbook.
 // Explicit comparisons can include read-only formats and files above edit limits.
 func (w *Workbook) SourceFileSHA256(ctx context.Context) (string, error) {
+	if w.Format == "db-online" {
+		// The raw manifest digest binds the task to every verified data part.
+		if err := w.VerifyDatabaseSnapshot(ctx); err != nil {
+			return "", err
+		}
+		return w.Fingerprint, nil
+	}
 	f, err := openSourceFile(w.Path, 0)
 	if err != nil {
 		return "", err

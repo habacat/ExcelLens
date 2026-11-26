@@ -82,6 +82,9 @@ func (a *App) retryRecovery(roots localstore.Roots) {
 	s := &a.restoreState
 	report := func(p localstore.Progress) { s.mu.Lock(); s.progress = p; s.mu.Unlock() }
 	err := roots.RecoverWith(context.Background(), localstore.TransferOptions{Report: report})
+	if err == nil {
+		recoverSnapshotStages(roots)
+	}
 	a.toolbar.mu.Lock()
 	a.toolbar.loaded = false
 	a.toolbar.mu.Unlock()

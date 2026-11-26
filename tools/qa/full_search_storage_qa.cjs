@@ -7,7 +7,7 @@ const {launch,pause}=require('./browser_harness.cjs');
     const {roots}=await p.api('/api/storage'),history=path.join(roots.config,'transfer-history.json');
     fs.mkdirSync(roots.config,{recursive:true});fs.writeFileSync(history,'broken-history');
     const parent=path.join(h.storage,'backups');fs.mkdirSync(parent);
-    await p.click('#storageHome');await p.wait('!storageHistoryIssue.hidden&&storageDialog.getAttribute("aria-busy")==="false"');
+    await p.click('#homeDataMenu summary');await p.click('#storageHome');await p.wait('!storageHistoryIssue.hidden&&storageDialog.getAttribute("aria-busy")==="false"');
     await p.run(dir=>{storageDirectory.value=dir;},parent);
     await p.click('[data-storage="backup"]');await p.wait('storageStatus.textContent.includes("备份已核验")');
     assert.equal(fs.readFileSync(history,'utf8'),'broken-history');
@@ -38,7 +38,7 @@ const {launch,pause}=require('./browser_harness.cjs');
     assert.equal(status.matchedRows,2); // The filter keeps the header and one data row.
     const {targetId}=await p.call('Target.createTarget',{url:h.address});
     const other=await h.connect((await h.tabs()).find(t=>t.id===targetId));await other.wait('!!window.ExcelLensSession');await other.evaluate('ExcelLensSession.ready');
-    await other.click('#storageHome');await other.evaluate('storageBackground.open=true');
+    await other.click('#homeDataMenu summary');await other.click('#storageHome');await other.evaluate('storageBackground.open=true');
     await other.wait('storageWork.textContent.includes("活动页面使用中")');
     const items=await other.api('/api/background');const item=items.items.find(x=>x.id===filter.jobId);
     assert.equal(item.protected,true);

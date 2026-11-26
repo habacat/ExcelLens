@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
 	"excellens/internal/workbook"
 )
@@ -22,7 +24,22 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 409, err.Error())
 			return
 		}
-		writeJSON(w, map[string]any{"items": items})
+		roots, err := dataRoots()
+		if err != nil {
+			writeError(w, 500, err.Error())
+			return
+		}
+		stages, err := roots.SnapshotStages(r.Context(), false)
+		if err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+		policy, err := loadSnapshotPolicy(roots.Config)
+		response := map[string]any{"items": items, "stages": stages, "stageRoot": workbook.DatabaseSnapshotRoot(), "policy": policy}
+		if err != nil {
+			response["policyError"] = err.Error()
+		}
+		writeJSON(w, response)
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -30,10 +47,34 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Action string `json:"action"`
-		Key    string `json:"key"`
+		Action string          `json:"action"`
+		Key    string          `json:"key"`
+		Policy *snapshotPolicy `json:"policy,omitempty"`
 	}
 	if !decodeDatabaseRequest(w, r, &req) {
+		return
+	}
+	if req.Action == "policy" {
+		if req.Policy == nil || !req.Policy.valid() {
+			writeError(w, 400, "容量与复核天数无效")
+			return
+		}
+		if !root.storageMu.TryLock() {
+			writeError(w, 409, "另一项数据管理操作正在进行")
+			return
+		}
+		defer root.storageMu.Unlock()
+		roots, err := dataRoots()
+		if err == nil {
+			if _, err = loadSnapshotPolicy(roots.Config); err == nil {
+				err = writeSavedConfig(snapshotPolicyPath(roots.Config), 4096, req.Policy, durableConfigOps)
+			}
+		}
+		if err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+		writeJSON(w, req.Policy)
 		return
 	}
 	path := workbook.DatabaseSnapshotPath(req.Key)
@@ -53,13 +94,19 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.writeWorkbookStatus(w, wb)
-	case "verify":
-		wb, err := workbook.OpenDatabaseSnapshot(ctx, path)
+	case "verify", "export":
+		evidence, err := workbook.VerifiedDatabaseEvidence(ctx, req.Key)
 		if err != nil {
 			writeError(w, 409, err.Error())
 			return
 		}
-		writeJSON(w, map[string]any{"key": wb.Fingerprint, "verified": true, "evidence": wb.DatabaseSnapshotEvidence()})
+		if req.Action == "export" {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set("Content-Disposition", `attachment; filename="ExcelLens-snapshot-`+req.Key+`.json"`)
+			_, _ = w.Write(evidence)
+			return
+		}
+		writeJSON(w, map[string]any{"key": req.Key, "verified": true, "verifiedAt": time.Now().UTC(), "evidence": evidence})
 	case "retain":
 		if !root.storageMu.TryLock() {
 			writeError(w, 409, "另一项数据管理操作正在进行")
@@ -80,6 +127,26 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, 400, "请选择数据库快照操作")
 	}
+}
+
+type snapshotPolicy struct {
+	BudgetBytes int64 `json:"budgetBytes"`
+	ReviewDays  int   `json:"reviewDays"`
+}
+
+func (p snapshotPolicy) valid() bool {
+	return p.BudgetBytes >= 0 && p.BudgetBytes < 1<<53 && p.ReviewDays >= 0 && p.ReviewDays <= 365000
+}
+func snapshotPolicyPath(config string) string {
+	return filepath.Join(config, "settings", "database-snapshots.json")
+}
+func loadSnapshotPolicy(config string) (snapshotPolicy, error) {
+	var p snapshotPolicy
+	_, err := readSavedConfig(snapshotPolicyPath(config), 4096, &p)
+	if err == nil && !p.valid() {
+		err = errors.New("快照容量或复核提醒设置无效")
+	}
+	return p, err
 }
 
 func (a *App) openDatabaseSnapshot(ctx context.Context, path, key string) (*workbook.Workbook, error) {

@@ -13,26 +13,47 @@ import (
 	"excellens/internal/filelock"
 )
 
-const backupMarker = ".excellens-backup-stage"
 const stagePayload = "payload"
 
-var stagePattern = regexp.MustCompile(`^\.ExcelLens-[0-9]{8}-[0-9]{6}-[0-9]+$`)
+type stageLayout struct {
+	pattern           *regexp.Regexp
+	marker, signature string
+}
+
+var backupStageLayout = stageLayout{regexp.MustCompile(`^\.ExcelLens-[0-9]{8}-[0-9]{6}-[0-9]+$`), ".excellens-backup-stage", "ExcelLens backup stage v1"}
+var snapshotStageLayout = stageLayout{regexp.MustCompile(`^\.snapshot-[0-9]+\.tmp$`), ".excellens-snapshot-stage", "ExcelLens database snapshot stage v1"}
 
 type BackupStage struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
 }
 
-func markerText(name string) string { return "ExcelLens backup stage v1\n" + name + "\n" }
+func (layout stageLayout) markerText(name string) string {
+	return layout.signature + "\n" + name + "\n"
+}
 
 // Keep the lease outside the payload directory so Windows can publish it
 // atomically while the writer still excludes cleanup by another process.
 func newBackupStage(parent string) (string, func() error, error) {
-	stage, err := os.MkdirTemp(parent, ".ExcelLens-"+time.Now().Format("20060102-150405")+"-")
+	return backupStageLayout.create(parent, ".ExcelLens-"+time.Now().Format("20060102-150405")+"-")
+}
+
+// NewSnapshotStage returns the private payload and a cleanup function which
+// holds the writer lease until after publication or discard.
+func NewSnapshotStage(parent string) (string, func() error, error) {
+	stage, cleanup, err := snapshotStageLayout.create(parent, ".snapshot-*.tmp")
 	if err != nil {
 		return "", nil, err
 	}
-	marker, err := os.OpenFile(filepath.Join(stage, backupMarker), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	return filepath.Join(stage, stagePayload), cleanup, nil
+}
+
+func (layout stageLayout) create(parent, pattern string) (string, func() error, error) {
+	stage, err := os.MkdirTemp(parent, pattern)
+	if err != nil {
+		return "", nil, err
+	}
+	marker, err := os.OpenFile(filepath.Join(stage, layout.marker), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
 	if err != nil {
 		os.Remove(stage)
 		return "", nil, err
@@ -42,7 +63,7 @@ func newBackupStage(parent string) (string, func() error, error) {
 		if err := errors.Join(removeErr, marker.Close()); err != nil {
 			return err
 		}
-		if err := os.Remove(filepath.Join(stage, backupMarker)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.Remove(filepath.Join(stage, layout.marker)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		if err := os.Remove(stage); !errors.Is(err, os.ErrNotExist) {
@@ -51,7 +72,7 @@ func newBackupStage(parent string) (string, func() error, error) {
 		return nil
 	}
 	if err = filelock.Lock(marker); err == nil {
-		_, err = io.WriteString(marker, markerText(filepath.Base(stage)))
+		_, err = io.WriteString(marker, layout.markerText(filepath.Base(stage)))
 	}
 	if err == nil {
 		err = marker.Sync()
@@ -68,8 +89,8 @@ func newBackupStage(parent string) (string, func() error, error) {
 	return stage, cleanup, nil
 }
 
-func inspectStage(parent *os.Root, name string, clean bool) (string, error) {
-	if !stagePattern.MatchString(name) {
+func (layout stageLayout) inspect(parent *os.Root, name string, clean bool) (string, error) {
+	if !layout.pattern.MatchString(name) {
 		return "", errors.New("暂存目录名称无效")
 	}
 	st, err := parent.Lstat(name)
@@ -81,7 +102,7 @@ func inspectStage(parent *os.Root, name string, clean bool) (string, error) {
 		return "", err
 	}
 	defer stage.Close()
-	marker, _, err := openRegular(stage, backupMarker)
+	marker, _, err := openRegular(stage, layout.marker)
 	if errors.Is(err, os.ErrNotExist) {
 		return "unknown", nil
 	}
@@ -98,7 +119,7 @@ func inspectStage(parent *os.Root, name string, clean bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if string(b) != markerText(name) {
+	if string(b) != layout.markerText(name) {
 		return "unknown", nil
 	}
 	if !clean {
@@ -110,7 +131,7 @@ func inspectStage(parent *os.Root, name string, clean bool) (string, error) {
 		return "", err
 	}
 	for _, e := range entries {
-		if e.Name() != stagePayload && e.Name() != backupMarker {
+		if e.Name() != stagePayload && e.Name() != layout.marker {
 			return "", errors.New("暂存目录含其他文件，请先核对")
 		}
 	}
@@ -120,7 +141,7 @@ func inspectStage(parent *os.Root, name string, clean bool) (string, error) {
 	if err := marker.Close(); err != nil {
 		return "", err
 	}
-	if err := stage.Remove(backupMarker); err != nil {
+	if err := stage.Remove(layout.marker); err != nil {
 		return "", err
 	}
 	if err := stage.Close(); err != nil {
@@ -151,10 +172,10 @@ func (r Roots) BackupStages(folder string) ([]BackupStage, error) {
 	}
 	out := []BackupStage{}
 	for _, e := range entries {
-		if !e.IsDir() || !stagePattern.MatchString(e.Name()) {
+		if !e.IsDir() || !backupStageLayout.pattern.MatchString(e.Name()) {
 			continue
 		}
-		state, err := inspectStage(root, e.Name(), false)
+		state, err := backupStageLayout.inspect(root, e.Name(), false)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -175,7 +196,7 @@ func (r Roots) CleanBackupStage(folder, name string) error {
 		return err
 	}
 	defer root.Close()
-	state, err := inspectStage(root, name, true)
+	state, err := backupStageLayout.inspect(root, name, true)
 	if err != nil {
 		return err
 	}

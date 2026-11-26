@@ -227,7 +227,11 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
-	idx := wb.GetCachedIndex(meta.Path)
+	idx, integrityErr := wb.CachedIndexForRead(r.Context(), meta.Path)
+	if integrityErr != nil {
+		writeError(w, http.StatusConflict, integrityErr.Error())
+		return
+	}
 	if idx == nil {
 		writeError(w, http.StatusConflict, "工作表索引尚未建立")
 		return

@@ -8,7 +8,7 @@ async function main() {
   const report = {}, errors = [];
   const h = await launch({errors}), home = h.page;
   try {
-    await home.click('#storageHome');
+    await home.click('#homeDataMenu summary');await home.click('#storageHome');
     await home.wait('storageDialog.open && storageRows.rows.length >= 10 && storageDialog.getAttribute("aria-busy")==="false"');
     assert.ok((await home.evaluate('storageRows.textContent')).includes('上传副本'));
     await home.evaluate('storageDialog.close()');
@@ -66,7 +66,7 @@ async function main() {
     await pause(56000);
     assert.equal(await lease(next,'heartbeat'),410);
     report.closedTabExpiredAfterMs = Date.now()-closed;
-    await home.click('#storageHome');
+    await home.click('#homeDataMenu summary');await home.click('#storageHome');
     await home.wait('storageDialog.getAttribute("aria-busy")==="false"');
     await home.run(folder => { storageDirectory.value=folder; },path.join(parent,folders[0]));
     await home.click('[data-storage="restore"]');

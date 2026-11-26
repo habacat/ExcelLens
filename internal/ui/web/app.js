@@ -4212,9 +4212,8 @@
       take(()=>followCellHyperlink(S.selected.hyperlink));return;
     }
     if(ctrl&&!alt&&!shift&&key==='o'&&!editing){take(chooseFile);return;}
-    if(!S.opened||!S.indexReady)return;
-    // Native text selection inside formula inspector must retain Ctrl+C.
-    if(insideFormula&&ctrl&&key==='c'&&window.getSelection()?.toString())return;
+    if(!$('welcome').hidden||!S.opened||!S.indexReady)return;
+    if(ctrl&&!alt&&!shift&&key==='c'&&window.getSelection()?.toString())return;
     if(insideFormula&&ctrl&&!alt&&!shift&&key==='a'){
       take(()=>{const range=document.createRange();range.selectNodeContents($('formulaText'));
         const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);});
@@ -4309,6 +4308,35 @@
   }
 
   function bindEvents() {
+    const homeMenu = $('homeDataMenu');
+    const menuTrigger = $('homeDataTrigger');
+    homeMenu.addEventListener('click', event => {
+      if (!event.target.closest('[role="button"]')) return;
+      const selection = window.getSelection();
+      if (event.detail && !selection.isCollapsed && homeMenu.contains(selection.anchorNode)) {
+        event.stopPropagation();
+        return;
+      }
+      homeMenu.open = false;
+      menuTrigger.focus();
+    }, true);
+    homeMenu.addEventListener('keydown', event => {
+      if (event.target.matches('[role="button"]') && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) event.target.click();
+        return;
+      }
+      if (event.key === 'Escape' && homeMenu.open) {
+        event.preventDefault();
+        event.stopPropagation();
+        homeMenu.open = false;
+        menuTrigger.focus();
+      }
+    });
+    document.addEventListener('pointerdown', event => {
+      if (homeMenu.open && !homeMenu.contains(event.target)) homeMenu.open = false;
+    });
     window.ExcelLensStorage({api, openDialog, background: window.ExcelLensBackground({
       api, state:S, openDialog, toast, adoptTask:adoptRecoveredTask,
       analysis:(job,status)=>window.ExcelLensAnalytics.reopenJob(job,status),

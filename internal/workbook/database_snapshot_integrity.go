@@ -18,15 +18,17 @@ import (
 )
 
 type DatabaseSnapshotSummary struct {
-	Key       string    `json:"key"`
-	Name      string    `json:"name"`
-	Taken     time.Time `json:"taken"`
-	Sheets    int       `json:"sheets"`
-	Records   int64     `json:"records"`
-	Bytes     int64     `json:"bytes"`
-	Retained  bool      `json:"retained"`
-	LegacyKey string    `json:"-"`
-	Error     string    `json:"error,omitempty"`
+	Key       string                  `json:"key"`
+	Name      string                  `json:"name"`
+	Taken     time.Time               `json:"taken"`
+	Sheets    int                     `json:"sheets"`
+	Records   int64                   `json:"records"`
+	Bytes     int64                   `json:"bytes"`
+	Retained  bool                    `json:"retained"`
+	Source    *DatabaseSnapshotSource `json:"source,omitempty"`
+	Tables    []string                `json:"tables,omitempty"`
+	LegacyKey string                  `json:"legacyKey,omitempty"`
+	Error     string                  `json:"error,omitempty"`
 }
 
 func ListDatabaseSnapshots(ctx context.Context) ([]DatabaseSnapshotSummary, error) {
@@ -38,17 +40,7 @@ func ListDatabaseSnapshots(ctx context.Context) ([]DatabaseSnapshotSummary, erro
 	if err != nil {
 		return nil, err
 	}
-	claimed := make(map[string]bool, len(retained))
-	for _, item := range retained {
-		if item.LegacyKey != "" {
-			claimed[item.LegacyKey] = true
-		}
-	}
-	for _, item := range legacy {
-		if !claimed[item.Key] {
-			retained = append(retained, item)
-		}
-	}
+	retained = append(retained, legacy...)
 	slices.SortStableFunc(retained, func(a, b DatabaseSnapshotSummary) int { return b.Taken.Compare(a.Taken) })
 	return retained, nil
 }
@@ -82,33 +74,44 @@ func listDatabaseSnapshotRoot(ctx context.Context, root string, retained bool) (
 				continue
 			}
 		}
-		data, _, _, err := databaseManifestAt(filepath.Join(dir, databaseSnapshotFile))
-		if err != nil {
-			out = append(out, DatabaseSnapshotSummary{Key: key, Name: "数据库快照", Error: err.Error()})
-			continue
+		item := DatabaseSnapshotSummary{Key: key, Name: "数据库快照", Retained: retained}
+		meta, _, _, manifestErr := databaseManifestAt(filepath.Join(dir, databaseSnapshotFile))
+		if manifestErr == nil && retained != (meta.Version == 2) {
+			manifestErr = errors.New("快照的存放位置无效")
 		}
-		if retained != (data.Version == 2) {
-			out = append(out, DatabaseSnapshotSummary{Key: key, Name: data.Label, Error: "快照的存放位置无效"})
-			continue
-		}
-		item := DatabaseSnapshotSummary{Key: key, Name: data.Label, Taken: data.Taken, Sheets: len(data.Tables), LegacyKey: data.LegacyKey, Retained: retained}
-		if retained {
-			for _, t := range data.Tables {
-				item.Records += int64(t.Evidence.Records)
-				item.Bytes += t.Evidence.Rows.Bytes + t.Evidence.Index.Bytes
+		if manifestErr == nil {
+			item.Name, item.Taken, item.Source = meta.Label, meta.Taken, meta.Source
+			item.Sheets, item.LegacyKey = len(meta.Tables), meta.LegacyKey
+			for _, t := range meta.Tables {
+				item.Tables = append(item.Tables, t.Schema+"."+t.Name)
+				if t.Evidence != nil {
+					item.Records += int64(t.Evidence.Records)
+				}
 			}
+		}
+		item.Bytes, err = snapshotDirectorySize(ctx, dir)
+		if problem := errors.Join(manifestErr, err); problem != nil {
+			item.Error = problem.Error()
 		}
 		out = append(out, item)
 	}
 	return out, nil
 }
 
-func (w *Workbook) DatabaseSnapshotEvidence() json.RawMessage {
-	if w.Format != "db-online" || w.source.database.manifest.Version != 2 {
-		return nil
+func VerifiedDatabaseEvidence(ctx context.Context, key string) (json.RawMessage, error) {
+	path := DatabaseSnapshotPath(key)
+	meta, data, _, err := databaseManifestAt(path)
+	if err != nil {
+		return nil, err
 	}
-	data, _ := json.Marshal(w.source.database.manifest)
-	return data
+	if meta.Version != 2 || databaseSnapshotKey(data) != key {
+		return nil, errors.New("快照清单未固化或身份不匹配")
+	}
+	w := databaseWorkbook(meta, key, filepath.Dir(path))
+	if err := w.VerifyDatabaseSnapshot(ctx); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func HasLegacyDatabaseSnapshot(dir string) (bool, error) {
@@ -120,14 +123,6 @@ func HasLegacyDatabaseSnapshot(dir string) (bool, error) {
 }
 
 func OpenDatabaseSnapshot(ctx context.Context, path string) (*Workbook, error) {
-	return loadDatabaseSnapshot(ctx, path, true)
-}
-
-func openDatabaseSnapshot(path string) (*Workbook, error) {
-	return OpenDatabaseSnapshot(context.Background(), path)
-}
-
-func loadDatabaseSnapshot(ctx context.Context, path string, verify bool) (*Workbook, error) {
 	meta, data, st, err := databaseManifestAt(path)
 	if err != nil {
 		return nil, err
@@ -136,13 +131,22 @@ func loadDatabaseSnapshot(ctx context.Context, path string, verify bool) (*Workb
 	if meta.Version == 2 {
 		dir = filepath.Dir(DatabaseSnapshotPath(databaseSnapshotKey(data)))
 	}
-	w := databaseWorkbook(meta, databaseSnapshotKey(data), dir)
+	return prepareDatabaseWorkbook(ctx, meta, databaseSnapshotKey(data), dir, st)
+}
+
+func prepareDatabaseWorkbook(ctx context.Context, meta databaseManifest, key, dir string, st os.FileInfo) (*Workbook, error) {
+	w := databaseWorkbook(meta, key, dir)
 	w.source.size, w.source.modified = st.Size(), st.ModTime()
 	if meta.Version == 2 {
-		w.source.database.parts, err = w.loadDatabaseParts(ctx, verify)
+		w.source.database.manifestPart.expected = databasePart{Bytes: st.Size(), SHA256: w.Fingerprint}
+		if err := w.source.database.manifestPart.check(ctx, w.Path); err != nil {
+			return nil, err
+		}
+		parts, err := w.loadDatabaseParts(ctx)
 		if err != nil {
 			return nil, err
 		}
+		w.source.database.parts = parts
 	} else {
 		for _, sheet := range w.Sheets {
 			if w.GetCachedIndex(sheet.Path) == nil {
@@ -158,6 +162,10 @@ func loadDatabaseSnapshot(ctx context.Context, path string, verify bool) (*Workb
 		return nil, fmt.Errorf("无法创建数据库查询缓存：%w", err)
 	}
 	return w, nil
+}
+
+func openDatabaseSnapshot(path string) (*Workbook, error) {
+	return OpenDatabaseSnapshot(context.Background(), path)
 }
 
 func databaseManifestAt(path string) (databaseManifest, []byte, os.FileInfo, error) {
@@ -230,61 +238,8 @@ func (w *Workbook) VerifyDatabaseSnapshot(ctx context.Context) error {
 	if err != nil || databaseSnapshotKey(data) != w.Fingerprint {
 		return errors.New("数据库快照清单摘要不匹配")
 	}
-	_, err = w.loadDatabaseParts(ctx, true)
+	_, err = w.loadDatabaseParts(ctx)
 	return err
-}
-
-func (w *Workbook) loadDatabaseParts(ctx context.Context, verify bool) (map[string][2]os.FileInfo, error) {
-	out := make(map[string][2]os.FileInfo, len(w.Sheets))
-	for n, sheet := range w.Sheets {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		rows, index := w.cachePaths(sheet.Path)
-		evidence := w.source.database.manifest.Tables[n].Evidence
-		var stats [2]os.FileInfo
-		for i, item := range []struct {
-			path, label string
-			part        databasePart
-		}{{rows, "行文件", evidence.Rows}, {index, "索引", evidence.Index}} {
-			st, err := os.Lstat(item.path)
-			if err == nil && (!st.Mode().IsRegular() || st.Size() != item.part.Bytes) {
-				err = errors.New("文件类型或长度不匹配")
-			}
-			if err == nil && verify {
-				var actual databasePart
-				actual, err = readDatabasePart(ctx, item.path, st, nil)
-				if err == nil && actual != item.part {
-					err = errors.New("SHA-256 摘要不匹配")
-				}
-			}
-			if err != nil {
-				return nil, fmt.Errorf("数据库快照 %s 的%s校验失败：%w", sheet.SourceName, item.label, err)
-			}
-			stats[i] = st
-		}
-		out[sheet.Path] = stats
-	}
-	return out, nil
-}
-
-func (w *Workbook) databasePartsUnchanged(sheet string) bool {
-	source := w.source.database
-	if source.manifest.Version == 1 {
-		return true
-	}
-	expected, ok := source.parts[sheet]
-	if !ok {
-		return false
-	}
-	rows, index := w.cachePaths(sheet)
-	for i, path := range []string{rows, index} {
-		st, err := os.Lstat(path)
-		if err != nil || !sameDatabasePart(expected[i], st) {
-			return false
-		}
-	}
-	return true
 }
 
 func sameDatabasePart(a, b os.FileInfo) bool {
@@ -306,24 +261,25 @@ func (r databaseReadContext) Read(p []byte) (int, error) {
 }
 
 func readDatabasePart(ctx context.Context, path string, original os.FileInfo, copyTo io.Writer) (databasePart, error) {
-	var part databasePart
-	f, stable, err := fileidentity.Open(path)
+	f, version, err := openDatabasePart(path)
 	if err != nil {
-		return part, err
+		return databasePart{}, err
 	}
 	defer f.Close()
-	st, err := f.Stat()
-	if err != nil || !sameDatabasePart(original, st) || st.Size() <= 0 || st.Size() > formats.DatabaseSnapshotBytes {
-		return part, errors.New("快照文件身份或大小已改变")
+	if !sameDatabasePart(original, version.info) {
+		return databasePart{}, errors.New("快照文件身份或大小已改变")
 	}
-	part.Bytes = st.Size()
-	var stamp fileidentity.Stamp
-	var revision bool
-	if stable {
-		stamp, revision = fileidentity.Revision(f, st)
+	return hashDatabasePart(ctx, f, version, copyTo)
+}
+
+func hashDatabasePart(ctx context.Context, f *os.File, version databaseFileVersion, copyTo io.Writer) (databasePart, error) {
+	var part databasePart
+	part.Bytes = version.info.Size()
+	if part.Bytes <= 0 || part.Bytes > formats.DatabaseSnapshotBytes {
+		return part, errors.New("快照文件大小无效")
 	}
-	if revision && copyTo == nil {
-		part.SHA256, _ = fileidentity.Recall(stamp, databasePartMemo)
+	if version.stamp.Revision != 0 && copyTo == nil {
+		part.SHA256, _ = fileidentity.Recall(version.stamp, databasePartMemo)
 	}
 	if part.SHA256 == "" {
 		h := sha256.New()
@@ -340,16 +296,12 @@ func readDatabasePart(ctx context.Context, path string, original os.FileInfo, co
 		}
 		part.SHA256 = hex.EncodeToString(h.Sum(nil))
 	}
-	current, err := os.Lstat(path)
-	if err != nil || !sameDatabasePart(st, current) {
+	after, err := databaseVersion(f, version.locked)
+	if err != nil || !version.equal(after) {
 		return part, errors.New("快照文件在核验时发生变化")
 	}
-	if revision {
-		after, ok := fileidentity.Revision(f, current)
-		if !ok || after != stamp {
-			return part, errors.New("快照文件在核验时发生变化")
-		}
-		fileidentity.Remember(stamp, databasePartMemo, part.SHA256)
+	if version.stamp.Revision != 0 {
+		fileidentity.Remember(version.stamp, databasePartMemo, part.SHA256)
 	}
 	return part, ctx.Err()
 }

@@ -1,6 +1,7 @@
 package workbook
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -107,6 +108,9 @@ func newExternalWorkbook(filePath, format, fingerprint string, st os.FileInfo) (
 }
 
 func (w *Workbook) checkExternalUnchanged() error {
+	if w.Format == "db-online" && w.source.database.manifest.Version == 2 {
+		return w.source.database.manifestPart.check(context.Background(), w.Path)
+	}
 	st, err := os.Stat(w.Path)
 	if err != nil {
 		return fmt.Errorf("源文件不可访问：%w", err)

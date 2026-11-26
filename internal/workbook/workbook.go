@@ -158,17 +158,25 @@ func (w *Workbook) FindSheet(name string) (SheetMeta, bool) {
 }
 
 func (w *Workbook) GetCachedIndex(sheetPath string) *SheetIndex {
-	if w.source != nil && w.checkExternalUnchanged() != nil {
-		return nil
-	}
-	if w.Format == "db-online" && !w.databasePartsUnchanged(sheetPath) {
-		return nil
+	idx, _ := w.CachedIndexForRead(context.Background(), sheetPath)
+	return idx
+}
+
+func (w *Workbook) CachedIndexForRead(ctx context.Context, sheetPath string) (*SheetIndex, error) {
+	if w.Format == "db-online" && w.source.database.manifest.Version == 2 {
+		if err := w.checkDatabaseSheet(ctx, sheetPath); err != nil {
+			return nil, err
+		}
+	} else if w.source != nil {
+		if err := w.checkExternalUnchanged(); err != nil {
+			return nil, err
+		}
 	}
 	w.indexMu.RLock()
 	idx := w.indexes[sheetPath]
 	w.indexMu.RUnlock()
 	if idx != nil {
-		return idx
+		return idx, nil
 	}
 	xmlPath, idxPath := w.cachePaths(sheetPath)
 	var loaded *SheetIndex
@@ -179,7 +187,7 @@ func (w *Workbook) GetCachedIndex(sheetPath string) *SheetIndex {
 		loaded, err = loadIndex(idxPath, xmlPath, sheetPath)
 	}
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	loaded.SourceFormat = w.Format
 	w.indexMu.Lock()
@@ -190,7 +198,7 @@ func (w *Workbook) GetCachedIndex(sheetPath string) *SheetIndex {
 		idx = loaded
 	}
 	w.indexMu.Unlock()
-	return idx
+	return idx, nil
 }
 
 // CheckSourceUnchanged checks the live file before an explicit operation binds

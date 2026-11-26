@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 func (r Roots) Restore(ctx context.Context, folder string) error {
@@ -180,7 +182,15 @@ func stageUnit(ctx context.Context, volume backupVolume, files map[string]fileRe
 			if _, planned := space.planned[name]; !planned {
 				return fmt.Errorf("空间预检后目标发生变化：%s", u.key)
 			}
-			err := writeNew(stage, rel, func(f *os.File) error { return volume.verify(ctx, name, want, space.targets[u.base].writer(f)) })
+			err := writeNew(stage, rel, func(f *os.File) error {
+				if err := volume.verify(ctx, name, want, space.targets[u.base].writer(f)); err != nil {
+					return err
+				}
+				if u.base == "local" && strings.HasPrefix(rel, formats.DatabaseSnapshotDirectory+"/") {
+					return f.Chmod(0400)
+				}
+				return nil
+			})
 			if err != nil {
 				return err
 			}

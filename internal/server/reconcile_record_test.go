@@ -50,6 +50,12 @@ func TestReconcileRecordBundlesCapturedInputsAndCompleteFilteredEvidence(t *test
 			"jobId": run.ID, "format": "zipcsv", "status": status, "protectCSV": true,
 		}))
 		export := awaitReconcileExport(t, a, start.JobID)
+		for _, input := range run.Record.Inputs {
+			found, err := exportedSnapshotReference(export.FilePath, input.Fingerprint)
+			if err != nil || !found {
+				t.Fatal("closed reconciliation bundle lost a source reference", err)
+			}
+		}
 		z, err := zip.OpenReader(export.FilePath)
 		if err != nil {
 			t.Fatal(err)

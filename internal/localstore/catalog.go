@@ -115,8 +115,7 @@ func (r Roots) walk(ctx context.Context, g group, forBackup bool, visit func(*os
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if part == formats.DatabaseSnapshotDirectory && entry.IsDir() &&
-				strings.HasPrefix(entry.Name(), ".snapshot-") && strings.HasSuffix(entry.Name(), ".tmp") {
+			if part == formats.DatabaseSnapshotDirectory && entry.IsDir() && snapshotStageName(entry.Name()) {
 				return fs.SkipDir
 			}
 			if forBackup && name != part {
@@ -171,7 +170,21 @@ func (r Roots) Inventory(ctx context.Context) []Usage {
 		}
 		rows = append(rows, u)
 	}
-	return rows
+	stagePath := filepath.Join(r.Local, formats.DatabaseSnapshotDirectory)
+	stages, err := r.SnapshotStages(ctx, false)
+	usage := Usage{Name: "数据库快照暂存", Kind: "采集暂存", Paths: []string{stagePath}}
+	for _, stage := range stages {
+		usage.Bytes += stage.Bytes
+		usage.Allocated += stage.allocated
+		usage.Files += stage.Files
+		if stage.Error != "" {
+			err = errors.Join(err, errors.New(stage.Error))
+		}
+	}
+	if err != nil {
+		usage.Error = err.Error()
+	}
+	return append(rows, usage)
 }
 
 func (r Roots) backupPart(name string) bool {
@@ -180,6 +193,13 @@ func (r Roots) backupPart(name string) bool {
 		return false
 	}
 	part, _, _ := strings.Cut(rest, "/")
+	if part == formats.DatabaseSnapshotDirectory {
+		_, tail, _ := strings.Cut(rest, "/")
+		name, _, _ := strings.Cut(tail, "/")
+		if snapshotStageName(name) {
+			return false
+		}
+	}
 	for _, g := range r.groups() {
 		if g.backup && base == g.base {
 			for _, p := range g.parts {

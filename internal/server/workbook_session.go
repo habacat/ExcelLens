@@ -16,6 +16,7 @@ type workbookSession struct {
 	mu           sync.RWMutex
 	wb           *workbook.Workbook
 	startupError string
+	launchPath   string // native open reserved for this page's first request
 	maintenance  bool
 }
 

@@ -1,18 +1,3 @@
-.landing-source-actions { display: flex; flex-wrap: wrap; column-gap: 18px; }
-.landing-database-button {
-  margin-top: 10px;
-  min-height: 32px;
-  padding: 3px 0;
-  border: 0;
-  background: transparent;
-  color: var(--zone-ink);
-  font: 600 var(--fs-3)/1.4 var(--font-ui);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  cursor: pointer;
-}
-.landing-database-button:focus-visible { outline: 2px solid var(--zone-ink); outline-offset: 4px; }
-
 .database-dialog { width: min(660px, calc(100vw - 24px)); max-height: min(88dvh, 790px); }
 .database-dialog .dialog-title { margin: 0; }
 .database-body { padding-block: 16px; }
@@ -83,6 +68,29 @@
 .database-feedback-text.is-error { color: var(--danger); }
 .database-progress { width: 100%; height: 5px; accent-color: var(--accent); }
 #retainDatabaseSnapshot { margin-inline-start: 8px; }
+
+#databaseSnapshotsDialog, .snapshot-evidence { width: min(760px, calc(100vw - 24px)); }
+.snapshot-usage, .snapshot-evidence h3 { margin: 0 0 10px; font-weight: 650; }
+.snapshot-options { border-bottom: 1px solid var(--line-soft); padding: 6px 0; }
+.snapshot-options summary { cursor: pointer; color: var(--ink); }
+.snapshot-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr)); gap: 8px 12px; padding: 10px 0 4px; }
+.snapshot-fields label, .snapshot-table-select { display: grid; gap: 4px; font-size: var(--fs-2); color: var(--muted); }
+.snapshot-fields input, .snapshot-table-select select { min-width: 0; width: 100%; font: inherit; color: var(--ink); }
+.snapshot-fields .snapshot-check { display: flex; align-items: center; }
+.snapshot-fields input[type=checkbox] { width: auto; }
+.snapshot-fields .mini-button { align-self: end; justify-self: start; }
+#dbSnapshotStages, .snapshot-removal, #dbSnapshotUsage { overflow-wrap: anywhere; }
+#dbSnapshotMatches:not(:empty), .database-snapshots-list:not(:empty) { margin-top: 10px; }
+.snapshot-facts { display: grid; grid-template-columns: minmax(6em, max-content) minmax(0,1fr); gap: 5px 14px; margin: 10px 0 16px; }
+.snapshot-facts dt, .snapshot-column-wrap th { color: var(--muted); }
+.snapshot-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
+.snapshot-table-select select { padding: 5px; }
+.snapshot-column-wrap { overflow: auto; }
+.snapshot-column-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.snapshot-column-wrap caption { text-align: left; font-weight: 600; padding-bottom: 4px; }
+.snapshot-column-wrap :is(td, th) { padding: 5px 8px; border-bottom: 1px solid var(--line-soft); overflow-wrap: anywhere; }
+.snapshot-evidence .database-footer { align-items: center; }
+.snapshot-evidence .database-paging { margin-top: 6px; }
 
 @media (max-width: 520px) {
   .database-fields, .database-advanced-fields { grid-template-columns: minmax(0, 1fr); gap: 9px; }
