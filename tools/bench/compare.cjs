@@ -65,12 +65,14 @@ function compareBaseline(current, root, output) {
         'warmViewportMedianMs', 'warmViewportP95Ms', 'reopenAndIndexMedianMs', 'reopenedViewportMedianMs', 'sharedIndexBytes']);
     }
     fields('conditional.cell', old.perCell, cf.perCell, ['medianNs', 'medianBytes', 'medianAllocs']);
-    for (const [name, series] of Object.entries(cf.inlinePresentation)) {
-      const medians = runs => Object.fromEntries(Object.keys(runs[0]).map(key => {
-        const values = runs.map(r => r[key]).sort((a, b) => a - b);
-        return [key, values[Math.floor(values.length / 2)]];
-      }));
-      fields('inline.' + name, medians(old.inlinePresentation[name]), medians(series), Object.keys(series[0]));
+    const medians = runs => Object.fromEntries(Object.keys(runs[0]).map(key => {
+      const values = runs.map(r => r[key]).sort((a, b) => a - b);
+      return [key, values[Math.floor(values.length / 2)]];
+    }));
+    for (const [section, prefix] of [['inlinePresentation', 'inline'], ['conditionalViewports', 'conditional.viewport'], ['sourceNumberReads', 'source.read']]) {
+      for (const [name, series] of Object.entries(cf[section] ?? {})) {
+        if (old[section]?.[name]) fields(prefix + '.' + name, medians(old[section][name]), medians(series), Object.keys(series[0]));
+      }
     }
     for (const [i, view] of cf.browser.entries()) {
       const base = old.browser[i], prefix = 'conditional.' + view.mode;

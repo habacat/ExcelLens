@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func sourceMetadataWorkbook(t *testing.T, worksheet, styles string) string {
+func sourceMetadataWorkbook(t testing.TB, worksheet, styles string) string {
 	t.Helper()
 	file := filepath.Join(t.TempDir(), "presentation.xlsx")
 	f, err := os.Create(file)

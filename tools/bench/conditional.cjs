@@ -51,20 +51,30 @@ async function measureConditional({ root, temp, go, exe, meter, smoke, onProgres
       reopenedViewportMedianMs: percentile(runs.map(r => r.reopenedViewportMs), .5),
       sharedIndexBytes: Math.max(...runs.map(r => r.sharedIndexBytes)), runs };
   });
-  const micro = execFileSync(test, ['-test.run=^$', '-test.bench=^Benchmark(ConditionalCellEvaluation|InlinePresentationViewport)$', '-test.benchmem',
+  const micro = execFileSync(test, ['-test.run=^$', '-test.bench=^Benchmark(ConditionalCellEvaluation|InlinePresentationViewport|ConditionalViewportRead|SourceNumberRead)$', '-test.benchmem',
     '-test.benchtime=300ms', '-test.count=' + repetitions], { cwd, windowsHide: true, encoding: 'utf8' });
   const measurements = [...micro.matchAll(/BenchmarkConditionalCellEvaluation-\d+\s+\d+\s+([\d.]+) ns\/op\s+(\d+) B\/op\s+(\d+) allocs\/op/g)]
     .map(([, ns, bytes, allocs]) => ({ nsPerCell: Number(ns), bytesPerCell: Number(bytes), allocationsPerCell: Number(allocs) }));
   assert.equal(measurements.length, repetitions);
-  const inlinePresentation = {};
-  for (const [, kind, styled, latency, bytes, allocations] of micro.matchAll(/BenchmarkInlinePresentationViewport\/(simple|four_runs)\/styled_(true|false)-\d+\s+\d+\s+([\d.]+) ns\/op\s+(\d+) B\/op\s+(\d+) allocs\/op/g)) {
-    const samples = inlinePresentation[kind + '/styled_' + styled] ??= [];
-    samples.push({ nsPerViewport: Number(latency), bytesPerViewport: Number(bytes), allocationsPerViewport: Number(allocations) });
+  function viewportSeries(benchmark, names) {
+    const series = Object.fromEntries(names.map(n => [n, []]));
+    for (const line of micro.split(/\r?\n/)) {
+      const match = /^Benchmark(\w+)\/(\S+)-\d+\s+\d+\s+([\d.]+) ns\/op\s+(\d+) B\/op\s+(\d+) allocs\/op/.exec(line);
+      if (match && match[1] === benchmark) {
+        const [, , name, ns, bytes, allocs] = match;
+        assert.ok(Object.hasOwn(series, name), benchmark + '/' + name);
+        series[name].push({ nsPerViewport: Number(ns), bytesPerViewport: Number(bytes), allocationsPerViewport: Number(allocs) });
+      }
+    }
+    for (const [name, samples] of Object.entries(series)) assert.equal(samples.length, repetitions, benchmark + '/' + name);
+    return series;
   }
-  assert.equal(Object.keys(inlinePresentation).length, 4);
-  for (const samples of Object.values(inlinePresentation)) assert.equal(samples.length, repetitions);
+  const inlinePresentation = viewportSeries('InlinePresentationViewport',
+    ['simple/styled_true', 'simple/styled_false', 'four_runs/styled_true', 'four_runs/styled_false']);
+  const conditionalViewports = viewportSeries('ConditionalViewportRead', ['column_step_1', 'column_step_7']);
+  const sourceNumberReads = viewportSeries('SourceNumberRead', ['single', 'forward', 'reverse', 'scattered']);
   const browser = [];
-  const report = { statistics, inlinePresentation, perCell: { runs: measurements,
+  const report = { statistics, inlinePresentation, conditionalViewports, sourceNumberReads, perCell: { runs: measurements,
     medianNs: percentile(measurements.map(m => m.nsPerCell), .5), medianBytes: percentile(measurements.map(m => m.bytesPerCell), .5),
     medianAllocs: percentile(measurements.map(m => m.allocationsPerCell), .5) }, browser };
   onProgress({ stage: 'browser', ...report });

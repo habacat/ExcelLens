@@ -38,13 +38,21 @@ func (s *indexedStream) readWithOptions(w *Workbook, row, first, last int, selec
 		s.start = off.Start
 		s.end = off.End
 		distance := off.Start - s.lastStart
+		ahead := indexedReadAhead
+		if int64(len(s.block)) <= indexedRandomBlock {
+			ahead = indexedReadAhead / 8
+		}
 		switch {
-		case !s.hasLast || distance >= 0 && distance <= indexedReadAhead/8:
-			s.end = min(s.idx.XMLSize, max(off.End, off.Start+indexedReadAhead))
+		case !s.hasLast:
+			// A single lookup has no observed direction. Grow only when the
+			// next refill establishes a sequential or reverse scan.
+			s.end = min(s.idx.XMLSize, max(off.End, off.Start+indexedRandomBlock))
+		case distance >= 0 && distance <= indexedReadAhead/8:
+			s.end = min(s.idx.XMLSize, max(off.End, off.Start+ahead))
 		case distance < 0 && -distance <= indexedReadAhead/8:
 			// A reversed sort walks backwards through the source. Reading
 			// forwards here would reload a MiB for every preceding tiny row.
-			s.start = max(0, off.End-indexedReadAhead)
+			s.start = max(0, min(off.Start, off.End-ahead))
 		default:
 			// Scattered sort keys should not amplify each random row into a
 			// MiB read. Align a small window; nearby rows can still reuse it.
@@ -57,6 +65,7 @@ func (s *indexedStream) readWithOptions(w *Workbook, row, first, last int, selec
 		}
 		s.block = s.block[:size]
 		if _, err := s.f.ReadAt(s.block, s.start); err != nil {
+			s.block = s.block[:0]
 			if err == io.EOF {
 				err = io.ErrUnexpectedEOF
 			}

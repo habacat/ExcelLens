@@ -31,6 +31,7 @@ type ConditionalEvaluator struct {
 	index           *SourceConditionalFormats
 	ctx             context.Context
 	groups, rules   []int
+	nextCol         int // Earliest possible candidate to the right after a miss.
 	marked          []uint64
 	resolver        ConditionalCellResolver
 	operandResolver conditional.CellResolver
@@ -84,7 +85,12 @@ func (e *ConditionalEvaluator) query(at int, row, col int) bool {
 		return true
 	}
 	n := &e.index.nodes[at]
-	if n.maxRow < row {
+	b := &n.bounds
+	if row < b.Row || row > b.EndRow || col > b.EndCol {
+		return true
+	}
+	if col < b.Col {
+		e.nextCol = min(e.nextCol, b.Col)
 		return true
 	}
 	if n.onlyGroup >= 0 && e.marked[n.onlyGroup/64]&(uint64(1)<<uint(n.onlyGroup%64)) != 0 {
@@ -100,7 +106,9 @@ func (e *ConditionalEvaluator) query(at int, row, col int) bool {
 		return false
 	}
 	a := n.entry.area
-	if a.EndRow >= row && a.Col <= col && a.EndCol >= col {
+	if a.EndRow >= row && col < a.Col {
+		e.nextCol = min(e.nextCol, a.Col)
+	} else if a.EndRow >= row && col <= a.EndCol {
 		group := n.entry.group
 		bit := uint64(1) << uint(group%64)
 		if e.marked[group/64]&bit == 0 {
@@ -115,48 +123,63 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 	if err := e.ctx.Err(); err != nil {
 		return nil, err
 	}
+	notice := e.prepare(row, col)
+	return e.evaluatePrepared(row, col, toConditionalOperand(cell), resolver, notice)
+}
+
+// Select applicable rules before materializing the cell. On a miss, nextCol
+// allows a contiguous viewport to skip an interval proven to contain no rule.
+func (e *ConditionalEvaluator) prepare(row, col int) string {
+	e.rules = e.rules[:0]
+	e.nextCol = formats.ExcelColumns + 1
 	index := e.index
 	if index == nil {
-		return nil, nil
+		return ""
 	}
 	if index.notice != "" {
-		return &ConditionalFormatResult{Notice: index.notice}, nil
+		return index.notice
 	}
 	for _, id := range e.groups {
 		e.marked[id/64] &= ^(uint64(1) << uint(id%64))
 	}
 	e.groups = e.groups[:0]
-	e.rules = e.rules[:0]
 	if !e.query(index.root, row, col) {
-		return &ConditionalFormatResult{Notice: "条件格式超过本次求值预算，原值保留"}, nil
+		return "条件格式超过本次求值预算，原值保留"
 	}
 	for _, id := range e.groups {
 		if group := &index.groups[id]; len(group.ruleIndices) == 0 && group.notice != "" {
 			// An unrecognised block has no reliable priority. It cannot be
 			// ignored in favour of another block's apparently valid colors.
-			return &ConditionalFormatResult{Notice: group.notice}, nil
+			return group.notice
 		}
 		e.rules = append(e.rules, index.groups[id].ruleIndices...)
+	}
+	if !e.spend(len(e.rules) * max(1, conditionalSortCost(len(e.rules)))) {
+		return "条件格式超过本次求值预算，原值保留"
+	}
+	sort.Ints(e.rules)
+	return ""
+}
+
+func (e *ConditionalEvaluator) evaluatePrepared(row, col int, cell conditional.CellOperand, resolver ConditionalCellResolver, notice string) (*ConditionalFormatResult, error) {
+	if notice != "" {
+		return &ConditionalFormatResult{Notice: notice}, nil
 	}
 	if len(e.rules) == 0 {
 		return nil, nil
 	}
-	if !e.spend(len(e.rules) * max(1, conditionalSortCost(len(e.rules)))) {
-		return &ConditionalFormatResult{Notice: "条件格式超过本次求值预算，原值保留"}, nil
-	}
-	sort.Ints(e.rules)
 	e.resolver = resolver
 	var operand conditional.CellResolver
 	if resolver != nil {
 		operand = e.operandResolver
 	}
-	e.engine.ResetCell(row, col, toConditionalOperand(cell), operand)
+	e.engine.ResetCell(row, col, cell, operand)
 	out := &ConditionalFormatResult{}
 	for _, id := range e.rules {
 		if err := e.ctx.Err(); err != nil {
 			return nil, err
 		}
-		rule := &index.rules[id]
+		rule := &e.index.rules[id]
 		if !e.spend(1) {
 			out.Notice = "条件格式超过本次求值预算，低优先级样式未应用"
 			break
@@ -185,7 +208,7 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 			out.Priorities = append(out.Priorities, rule.source.Priority)
 		}
 		if rule.source.DxfID != nil {
-			styles.MergeDifferentialStyle(&out.Style, index.styles[*rule.source.DxfID])
+			styles.MergeDifferentialStyle(&out.Style, e.index.styles[*rule.source.DxfID])
 		}
 		if rule.source.StopIfTrue {
 			break

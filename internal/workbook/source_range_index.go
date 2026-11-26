@@ -12,7 +12,7 @@ type sourceRangeEntry struct {
 type sourceRangeNode struct {
 	entry       sourceRangeEntry
 	left, right int
-	maxRow      int
+	bounds      CellMerge
 	onlyGroup   int
 }
 
@@ -32,13 +32,17 @@ func buildSourceRangeTree(entries []sourceRangeEntry) ([]sourceRangeNode, int) {
 		mid := lo + (hi-lo)/2
 		at := len(nodes)
 		entry := entries[mid]
-		nodes = append(nodes, sourceRangeNode{entry: entry, maxRow: entry.area.EndRow, onlyGroup: entry.group})
+		nodes = append(nodes, sourceRangeNode{entry: entry, bounds: entry.area, onlyGroup: entry.group})
 		left, right := build(lo, mid), build(mid+1, hi)
 		node := &nodes[at]
 		node.left, node.right = left, right
 		for _, child := range []int{left, right} {
 			if child >= 0 {
-				node.maxRow = max(node.maxRow, nodes[child].maxRow)
+				b := nodes[child].bounds
+				node.bounds.Row = min(node.bounds.Row, b.Row)
+				node.bounds.EndRow = max(node.bounds.EndRow, b.EndRow)
+				node.bounds.Col = min(node.bounds.Col, b.Col)
+				node.bounds.EndCol = max(node.bounds.EndCol, b.EndCol)
 				if nodes[child].onlyGroup != node.onlyGroup {
 					node.onlyGroup = -1
 				}

@@ -47,7 +47,7 @@ func TestOpenExistingAndCheckDetectDamageWithoutRebuilding(t *testing.T) {
 
 	// Build repairs the damaged file cleanly.
 	idx, built, err := Build(context.Background(), file, "sig1", 1, func(w *Writer) error {
-		return w.Group(0, Tuple([]string{"k"}), 2, 1, Value{Number: big.NewRat(4, 1)})
+		return w.addGroup(0, Tuple([]string{"k"}), 2, 1, Value{Number: big.NewRat(4, 1)})
 	}, nil)
 	if err != nil || !built {
 		t.Fatalf("Build failed: built=%v err=%v", built, err)
@@ -88,7 +88,7 @@ func TestBudgetLRUEvictionProtectsActiveReadersAndOpenWorkbooks(t *testing.T) {
 		t.Helper()
 		file := filepath.Join(dir, name)
 		idx, _, err := Build(context.Background(), file, name, 1, func(w *Writer) error {
-			return w.Group(0, Tuple([]string{name}), 2, 1, Value{})
+			return w.addGroup(0, Tuple([]string{name}), 2, 1, Value{})
 		}, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -154,7 +154,7 @@ func TestBudgetLRUEvictionProtectsActiveReadersAndOpenWorkbooks(t *testing.T) {
 	// Publishing a new file under a tight budget that only fits active + new evicts unprotected newest.
 	fourth := filepath.Join(dir, cacheName("bookD"))
 	idx4, built, err := Build(context.Background(), fourth, cacheName("bookD"), 1, func(w *Writer) error {
-		return w.Group(0, Tuple([]string{"d"}), 2, 1, Value{})
+		return w.addGroup(0, Tuple([]string{"d"}), 2, 1, Value{})
 	}, &BudgetPolicy{
 		Dir:         dir,
 		BudgetBytes: s2 + s3, // enough for active + fourth, not active + newest + fourth

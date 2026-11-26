@@ -17,11 +17,11 @@ func TestSharedIndexPublicationCancellationAndRepair(t *testing.T) {
 	key := Tuple([]string{"a", "bc"})
 	ctx, cancel := context.WithCancel(context.Background())
 	_, _, err := Open(ctx, file, "sheet", 1, func(w *Writer) error {
-		if err := w.Group(0, key, 2, 1, Value{}); err != nil {
+		if err := w.addGroup(0, key, 2, 1, Value{}); err != nil {
 			return err
 		}
 		cancel()
-		return w.Next()
+		return w.nextRow()
 	})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestSharedIndexPublicationCancellationAndRepair(t *testing.T) {
 		t.Fatal(staged)
 	}
 	var builds atomic.Int32
-	build := func(w *Writer) error { builds.Add(1); return w.Group(0, key, 3, 2, Value{Number: big.NewRat(7, 2)}) }
+	build := func(w *Writer) error { builds.Add(1); return w.addGroup(0, key, 3, 2, Value{Number: big.NewRat(7, 2)}) }
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
@@ -75,17 +75,17 @@ func TestMovingSumAndFirstMatchKeepSourceOrder(t *testing.T) {
 	key := Tuple([]string{"k"})
 	idx, _, err := Open(context.Background(), file, "sheet", 2, func(w *Writer) error {
 		for i, x := range []int64{10000000000000000, 1, -10000000000000000, 5} {
-			if err := w.Prefix(0, i+1, Value{Number: big.NewRat(x, 1)}); err != nil {
+			if err := w.addPrefix(0, i+1, Value{Number: big.NewRat(x, 1)}); err != nil {
 				return err
 			}
 		}
-		if err := w.Issue(0, 5, Value{Unknown: true, Fault: "missing cache"}); err != nil {
+		if err := w.recordIssue(0, 5, Value{Unknown: true, Fault: "missing cache"}); err != nil {
 			return err
 		}
-		if err := w.Group(1, key, 2, 1, Value{}); err != nil {
+		if err := w.addGroup(1, key, 2, 1, Value{}); err != nil {
 			return err
 		}
-		return w.Issue(1, 3, Value{Unknown: true, Fault: "missing cache"})
+		return w.recordIssue(1, 3, Value{Unknown: true, Fault: "missing cache"})
 	})
 	if err != nil {
 		t.Fatal(err)

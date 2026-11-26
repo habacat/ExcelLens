@@ -43,11 +43,19 @@ const (
 )
 
 // Each viewport reuses one read-only transaction on the immutable file.
+type indexPlan struct {
+	values, issues *bolt.Bucket
+	firstIssue     int
+	issue          Result
+	ordered        bool
+}
+
 type Index struct {
-	mu   sync.Mutex
-	path string
-	db   *bolt.DB
-	tx   *bolt.Tx
+	plans []indexPlan
+	mu    sync.Mutex
+	path  string
+	db    *bolt.DB
+	tx    *bolt.Tx
 }
 
 func (i *Index) Close() error {
@@ -58,6 +66,7 @@ func (i *Index) Close() error {
 	}
 	err := i.tx.Rollback()
 	i.tx = nil
+	i.plans = nil
 	closeErr := i.db.Close()
 	if i.path != "" {
 		unpinReader(i.path)
@@ -66,13 +75,16 @@ func (i *Index) Close() error {
 	return errors.Join(err, closeErr)
 }
 
-func (i *Index) view(read func(*bolt.Tx) error) error {
+func (i *Index) view(id int, read func(*indexPlan) error) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if i.tx == nil {
 		return errors.New("条件统计读取已结束")
 	}
-	return read(i.tx)
+	if id < 0 || id >= len(i.plans) {
+		return errors.New("条件统计方案不存在")
+	}
+	return read(&i.plans[id])
 }
 
 var slots [32]chan struct{}
@@ -112,31 +124,46 @@ func openRead(file, key string, plans int) (*Index, error) {
 		unpinReader(file)
 		return nil, err
 	}
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(meta)
-		for id := 0; id < plans; id++ {
-			p := tx.Bucket(bucketID(id))
-			if p == nil || p.Bucket([]byte("values")) == nil || p.Bucket([]byte("issues")) == nil {
-				return errIncomplete
-			}
-		}
-		if b == nil || !bytes.Equal(b.Get([]byte("complete")), []byte(key)) {
-			return errIncomplete
-		}
-		return nil
-	})
-	if err != nil {
-		_ = db.Close()
-		unpinReader(file)
-		return nil, err
-	}
 	tx, err := db.Begin(false)
 	if err != nil {
 		_ = db.Close()
 		unpinReader(file)
 		return nil, err
 	}
-	return &Index{path: file, db: db, tx: tx}, nil
+	idx := &Index{path: file, db: db, tx: tx}
+	b := tx.Bucket(meta)
+	if b == nil || !bytes.Equal(b.Get([]byte("complete")), []byte(key)) {
+		_ = idx.Close()
+		return nil, errIncomplete
+	}
+	idx.plans = make([]indexPlan, plans)
+	for id := range idx.plans {
+		bucket := tx.Bucket(bucketID(id))
+		if bucket == nil {
+			_ = idx.Close()
+			return nil, errIncomplete
+		}
+		p := &idx.plans[id]
+		p.values, p.issues = bucket.Bucket([]byte("values")), bucket.Bucket([]byte("issues"))
+		if p.values == nil || p.issues == nil {
+			_ = idx.Close()
+			return nil, errIncomplete
+		}
+		p.ordered = bucket.Get([]byte("ordered")) != nil
+		if pos, value := p.issues.Cursor().First(); pos != nil {
+			if len(pos) != 4 {
+				_ = idx.Close()
+				return nil, errIncomplete
+			}
+			p.firstIssue = int(binary.BigEndian.Uint32(pos))
+			p.issue, err = decode(value)
+			if err != nil || p.firstIssue != p.issue.First || p.firstIssue < 1 || p.issue.Fault == "" {
+				_ = idx.Close()
+				return nil, errIncomplete
+			}
+		}
+	}
+	return idx, nil
 }
 
 // OpenExisting opens a verified read-only statistics index without ever triggering
@@ -294,22 +321,26 @@ func publishIndex(ctx context.Context, tmp, file string, size int64, policy *Bud
 }
 
 type Writer struct {
-	db           *bolt.DB
-	tx           *bolt.Tx
-	ctx          context.Context
-	maxBytes     int64
-	rows         int
-	sums         []*big.Rat
-	absolute     []*big.Rat
-	denBits      []int
-	unsafePrefix []bool
+	values, issues         []*bolt.Bucket
+	groups                 []map[string]*groupedValue
+	groupBytes, groupLimit int
+	dirty                  bool
+	db                     *bolt.DB
+	tx                     *bolt.Tx
+	ctx                    context.Context
+	maxBytes               int64
+	rows                   int
+	sums                   []*big.Rat
+	absolute               []*big.Rat
+	denBits                []int
+	unsafePrefix           []bool
 }
 
 func writeIndex(ctx context.Context, db *bolt.DB, key string, plans int, maxBytes int64, build func(*Writer) error) error {
 	if maxBytes <= 0 {
 		maxBytes = formats.ConditionalStatsDiskBytes
 	}
-	w := &Writer{ctx: ctx, db: db, maxBytes: maxBytes, sums: make([]*big.Rat, plans), absolute: make([]*big.Rat, plans), denBits: make([]int, plans), unsafePrefix: make([]bool, plans)}
+	w := &Writer{values: make([]*bolt.Bucket, plans), issues: make([]*bolt.Bucket, plans), groups: make([]map[string]*groupedValue, plans), groupLimit: formats.ConditionalStatsGroupBufferBytes, dirty: true, ctx: ctx, db: db, maxBytes: maxBytes, sums: make([]*big.Rat, plans), absolute: make([]*big.Rat, plans), denBits: make([]int, plans), unsafePrefix: make([]bool, plans)}
 	var err error
 	w.tx, err = db.Begin(true)
 	if err != nil {
@@ -328,10 +359,10 @@ func writeIndex(ctx context.Context, db *bolt.DB, key string, plans int, maxByte
 		if err != nil {
 			return err
 		}
-		if _, err = b.CreateBucket([]byte("values")); err != nil {
+		if w.values[i], err = b.CreateBucket([]byte("values")); err != nil {
 			return err
 		}
-		if _, err = b.CreateBucket([]byte("issues")); err != nil {
+		if w.issues[i], err = b.CreateBucket([]byte("issues")); err != nil {
 			return err
 		}
 		w.sums[i] = new(big.Rat)
@@ -341,6 +372,9 @@ func writeIndex(ctx context.Context, db *bolt.DB, key string, plans int, maxByte
 		return err
 	}
 	if err = w.ctx.Err(); err != nil {
+		return err
+	}
+	if err = w.flushGroups(); err != nil {
 		return err
 	}
 	if err = w.tx.Bucket(meta).Put([]byte("complete"), []byte(key)); err != nil {
@@ -372,35 +406,53 @@ func (w *Writer) commit() error {
 	return nil
 }
 
-func (w *Writer) Next() error {
+func (w *Writer) nextRow() error {
 	if err := w.ctx.Err(); err != nil {
 		return err
 	}
 	w.rows++
-	if w.rows%2048 != 0 {
+	if w.rows%2048 != 0 || !w.dirty {
 		return nil
 	}
+	return w.rotate()
+}
+
+func (w *Writer) rotate() error {
 	if err := w.commit(); err != nil {
 		return err
 	}
 	var err error
 	w.tx, err = w.db.Begin(true)
-	return err
+	if err != nil {
+		return err
+	}
+	for id := range w.values {
+		plan := w.tx.Bucket(bucketID(id))
+		w.values[id] = plan.Bucket([]byte("values"))
+		w.issues[id] = plan.Bucket([]byte("issues"))
+	}
+	w.dirty = false
+	return nil
 }
 
-func encode(r Result) []byte {
-	b := binary.AppendUvarint(nil, uint64(r.Count))
-	b = binary.AppendUvarint(b, uint64(r.First))
-	if r.Fault != "" {
-		if r.Unknown {
+// All v1 records, including buffered groups, share this wire header.
+func recordHeader(count, first int, fault string, unknown bool) []byte {
+	b := binary.AppendUvarint(nil, uint64(count))
+	b = binary.AppendUvarint(b, uint64(first))
+	if fault != "" {
+		if unknown {
 			b = append(b, 'u')
 		} else {
 			b = append(b, 'e')
 		}
-		return append(b, r.Fault...)
+		return append(b, fault...)
 	}
-	b = append(b, 'n')
-	if r.Number != nil && r.Number.Sign() != 0 {
+	return append(b, 'n')
+}
+
+func encode(r Result) []byte {
+	b := recordHeader(r.Count, r.First, r.Fault, r.Unknown)
+	if r.Fault == "" && r.Number != nil && r.Number.Sign() != 0 {
 		b = append(b, r.Number.RatString()...)
 	}
 	return b
@@ -439,41 +491,14 @@ func decode(b []byte) (Result, error) {
 	return r, nil
 }
 
-func (w *Writer) Group(id int, key []byte, row, weight int, v Value) error {
-	b := w.tx.Bucket(bucketID(id)).Bucket([]byte("values"))
-	if len(key) > bolt.MaxKeySize {
-		return w.Issue(id, row, Value{Unknown: true, Fault: "条件统计组合键超过容量"})
-	}
-	old, err := decode(b.Get(key))
-	if err != nil {
-		return err
-	}
-	if old.First == 0 {
-		old.First = row
-	}
-	old.Count += weight
-	if v.Fault != "" && (old.Fault == "" || v.Unknown && !old.Unknown) {
-		old.Value = v
-	}
-	if v.Number != nil && old.Fault == "" {
-		if old.Number == nil {
-			old.Number = new(big.Rat)
-		}
-		if !excelformula.AddFloat(old.Number, v.Number) {
-			old.Fault = "#NUM!"
-			old.Number = nil
-		}
-	}
-	return b.Put(key, encode(old))
+func (w *Writer) recordIssue(id, row int, v Value) error {
+	w.dirty = true
+	return w.issues[id].Put(rowKey(row), encode(Result{First: row, Value: v}))
 }
 
-func (w *Writer) Issue(id, row int, v Value) error {
-	return w.tx.Bucket(bucketID(id)).Bucket([]byte("issues")).Put(rowKey(row), encode(Result{First: row, Value: v}))
-}
-
-func (w *Writer) Prefix(id, row int, v Value) error {
+func (w *Writer) addPrefix(id, row int, v Value) error {
 	if v.Fault != "" {
-		return w.Issue(id, row, v)
+		return w.recordIssue(id, row, v)
 	}
 	if v.Number == nil || v.Number.Sign() == 0 {
 		return nil
@@ -495,24 +520,20 @@ func (w *Writer) Prefix(id, row int, v Value) error {
 	}
 	sum := w.sums[id]
 	sum.Add(sum, v.Number)
-	return w.tx.Bucket(bucketID(id)).Bucket([]byte("values")).Put(rowKey(row), encode(Result{Value: Value{Number: sum}}))
+	w.dirty = true
+	return w.values[id].Put(rowKey(row), encode(Result{Value: Value{Number: sum}}))
 }
 
 func (i *Index) Lookup(id int, key []byte, match bool) (Result, error) {
 	var r Result
-	err := i.view(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketID(id))
-		if b == nil {
-			return errors.New("条件统计方案不存在")
-		}
+	err := i.view(id, func(p *indexPlan) error {
 		var err error
-		r, err = decode(b.Bucket([]byte("values")).Get(key))
+		r, err = decode(p.values.Get(key))
 		if err != nil {
 			return err
 		}
-		pos, v := b.Bucket([]byte("issues")).Cursor().First()
-		if pos != nil && (!match || r.First == 0 || bytes.Compare(pos, rowKey(r.First)) <= 0) {
-			r, err = decode(v)
+		if p.firstIssue > 0 && (!match || r.First == 0 || p.firstIssue <= r.First) {
+			r = p.issue
 		}
 		return err
 	})
@@ -521,19 +542,21 @@ func (i *Index) Lookup(id int, key []byte, match bool) (Result, error) {
 
 func (i *Index) Sum(id, from, to int) (Result, error) {
 	var r Result
-	err := i.view(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketID(id))
-		if b == nil {
-			return errors.New("条件统计方案不存在")
-		}
-		k, v := b.Bucket([]byte("issues")).Cursor().Seek(rowKey(from))
-		if k != nil && bytes.Compare(k, rowKey(to)) <= 0 {
-			var err error
-			r, err = decode(v)
-			return err
+	err := i.view(id, func(p *indexPlan) error {
+		if p.firstIssue > 0 && p.firstIssue <= to {
+			if p.firstIssue >= from {
+				r = p.issue
+				return nil
+			}
+			k, v := p.issues.Cursor().Seek(rowKey(from))
+			if k != nil && bytes.Compare(k, rowKey(to)) <= 0 {
+				var err error
+				r, err = decode(v)
+				return err
+			}
 		}
 		at := func(row int) (*big.Rat, error) {
-			cur := b.Bucket([]byte("values")).Cursor()
+			cur := p.values.Cursor()
 			k, v := cur.Seek(rowKey(row))
 			if k == nil {
 				k, v = cur.Last()
@@ -550,10 +573,10 @@ func (i *Index) Sum(id, from, to int) (Result, error) {
 		if err != nil {
 			return err
 		}
-		if b.Get([]byte("ordered")) != nil {
+		if p.ordered {
 			// Floating-point addition is not associative. For a moving window that
 			// needs binary rounding, recover only its occupied terms from the index.
-			cur := b.Bucket([]byte("values")).Cursor()
+			cur := p.values.Cursor()
 			sum := new(big.Rat)
 			limit := rowKey(to)
 			work := 0
@@ -593,8 +616,7 @@ func (i *Index) Sum(id, from, to int) (Result, error) {
 func Tuple(parts []string) []byte {
 	var b []byte
 	for _, s := range parts {
-		b = binary.AppendUvarint(b, uint64(len(s)))
-		b = append(b, s...)
+		b = appendKeyPart(b, s)
 	}
 	if len(b) == 0 {
 		return []byte{0}

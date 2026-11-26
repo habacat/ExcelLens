@@ -155,7 +155,11 @@ func (w *Workbook) readRowFromFileWithOptions(f *os.File, idx *SheetIndex, rowIn
 	rowNum := off.Number
 	rowStyle := 0
 	lastColumn := 0 // OOXML permits <c> without an r attribute.
-	cells := make([]CellData, 0, 32)
+	capacity := 32
+	if selected != nil {
+		capacity = min(capacity, len(selected))
+	}
+	cells := options.cells(capacity)
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {

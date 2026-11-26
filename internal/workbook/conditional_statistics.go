@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"excellens/internal/conditional"
@@ -431,167 +430,42 @@ func (w *Workbook) PrepareConditionalStatisticsWithPolicy(ctx context.Context, m
 }
 
 func (r *conditionalRead) buildStatistics(w *conditional.Writer) error {
-	plans := r.index.statistics
-	columns := []int{}
-	for _, p := range plans {
-		columns = append(columns, p.Cols...)
-		if p.SumCol != 0 {
-			columns = append(columns, p.SumCol)
-		}
-	}
-	slices.Sort(columns)
-	columns = slices.Compact(columns)
+	builder := conditional.NewRowAggregator(r.ctx, w, r.index.statistics, r.index.date1904)
+	columns := builder.Columns()
 	if len(columns) == 0 {
 		return errors.New("条件统计缺少引用列")
 	}
-	values := make(map[int]conditionalValue, len(columns))
-	notices := make(map[int]string, len(columns))
-	eval := conditional.NewEngine(r.ctx, r.index.date1904)
-	// Static criteria share the builder's per-row budget, not the viewport's.
-	filters := make([][]conditional.Criterion, len(plans))
-	for i, p := range plans {
-		if len(p.Cols) == 0 {
-			continue
-		}
-		filters[i] = make([]conditional.Criterion, len(p.Cols))
-		for j, literal := range p.Literals {
-			if literal != "" {
-				filters[i][j] = eval.CompileCriterion(p.Constants[j])
-			}
-		}
-	}
-	accumulate := func(first, last int, gap bool) error {
-		for id, p := range plans {
-			a, b := max(first, p.From), min(last, p.To)
-			if a > b {
-				continue
-			}
-			value := func(col int) conditionalValue {
-				if v, ok := values[col]; ok && !gap {
-					return v
-				}
-				return conditional.BlankValue()
-			}
-			notice := func(col int) string {
-				if gap {
-					return ""
-				}
-				return notices[col]
-			}
-			if p.Kind == "match" {
-				v := value(p.Cols[0])
-				if why := notice(p.Cols[0]); why != "" {
-					if err := w.Issue(id, a, conditional.Value{Unknown: true, Fault: why}); err != nil {
-						return err
-					}
-				} else if v.Kind != "blank" {
-					if err := w.Group(id, conditional.Tuple([]string{conditional.TypedKey(v)}), a, b-a+1, conditional.Value{}); err != nil {
-						return err
-					}
-				}
-				continue
-			}
-			parts := make([]string, 0, len(p.Cols))
-			matched := true
-			for j, col := range p.Cols {
-				if why := notice(col); why != "" {
-					if err := w.Issue(id, a, conditional.Value{Unknown: true, Fault: why}); err != nil {
-						return err
-					}
-					matched = false
-					break
-				}
-				v := value(col)
-				if filters[id][j] != nil {
-					ok, msg := filters[id][j](v)
-					if msg != "" {
-						if err := w.Issue(id, a, conditional.Value{Unknown: true, Fault: msg}); err != nil {
-							return err
-						}
-					}
-					if !ok || msg != "" {
-						matched = false
-						break
-					}
-				} else {
-					parts = append(parts, conditional.GroupKey(v))
-				}
-			}
-			if !matched {
-				continue
-			}
-			var add conditional.Value
-			if p.SumCol != 0 {
-				v := value(p.SumCol)
-				if why := notice(p.SumCol); why != "" {
-					add = conditional.Value{Unknown: true, Fault: why}
-				} else if v.Kind == "number" {
-					var ok bool
-					add.Number, ok = conditional.ValueToRat(v)
-					if !ok {
-						add.Fault = "#NUM!"
-					}
-				} else if v.Kind == "error" {
-					add.Fault = v.Text
-				}
-			}
-			var err error
-			if p.Kind == "prefix" {
-				err = w.Prefix(id, a, add)
-			} else {
-				err = w.Group(id, conditional.Tuple(parts), a, b-a+1, add)
-			}
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	lower, upper := formats.ExcelRows, 1
-	for _, p := range plans {
-		lower = min(lower, p.From)
-		upper = max(upper, p.To)
-	}
-	startPos, endPos := r.idx.FindRowOffset(lower), r.idx.FindRowOffset(upper+1)
-	visited := 0
+	lower, upper := builder.Bounds()
+	start, end := r.idx.FindRowOffset(lower), r.idx.FindRowOffset(upper+1)
 	if r.statProgress != nil {
-		r.statProgress(0, endPos-startPos)
+		r.statProgress(0, end-start)
 	}
-	prev := lower - 1
 	positions := func(yield func(int) bool) {
-		for pos := startPos; pos < endPos; pos++ {
+		for pos := start; pos < end; pos++ {
 			if !yield(pos) {
 				return
 			}
 		}
 	}
-	err := r.w.VisitRowsWithOptionsContext(r.ctx, r.idx, positions, columns[0], columns[len(columns)-1], RowReadOptions{Columns: columns}, func(row RowData) error {
-		if err := w.Next(); err != nil {
+	visited := 0
+	scratch := make([]CellData, 0, len(columns))
+	err := r.w.VisitRowsWithOptionsContext(r.ctx, r.idx, positions, columns[0], columns[len(columns)-1], RowReadOptions{Columns: columns, cellScratch: &scratch}, func(row RowData) error {
+		if err := builder.Next(row.Number); err != nil {
 			return err
 		}
+		for i := range row.Cells {
+			c := &row.Cells[i]
+			builder.Set(c.Col, conditional.CellOperand{Raw: c.Raw, Type: c.Type, CacheMissing: c.CacheMissing})
+		}
+		clear(row.Cells)
 		visited++
-		if r.statProgress != nil && (visited%2048 == 0 || visited == endPos-startPos) {
-			r.statProgress(visited, endPos-startPos)
+		if r.statProgress != nil && (visited%2048 == 0 || visited == end-start) {
+			r.statProgress(visited, end-start)
 		}
-		eval.ResetBudget()
-		if row.Number > prev+1 {
-			if err := accumulate(prev+1, row.Number-1, true); err != nil {
-				return err
-			}
-		}
-		clear(values)
-		clear(notices)
-		for _, c := range row.Cells {
-			values[c.Col], notices[c.Col] = eval.CellValue(toConditionalOperand(c))
-		}
-		prev = row.Number
-		return accumulate(prev, prev, false)
+		return nil
 	})
 	if err != nil {
 		return err
 	}
-	if prev < upper {
-		return accumulate(prev+1, upper, true)
-	}
-	return nil
+	return builder.Finish()
 }

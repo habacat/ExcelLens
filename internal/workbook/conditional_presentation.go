@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,8 +47,11 @@ type conditionalRead struct {
 	first, last                      int
 	selected                         map[int]struct{}
 	columns                          []int
-	cells                            map[int]CellData
-	batchRows                        map[int]map[int]CellData
+	active                           conditionalSourceRow
+	batchRows                        []conditionalSourceRow
+	batchStart                       int
+	batchPositions                   map[int]int
+	operandResolver                  ConditionalCellResolver
 	batchFirst, batchLast            int
 	batchSelected                    map[int]struct{}
 	cache                            map[conditionalAddress]CellData
@@ -99,6 +103,7 @@ func (w *Workbook) newConditionalRead(ctx context.Context, idx *SheetIndex, file
 		readOnlyStats: options.ConditionalStatsReadOnly,
 		statsStatus:   options.ConditionalStatsStatus,
 	}
+	r.operandResolver = r.resolve
 	r.evaluator.SetRangeResolver(r.resolveRange)
 	r.evaluator.engine.ForeignCell = func(sheet string, row, col int) (conditional.CellOperand, string, error) {
 		cell, notice, err := r.resolveForeignCell(sheet, row, col)
@@ -107,32 +112,13 @@ func (w *Workbook) newConditionalRead(ctx context.Context, idx *SheetIndex, file
 	if len(index.statistics) > 0 && idx.RowCount() >= formats.ConditionalStatsMinRows {
 		r.evaluator.engine.StatHandler = r.indexedStatistic
 	}
-	r.columns = append([]int(nil), options.Columns...)
+	r.columns = slices.Clone(options.Columns)
+	if !slices.IsSorted(r.columns) {
+		slices.Sort(r.columns)
+	}
+	r.columns = slices.Compact(r.columns)
 	r.resetBudget()
 	return r, nil
-}
-
-func (r *conditionalRead) setBatchRows(rows []RowData, first, last int, selected map[int]struct{}) {
-	if r == nil {
-		return
-	}
-	r.batchFirst, r.batchLast, r.batchSelected = first, last, selected
-	if len(rows) == 0 {
-		r.batchRows = nil
-		return
-	}
-	if r.batchRows == nil {
-		r.batchRows = make(map[int]map[int]CellData, len(rows))
-	} else {
-		clear(r.batchRows)
-	}
-	for i := range rows {
-		cols := make(map[int]CellData, len(rows[i].Cells))
-		for _, c := range rows[i].Cells {
-			cols[c.Col] = c
-		}
-		r.batchRows[rows[i].Number] = cols
-	}
 }
 
 func conditionalNotice(s string) string {
@@ -182,12 +168,12 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 	}
 	if row == r.row.Number && col >= r.first && col <= r.last {
 		if _, included := r.selected[col]; r.selected == nil || included {
-			return r.cells[col], true, nil // an omitted, read column is a proven blank
+			return r.active.cell(col), true, nil // an omitted, read column is a proven blank
 		}
 	}
 	if r.batchRows != nil && r.batchHasColumn(col) {
-		if cols, ok := r.batchRows[row]; ok {
-			return conditionalOperand(cols[col]), true, nil
+		if source, ok := r.batchRow(row); ok {
+			return conditionalOperand(source.cell(col)), true, nil
 		}
 	}
 	key := conditionalAddress{row, col}
@@ -236,14 +222,8 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditional.RangeDat
 	// Fast path: range entirely within the currently loaded row window.
 	if r1 == r2 && r1 == r.row.Number && c1 >= r.first && c2 <= r.last && r.selected == nil {
 		out := conditional.RangeData{R1: r1, C1: c1, R2: r2, C2: c2}
-		for col := c1; col <= c2; col++ {
-			cell, ok := r.cells[col]
-			if !ok || (!cell.CacheMissing && cell.Type == "" && cell.Raw == "") {
-				out.BlankCount++
-				continue
-			}
-			out.Cells = append(out.Cells, conditional.RangeCell{Row: r1, Col: col, Cell: toConditionalOperand(cell)})
-		}
+		r.active.appendRange(&out, r1, c1, c2)
+		out.BlankCount = totalArea - int64(len(out.Cells))
 		return out, "", nil
 	}
 	startPos := r.idx.FindRowOffset(r1)
@@ -262,24 +242,12 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditional.RangeDat
 		offset := r.idx.RowAt(pos)
 		rowNum := offset.Number
 		if rowNum == r.row.Number && c1 >= r.first && c2 <= r.last && r.selected == nil {
-			for col := c1; col <= c2; col++ {
-				cell, ok := r.cells[col]
-				if ok && (cell.CacheMissing || cell.Type != "" || cell.Raw != "") {
-					out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: col, Cell: toConditionalOperand(cell)})
-					estBytes += len(cell.Raw) + len(cell.Type)
-				}
-			}
+			estBytes += r.active.appendRange(&out, rowNum, c1, c2)
 			continue
 		}
 		if batchCoversCols {
-			if cols, ok := r.batchRows[rowNum]; ok {
-				for col := c1; col <= c2; col++ {
-					cell, exists := cols[col]
-					if exists && (cell.CacheMissing || cell.Type != "" || cell.Raw != "") {
-						out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: col, Cell: toConditionalOperand(cell)})
-						estBytes += len(cell.Raw) + len(cell.Type)
-					}
-				}
+			if source, ok := r.batchRow(rowNum); ok {
+				estBytes += source.appendRange(&out, rowNum, c1, c2)
 				continue
 			}
 		}
@@ -334,16 +302,13 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditional.RangeDat
 }
 
 func (r *conditionalRead) apply(row *RowData, first, last int, selected map[int]struct{}) error {
+	return r.applySource(row, indexConditionalRow(row.Cells), first, last, selected)
+}
+
+func (r *conditionalRead) applySource(row *RowData, source conditionalSourceRow, first, last int, selected map[int]struct{}) error {
 	r.row, r.first, r.last, r.selected = *row, first, last, selected
-	r.cells = make(map[int]CellData, len(row.Cells))
-	for _, cell := range row.Cells {
-		r.cells[cell.Col] = cell
-	}
-	positions := make(map[int]int, len(row.Cells))
-	for i, cell := range row.Cells {
-		positions[cell.Col] = i
-	}
-	added := false
+	r.active = source
+	var extra []CellData
 	columns := r.columns
 	count := last - first + 1
 	if selected != nil {
@@ -359,20 +324,33 @@ func (r *conditionalRead) apply(row *RowData, first, last int, selected map[int]
 		col := first + at
 		if selected != nil {
 			col = columns[at]
+			if col < first || col > last {
+				continue
+			}
 		}
 		if err := r.ctx.Err(); err != nil {
 			return err
+		}
+		notice := r.evaluator.prepare(row.Number, col)
+		if notice == "" && len(r.evaluator.rules) == 0 {
+			if selected == nil {
+				at = r.evaluator.nextCol - first - 1
+			}
+			continue
 		}
 		if r.remainingCells == 0 {
 			row.PresentationNotice = "条件格式超过本次显示格数容量，原文完整保留"
 			break
 		}
 		r.remainingCells--
-		cell, exists := r.cells[col]
-		if !exists {
+		position := source.position(col)
+		var cell CellData
+		if position >= 0 {
+			cell = row.Cells[position]
+		} else {
 			cell = CellData{Ref: ColumnName(col) + strconv.Itoa(row.Number), Col: col, Style: row.Style, PresentationOnly: true}
 		}
-		result, err := r.evaluator.Evaluate(row.Number, col, cell, r.resolve)
+		result, err := r.evaluator.evaluatePrepared(row.Number, col, toConditionalOperand(cell), r.operandResolver, notice)
 		if err != nil {
 			return err
 		}
@@ -390,16 +368,13 @@ func (r *conditionalRead) apply(row *RowData, first, last int, selected map[int]
 		}
 		r.remainingBytes -= len(encoded)
 		cell.Conditional = view
-		if position, ok := positions[col]; ok {
-			row.Cells[position] = cell
+		if position >= 0 {
+			row.Cells[position].Conditional = view
 		} else {
-			row.Cells = append(row.Cells, cell)
-			added = true
+			extra = append(extra, cell)
 		}
 	}
-	if added {
-		sort.SliceStable(row.Cells, func(i, j int) bool { return row.Cells[i].Col < row.Cells[j].Col })
-	}
+	row.Cells = source.withExtra(extra)
 	return nil
 }
 

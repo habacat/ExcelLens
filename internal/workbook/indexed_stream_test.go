@@ -1,7 +1,9 @@
 package workbook
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -48,8 +50,35 @@ func TestIndexedStreamPreReadsBothDirectionsAndBoundsRandomReads(t *testing.T) {
 		if _, err := stream.read(w, at, 1, 1, nil, false, false); err != nil {
 			t.Fatal(err)
 		}
-		if at != 0 && int64(len(stream.block)) > indexedRandomBlock {
+		if int64(len(stream.block)) > indexedRandomBlock {
 			t.Fatalf("random small row fetched %d bytes", len(stream.block))
 		}
+	}
+}
+
+func TestIndexedStreamRetriesIncompleteRead(t *testing.T) {
+	xml := `<row r="1"><c r="A1"><v>42</v></c></row>`
+	idx := syntheticIndex(t, xml)
+	f, err := os.OpenFile(idx.XMLPath, os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := f.Truncate(5); err != nil {
+		t.Fatal(err)
+	}
+	s := indexedStream{f: f, idx: idx}
+	w := &Workbook{}
+	for attempt := 0; attempt < 2; attempt++ {
+		if _, err := s.read(w, 0, 1, 1, nil, false, false); !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("read %d returned %v", attempt+1, err)
+		}
+	}
+	if _, err := f.WriteAt([]byte(xml), 0); err != nil {
+		t.Fatal(err)
+	}
+	row, err := s.read(w, 0, 1, 1, nil, false, false)
+	if err != nil || len(row.Cells) != 1 || row.Cells[0].Raw != "42" {
+		t.Fatal(row, err)
 	}
 }

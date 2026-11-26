@@ -1,0 +1,371 @@
+{
+  "result": "PASS",
+  "previous": "v1.19.0",
+  "current": "1.19.1 candidate",
+  "host": "Windows amd64, Intel i7-9750H, Go 1.27.4",
+  "rounds": 4,
+  "benchtime": "250ms",
+  "order": [
+    "previous/current",
+    "current/previous",
+    "previous/current",
+    "current/previous"
+  ],
+  "measurement": "The same two benchmark functions are compiled against both versions. Timed calls verify every sampled source row or conditional style. Existing OS file cache is retained.",
+  "binarySHA256": {
+    "before": "ea4000cd4e67853f41e03073e094bb7dfe8d5546a1f1c296c86ac17a85e40935",
+    "after": "e19ce23cf02d46ef78cc7ac850f45bf4ba0bf47edb04cbcf0c0290ee49ebbce0"
+  },
+  "samples": {
+    "ConditionalViewportRead/column_step_1": {
+      "before": [
+        {
+          "nsPerRead": 5318238.0,
+          "bytesPerRead": 5179797,
+          "allocationsPerRead": 23687
+        },
+        {
+          "nsPerRead": 8050949.0,
+          "bytesPerRead": 5180633,
+          "allocationsPerRead": 23694
+        },
+        {
+          "nsPerRead": 10199572.0,
+          "bytesPerRead": 5180626,
+          "allocationsPerRead": 23693
+        },
+        {
+          "nsPerRead": 8494006.0,
+          "bytesPerRead": 5179749,
+          "allocationsPerRead": 23688
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 3313307.0,
+          "bytesPerRead": 2686460,
+          "allocationsPerRead": 11267
+        },
+        {
+          "nsPerRead": 3643306.0,
+          "bytesPerRead": 2686440,
+          "allocationsPerRead": 11267
+        },
+        {
+          "nsPerRead": 5959633.0,
+          "bytesPerRead": 2687588,
+          "allocationsPerRead": 11274
+        },
+        {
+          "nsPerRead": 4523637.0,
+          "bytesPerRead": 2686957,
+          "allocationsPerRead": 11270
+        }
+      ]
+    },
+    "ConditionalViewportRead/column_step_7": {
+      "before": [
+        {
+          "nsPerRead": 2767115.0,
+          "bytesPerRead": 1533994,
+          "allocationsPerRead": 19991
+        },
+        {
+          "nsPerRead": 4571139.0,
+          "bytesPerRead": 1533872,
+          "allocationsPerRead": 19990
+        },
+        {
+          "nsPerRead": 3363261.0,
+          "bytesPerRead": 1533899,
+          "allocationsPerRead": 19989
+        },
+        {
+          "nsPerRead": 5407678.0,
+          "bytesPerRead": 1534003,
+          "allocationsPerRead": 19992
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 1837541.0,
+          "bytesPerRead": 1245651,
+          "allocationsPerRead": 8214
+        },
+        {
+          "nsPerRead": 2242250.0,
+          "bytesPerRead": 1245826,
+          "allocationsPerRead": 8215
+        },
+        {
+          "nsPerRead": 3159061.0,
+          "bytesPerRead": 1245600,
+          "allocationsPerRead": 8214
+        },
+        {
+          "nsPerRead": 3626284.0,
+          "bytesPerRead": 1245473,
+          "allocationsPerRead": 8214
+        }
+      ]
+    },
+    "SourceNumberRead/single": {
+      "before": [
+        {
+          "nsPerRead": 386470.0,
+          "bytesPerRead": 911247,
+          "allocationsPerRead": 19
+        },
+        {
+          "nsPerRead": 731325.0,
+          "bytesPerRead": 911260,
+          "allocationsPerRead": 19
+        },
+        {
+          "nsPerRead": 620255.0,
+          "bytesPerRead": 911236,
+          "allocationsPerRead": 19
+        },
+        {
+          "nsPerRead": 1476633.0,
+          "bytesPerRead": 911247,
+          "allocationsPerRead": 19
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 199180.0,
+          "bytesPerRead": 17700,
+          "allocationsPerRead": 18
+        },
+        {
+          "nsPerRead": 184769.0,
+          "bytesPerRead": 17699,
+          "allocationsPerRead": 18
+        },
+        {
+          "nsPerRead": 237147.0,
+          "bytesPerRead": 17702,
+          "allocationsPerRead": 18
+        },
+        {
+          "nsPerRead": 238237.0,
+          "bytesPerRead": 17699,
+          "allocationsPerRead": 18
+        }
+      ]
+    },
+    "SourceNumberRead/forward": {
+      "before": [
+        {
+          "nsPerRead": 632384.0,
+          "bytesPerRead": 936296,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 1115659.0,
+          "bytesPerRead": 936259,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 1114562.0,
+          "bytesPerRead": 936291,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 1620557.0,
+          "bytesPerRead": 936248,
+          "allocationsPerRead": 256
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 385179.0,
+          "bytesPerRead": 173892,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 468884.0,
+          "bytesPerRead": 173895,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 414052.0,
+          "bytesPerRead": 173891,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 520373.0,
+          "bytesPerRead": 173893,
+          "allocationsPerRead": 256
+        }
+      ]
+    },
+    "SourceNumberRead/reverse": {
+      "before": [
+        {
+          "nsPerRead": 730597.0,
+          "bytesPerRead": 911712,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 927657.0,
+          "bytesPerRead": 911688,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 1343507.0,
+          "bytesPerRead": 911676,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 1455900.0,
+          "bytesPerRead": 911673,
+          "allocationsPerRead": 256
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 360579.0,
+          "bytesPerRead": 173893,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 553136.0,
+          "bytesPerRead": 173888,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 466608.0,
+          "bytesPerRead": 173890,
+          "allocationsPerRead": 256
+        },
+        {
+          "nsPerRead": 496678.0,
+          "bytesPerRead": 173889,
+          "allocationsPerRead": 256
+        }
+      ]
+    },
+    "SourceNumberRead/scattered": {
+      "before": [
+        {
+          "nsPerRead": 509019.0,
+          "bytesPerRead": 1052696,
+          "allocationsPerRead": 39
+        },
+        {
+          "nsPerRead": 978956.0,
+          "bytesPerRead": 1052661,
+          "allocationsPerRead": 39
+        },
+        {
+          "nsPerRead": 1652180.0,
+          "bytesPerRead": 1052675,
+          "allocationsPerRead": 39
+        },
+        {
+          "nsPerRead": 929954.0,
+          "bytesPerRead": 1052657,
+          "allocationsPerRead": 39
+        }
+      ],
+      "after": [
+        {
+          "nsPerRead": 243590.0,
+          "bytesPerRead": 19854,
+          "allocationsPerRead": 38
+        },
+        {
+          "nsPerRead": 263083.0,
+          "bytesPerRead": 19853,
+          "allocationsPerRead": 38
+        },
+        {
+          "nsPerRead": 288612.0,
+          "bytesPerRead": 19852,
+          "allocationsPerRead": 38
+        },
+        {
+          "nsPerRead": 307507.0,
+          "bytesPerRead": 19853,
+          "allocationsPerRead": 38
+        }
+      ]
+    }
+  },
+  "medians": {
+    "ConditionalViewportRead/column_step_1": {
+      "before": {
+        "nsPerRead": 8272477.5,
+        "bytesPerRead": 5180211.5,
+        "allocationsPerRead": 23690.5
+      },
+      "after": {
+        "nsPerRead": 4083471.5,
+        "bytesPerRead": 2686708.5,
+        "allocationsPerRead": 11268.5
+      }
+    },
+    "ConditionalViewportRead/column_step_7": {
+      "before": {
+        "nsPerRead": 3967200.0,
+        "bytesPerRead": 1533946.5,
+        "allocationsPerRead": 19990.5
+      },
+      "after": {
+        "nsPerRead": 2700655.5,
+        "bytesPerRead": 1245625.5,
+        "allocationsPerRead": 8214.0
+      }
+    },
+    "SourceNumberRead/single": {
+      "before": {
+        "nsPerRead": 675790.0,
+        "bytesPerRead": 911247.0,
+        "allocationsPerRead": 19.0
+      },
+      "after": {
+        "nsPerRead": 218163.5,
+        "bytesPerRead": 17699.5,
+        "allocationsPerRead": 18.0
+      }
+    },
+    "SourceNumberRead/forward": {
+      "before": {
+        "nsPerRead": 1115110.5,
+        "bytesPerRead": 936275.0,
+        "allocationsPerRead": 256.0
+      },
+      "after": {
+        "nsPerRead": 441468.0,
+        "bytesPerRead": 173892.5,
+        "allocationsPerRead": 256.0
+      }
+    },
+    "SourceNumberRead/reverse": {
+      "before": {
+        "nsPerRead": 1135582.0,
+        "bytesPerRead": 911682.0,
+        "allocationsPerRead": 256.0
+      },
+      "after": {
+        "nsPerRead": 481643.0,
+        "bytesPerRead": 173889.5,
+        "allocationsPerRead": 256.0
+      }
+    },
+    "SourceNumberRead/scattered": {
+      "before": {
+        "nsPerRead": 954455.0,
+        "bytesPerRead": 1052668.0,
+        "allocationsPerRead": 39.0
+      },
+      "after": {
+        "nsPerRead": 275847.5,
+        "bytesPerRead": 19853.0,
+        "allocationsPerRead": 38.0
+      }
+    }
+  }
+}

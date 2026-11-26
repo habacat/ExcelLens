@@ -22,6 +22,16 @@ type RowReadOptions struct {
 	ConditionalStatsStatus   string
 	Columns                  []int
 	richBudget               *richReadBudget
+	// Only a synchronous internal scan that consumes every cell before the
+	// next read supplies storage. Returned public rows always own their cells.
+	cellScratch *[]CellData
+}
+
+func (o RowReadOptions) cells(capacity int) []CellData {
+	if o.cellScratch != nil && cap(*o.cellScratch) >= capacity {
+		return (*o.cellScratch)[:0]
+	}
+	return make([]CellData, 0, capacity)
 }
 
 // VisitRowsWithOptionsContext streams source rows with one descriptor and a

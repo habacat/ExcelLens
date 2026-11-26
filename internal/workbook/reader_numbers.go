@@ -20,7 +20,7 @@ func (w *Workbook) ReadRowsByNumbersWithOptionsContext(ctx context.Context, idx 
 				return
 			}
 		}
-	}, first, last, options, false, func(row RowData) error { rows = append(rows, row); return nil })
+	}, first, last, options, &rows, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -31,11 +31,11 @@ func (w *Workbook) ReadRowsByNumbersWithOptionsContext(ctx context.Context, idx 
 // descriptor. Presentation budgets reset per row, like rich-text budgets;
 // the dependency memo stays bounded for the whole visit.
 func (w *Workbook) VisitRowsByNumbersWithOptionsContext(ctx context.Context, idx *SheetIndex, numbers iter.Seq[int], first, last int, options RowReadOptions, visit func(RowData) error) error {
-	return w.visitSourceNumbers(ctx, idx, numbers, first, last, options, true, visit)
+	return w.visitSourceNumbers(ctx, idx, numbers, first, last, options, nil, visit)
 }
 
-func (w *Workbook) visitSourceNumbers(ctx context.Context, idx *SheetIndex, numbers iter.Seq[int], first, last int, options RowReadOptions, byRow bool, visit func(RowData) error) error {
-	return w.visitSourceReferences(ctx, idx, sourceRowReferences(idx, numbers), first, last, options, byRow, true, visit)
+func (w *Workbook) visitSourceNumbers(ctx context.Context, idx *SheetIndex, numbers iter.Seq[int], first, last int, options RowReadOptions, result *[]RowData, visit func(RowData) error) error {
+	return w.visitSourceReferences(ctx, idx, sourceRowReferences(idx, numbers), first, last, options, result, true, visit)
 }
 
 func sourceRowReferences(idx *SheetIndex, numbers iter.Seq[int]) iter.Seq[SourceRowReference] {
@@ -65,14 +65,14 @@ func sourceRowReferences(idx *SheetIndex, numbers iter.Seq[int]) iter.Seq[Source
 // descriptor and presentation budgets, while ordered callers reuse known index
 // positions. Invalid coordinates, mismatched positions and false blanks fail.
 func (w *Workbook) VisitRowsByReferencesWithOptionsContext(ctx context.Context, idx *SheetIndex, refs iter.Seq[SourceRowReference], first, last int, options RowReadOptions, visit func(RowData) error) error {
-	return w.visitSourceReferences(ctx, idx, refs, first, last, options, true, false, visit)
+	return w.visitSourceReferences(ctx, idx, refs, first, last, options, nil, false, visit)
 }
 
-func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, refs iter.Seq[SourceRowReference], first, last int, options RowReadOptions, byRow, knownBlanks bool, visit func(RowData) error) error {
+func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, refs iter.Seq[SourceRowReference], first, last int, options RowReadOptions, result *[]RowData, knownBlanks bool, visit func(RowData) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if idx == nil || refs == nil || visit == nil {
+	if idx == nil || refs == nil || (visit == nil && result == nil) {
 		return errors.New("源行引用或读取目标无效")
 	}
 	if first < 1 || last < first || last > formats.ExcelColumns {
@@ -100,52 +100,11 @@ func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, r
 		return err
 	}
 	defer presentation.closeStatistics()
-	if !byRow {
+	if result != nil {
 		options = prepareRichRead(options)
 	}
 	stream := indexedStream{f: f, idx: idx}
-	if presentation != nil && !byRow {
-		var batch []RowData
-		for ref := range refs {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			number, position := ref.Number, ref.Position
-			if number < 1 || number > MaxRowsForIndex(idx) {
-				return errors.New("源行号超出允许范围")
-			}
-			if position < -1 || position >= idx.RowCount() || position >= 0 && idx.RowAt(position).Number != number {
-				return errors.New("源行号与索引位置不匹配")
-			}
-			if position == -1 && !knownBlanks {
-				i := idx.FindRowOffset(number)
-				if i < idx.RowCount() && idx.RowAt(i).Number == number {
-					return errors.New("已有源记录不能伪装成空白行")
-				}
-			}
-			row := RowData{Number: number}
-			if position >= 0 {
-				row, err = stream.readWithOptions(w, position, first, last, selected, options)
-				if err != nil {
-					return err
-				}
-			}
-			batch = append(batch, row)
-		}
-		presentation.setBatchRows(batch, first, last, selected)
-		for i := range batch {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			if err := presentation.apply(&batch[i], first, last, selected); err != nil {
-				return err
-			}
-			if err := visit(batch[i]); err != nil {
-				return err
-			}
-		}
-		return ctx.Err()
-	}
+
 	for ref := range refs {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -170,15 +129,22 @@ func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, r
 				return err
 			}
 		}
+		if result != nil {
+			*result = append(*result, row)
+			continue
+		}
 		if presentation != nil {
-			if byRow {
-				presentation.resetBudget()
-			}
+			presentation.resetBudget()
 			if err := presentation.apply(&row, first, last, selected); err != nil {
 				return err
 			}
 		}
 		if err := visit(row); err != nil {
+			return err
+		}
+	}
+	if result != nil {
+		if err := presentation.applyBatch(*result, first, last, selected); err != nil {
 			return err
 		}
 	}

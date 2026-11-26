@@ -258,7 +258,8 @@ async function editCase(){
    report.productionSHA256=componentHash('internal','tools/uiprobe','go.mod','go.sum','vendor');
    report.suiteSHA256=componentHash('tools/bench','tools/qa/browser_harness.cjs','tools/qa/project_config.cjs',
      'tools/qa/conditional_scroll_qa.cjs','tools/qa/conditional_scroll_fixture.cjs','tools/qa/generated_workbook.cjs',
-     'internal/workbook/conditional_statistics_test.go','internal/workbook/conditional_bench_test.go','internal/workbook/reader_presentation_bench_test.go');
+     'internal/workbook/conditional_statistics_test.go','internal/workbook/conditional_bench_test.go',
+     'internal/workbook/conditional_viewport_bench_test.go','internal/workbook/reader_presentation_bench_test.go');
    const scenarios={reading:readingCases,reconcile:reconcileCase,tabs:tabCases,lifecycle,edit:editCase,
      rowQuery:async()=>{
        const rows=smoke?1001:1000000, file=await fixture('csv',rows);

@@ -1,0 +1,406 @@
+{
+  "version": "1.19.1",
+  "result": "PASS",
+  "sourceVersion": "v1.19.0",
+  "method": "Alternating old/new/new/old isolated processes. Three measured 80-row by 48-column reads per benchmark invocation, two cold 200,000-row builds per version. Measurements overlapped part of the previous release workload; use the formal same-suite baseline for stable version comparison.",
+  "comparison": {
+    "before": {
+      "viewports": {
+        "1": {
+          "samples": [
+            {
+              "nsPerViewport": 14095714.0,
+              "bytesPerViewport": 5181496.0,
+              "allocsPerViewport": 23699.0
+            },
+            {
+              "nsPerViewport": 13212965.0,
+              "bytesPerViewport": 5178819.0,
+              "allocsPerViewport": 23678.0
+            },
+            {
+              "nsPerViewport": 16706108.0,
+              "bytesPerViewport": 5179872.0,
+              "allocsPerViewport": 23686.0
+            },
+            {
+              "nsPerViewport": 15867531.0,
+              "bytesPerViewport": 5179903.0,
+              "allocsPerViewport": 23691.0
+            },
+            {
+              "nsPerViewport": 16924867.0,
+              "bytesPerViewport": 5179135.0,
+              "allocsPerViewport": 23682.0
+            },
+            {
+              "nsPerViewport": 24933068.0,
+              "bytesPerViewport": 5179154.0,
+              "allocsPerViewport": 23683.0
+            }
+          ],
+          "median": {
+            "nsPerViewport": 16286819.5,
+            "bytesPerViewport": 5179513.0,
+            "allocsPerViewport": 23684.5
+          }
+        },
+        "7": {
+          "samples": [
+            {
+              "nsPerViewport": 6567925.0,
+              "bytesPerViewport": 1534402.0,
+              "allocsPerViewport": 19994.0
+            },
+            {
+              "nsPerViewport": 6245492.0,
+              "bytesPerViewport": 1534076.0,
+              "allocsPerViewport": 19991.0
+            },
+            {
+              "nsPerViewport": 6624291.0,
+              "bytesPerViewport": 1534245.0,
+              "allocsPerViewport": 19993.0
+            },
+            {
+              "nsPerViewport": 14746471.0,
+              "bytesPerViewport": 1534372.0,
+              "allocsPerViewport": 19995.0
+            },
+            {
+              "nsPerViewport": 10582197.0,
+              "bytesPerViewport": 1533902.0,
+              "allocsPerViewport": 19991.0
+            },
+            {
+              "nsPerViewport": 6645763.0,
+              "bytesPerViewport": 1534010.0,
+              "allocsPerViewport": 19991.0
+            }
+          ],
+          "median": {
+            "nsPerViewport": 6635027.0,
+            "bytesPerViewport": 1534160.5,
+            "allocsPerViewport": 19992.0
+          }
+        }
+      },
+      "statistics": [
+        {
+          "cellsPerViewport": 120,
+          "distinctKeys": 2000,
+          "firstViewportMs": 4.987,
+          "reopenAndIndexMs": 14.4363,
+          "reopenedViewportMs": 4.9874,
+          "result": "PASS",
+          "rows": 200000,
+          "rules": [
+            "COUNTIF($A:$A,$A2)=100",
+            "SUMIF($A:$A,$A2,$C:$C)=200",
+            "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+            "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+            "MATCH($A2,$A:$A,0)=MOD(ROW()-2,2000)+2",
+            "SUM($C2:$C4)=6"
+          ],
+          "sharedIndexBytes": 2097152,
+          "sharedIndexUnchangedOnWarmAndReopen": true,
+          "sourceIndexMs": 1275,
+          "sourceSHA256": "0e694e6fc1042b3552220652a46b3ffbda64e57be8459063e2c5731ef3a5fc6f",
+          "statisticsPreparationMs": 3330.6812,
+          "warmViewportMaxMs": 4.8642,
+          "warmViewportMedianMs": 3.48815,
+          "warmViewportSamplesMs": [
+            2.9912,
+            2.9919,
+            2.992,
+            3.0237,
+            3.03,
+            3.2275,
+            3.2358,
+            3.244,
+            3.7323,
+            3.7376,
+            3.7447,
+            3.9904,
+            4.0228,
+            4.082,
+            4.5266,
+            4.8642
+          ],
+          "warmViewports": 16
+        },
+        {
+          "cellsPerViewport": 120,
+          "distinctKeys": 2000,
+          "firstViewportMs": 6.2014,
+          "reopenAndIndexMs": 26.144,
+          "reopenedViewportMs": 5.6772,
+          "result": "PASS",
+          "rows": 200000,
+          "rules": [
+            "COUNTIF($A:$A,$A2)=100",
+            "SUMIF($A:$A,$A2,$C:$C)=200",
+            "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+            "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+            "MATCH($A2,$A:$A,0)=MOD(ROW()-2,2000)+2",
+            "SUM($C2:$C4)=6"
+          ],
+          "sharedIndexBytes": 2097152,
+          "sharedIndexUnchangedOnWarmAndReopen": true,
+          "sourceIndexMs": 1211,
+          "sourceSHA256": "0e694e6fc1042b3552220652a46b3ffbda64e57be8459063e2c5731ef3a5fc6f",
+          "statisticsPreparationMs": 4533.4254,
+          "warmViewportMaxMs": 6.758,
+          "warmViewportMedianMs": 4.7366,
+          "warmViewportSamplesMs": [
+            2.9922,
+            3.6229,
+            3.9329,
+            3.9897,
+            4.3554,
+            4.3714,
+            4.4389,
+            4.716,
+            4.7572,
+            4.7921,
+            4.8332,
+            4.9804,
+            4.9861,
+            5.0061,
+            5.9834,
+            6.758
+          ],
+          "warmViewports": 16
+        }
+      ]
+    },
+    "optimized": {
+      "viewports": {
+        "1": {
+          "samples": [
+            {
+              "nsPerViewport": 5113415.0,
+              "bytesPerViewport": 2965620.0,
+              "allocsPerViewport": 11269.0
+            },
+            {
+              "nsPerViewport": 5200964.0,
+              "bytesPerViewport": 2964793.0,
+              "allocsPerViewport": 11263.0
+            },
+            {
+              "nsPerViewport": 5115477.0,
+              "bytesPerViewport": 2964573.0,
+              "allocsPerViewport": 11261.0
+            },
+            {
+              "nsPerViewport": 5452361.0,
+              "bytesPerViewport": 2965814.0,
+              "allocsPerViewport": 11271.0
+            },
+            {
+              "nsPerViewport": 6160757.0,
+              "bytesPerViewport": 2964596.0,
+              "allocsPerViewport": 11262.0
+            },
+            {
+              "nsPerViewport": 5985780.0,
+              "bytesPerViewport": 2964834.0,
+              "allocsPerViewport": 11262.0
+            }
+          ],
+          "median": {
+            "nsPerViewport": 5326662.5,
+            "bytesPerViewport": 2964813.5,
+            "allocsPerViewport": 11262.5
+          }
+        },
+        "7": {
+          "samples": [
+            {
+              "nsPerViewport": 3523791.0,
+              "bytesPerViewport": 1315308.0,
+              "allocsPerViewport": 14616.0
+            },
+            {
+              "nsPerViewport": 3879561.0,
+              "bytesPerViewport": 1315319.0,
+              "allocsPerViewport": 14616.0
+            },
+            {
+              "nsPerViewport": 3193890.0,
+              "bytesPerViewport": 1315200.0,
+              "allocsPerViewport": 14615.0
+            },
+            {
+              "nsPerViewport": 3977447.0,
+              "bytesPerViewport": 1315454.0,
+              "allocsPerViewport": 14617.0
+            },
+            {
+              "nsPerViewport": 3088292.0,
+              "bytesPerViewport": 1315121.0,
+              "allocsPerViewport": 14614.0
+            },
+            {
+              "nsPerViewport": 3621411.0,
+              "bytesPerViewport": 1315443.0,
+              "allocsPerViewport": 14617.0
+            }
+          ],
+          "median": {
+            "nsPerViewport": 3572601.0,
+            "bytesPerViewport": 1315313.5,
+            "allocsPerViewport": 14616.0
+          }
+        }
+      },
+      "statistics": [
+        {
+          "cellsPerViewport": 120,
+          "distinctKeys": 2000,
+          "firstViewportMs": 3.2991,
+          "reopenAndIndexMs": 12.6728,
+          "reopenedViewportMs": 5.1621,
+          "result": "PASS",
+          "rows": 200000,
+          "rules": [
+            "COUNTIF($A:$A,$A2)=100",
+            "SUMIF($A:$A,$A2,$C:$C)=200",
+            "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+            "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+            "MATCH($A2,$A:$A,0)=MOD(ROW()-2,2000)+2",
+            "SUM($C2:$C4)=6"
+          ],
+          "sharedIndexBytes": 1048576,
+          "sharedIndexUnchangedOnWarmAndReopen": true,
+          "sourceIndexMs": 754,
+          "sourceSHA256": "0e694e6fc1042b3552220652a46b3ffbda64e57be8459063e2c5731ef3a5fc6f",
+          "statisticsPreparationMs": 1000.032,
+          "warmViewportMaxMs": 5.7991,
+          "warmViewportMedianMs": 3.1092500000000003,
+          "warmViewportSamplesMs": [
+            2.1012,
+            2.695,
+            2.7549,
+            2.8272,
+            2.9914,
+            2.9924,
+            2.9977,
+            3.0032,
+            3.2153,
+            4.0477,
+            4.4328,
+            4.6346,
+            5.0042,
+            5.018,
+            5.018,
+            5.7991
+          ],
+          "warmViewports": 16
+        },
+        {
+          "cellsPerViewport": 120,
+          "distinctKeys": 2000,
+          "firstViewportMs": 8.7949,
+          "reopenAndIndexMs": 24.0893,
+          "reopenedViewportMs": 9.4886,
+          "result": "PASS",
+          "rows": 200000,
+          "rules": [
+            "COUNTIF($A:$A,$A2)=100",
+            "SUMIF($A:$A,$A2,$C:$C)=200",
+            "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+            "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+            "MATCH($A2,$A:$A,0)=MOD(ROW()-2,2000)+2",
+            "SUM($C2:$C4)=6"
+          ],
+          "sharedIndexBytes": 1048576,
+          "sharedIndexUnchangedOnWarmAndReopen": true,
+          "sourceIndexMs": 1516,
+          "sourceSHA256": "0e694e6fc1042b3552220652a46b3ffbda64e57be8459063e2c5731ef3a5fc6f",
+          "statisticsPreparationMs": 3851.8189,
+          "warmViewportMaxMs": 7.596,
+          "warmViewportMedianMs": 5.91205,
+          "warmViewportSamplesMs": [
+            3.9886,
+            4.3574,
+            4.5304,
+            4.8147,
+            4.9866,
+            5.281,
+            5.2934,
+            5.8412,
+            5.9829,
+            5.984,
+            5.9843,
+            6.9267,
+            6.9826,
+            7.4056,
+            7.4369,
+            7.596
+          ],
+          "warmViewports": 16
+        }
+      ]
+    }
+  },
+  "cacheInteroperability": [
+    {
+      "writer": "old",
+      "reader": "new",
+      "result": "PASS",
+      "checkedStyles": 72,
+      "cacheSHA256": "5b963d13fe69342263c19a80d32dc20a5196b83c5c908c54bad0d907b8d66d40"
+    },
+    {
+      "writer": "new",
+      "reader": "old",
+      "result": "PASS",
+      "checkedStyles": 72,
+      "cacheSHA256": "86774f1a02a378ef7ca7e3b982d203fe6b91aa73adbe1e81ec5abd682bde3eae"
+    }
+  ],
+  "manualDesktopAcceptance": false,
+  "wpsAcceptance": false,
+  "allocationProfile": {
+    "before": {
+      "rows": 100000,
+      "distinctKeys": 1000,
+      "sampledTotalMiB": 361.29
+    },
+    "optimized": {
+      "rows": 100000,
+      "distinctKeys": 1000,
+      "sampledTotalMiB": 110.48
+    },
+    "method": "Go pprof alloc_space sampling, including fixture generation, source indexing and reads; MiB are sampled cumulative allocations, not process peak memory."
+  },
+  "realWorkbook": {
+    "nativeDateAndFillMatch": true,
+    "originalNoticeAbsent": true,
+    "sourceDigestUnchanged": true
+  },
+  "finalViewportReview": {
+    "result": "PASS",
+    "wideCoverage": "Both edges of two full-width rows retained all four rule hits and original data in B.",
+    "shortRead": "Repeated incomplete reads returned EOF and the repaired source was read on retry.",
+    "directionalReadAhead": "Random first read bounded to 16 KiB for small rows; forward and reverse long scans passed refill and value assertions.",
+    "rectangleOracle": "Compared rectangular source declarations with rule selection and every skipped interval across 1,919 coordinates.",
+    "publicInterface": "Five disk write operations and two source key encoders became package-private.",
+    "pairedMeasurements": "viewport-performance.json",
+    "originalWorkbook": {
+      "result": "PASS",
+      "sourceUnchanged": true,
+      "nativeDisplayMatched": true,
+      "sample": {
+        "text": "2026/8/31",
+        "baseColor": "rgb(255, 192, 0)",
+        "raw": "46265",
+        "notice": "",
+        "title": ""
+      },
+      "errors": []
+    }
+  }
+}

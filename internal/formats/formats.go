@@ -174,6 +174,7 @@ const (
 	ConditionalStatsTaskHistory              = 16
 	ConditionalStatsColumns                  = 8
 	ConditionalStatsDiskBytes          int64 = 512 << 20
+	ConditionalStatsGroupBufferBytes         = 16 << 20
 	ConditionalStatsDefaultBudgetBytes int64 = 2 << 30
 	ConditionalStatsMinBudgetBytes     int64 = 64 << 20
 	ConditionalStatsMaxBudgetBytes     int64 = 64 << 30

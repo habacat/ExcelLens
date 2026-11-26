@@ -101,7 +101,7 @@ func (w *Workbook) fastDecodeXMLRowWithOptions(f *os.File, idx *SheetIndex, rowI
 	if selected != nil {
 		capacity = minInt(len(selected), capacity)
 	}
-	result := RowData{Number: rowNum, Style: style, Cells: make([]CellData, 0, capacity)}
+	result := RowData{Number: rowNum, Style: style, Cells: options.cells(capacity)}
 	if bytes.HasSuffix(bytes.TrimSpace(header), []byte("/>")) {
 		return result, nil
 	}

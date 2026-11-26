@@ -453,7 +453,7 @@ floatPow:
 	return NumberValue(d)
 }
 
-func TypedKey(v EvalValue) string {
+func typedKey(v EvalValue) string {
 	switch v.Kind {
 	case "number":
 		d := v.Number
@@ -472,16 +472,16 @@ func TypedKey(v EvalValue) string {
 	}
 }
 
-func GroupKey(v EvalValue) string {
+func groupKey(v EvalValue) string {
 	if v.Kind == "text" {
 		if v.Text == "" {
 			return "z"
 		}
 		if d, ok := ParseDecimal(strings.TrimSpace(v.Text)); ok {
-			return TypedKey(NumberValue(d))
+			return typedKey(NumberValue(d))
 		}
 	}
-	return TypedKey(v)
+	return typedKey(v)
 }
 
 func LookupKey(v EvalValue, match bool) (string, bool) {
@@ -497,7 +497,7 @@ func LookupKey(v EvalValue, match bool) (string, bool) {
 		if v.Kind == "text" && strings.ContainsAny(v.Text, "*?~") {
 			return "", false
 		}
-		return TypedKey(v), true
+		return typedKey(v), true
 	}
 	if v.Kind == "blank" {
 		v = IntValue(0)
@@ -512,11 +512,11 @@ func LookupKey(v EvalValue, match bool) (string, bool) {
 			return "", false
 		}
 		if strings.EqualFold(text, "TRUE") || strings.EqualFold(text, "FALSE") {
-			return TypedKey(BoolValue(strings.EqualFold(text, "TRUE"))), true
+			return typedKey(BoolValue(strings.EqualFold(text, "TRUE"))), true
 		}
 		v = TextValue(text)
 	}
-	return GroupKey(v), true
+	return groupKey(v), true
 }
 
 // DecodeOperand converts a source cell operand into a typed conditional value

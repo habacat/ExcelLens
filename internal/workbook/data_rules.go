@@ -185,10 +185,14 @@ func (index *SourceDataRuleIndex) idsAt(ctx context.Context, row, col int) ([]in
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if at < 0 || index.nodes[at].maxRow < row {
+		if at < 0 {
 			return nil
 		}
-		node := index.nodes[at]
+		node := &index.nodes[at]
+		b := &node.bounds
+		if row < b.Row || row > b.EndRow || col < b.Col || col > b.EndCol {
+			return nil
+		}
 		if node.onlyGroup >= 0 && seen[node.onlyGroup] {
 			return nil
 		}

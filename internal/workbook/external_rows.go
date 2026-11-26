@@ -330,7 +330,7 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 	if selected != nil {
 		capacity = min(capacity, len(selected))
 	}
-	res.Cells = make([]CellData, 0, capacity)
+	res.Cells = options.cells(capacity)
 	prev := uint64(0)
 	for i := uint64(0); i < count; i++ {
 		col, err := get()
