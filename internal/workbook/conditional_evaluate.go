@@ -2,13 +2,14 @@ package workbook
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"excellens/internal/formats"
 )
+
+const conditionalWorkNotice = "条件格式超过本次求值预算"
 
 type ConditionalFormatResult struct {
 	Style      DifferentialStyle `json:"style"`
@@ -33,6 +34,11 @@ type ConditionalEvaluator struct {
 	currentReady    bool
 	currentNotice   string
 	resolver        ConditionalCellResolver
+	rangeResolver   ConditionalRangeResolver
+}
+
+func (e *ConditionalEvaluator) SetRangeResolver(r ConditionalRangeResolver) {
+	e.rangeResolver = r
 }
 
 func (index *SourceConditionalFormats) NewEvaluator(ctx context.Context) *ConditionalEvaluator {
@@ -142,8 +148,8 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 		if !matched {
 			continue
 		}
-		if rule.notice != "" {
-			out.Notice = fmt.Sprintf("条件规则%d：%s；低优先级样式未应用", rule.source.Priority, rule.notice)
+		if rule.styleNotice != "" {
+			out.Notice = fmt.Sprintf("条件规则%d：%s；低优先级样式未应用", rule.source.Priority, rule.styleNotice)
 			break
 		}
 		out.Matched++
@@ -215,58 +221,28 @@ func (e *ConditionalEvaluator) currentValue() (conditionalValue, string) {
 	return e.current, e.currentNotice
 }
 
-func (e *ConditionalEvaluator) operand(value conditionalOperand, group *conditionalGroup) (conditionalValue, string, error) {
-	if value.reference == nil {
-		return value.value, "", nil
-	}
-	ref := value.reference
-	row, col := ref.row, ref.col
-	if !ref.absoluteRow {
-		row += e.row - group.anchorRow
-	}
-	if !ref.absoluteCol {
-		col += e.col - group.anchorCol
-	}
-	if row < 1 || row > formats.ExcelRows || col < 1 || col > formats.ExcelColumns {
-		return conditionalValue{kind: "error", text: "#REF!"}, "", nil
-	}
-	if row == e.row && col == e.col {
-		v, notice := e.currentValue()
-		return v, notice, nil
-	}
-	if e.resolver == nil {
-		return conditionalValue{}, "引用的源单元格尚未读取，不能用空白或零替代", nil
-	}
-	cell, available, err := e.resolver(row, col)
-	if err != nil {
-		var unavailable *conditionalDependencyUnavailable
-		if errors.As(err, &unavailable) {
-			return conditionalValue{}, unavailable.reason, nil
-		}
-		return conditionalValue{}, "", err
-	}
-	if !available {
-		return conditionalValue{}, "引用的源单元格尚未读取，不能用空白或零替代", nil
-	}
-	v, notice := e.value(cell)
-	return v, notice, nil
-}
-
 func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, string, error) {
 	s := rule.source
 	group := &e.index.groups[rule.group]
-	// Unsupported predicates may match; they cannot be treated as a false
-	// result allowing lower-priority colors to masquerade as the source.
-	if len(rule.operands) == 0 && s.Type == "cellIs" || rule.notice != "" && s.Type != "cellIs" && s.Type != "expression" {
-		return false, rule.notice, nil
+	// Unsupported predicates or malformed blocks may match; they cannot be
+	// treated as false allowing lower-priority colors to masquerade as source.
+	if rule.predicateNotice != "" {
+		return false, rule.predicateNotice, nil
 	}
 	switch s.Type {
 	case "cellIs":
+		need := 1
+		if s.Operator == "between" || s.Operator == "notBetween" {
+			need = 2
+		}
+		if len(rule.exprs) < need {
+			return false, "条件比较的表达式数量无效", nil
+		}
 		left, notice := e.currentValue()
 		if notice != "" {
 			return false, notice, nil
 		}
-		right, notice, err := e.operand(rule.operands[0], group)
+		right, notice, err := e.evalExpr(rule.exprs[0], group)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
@@ -277,7 +253,7 @@ func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, strin
 		if s.Operator != "between" && s.Operator != "notBetween" {
 			return matchConditionalComparison(cmp, s.Operator), "", nil
 		}
-		other, notice, err := e.operand(rule.operands[1], group)
+		other, notice, err := e.evalExpr(rule.exprs[1], group)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
@@ -285,37 +261,32 @@ func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, strin
 		if !valid {
 			return false, "", nil
 		}
+		// Excel allows reversed bounds in between/notBetween (e.g. 10 and 5).
+		if boundCmp, ok := compareConditionalValues(right, other); ok && boundCmp > 0 {
+			cmp, upper = upper, cmp
+		}
 		match := cmp >= 0 && upper <= 0
 		if s.Operator == "notBetween" {
 			match = !match
 		}
 		return match, "", nil
 	case "expression":
-		if rule.notice != "" && rule.predicate.left.value.kind == "" && rule.predicate.left.reference == nil {
-			return false, rule.notice, nil
+		if len(rule.exprs) < 1 {
+			return false, "条件格式公式数量无效", nil
 		}
-		predicate := rule.predicate
-		left, notice, err := e.operand(predicate.left, group)
+		val, notice, err := e.evalExpr(rule.exprs[0], group)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
-		if !predicate.comparison {
-			switch left.kind {
-			case "number":
-				return left.number.digits != "0", "", nil
-			case "boolean":
-				return left.boolean, "", nil
-			case "blank", "error":
-				return false, "", nil
-			}
-			return false, "文本条件公式结果不能默认为布尔值", nil
+		switch val.kind {
+		case "number":
+			return conditionalValueIsNonZero(val), "", nil
+		case "boolean":
+			return val.boolean, "", nil
+		case "blank", "error":
+			return false, "", nil
 		}
-		right, notice, err := e.operand(predicate.right, group)
-		if notice != "" || err != nil {
-			return false, notice, err
-		}
-		cmp, valid := compareConditionalValues(left, right)
-		return valid && matchConditionalComparison(cmp, predicate.operator), "", nil
+		return false, "文本条件公式结果不能默认为布尔值", nil
 	case "containsErrors", "notContainsErrors":
 		if e.cell.CacheMissing {
 			return false, "所引用公式没有保存计算结果", nil
@@ -366,7 +337,7 @@ func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, strin
 		}
 		return matched, "", nil
 	}
-	return false, rule.notice, nil
+	return false, "该条件格式需要范围统计或尚未支持的规则，不自动扫描整表", nil
 }
 
 // First (higher-priority) property wins. Copy containers before adding lower

@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 type htmlWorkbookMetadata struct {
@@ -76,7 +78,7 @@ func (m htmlStyleMetadata) valid() bool {
 		return false
 	}
 	for _, sheet := range m.Sheets {
-		if len(sheet.Merges) > 100000 || len(sheet.Rows) > 100000 || len(sheet.Cols) > 16384 {
+		if len(sheet.Merges) > 100000 || len(sheet.Rows) > 100000 || len(sheet.Cols) > formats.ExcelColumns {
 			return false
 		}
 		last := 0
@@ -87,12 +89,12 @@ func (m htmlStyleMetadata) valid() bool {
 			last = r.Max
 		}
 		for c, size := range sheet.Cols {
-			if c < 1 || c > 16384 || !(size >= 10 && size <= 1200) {
+			if c < 1 || c > formats.ExcelColumns || !(size >= 10 && size <= 1200) {
 				return false
 			}
 		}
 		for _, r := range sheet.Merges {
-			if r.Row < 1 || r.Col < 1 || r.EndRow < r.Row || r.EndCol < r.Col || r.EndRow > maxExternalRows || r.EndCol > 16384 {
+			if r.Row < 1 || r.Col < 1 || r.EndRow < r.Row || r.EndCol < r.Col || r.EndRow > maxExternalRows || r.EndCol > formats.ExcelColumns {
 				return false
 			}
 		}

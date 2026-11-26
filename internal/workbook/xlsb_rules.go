@@ -176,7 +176,7 @@ func (w *Workbook) loadXLSBConditional(ctx context.Context, meta SheetMeta) (*So
 	if err != nil {
 		return nil, err
 	}
-	result := &SourceConditionalFormats{root: -1, styles: w.differentialStyles}
+	result := &SourceConditionalFormats{root: -1, styles: w.differentialStyles, sheetName: meta.Name, date1904: w.Date1904}
 	var entries []conditionalRangeEntry
 	group, groupStart, remaining, rangeCount := -1, 0, 0, 0
 	var rule *xlsbConditionalRule
@@ -249,7 +249,7 @@ func (w *Workbook) loadXLSBConditional(ctx context.Context, meta SheetMeta) (*So
 					}
 					extensionOwners[rule.guid] = len(result.rules)
 				}
-				result.rules = append(result.rules, compileSourceConditionalRule(rule.SourceConditionalRule, group))
+				result.rules = append(result.rules, compileSourceConditionalRule(rule.SourceConditionalRule, group, meta.Name))
 			}
 			rule = nil
 		case brtCFRuleExt:
@@ -284,7 +284,7 @@ func (w *Workbook) loadXLSBConditional(ctx context.Context, meta SheetMeta) (*So
 			}
 		} else {
 			compiled.source.Notice = "XLSB 数据条扩展缺失，无法完整还原"
-			compiled.notice = compiled.source.Notice
+			compiled.predicateNotice = compiled.source.Notice
 		}
 	}
 	return finishConditionalFormats(result, entries), nil
@@ -447,7 +447,12 @@ func (w *Workbook) decodeXLSBConditionalRule(data []byte, extended bool, row, co
 		} else {
 			parsed = f.formula()
 		}
-		if uint32(len(parsed.tokens)) != length {
+		if f.err != nil {
+			return out, f.err
+		}
+		// MS-XLSB BrtBeginCFRule uses nonzero cbFmla fields as presence
+		// flags. CFRule14 additionally requires the token length to agree.
+		if len(parsed.tokens) == 0 || (extended && uint32(len(parsed.tokens)) != length) {
 			return out, errors.New("XLSB 条件格式公式长度不一致")
 		}
 		text, ok := w.source.xlsb.formulaText(parsed, row-1, col-1, true)

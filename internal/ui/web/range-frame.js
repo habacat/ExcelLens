@@ -123,22 +123,59 @@
     }
     while (layer.children.length > count) layer.lastElementChild.remove();
   }
+  function mergePieces(pieces) {
+    if (pieces.length <= 1) return pieces;
+    pieces.sort((a, b) => a.from - b.from || a.to - b.to);
+    const out = [{from: pieces[0].from, to: pieces[0].to}];
+    for (let i = 1; i < pieces.length; i++) {
+      const p = pieces[i], prev = out[out.length - 1];
+      if (p.from <= prev.to) prev.to = Math.max(prev.to, p.to);
+      else out.push({from: p.from, to: p.to});
+    }
+    return out;
+  }
   // The grid cells own the tint inside the worksheet. Only paint the exposed
   // scrollport beyond the last row/column, using the same pane projection.
-  function paintCrosshair(layer, cell, visual, view, dataWidth, dataHeight) {
+  function paintCrosshair(layer, areas, view, dataWidth, dataHeight) {
+    const list = Array.isArray(areas) ? areas : [];
     const cutX = Math.max(view.rowHead + view.frozenWidth, view.rowHead + dataWidth - view.left);
     const cutY = Math.max(view.header + view.frozenHeight, view.header + dataHeight - view.top);
-    function strip(node,x,y,w,h) {
-      node.hidden = !(w>0 && h>0);
+    const rowPieces = [], colPieces = [];
+    if (cutX < view.width) {
+      for (const area of list) {
+        if (!area.row1 && !area.row2) continue;
+        const a = view.rowBounds(area.row1, area.visual1), b = view.rowBounds(area.row2, area.visual2);
+        const y1 = Math.min(a[0], b[0]), y2 = Math.max(a[1], b[1]);
+        if (y2 > y1) rowPieces.push(...axisPieces(y1, y2, view.header, view.frozenHeight, view.top, view.height));
+      }
+    }
+    if (cutY < view.height) {
+      for (const area of list) {
+        if (!area.col1 && !area.col2) continue;
+        const x1 = view.colLeft(Math.min(area.col1, area.col2)), x2 = view.colLeft(Math.max(area.col1, area.col2) + 1);
+        if (x2 > x1) colPieces.push(...axisPieces(x1, x2, view.rowHead, view.frozenWidth, view.left, view.width));
+      }
+    }
+    const rows = mergePieces(rowPieces), cols = mergePieces(colPieces);
+    function strip(node, className, x, y, w, h) {
+      if (node.className !== className) node.className = className;
+      node.hidden = !(w > 0 && h > 0);
       if (node.hidden) return;
       const style = 'left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px';
       if (node._position !== style) { node.style.cssText=style; node._position=style; }
     }
-    const [a,b] = view.rowBounds(cell.row,visual);
-    const row = cutX < view.width && visual>0 && axisPieces(a,b,view.header,view.frozenHeight,view.top,view.height)[0];
-    const col = cutY < view.height && axisPieces(view.colLeft(cell.col),view.colLeft(cell.col+1),view.rowHead,view.frozenWidth,view.left,view.width)[0];
-    strip(layer.firstElementChild,cutX,row?.from,view.width-cutX,row ? row.to-row.from : 0);
-    strip(layer.lastElementChild,col?.from,cutY,col ? col.to-col.from : 0,view.height-cutY);
+    const ensure = i => layer.children[i] || layer.appendChild(document.createElement('i'));
+    if (rows.length <= 1 && cols.length <= 1) {
+      const row = rows[0], col = cols[0];
+      strip(ensure(0), 'row-tail', cutX, row?.from, view.width - cutX, row ? row.to - row.from : 0);
+      strip(ensure(1), 'column-tail', col?.from, cutY, col ? col.to - col.from : 0, view.height - cutY);
+      while (layer.children.length > 2) layer.lastElementChild.remove();
+      return;
+    }
+    let count = 0;
+    for (const row of rows) strip(ensure(count++), 'row-tail', cutX, row.from, view.width - cutX, row.to - row.from);
+    for (const col of cols) strip(ensure(count++), 'column-tail', col.from, cutY, col.to - col.from, view.height - cutY);
+    while (layer.children.length > count) layer.lastElementChild.remove();
   }
   window.ExcelLensRangeFrame = {paint,paintCrosshair};
 })();

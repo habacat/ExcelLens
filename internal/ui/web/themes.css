@@ -136,7 +136,7 @@
 }
 :root[data-crosshair-enabled="false"] { --crosshair-row-fill: transparent; --crosshair-column-fill: transparent; --crosshair-both-fill: transparent; }
 .crosshair-tails { position: absolute; inset: 0; z-index: 18; pointer-events: none; overflow: hidden; }
-.crosshair-tails[hidden], :root[data-crosshair-enabled="false"] .crosshair-tails, .has-range .crosshair-tails { display: none; }
+.crosshair-tails[hidden], :root[data-crosshair-enabled="false"] .crosshair-tails { display: none; }
 .crosshair-tails i { position: absolute; pointer-events: none; }
 .crosshair-tails .row-tail { background: var(--crosshair-row-fill); }
 .crosshair-tails .column-tail { background: var(--crosshair-column-fill); }
@@ -148,15 +148,15 @@
 /* A rectangle shares one perimeter. The active cell keeps its worksheet fill. */
 :root .grid-region .grid-cell.selected { outline-color: var(--selection-color); background-image: linear-gradient(var(--selection-active-fill), var(--selection-active-fill)) !important; }
 :root .grid-region:is(.has-cell-selection, .has-range) .grid-cell.selected { outline: 0; box-shadow: none; background-image: none !important; }
-:root[data-crosshair-enabled="true"] .grid-region.has-cell-selection .grid-cell.merge-crosshair:not(:is(.range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) {
-  background-image: linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill)),
-                    linear-gradient(var(--crosshair-row-fill), var(--crosshair-row-fill)) !important;
+:root[data-crosshair-enabled="true"] .grid-region:is(.has-cell-selection, .has-range) .grid-cell.merge-crosshair:not(:is(.range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) {
+  background-image: var(--merge-band-image,
+                    linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill)),
+                    linear-gradient(var(--crosshair-row-fill), var(--crosshair-row-fill))) !important;
   background-origin: border-box;
   background-position: var(--merge-band-position);
   background-size: var(--merge-band-size);
   background-repeat: no-repeat;
 }
-.grid-region.has-range { --crosshair-row-fill: transparent; --crosshair-column-fill: transparent; --crosshair-both-fill: transparent; }
 :root .grid-region :is(.column-head.active, .pinned-row-head.active, .grid-row.active-row .row-head) { background: color-mix(in srgb, var(--selection-color) 18%, var(--grid-head)); color: var(--ink); }
 :root .grid-region .column-head.column-selected { background: color-mix(in srgb, var(--selection-color) 20%, var(--grid-head)) !important; color: var(--ink); box-shadow: inset 0 -2px 0 var(--selection-color); }
 :root .grid-region .grid-row.whole-row-selected .grid-cell:not(.selected):not(.range-cell),

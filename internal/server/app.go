@@ -24,7 +24,6 @@ import (
 	"excellens/internal/localstore"
 	"excellens/internal/recovery"
 	"excellens/internal/transferjobs"
-	"excellens/internal/workbook"
 )
 
 type App struct {
@@ -33,48 +32,30 @@ type App struct {
 	queryController
 	workbookSession
 	databaseImportController
-	edits            editController
-	recoveryOnce     sync.Once
-	recoveryStore    *recovery.Store
-	recoveryErr      error
-	recoverySem      chan struct{}
-	archiveMu        sync.Mutex
-	archiveView      *archiveView
-	archiveTask      *archiveTask
-	cacheMu          *sync.RWMutex // shared by all browser sessions and source pins
-	transfers        transferjobs.Manager
-	restoreState     recoveryMode
-	restoreActive    atomic.Bool
-	storageView      sync.RWMutex // storage readers and the worker changing their inputs
-	storageMu        sync.Mutex   // root only: one explicit storage operation at a time
-	cacheResetMu     sync.RWMutex // root only: drain requests before discarding active caches
-	cacheEpoch       atomic.Uint64
-	toolbar          toolbarPreference
-	sourceMu         sync.Mutex
-	sourcePins       map[*workbook.Workbook]int
-	sourceUploads    map[string]int
-	compositionBytes int64 // root sourceMu; shared across every browser session
-	relationBytes    int64 // root sourceMu; retained inputs and independent plans
-	reconcileMu      sync.Mutex
-	reconcileBooks   map[string]*reconcileAttachment
-	reconcileJobs    map[string]*reconcileTask
-	recipeMu         sync.Mutex
-	recipeCaptures   map[string]*recipeCaptureTask
-	viewMu           sync.Mutex
-	bookmarkMu       sync.Mutex
-	recentMu         sync.Mutex
-
-	analysisMu       sync.Mutex
-	analysisJobs     map[string]*analysisTask
-	analysisTreeJobs map[string]*analysisTreeTask
-	analysisSources  map[string]*analysisSourceSnapshot
-	catalogueJobs    map[string]*catalogueTask
-	dataRuleJobs     map[string]*dataRuleTask
-	printJobs        map[string]*printTask
-	clusterJobs      map[string]*clusterTask
-	compositionJobs  map[string]*compositionTask
-	relationJobs     map[string]*relationTask
-	exports          exportController
+	archiveController
+	sourcePinController
+	reconcileController
+	recipeController
+	analysisController
+	metadataJobs
+	edits         editController
+	exports       exportController
+	recoveryOnce  sync.Once
+	recoveryStore *recovery.Store
+	recoveryErr   error
+	recoverySem   chan struct{}
+	cacheMu       *sync.RWMutex // shared by all browser sessions and source pins
+	transfers     transferjobs.Manager
+	restoreState  recoveryMode
+	restoreActive atomic.Bool
+	storageView   sync.RWMutex // storage readers and the worker changing their inputs
+	storageMu     sync.Mutex   // root only: one explicit storage operation at a time
+	cacheResetMu  sync.RWMutex // root only: drain requests before discarding active caches
+	cacheEpoch    atomic.Uint64
+	toolbar       toolbarPreference
+	viewMu        sync.Mutex
+	bookmarkMu    sync.Mutex
+	recentMu      sync.Mutex
 
 	server       *http.Server
 	token        string
@@ -131,33 +112,24 @@ func newApp() (*App, error) {
 		return nil, fmt.Errorf("生成图片访问票据失败：%w", err)
 	}
 	return &App{
-		submitted:       &browserlease.Work{},
-		workAdmission:   newWorkAdmission(),
-		queryController: newQueryController(),
-		edits:           newEditController(),
-		cacheMu:         &sync.RWMutex{},
-		sourcePins:      make(map[*workbook.Workbook]int),
-		sourceUploads:   make(map[string]int),
-		reconcileBooks:  make(map[string]*reconcileAttachment),
-		reconcileJobs:   make(map[string]*reconcileTask),
-		recipeCaptures:  make(map[string]*recipeCaptureTask),
-		recoverySem:     make(chan struct{}, 2),
-		catalogueJobs:   make(map[string]*catalogueTask),
-		dataRuleJobs:    make(map[string]*dataRuleTask),
-		printJobs:       make(map[string]*printTask),
-		clusterJobs:     make(map[string]*clusterTask),
-		compositionJobs: make(map[string]*compositionTask),
-		relationJobs:    make(map[string]*relationTask),
-		exports:         make(exportController),
+		submitted:           &browserlease.Work{},
+		workAdmission:       newWorkAdmission(),
+		queryController:     newQueryController(),
+		sourcePinController: newSourcePinController(),
+		reconcileController: newReconcileController(),
+		recipeController:    newRecipeController(),
+		analysisController:  newAnalysisController(),
+		metadataJobs:        newMetadataJobs(),
+		edits:               newEditController(),
+		exports:             make(exportController),
+		cacheMu:             &sync.RWMutex{},
+		recoverySem:         make(chan struct{}, 2),
 
 		token:       hex.EncodeToString(tokenBytes[:]),
 		mediaTicket: hex.EncodeToString(mediaBytes[:]),
 
-		analysisJobs:     make(map[string]*analysisTask),
-		analysisTreeJobs: make(map[string]*analysisTreeTask),
-		analysisSources:  make(map[string]*analysisSourceSnapshot),
-		sessions:         make(map[string]*browserSession),
-		retiring:         make(map[*App]struct{}),
+		sessions: make(map[string]*browserSession),
+		retiring: make(map[*App]struct{}),
 	}, nil
 }
 
@@ -208,36 +180,12 @@ func (a *App) Shutdown() {
 		a.restoreState.stop()
 		a.transfers.Stop()
 		a.mu.Lock()
-		for _, job := range a.catalogueJobs {
-			job.cancel()
-		}
-		for _, job := range a.dataRuleJobs {
-			job.cancel()
-		}
-		for _, job := range a.printJobs {
-			job.cancel()
-		}
-		for _, job := range a.clusterJobs {
-			job.cancel()
-		}
-		for _, job := range a.compositionJobs {
-			job.cancel()
-		}
-		for _, job := range a.relationJobs {
-			job.cancel()
-		}
+		a.metadataJobs.cancelAllLocked()
 		a.queryController.cancelLocked()
 		a.exports.cancelAllLocked()
 		srv := a.server
 		a.mu.Unlock()
-		a.analysisMu.Lock()
-		for _, job := range a.analysisJobs {
-			job.cancel()
-		}
-		for _, job := range a.analysisTreeJobs {
-			job.cancel()
-		}
-		a.analysisMu.Unlock()
+		a.analysisController.cancelAll()
 		a.cancelReconciliations()
 		a.cancelRecipeCaptures()
 		if a.owner == nil {

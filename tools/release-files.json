@@ -13,6 +13,7 @@
   "docs/CHANGELOG.md",
   "docs/README.md",
   "docs/development/architecture.md",
+  "docs/development/monolith-and-modularization-audit.md",
   "docs/development/xlsb-compatibility.md",
   "docs/development/reading-benchmarks.md",
   "validation/1.8.19/reading-benchmarks.json",

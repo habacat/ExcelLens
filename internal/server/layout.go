@@ -65,7 +65,7 @@ func readLayouts(path string) (workbookLayouts, error) {
 		}
 		for key, hidden := range layout.ColumnVisibility {
 			i, err := strconv.Atoi(key)
-			if err == nil && i >= 1 && i <= 16384 && len(clean.ColumnVisibility) < 16384 {
+			if err == nil && i >= 1 && i <= formats.ExcelColumns && len(clean.ColumnVisibility) < formats.ExcelColumns {
 				clean.ColumnVisibility[key] = hidden
 			}
 		}
@@ -114,7 +114,7 @@ func validLayoutSize(kind string, index, value int) bool {
 	if kind == "row" {
 		return index >= 1 && index <= formats.ExternalRows && value >= 14 && value <= 500
 	}
-	return kind == "col" && index >= 1 && index <= 16384 && value >= 32 && value <= 800
+	return kind == "col" && index >= 1 && index <= formats.ExcelColumns && value >= 32 && value <= 800
 }
 func writeWorkbookSetting(path string, v any) error {
 	dir := filepath.Dir(path)
@@ -166,10 +166,17 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sheet = input.Sheet
+		source, ok := formats.Lookup(wb.Format)
+		if !ok {
+			writeError(w, 400, "工作簿来源格式无效")
+			return
+		}
 		if (input.Kind == "font" && !validFontOverride(input.Font)) ||
 			(input.Kind == "visibility" && (!validVisibilityAction(input.Mode) ||
-				(input.Mode == "column" && (input.Index < 1 || input.Index > 16384)) ||
-				(input.Mode == "range" && (input.Index < 1 || input.End < input.Index || input.End > 16384)))) ||
+				(input.Mode == "column" && (input.Index < 1 || input.Index > source.MaxColumns)) ||
+				(input.Mode == "range" && (input.Index < 1 || input.End < input.Index || input.End > source.MaxColumns)))) ||
+			(input.Kind == "col" && input.Index > source.MaxColumns) ||
+			(input.Kind == "row" && input.Index > source.MaxRows) ||
 			(input.Kind != "font" && input.Kind != "visibility" && !validLayoutSize(input.Kind, input.Index, input.Size)) {
 			writeError(w, 400, "显示设置不在允许范围内")
 			return
@@ -215,7 +222,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 					end = input.End
 				}
 				// A single atomic layout update for every selected column. The
-				// cap is Excel's actual 16,384 columns, not a UI-only limit.
+				// range has already been checked against the source format.
 				for col := input.Index; col <= end; col++ {
 					layout.ColumnVisibility[strconv.Itoa(col)] = input.Hidden
 				}

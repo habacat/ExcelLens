@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 // InspectOptions drives read-only Excel inspection without loading entire sheets
@@ -139,7 +141,7 @@ func previewCellResult(row int, cell CellData) SearchResult {
 func (w *Workbook) InspectSelection(ctx context.Context, idx *SheetIndex, opt InspectOptions) (InspectOutcome, error) {
 	result := InspectOutcome{Mode: opt.Mode, Matches: make([]SearchResult, 0, minInt(opt.Limit, 1024))}
 	if opt.FirstRow < 1 || opt.LastRow > MaxRowsForIndex(idx) || opt.FirstRow > opt.LastRow ||
-		opt.FirstCol < 1 || opt.LastCol > 16384 || opt.FirstCol > opt.LastCol {
+		opt.FirstCol < 1 || opt.LastCol > formats.ExcelColumns || opt.FirstCol > opt.LastCol {
 		return result, errors.New("invalid inspection range")
 	}
 	if opt.Limit < 1 || opt.Limit > 2500 {

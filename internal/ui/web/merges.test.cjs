@@ -66,6 +66,37 @@ test('merged crosshair hit and paint use the same visible row and column edges',
   assert.equal(click(35,45),null);
 });
 
+test('merged crosshair supports contiguous and multi-range band spans and clears custom gradient layers',()=>{
+  const m=create(),range={row:2,col:2,endRow:4,endCol:5};
+  const left=c=>[0,0,50,75,75,148.5,180][c],top=r=>[0,0,17,39.5,85,110][r];
+  const props=new Map(),classes=new Set();
+  const node={_xlMerge:range,
+    classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)},
+    style:{setProperty:(k,v)=>props.set(k,v),getPropertyValue:k=>props.get(k)||'',removeProperty:k=>props.delete(k)}};
+  m.paintCrosshair(node,{rowSpans:[[5,8]],colSpans:[[4,6]]},left,top);
+  assert.ok(classes.has('merge-crosshair'));
+  assert.equal(props.has('--merge-band-image'),false);
+  assert.equal(props.get('--merge-band-position'),'25px 0, 0 0px');
+  assert.equal(props.get('--merge-band-size'),'105px 100%, 100% 0px');
+
+  m.paintCrosshair(node,{rowSpans:[[6,7]],colSpans:[[2,2],[5,5]]},left,top);
+  assert.ok(classes.has('merge-crosshair'));
+  assert.equal(props.get('--merge-band-image'),'linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill)), linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill))');
+  assert.equal(props.get('--merge-band-position'),'0px 0, 98.5px 0');
+  assert.equal(props.get('--merge-band-size'),'25px 100%, 31.5px 100%');
+
+  m.paintCrosshair(node,{rowSpans:[[6,7]],colSpans:[[4,4]]},left,top);
+  assert.equal(props.has('--merge-band-image'),false);
+  assert.equal(props.get('--merge-band-position'),'25px 0, 0 0px');
+  assert.equal(props.get('--merge-band-size'),'73.5px 100%, 100% 0px');
+
+  // Unsorted adjacent spans still coalesce into a single band without custom layers.
+  m.paintCrosshair(node,{rowSpans:[[6,7]],colSpans:[[4,5],[2,3]]},left,top);
+  assert.equal(props.has('--merge-band-image'),false);
+  assert.equal(props.get('--merge-band-position'),'0px 0, 0 0px');
+  assert.equal(props.get('--merge-band-size'),'130px 100%, 100% 0px');
+});
+
 test('actual grid helpers disable source merges during filtering or across a frozen boundary',()=>{
   const source=fs.readFileSync(__dirname+'/app.js','utf8');
   const start=source.indexOf('  function activeMerge('),end=source.indexOf('  // Updating the text node',start);

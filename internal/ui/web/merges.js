@@ -58,13 +58,48 @@
     }
     paintCrosshair(node,point,colLeft,rowTop) {
       const range=node._xlMerge;
-      const inRow=point && range.row<=point.row && point.row<=range.endRow;
-      const inCol=point && range.col<=point.col && point.col<=range.endCol;
+      const clearImage=()=>{if(node.style.getPropertyValue?.('--merge-band-image'))node.style.removeProperty?.('--merge-band-image');};
+      const rawRows=point?.rowSpans||(point?.row?[[point.row,point.row]]:[]);
+      const rawCols=point?.colSpans||(point?.col?[[point.col,point.col]]:[]);
+      const clip=(spans,min,max)=>{
+        const ordered=spans.length>1?[...spans].sort((a,b)=>a[0]-b[0]||a[1]-b[1]):spans;
+        const out=[];
+        for(const [a,b] of ordered){
+          const start=Math.max(min,a),end=Math.min(max,b);
+          if(start<=end){
+            const prev=out[out.length-1];
+            if(prev&&start<=prev[1]+1)prev[1]=Math.max(prev[1],end);
+            else out.push([start,end]);
+          }
+        }
+        return out;
+      };
+      const rows=clip(rawRows,range.row,range.endRow),cols=clip(rawCols,range.col,range.endCol);
+      const inRow=rows.length>0,inCol=cols.length>0;
       node.classList.toggle('merge-crosshair',Boolean(inRow||inCol));
-      if(!inRow&&!inCol)return;
-      const x=inCol?colLeft(point.col):0,y=inRow?rowTop(point.row):0;
-      const position=`${inCol?x-colLeft(range.col):0}px 0, 0 ${inRow?y-rowTop(range.row):0}px`;
-      const size=`${inCol?colLeft(point.col+1)-x:0}px 100%, 100% ${inRow?rowTop(point.row+1)-y:0}px`;
+      if(!inRow&&!inCol){clearImage();return;}
+      if(cols.length<=1&&rows.length<=1){
+        clearImage();
+        const c=cols[0],r=rows[0];
+        const x=c?colLeft(c[0]):0,y=r?rowTop(r[0]):0;
+        const position=`${c?x-colLeft(range.col):0}px 0, 0 ${r?y-rowTop(range.row):0}px`;
+        const size=`${c?colLeft(c[1]+1)-x:0}px 100%, 100% ${r?rowTop(r[1]+1)-y:0}px`;
+        if(node.style.getPropertyValue('--merge-band-position')!==position)node.style.setProperty('--merge-band-position',position);
+        if(node.style.getPropertyValue('--merge-band-size')!==size)node.style.setProperty('--merge-band-size',size);
+        return;
+      }
+      const images=[],positions=[],sizes=[],originX=colLeft(range.col),originY=rowTop(range.row);
+      for(const [c1,c2] of cols){
+        const x=colLeft(c1),w=colLeft(c2+1)-x;
+        if(w>0){images.push('linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill))');positions.push(`${x-originX}px 0`);sizes.push(`${w}px 100%`);}
+      }
+      for(const [r1,r2] of rows){
+        const y=rowTop(r1),h=rowTop(r2+1)-y;
+        if(h>0){images.push('linear-gradient(var(--crosshair-row-fill), var(--crosshair-row-fill))');positions.push(`0 ${y-originY}px`);sizes.push(`100% ${h}px`);}
+      }
+      if(!images.length){clearImage();node.classList.toggle('merge-crosshair',false);return;}
+      const image=images.join(', '),position=positions.join(', '),size=sizes.join(', ');
+      if(node.style.getPropertyValue('--merge-band-image')!==image)node.style.setProperty('--merge-band-image',image);
       if(node.style.getPropertyValue('--merge-band-position')!==position)node.style.setProperty('--merge-band-position',position);
       if(node.style.getPropertyValue('--merge-band-size')!==size)node.style.setProperty('--merge-band-size',size);
     }
@@ -113,6 +148,7 @@
       }else if(node._xlMerge){
         node.style.width=`${colWidth(col)}px`;node.style.height='';node.style.zIndex='';node._xlMerge=null;
         node.classList.toggle('merge-crosshair',false);
+        if(node.style.getPropertyValue?.('--merge-band-image'))node.style.removeProperty?.('--merge-band-image');
       }
       node.classList.toggle('merged-cell',!!range&&!covered);
     }

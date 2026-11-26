@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 // HiddenColumnRange represents source workbook visibility. Columns use
@@ -67,7 +69,7 @@ func ReadHiddenColumns(xmlPath string) ([]HiddenColumnRange, error) {
 						return nil, fmt.Errorf("列范围含有无效数字：%w", err)
 					}
 				}
-				if !hasMin || !hasMax || min < 1 || max > 16384 || max < min {
+				if !hasMin || !hasMax || min < 1 || max > formats.ExcelColumns || max < min {
 					return nil, fmt.Errorf("工作簿列显隐范围无效：%d:%d", min, max)
 				}
 				for i := min; i <= max; i++ {

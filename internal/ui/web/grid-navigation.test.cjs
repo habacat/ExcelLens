@@ -188,3 +188,94 @@ test('setting the active cell updates the selection outline inside the frozen pa
   assert.ok(!second.classes.has('active-column'));
   assert.ok(!second.classes.has('crosshair-row'));
 });
+
+test('range selection extends header active marks, cell crosshair bands, merged bands and tails, and cleans up on collapse',()=>{
+  const msCtx={window:{}};
+  vm.runInNewContext(fs.readFileSync(__dirname+'/multiselection.js','utf8'),msCtx);
+  const makeNode=(dataset={})=>{
+    const classes=new Set();
+    return {classes,dataset,classList:{
+      add(n){classes.add(n);},
+      remove(n){classes.delete(n);},
+      toggle(n,on){if(on)classes.add(n);else classes.delete(n);},
+      contains(n){return classes.has(n);}
+    }};
+  };
+  const colHeads=[1,2,3,4,5].map(c=>makeNode({col:String(c)}));
+  const pinnedRowHeads=[1,2].map(r=>makeNode({row:String(r)}));
+  const pinnedCells=[makeNode({ref:'B1',row:'1',col:'2',visualIndex:'1'}),makeNode({ref:'C2',row:'2',col:'3',visualIndex:'2'})];
+  const renderedRows=new Map();
+  for(const r of [3,4,5,6]){
+    const row=makeNode({row:String(r),visualIndex:String(r)});
+    row._xlCells=new Map();
+    for(const c of [1,2,3,4,5])row._xlCells.set(c,makeNode({ref:String.fromCharCode(64+c)+r,row:String(r),col:String(c),visualIndex:String(r)}));
+    renderedRows.set(r,row);
+  }
+  const mergedNode={_xlMerge:{row:1,col:2,endRow:1,endCol:4}};
+  const mergeCalls=[],tailCalls=[];
+  const S={indexReady:true,selected:{ref:'B3',row:3,col:2},selectedVisualIndex:3,
+    range:null,multiRanges:[],lastHighlight:{},renderedRows,freeze:{rows:2,cols:0}};
+  const layer={childElementCount:1,parentElement:{classList:makeNode().classList}};
+  const tails={hidden:true};
+  const grid={clientWidth:500,clientHeight:300,scrollLeft:0};
+  const ctx={S,selectionQuick:null,transposeCenter:null,cellExplanation:null,profileCenter:null,
+    $:id=>id==='grid'?grid:id==='rangeFrames'?layer:id==='crosshairTails'?tails:{childElementCount:0},
+    editCopy:null,colTotal:()=>260,sheetHeight:()=>180,activeMerge:()=>null,
+    frozenPanes:{effective:()=>({rows:2,cols:0})},getVirtualScrollTop:()=>0,headerHeight:()=>20,
+    ROW_HEAD:28,colLeft:c=>(c-1)*50,sourceRowTop:r=>(r-1)*20,rowTop:r=>(r-1)*20,
+    mergedCells:{root:{},paintCrosshair:(node,target)=>mergeCalls.push(target)},
+    paintRangeCell(cell,r,c,v,areas){cell.classList.toggle('range-cell',areas.some(a=>msCtx.window.ExcelLensMultiSelection.contains(a,r,c,v)));},
+    window:{ExcelLensMultiSelection:msCtx.window.ExcelLensMultiSelection,
+      ExcelLensRangeFrame:{paint(){},paintCrosshair:(_,areas)=>tailCalls.push(areas)}},
+    crosshairCell:()=>S.selected,
+    document:{
+      getElementsByClassName:cls=>cls==='merged-cell'?[mergedNode]:[],
+      querySelectorAll:sel=>{
+        if(sel==='.grid-region .pinned-cell')return pinnedCells;
+        if(sel==='.grid-region .pinned-row-head')return pinnedRowHeads;
+        if(sel==='.grid-region .column-head[data-col]')return colHeads;
+        const m=/data-col="(\d+)"/.exec(sel);
+        if(m)return colHeads.filter(n=>n.dataset.col===m[1]);
+        return [];
+      }
+    }
+  };
+  vm.runInNewContext(
+    section('function paintRangeFrames(','function decorateGridCell(')+'\n'+
+    section('function applySelectionClasses(','function selectCell(')+
+    ';this.paint=applySelectionClasses;',ctx);
+
+  // Initial single cell B3
+  ctx.paint();
+  assert.deepEqual(colHeads.filter(n=>n.classes.has('active')).map(n=>n.dataset.col),['2']);
+  assert.equal(tails.hidden,false);
+  assert.equal(mergeCalls.length,1);
+
+  // Drag range B3:D5 (anchor stays B3!)
+  S.range={row1:3,col1:2,row2:5,col2:4};
+  ctx.paint();
+  assert.deepEqual(colHeads.filter(n=>n.classes.has('active')).map(n=>n.dataset.col),['2','3','4']);
+  assert.deepEqual([...renderedRows.values()].filter(r=>r.classes.has('active-row')).map(r=>r.dataset.row),['3','4','5']);
+  assert.deepEqual([...renderedRows.get(6)._xlCells.entries()].filter(([,n])=>n.classes.has('active-column')).map(([c])=>c),[2,3,4]);
+  assert.equal(pinnedCells[0].classes.has('active-column'),true);
+  assert.equal(pinnedCells[1].classes.has('active-column'),true);
+  assert.equal(tails.hidden,false);
+  assert.deepEqual(JSON.parse(JSON.stringify(tailCalls.at(-1))),[{row1:3,col1:2,row2:5,col2:4}]);
+  assert.equal(mergeCalls.length,2);
+  assert.deepEqual(JSON.parse(JSON.stringify(mergeCalls.at(-1))),{rowSpans:[[3,5]],colSpans:[[2,4]]});
+
+  // Range crossing frozen row 2 (B2:C4)
+  S.range={row1:2,col1:2,row2:4,col2:3};
+  ctx.paint();
+  assert.deepEqual(pinnedRowHeads.filter(n=>n.classes.has('active')).map(n=>n.dataset.row),['2']);
+  assert.equal(pinnedCells[0].classes.has('crosshair-row'),false);
+  assert.equal(pinnedCells[1].classes.has('crosshair-row'),true);
+
+  // Collapse back to single cell A6
+  S.range=null;S.selected={ref:'A6',row:6,col:1};
+  ctx.paint();
+  assert.deepEqual(colHeads.filter(n=>n.classes.has('active')).map(n=>n.dataset.col),['1']);
+  assert.deepEqual(pinnedRowHeads.filter(n=>n.classes.has('active')).map(n=>n.dataset.row),[]);
+  assert.deepEqual([...renderedRows.values()].filter(r=>r.classes.has('active-row')).map(r=>r.dataset.row),['6']);
+  assert.deepEqual([...renderedRows.get(3)._xlCells.entries()].filter(([,n])=>n.classes.has('active-column')).map(([c])=>c),[1]);
+});

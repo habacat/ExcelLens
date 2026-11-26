@@ -172,6 +172,12 @@ const (
 	ConditionalDependencyReads      = 4096
 	ConditionalDependencyXMLBytes   = 16 << 20
 	ConditionalDependencyCacheBytes = 2 << 20
+	ConditionalRangeCacheEntries    = 256
+	ConditionalRangeCells           = ConditionalDependencyReads * 4
+	ConditionalExprDepth            = 48
+	ConditionalExprNodes            = 512
+	ConditionalArithExponent        = 308
+	ConditionalArithBits            = 2048
 	ConditionalNoticeBytes          = 1024
 	DifferentialStyles              = 8192
 	SourceAxisRanges                = 100000
@@ -302,6 +308,23 @@ func supported(ext string, archivesOnly, dataOnly bool) bool {
 func Supported(ext string) bool        { return supported(ext, false, false) }
 func DataExtension(ext string) bool    { return supported(ext, false, true) }
 func ArchiveExtension(ext string) bool { return supported(ext, true, false) }
+
+// FormatForExtension resolves a supported non-archive file extension to its
+// canonical adapter ID in the central registry.
+func FormatForExtension(ext string) (string, bool) {
+	ext = strings.ToLower(ext)
+	for _, e := range registry {
+		if e.archive {
+			continue
+		}
+		for _, candidate := range e.extensions {
+			if ext == candidate {
+				return e.ID, true
+			}
+		}
+	}
+	return "", false
+}
 
 // Extensions returns a fresh, ordered list for upload, shell and dialog use.
 func Extensions() []string {

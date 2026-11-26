@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"excellens/internal/formats"
 	"excellens/internal/searchdsl"
 )
 
@@ -40,7 +41,7 @@ func (w *Workbook) searchAdvancedResumable(ctx context.Context, idx *SheetIndex,
 	headers := map[int]string{}
 	first := idx.FindRowOffset(1)
 	if first < idx.RowCount() && idx.RowAt(first).Number == 1 {
-		header, err := w.ReadRow(idx, first, 1, min(idx.MaxCol, 16384))
+		header, err := w.ReadRow(idx, first, 1, min(idx.MaxCol, formats.ExcelColumns))
 		if err != nil {
 			return state, err
 		}

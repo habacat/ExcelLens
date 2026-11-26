@@ -18,6 +18,8 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 const (
@@ -115,7 +117,7 @@ func markerFromXML(m drawingMarkerXML) ImageMarker {
 	return ImageMarker{Col: m.Col, Row: m.Row, ColOff: float64(m.ColOff) / emuPerPixel, RowOff: float64(m.RowOff) / emuPerPixel}
 }
 func validateMarker(m ImageMarker) bool {
-	return m.Col >= 0 && m.Col < 16384 && m.Row >= 0 && m.Row < 1048576 && m.ColOff >= -100000 && m.ColOff <= 100000 && m.RowOff >= -100000 && m.RowOff <= 100000
+	return m.Col >= 0 && m.Col < formats.ExcelColumns && m.Row >= 0 && m.Row < formats.ExcelRows && m.ColOff >= -100000 && m.ColOff <= 100000 && m.RowOff >= -100000 && m.RowOff <= 100000
 }
 
 func isPictureType(part string) bool {

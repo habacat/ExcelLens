@@ -2,6 +2,7 @@ package workbook
 
 import (
 	"excellens/internal/fileidentity"
+	"excellens/internal/formats"
 
 	"archive/zip"
 	"context"
@@ -24,8 +25,7 @@ const (
 )
 
 func OpenWorkbook(filePath string) (*Workbook, error) {
-	ext := strings.ToLower(filepath.Ext(filePath))
-	if ext != ".xlsx" && ext != ".xlsm" {
+	if format, ok := formats.FormatForExtension(filepath.Ext(filePath)); !ok || format != "xlsx" {
 		return OpenDataFile(filePath)
 	}
 	st, err := os.Stat(filePath)

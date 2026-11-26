@@ -310,7 +310,10 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 					ps = append(ps, ap...)
 				}
 				if s := attribute(t, "", "firstSheet"); s != "" {
-					v, _ := strconv.Atoi(s)
+					v, err := strconv.Atoi(s)
+					if err != nil || v < 0 {
+						return ErrXLSX
+					}
 					if drop && v > a.index {
 						v--
 					} else if drop && v == a.index {
@@ -329,7 +332,11 @@ func (a *sheetCollectionEdit) workbook(ctx context.Context, raw []byte) ([]byte,
 				text.Reset()
 				scope = -1
 				if s := attribute(t, "", "localSheetId"); s != "" {
-					scope, _ = strconv.Atoi(s)
+					v, err := strconv.Atoi(s)
+					if err != nil || v < 0 {
+						return ErrXLSX
+					}
+					scope = v
 				}
 			}
 		case xml.CharData:

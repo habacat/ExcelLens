@@ -80,10 +80,10 @@ func (w *externalRowWriter) beginStyled(count, cols, style int) (int64, error) {
 	if w.rows >= maxExternalRows {
 		return 0, fmt.Errorf("数据超过 %d 行的索引安全上限，请分批查看", maxExternalRows)
 	}
-	if cols > 16384 {
-		return 0, fmt.Errorf("第 %d 行有 %d 列，超过当前界面支持的 16384 列", w.rows+1, cols)
+	if cols > formats.ExcelColumns {
+		return 0, fmt.Errorf("第 %d 行有 %d 列，超过当前界面支持的 %d 列", w.rows+1, cols, formats.ExcelColumns)
 	}
-	if count > 16384 {
+	if count > formats.ExcelColumns {
 		return 0, fmt.Errorf("第 %d 行非空列数量过大", w.rows+1)
 	}
 	start := w.count
@@ -106,7 +106,7 @@ func (w *externalRowWriter) beginStyled(count, cols, style int) (int64, error) {
 	return start, nil
 }
 func (w *externalRowWriter) cell(c externalCell) error {
-	if c.Col <= 0 || c.Col > 16384 {
+	if c.Col <= 0 || c.Col > formats.ExcelColumns {
 		return errors.New("无效单元格列号")
 	}
 	if len(c.Raw) > maxExternalCell || len(c.Formula) > maxExternalCell {
@@ -184,8 +184,8 @@ func (w *externalRowWriter) row(fields []string) error {
 	if w.rows >= maxExternalRows {
 		return fmt.Errorf("数据超过 %d 行的索引安全上限，请分批查看", maxExternalRows)
 	}
-	if len(fields) > 16384 {
-		return fmt.Errorf("第 %d 行有 %d 列，超过当前界面支持的 16384 列", w.rows+1, len(fields))
+	if len(fields) > formats.ExcelColumns {
+		return fmt.Errorf("第 %d 行有 %d 列，超过当前界面支持的 %d 列", w.rows+1, len(fields), formats.ExcelColumns)
 	}
 	count := 0
 	for _, s := range fields {
@@ -322,7 +322,7 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 		}
 		res.Style = int(style)
 	}
-	if count > 16384 {
+	if count > formats.ExcelColumns {
 		return res, errors.New("外部行缓存列数损坏")
 	}
 	capacity := min(int(count), max(0, last-first+1), 32)
@@ -336,7 +336,7 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 		if err != nil {
 			return res, err
 		}
-		if col <= prev || col > 16384 {
+		if col <= prev || col > formats.ExcelColumns {
 			return res, errors.New("外部行缓存列号无效")
 		}
 		prev = col

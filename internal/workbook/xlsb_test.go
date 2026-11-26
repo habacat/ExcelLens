@@ -155,3 +155,29 @@ func TestXLSBSharedStringPagesPreserveValuesAcrossSequentialAndRandomReads(t *te
 		t.Fatal("out-of-bounds shared string was accepted")
 	}
 }
+
+func TestXLSBConditionalFormulaPresenceAndTruncation(t *testing.T) {
+	// Excel writes nonzero cbFmla values that can differ from the actual cce.
+	record := make([]byte, 46)
+	put := binary.LittleEndian.PutUint32
+	put(record[0:], 1) // cellIs
+	put(record[8:], ^uint32(0))
+	put(record[12:], 1)
+	put(record[16:], 1) // between
+	put(record[30:], 5)
+	put(record[34:], 7)
+	put(record[42:], ^uint32(0)) // null strParam
+	for _, v := range []byte{10, 5} {
+		record = binary.LittleEndian.AppendUint32(record, 3)
+		record = append(record, 0x1e, v, 0) // PtgInt
+		record = binary.LittleEndian.AppendUint32(record, 0)
+	}
+	w := &Workbook{source: &externalSource{xlsb: &xlsbBook{}}}
+	rule, err := w.decodeXLSBConditionalRule(record, false, 1, 1)
+	if err != nil || strings.Join(rule.Formulas, ",") != "=10,=5" {
+		t.Fatalf("between formulas: %+v, %v", rule, err)
+	}
+	if _, err = w.decodeXLSBConditionalRule(record[:len(record)-1], false, 1, 1); err == nil {
+		t.Fatal("truncated inner formula was accepted")
+	}
+}

@@ -128,3 +128,31 @@ func TestLocalHTTPBoundary(t *testing.T) {
 		t.Fatal("missing socket metadata accepted")
 	}
 }
+
+func TestControlEndpointsRejectOversizedBodies(t *testing.T) {
+	a, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	handler := a.Handler()
+	oversized := `{"id":"` + strings.Repeat("a", 16<<10) + `","sheet":"` + strings.Repeat("s", 16<<10) + `"}`
+	for _, endpoint := range []string{
+		"/api/index/start",
+		"/api/index/cancel",
+		"/api/search/cancel",
+		"/api/filter/cancel",
+		"/api/filter/clear",
+		"/api/export/cancel",
+	} {
+		for _, body := range []string{oversized, "{}" + strings.Repeat(" ", 16<<10), "{}{}"} {
+			r := localTestConnection(httptest.NewRequest(http.MethodPost, endpoint, strings.NewReader(body)))
+			r.Header.Set("X-ExcelLens-Token", a.token)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, r)
+			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "无效") {
+				t.Errorf("%s accepted an invalid control request: status=%d body=%s", endpoint, w.Code, w.Body.String())
+			}
+		}
+	}
+}

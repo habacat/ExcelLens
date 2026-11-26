@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
 
@@ -33,7 +33,7 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Sheet string `json:"sheet"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeControlRequest(w, r, 8<<10, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "请求内容无效")
 		return
 	}
@@ -187,7 +187,7 @@ func (a *App) handleIndexCancel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "请求内容无效")
 		return
 	}
@@ -238,7 +238,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := parseIntDefault(query.Get("offset"), 0)
 	limit := clamp(parseIntDefault(query.Get("limit"), 100), 1, 150)
-	startCol := clamp(parseIntDefault(query.Get("col"), 1), 1, 16384)
+	startCol := clamp(parseIntDefault(query.Get("col"), 1), 1, formats.ExcelColumns)
 	colCount := clamp(parseIntDefault(query.Get("cols"), 24), 1, 80)
 	var sparseCols []int
 	if value := query.Get("columns"); value != "" {
@@ -250,7 +250,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		previous := 0
 		for _, part := range parts {
 			number, err := strconv.Atoi(part)
-			if err != nil || number <= previous || number > 16384 {
+			if err != nil || number <= previous || number > formats.ExcelColumns {
 				writeError(w, 400, "可视列索引无效")
 				return
 			}
@@ -336,8 +336,8 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		end = totalRows
 	}
 	lastCol := startCol + colCount - 1
-	if lastCol > 16384 {
-		lastCol = 16384
+	if lastCol > formats.ExcelColumns {
+		lastCol = formats.ExcelColumns
 		colCount = lastCol - startCol + 1
 	}
 	var rows []workbook.RowData

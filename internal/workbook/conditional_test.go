@@ -328,3 +328,277 @@ func TestMalformedConditionalMetadataKeepsItsCauseAndDoesNotGuessPriorityOrFormu
 		}
 	}
 }
+
+func TestConditionalComplexFormulasLogicalArithmeticTextDateAndCellIs(t *testing.T) {
+	rules := strings.Join([]string{
+		// Zebra striping + lower-priority style must both apply when evaluated.
+		`<conditionalFormatting sqref="A1:A6">`,
+		`<cfRule type="expression" dxfId="0" priority="1"><formula>MOD(ROW(),2)=0</formula></cfRule>`,
+		`<cfRule type="expression" dxfId="1" priority="2"><formula>AND($A1&gt;0, OR($B1="异常", ABS($A1-$C1)&gt;0.01))</formula></cfRule>`,
+		`</conditionalFormatting>`,
+		// Lazy IF + IFERROR catching #DIV/0! without swallowing missing cache.
+		`<conditionalFormatting sqref="D1:D6">`,
+		`<cfRule type="expression" dxfId="0" priority="3"><formula>IF($C1=0, FALSE, $A1/$C1&gt;0.5)</formula></cfRule>`,
+		`<cfRule type="expression" dxfId="1" priority="4"><formula>IFERROR($A1/$C1&gt;1, FALSE)</formula></cfRule>`,
+		`</conditionalFormatting>`,
+		// Text, ISBLANK vs empty string, SEARCH returning positive integer as truthy and #VALUE! as falsy.
+		`<conditionalFormatting sqref="E1:E6">`,
+		`<cfRule type="expression" dxfId="0" priority="5"><formula>AND(NOT(ISBLANK(E1)), SEARCH("ab*z", TRIM(E1)))</formula></cfRule>`,
+		`<cfRule type="expression" dxfId="1" priority="6"><formula>LEFT(E1,2)&amp;RIGHT(E1,1)="XYZ"</formula></cfRule>`,
+		`</conditionalFormatting>`,
+		// Precedence (-2^2 = 4, -(2^2) = -4), date functions, same-sheet qualifier.
+		`<conditionalFormatting sqref="F1:F6">`,
+		`<cfRule type="expression" dxfId="0" priority="7"><formula>AND(-2^2=4, -(2^2)=-4, YEAR(Data!$F1)=2026, WEEKDAY(Data!$F1,2)&gt;5, 'Data'!$F1&gt;=DATE(2026,1,1))</formula></cfRule>`,
+		`</conditionalFormatting>`,
+		// cellIs with expression operand and reversed between bounds.
+		`<conditionalFormatting sqref="G1:G6">`,
+		`<cfRule type="cellIs" operator="greaterThan" dxfId="0" priority="8"><formula>$C1*1.1</formula></cfRule>`,
+		`<cfRule type="cellIs" operator="between" dxfId="1" priority="9"><formula>10</formula><formula>5</formula></cfRule>`,
+		`</conditionalFormatting>`,
+		// Cross-sheet reference remains honestly unevaluated.
+		`<conditionalFormatting sqref="H1:H2">`,
+		`<cfRule type="expression" dxfId="0" priority="10"><formula>OtherSheet!$A1&gt;0</formula></cfRule>`,
+		`</conditionalFormatting>`,
+	}, "")
+	_, _, index := conditionalFixture(t, rules)
+	if summary := index.Summary(); summary.Rules != 10 || summary.Pending != 1 || summary.Notice != "" {
+		for _, r := range index.rules {
+			if r.predicateNotice != "" || r.styleNotice != "" {
+				t.Logf("pending rule priority=%d formulas=%v predicate=%s style=%s", r.source.Priority, r.source.Formulas, r.predicateNotice, r.styleNotice)
+			}
+		}
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+	cells := map[[2]int]CellData{
+		{2, 1}: {Raw: "10.05"}, {2, 2}: {Raw: "正常", Type: "inlineStr"}, {2, 3}: {Raw: "10.00"},
+		{3, 1}: {Raw: "10.00"}, {3, 2}: {Raw: "异常", Type: "inlineStr"}, {3, 3}: {Raw: "10.00"},
+		{4, 1}: {Raw: "10"}, {4, 3}: {Raw: "0"},
+		{5, 1}: {Raw: "", HasFormula: true, CacheMissing: true}, {5, 3}: {Raw: "2"},
+	}
+	resolver := func(row, col int) (CellData, bool, error) {
+		return cells[[2]int{row, col}], true, nil
+	}
+	// Row 2 Col A: MOD(2,2)=0 matches priority 1 AND ABS(10.05-10.00)>0.01 matches priority 2 (no blocking notice).
+	r2a := evaluateConditional(t, index, 2, 1, cells[[2]int{2, 1}], resolver)
+	if r2a == nil || r2a.Notice != "" || !reflect.DeepEqual(r2a.Priorities, []int{1, 2}) || r2a.Style.Background == nil || *r2a.Style.Background != "#FFFF00" {
+		t.Fatalf("row 2 col A failed: %+v", r2a)
+	}
+	// Row 3 Col A: MOD(3,2)=1 false, priority 2 matches via $B3="异常".
+	r3a := evaluateConditional(t, index, 3, 1, cells[[2]int{3, 1}], resolver)
+	if r3a == nil || r3a.Notice != "" || !reflect.DeepEqual(r3a.Priorities, []int{2}) {
+		t.Fatalf("row 3 col A failed: %+v", r3a)
+	}
+	// Row 4 Col D: $C4=0 -> IF short-circuits to FALSE, IFERROR catches #DIV/0! -> FALSE (no match, no notice).
+	if r4d := evaluateConditional(t, index, 4, 4, CellData{}, resolver); r4d != nil {
+		t.Fatalf("row 4 col D should not match: %+v", r4d)
+	}
+	// Row 5 Col D: $A5 has CacheMissing -> IFERROR must NOT swallow missing-cache notice.
+	r5d := evaluateConditional(t, index, 5, 4, CellData{}, resolver)
+	if r5d == nil || !strings.Contains(r5d.Notice, "没有保存") {
+		t.Fatalf("missing cache swallowed by IF/IFERROR: %+v", r5d)
+	}
+	// Col E: SEARCH wildcard, blank vs empty string, concatenation.
+	if out := evaluateConditional(t, index, 1, 5, CellData{Raw: "  AB123z  ", Type: "s"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{5}) {
+		t.Fatalf("wildcard SEARCH failed: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 5, CellData{Raw: "XY99Z", Type: "s"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{6}) {
+		t.Fatalf("LEFT/RIGHT concat failed: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 5, CellData{}, nil); out != nil {
+		t.Fatalf("blank cell should not match Col E: %+v", out)
+	}
+	// Col F: 2026-01-03 is Saturday -> Excel serial 46025 (1900 date system).
+	if out := evaluateConditional(t, index, 1, 6, CellData{Raw: "46025"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{7}) {
+		t.Fatalf("date/precedence/same-sheet formula failed: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 6, CellData{Raw: "46027"}, nil); out != nil {
+		t.Fatalf("weekday Monday should not match >5: %+v", out)
+	}
+	// Col G: cellIs > $C2*1.1 (11) and reversed between (10, 5) matching 7.
+	if out := evaluateConditional(t, index, 2, 7, CellData{Raw: "7"}, resolver); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{9}) {
+		t.Fatalf("reversed between failed: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 2, 7, CellData{Raw: "12"}, resolver); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{8}) {
+		t.Fatalf("cellIs expression operand failed: %+v", out)
+	}
+	// Col H: cross-sheet ref keeps honest notice.
+	if out := evaluateConditional(t, index, 1, 8, CellData{Raw: "1"}, nil); out == nil || !strings.Contains(out.Notice, "跨工作表") {
+		t.Fatalf("cross-sheet ref did not report honest notice: %+v", out)
+	}
+}
+
+func TestConditionalOOXMLCompatibilityDXFPatternFillSqrefAndCanonicalFormulas(t *testing.T) {
+	isolateTestStorage(t)
+	styles := `<styleSheet><fonts count="1"><font><name val="宋体"/><sz val="11"/></font></fonts><cellXfs count="1"><xf fontId="0" numFmtId="0"/></cellXfs><dxfs count="2"><dxf><fill><patternFill><bgColor rgb="FFFFC000"/></patternFill></fill></dxf><dxf><fill><patternFill patternType="solid"><fgColor auto="1"/><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf></dxfs></styleSheet>`
+	rules := strings.Join([]string{
+		`<conditionalFormatting sqref="A:B"><cfRule type="beginsWith" text="abc" dxfId="0" priority="1"><formula>LEFT(A1,3)="abc"</formula></cfRule></conditionalFormatting>`,
+		`<conditionalFormatting sqref="2:3"><cfRule type="notContainsText" text="err" dxfId="1" priority="2"><formula>NOT(ISNUMBER(SEARCH("err",A2)))</formula></cfRule></conditionalFormatting>`,
+		`<conditionalFormatting sqref="D1:D2"><cfRule type="endsWith" text="元" dxfId="0" priority="3"><formula>RIGHT(D1,1)="元"</formula></cfRule></conditionalFormatting>`,
+	}, "")
+	file := sourceMetadataWorkbook(t, `<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>ABC123</t></is></c></row></sheetData>`+rules+`</worksheet>`, styles)
+	w, err := OpenWorkbook(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := w.BuildIndex(w.Sheets[0], nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := w.SourceConditionalFormats(context.Background(), w.Sheets[0], idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary := index.Summary(); summary.Pending != 0 || summary.Notice != "" {
+		t.Fatalf("expected clean OOXML compatibility, got %+v", summary)
+	}
+	out1 := evaluateConditional(t, index, 1, 1, CellData{Raw: "ABC123", Type: "inlineStr"}, nil)
+	if out1 == nil || out1.Notice != "" || out1.Style.Background == nil || *out1.Style.Background != "#FFC000" {
+		t.Fatalf("omitted patternType solid bgColor or whole-col sqref failed: %+v", out1)
+	}
+	out2 := evaluateConditional(t, index, 2, 10, CellData{Raw: "ok", Type: "inlineStr"}, nil)
+	if out2 == nil || out2.Notice != "" || out2.Style.Background == nil || *out2.Style.Background != "#FFC7CE" {
+		t.Fatalf("whole-row sqref or NOT(ISNUMBER(SEARCH)) failed: %+v", out2)
+	}
+	out3 := evaluateConditional(t, index, 1, 4, CellData{Raw: "100元", Type: "inlineStr"}, nil)
+	if out3 == nil || out3.Notice != "" || out3.Style.Background == nil || *out3.Style.Background != "#FFC000" {
+		t.Fatalf("RIGHT literal length endsWith failed: %+v", out3)
+	}
+}
+
+func TestConditionalEdgeCasesDateOverflowInvalidUTF8GroupNoticeAndDeterminism(t *testing.T) {
+	isolateTestStorage(t)
+	// 1. Invalid UTF-8 bytes in formula must never panic in decodeUTF8At.
+	if expr, _, notice := compileConditionalExpr("\xff=1", "Sheet1"); expr != nil || notice == "" {
+		t.Fatalf("invalid UTF-8 formula should fail cleanly without panic: expr=%v notice=%q", expr, notice)
+	}
+
+	// 2. Date serials beyond Go's 292-year time.Duration limit (up to 9999-12-31)
+	//    and negative fractional serials (-0.5 -> #NUM!).
+	styles := `<styleSheet><fonts count="1"><font><name val="宋体"/><sz val="11"/></font></fonts><cellXfs count="1"><xf fontId="0" numFmtId="0"/></cellXfs><dxfs count="2"><dxf><fill><patternFill patternType="solid"><bgColor rgb="FFCCFFCC"/></patternFill></fill></dxf><dxf><fill><patternFill patternType="solid"><bgColor rgb="FFFFCCCC"/></patternFill></fill></dxf></dxfs></styleSheet>`
+	rules := strings.Join([]string{
+		`<conditionalFormatting sqref="A1:A3"><cfRule type="expression" dxfId="0" priority="1"><formula>DATE(9999,12,31)=2958465</formula></cfRule></conditionalFormatting>`,
+		`<conditionalFormatting sqref="B1:B1"><cfRule type="expression" dxfId="0" priority="2"><formula>ISERROR(YEAR(-0.5))</formula></cfRule></conditionalFormatting>`,
+		// 3. Unicode simple-fold wildcard equivalence (Kelvin sign U+212A matches ASCII 'k').
+		`<conditionalFormatting sqref="C1:C1"><cfRule type="expression" dxfId="0" priority="3"><formula>ISNUMBER(SEARCH("k*",C1))</formula></cfRule></conditionalFormatting>`,
+		// 4. Unknown conditionalFormatting attribute sets group.notice; even when the
+		//    expression compiles and evaluates to FALSE, it must fail closed and block lower priorities.
+		`<conditionalFormatting sqref="D1:D1" unknownAttr="1"><cfRule type="expression" dxfId="0" priority="4"><formula>D1&gt;100</formula></cfRule></conditionalFormatting>`,
+		`<conditionalFormatting sqref="D1:D1"><cfRule type="cellIs" operator="greaterThan" dxfId="1" priority="5"><formula>0</formula></cfRule></conditionalFormatting>`,
+		// 5. Deterministic row-major error selection in SUMIFS across repeated runs.
+		`<conditionalFormatting sqref="E1:E1"><cfRule type="expression" dxfId="0" priority="6"><formula>ISNA(SUMIFS($F$1:$F$4,$G$1:$G$4,"hit"))</formula></cfRule></conditionalFormatting>`,
+	}, "")
+	file := sourceMetadataWorkbook(t, `<worksheet><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>`+rules+`</worksheet>`, styles)
+	w, err := OpenWorkbook(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := w.BuildIndex(w.Sheets[0], nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := w.SourceConditionalFormats(context.Background(), w.Sheets[0], idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{1}) {
+		t.Fatalf("DATE(9999,12,31) overflowed or failed: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 2, CellData{Raw: "1"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{2}) {
+		t.Fatalf("YEAR(-0.5) should return #NUM! error: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 3, CellData{Raw: "\u212Aelvin", Type: "s"}, nil); out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{3}) {
+		t.Fatalf("Unicode simple-fold wildcard failed for Kelvin sign: %+v", out)
+	}
+	if out := evaluateConditional(t, index, 1, 4, CellData{Raw: "10"}, nil); out == nil || out.Matched != 0 || !strings.Contains(out.Notice, "尚未支持的属性") {
+		t.Fatalf("group.notice must fail closed and block lower priority even when expr is false: %+v", out)
+	}
+
+	resolver := func(row, col int) (CellData, bool, error) {
+		if col == 7 && row >= 1 && row <= 4 {
+			return CellData{Raw: "hit", Type: "s"}, true, nil
+		}
+		if col == 6 {
+			switch row {
+			case 1:
+				return CellData{Raw: "#N/A", Type: "e"}, true, nil
+			case 2:
+				return CellData{Raw: "#DIV/0!", Type: "e"}, true, nil
+			case 3:
+				return CellData{Raw: "#VALUE!", Type: "e"}, true, nil
+			case 4:
+				return CellData{Raw: "#REF!", Type: "e"}, true, nil
+			}
+		}
+		return CellData{}, true, nil
+	}
+	for iter := 0; iter < 25; iter++ {
+		out := evaluateConditional(t, index, 1, 5, CellData{Raw: "1"}, resolver)
+		if out == nil || out.Notice != "" || !reflect.DeepEqual(out.Priorities, []int{6}) {
+			t.Fatalf("SUMIFS error order was non-deterministic on iter %d: %+v", iter, out)
+		}
+	}
+}
+
+func TestConditionalFormulasExcelBoundaryResults(t *testing.T) {
+	// Expected results come from an isolated Excel workbook, with A1 left empty.
+	for _, tc := range []struct {
+		formula  string
+		date1904 bool
+	}{
+		{`AND(DATE(1900,2,29)=60,DATE(1900,3,0)=60,DATE(1900,1,60)=60,DATE(1900,2,30)=61)`, false},
+		{`AND(WEEKDAY(1)=1,WEEKDAY(59)=3,WEEKDAY(60)=4,WEEKDAY(61)=5)`, false},
+		{`AND(DATE(1904,1,1)=0,WEEKDAY(0)=6,ISERROR(DATE(1904,0,32)))`, true},
+		{`AND(ISERROR(DATE(9999,13,0)),DATE(9999,12,31)=2958465)`, false},
+		{`AND(A1,TRUE,ISERROR(OR(A1)),IF("TRUE",TRUE,FALSE),NOT("FALSE"))`, false},
+		{`AND(FIND("","abc",4)=4,ISERROR(SEARCH("","abc",4)),ISERROR(SEARCH("*","")))`, false},
+		{`AND(SEARCH("ab~","abc")=1,SEARCH("~a","~a")=2,SEARCH("a~~","xa~")=2)`, false},
+	} {
+		t.Run(tc.formula, func(t *testing.T) {
+			index := SourceConditionalFormats{date1904: tc.date1904}
+			e := index.NewEvaluator(context.Background())
+			e.row, e.col = 1, 1
+			expr, _, notice := compileConditionalExpr(tc.formula, "Sheet1")
+			if notice != "" {
+				t.Fatal(notice)
+			}
+			result, notice, err := e.evalExpr(expr, &conditionalGroup{anchorRow: 1, anchorCol: 1})
+			if err != nil || notice != "" || result.kind != "boolean" || !result.boolean {
+				t.Fatalf("Excel returned TRUE, got %+v, notice %q, error %v", result, notice, err)
+			}
+		})
+	}
+}
+
+func TestConditionalLimitsPreserveUnknownResults(t *testing.T) {
+	group := &conditionalGroup{anchorRow: 1, anchorCol: 1}
+	for _, formula := range []string{
+		`IFERROR(SEARCH("*z", A1), 0)`,
+		`IFERROR(COUNTIF(A1,"*z"), 0)`,
+		`IFERROR(MATCH("*z",A1,0), 0)`,
+	} {
+		e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
+		e.row, e.col, e.work = 1, 1, 18
+		e.cell = CellData{Raw: "ordinary worksheet text", Type: "s"}
+		node, _, notice := compileConditionalExpr(formula, "Sheet1")
+		if notice != "" {
+			t.Fatal(notice)
+		}
+		_, notice, err := e.evalExpr(node, group)
+		if err != nil || notice != conditionalWorkNotice {
+			t.Errorf("%s must retain the work-limit notice, got %q, %v", formula, notice, err)
+		}
+	}
+
+	e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
+	e.row, e.col = 1, 2
+	e.resolver = func(row, col int) (CellData, bool, error) { return CellData{Raw: "0.9"}, true, nil }
+	node, _, _ := compileConditionalExpr("IFERROR(PRODUCT(A1:A750),0)", "Sheet1")
+	if _, notice, err := e.evalExpr(node, group); err != nil || !strings.Contains(notice, "容量") {
+		t.Errorf("bounded exact product lost its limit: %q, %v", notice, err)
+	}
+	node, _, _ = compileConditionalExpr("ISERROR(PRODUCT(1E300,1E300,0))", "Sheet1")
+	if result, notice, err := e.evalExpr(node, group); err != nil || notice != "" || !result.boolean {
+		t.Errorf("Excel numeric overflow lost: %+v, %q, %v", result, notice, err)
+	}
+}

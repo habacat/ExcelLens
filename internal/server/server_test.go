@@ -61,8 +61,25 @@ func TestGridAssetsExposeNativeSpreadsheetInteractions(t *testing.T) {
 	}
 	for path, required := range map[string][]string{
 		"/assets/app.js": {
-			"ArrowRight", "ArrowDown", "requestFullscreen", "parseFormulaReferences",
-			"tracePrecedents", "applyFilter", "showTooltip", "selectInitialCell",
+			"parseFormulaReferences", "tracePrecedents", "applyFilter", "selectInitialCell",
+		},
+		"/assets/grid-interactions.js": {
+			"ArrowRight", "ArrowDown", "handleSpreadsheetKeydown",
+		},
+		"/assets/grid-context-menu.js": {
+			"requestFullscreen", "showTooltip", "openCellMenu",
+		},
+		"/assets/grid-clipboard.js": {
+			"copySelection", "copyQualifiedAddress", "copyCellEvidence",
+		},
+		"/assets/grid-workbook-io.js": {
+			"renderSheetTabs", "openWorkbook", "acceptOpenedWorkbook",
+		},
+		"/assets/analytics-dashboard.js": {
+			"renderDashboard", "renderTemplates", "applyTemplate",
+		},
+		"/assets/analytics-sheets.js": {
+			"commitBatch", "retryDrafts", "bindSheetGrid",
 		},
 		"/assets/style.css": {
 			".active-row", ".grid-cell.selected",

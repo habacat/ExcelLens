@@ -39,7 +39,7 @@ type DistinctValue struct {
 // the workbook into RAM. A bounded result is intentional for high-cardinality
 // columns; callers MUST display Truncated instead of implying completeness.
 func (w *Workbook) DistinctColumnValues(idx *SheetIndex, column, headerRow, limit int, cancel <-chan struct{}) ([]DistinctValue, bool, error) {
-	if column < 1 || column > 16384 || headerRow < 0 || headerRow > MaxRowsForIndex(idx) || limit < 1 || limit > 10000 {
+	if column < 1 || column > formats.ExcelColumns || headerRow < 0 || headerRow > MaxRowsForIndex(idx) || limit < 1 || limit > 10000 {
 		return nil, false, errors.New("invalid distinct values request")
 	}
 	views, cached := w.cachedColumns(idx, []int{column})
@@ -203,7 +203,7 @@ func validatedFilterKeys(idx *SheetIndex, rules []FilterRule, opts FilterOptions
 	if idx == nil || len(rules) > formats.FilterRuleCount {
 		return nil, errors.New("筛选来源无效或超过32个条件")
 	}
-	if opts.HeaderRow < 0 || opts.HeaderRow > MaxRowsForIndex(idx) || opts.SortColumn < 0 || opts.SortColumn > 16384 {
+	if opts.HeaderRow < 0 || opts.HeaderRow > MaxRowsForIndex(idx) || opts.SortColumn < 0 || opts.SortColumn > formats.ExcelColumns {
 		return nil, errors.New("筛选表头或排序列无效")
 	}
 	keys := opts.SortKeys
@@ -215,7 +215,7 @@ func validatedFilterKeys(idx *SheetIndex, rules []FilterRule, opts FilterOptions
 	}
 	seenSort := map[int]bool{}
 	for _, key := range keys {
-		if key.Column < 1 || key.Column > 16384 || seenSort[key.Column] {
+		if key.Column < 1 || key.Column > formats.ExcelColumns || seenSort[key.Column] {
 			return nil, errors.New("排序列无效或重复")
 		}
 		if key.Mode != "" && key.Mode != "number" && key.Mode != "text" && key.Mode != "natural" {
@@ -224,7 +224,7 @@ func validatedFilterKeys(idx *SheetIndex, rules []FilterRule, opts FilterOptions
 		seenSort[key.Column] = true
 	}
 	for _, rule := range rules {
-		if rule.Column < 1 || rule.Column > 16384 {
+		if rule.Column < 1 || rule.Column > formats.ExcelColumns {
 			return nil, errors.New("筛选列超出范围")
 		}
 		if !validFilterOperator(rule.Operator) {
@@ -296,6 +296,22 @@ func compareSortNumeric(a, b string, af, bf float64) int {
 	return 0
 }
 
+func foldRune(r rune) rune {
+	if r < 0x80 {
+		if r >= 'a' && r <= 'z' {
+			return r - ('a' - 'A')
+		}
+		return r
+	}
+	minimum := r
+	for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
+		if folded < minimum {
+			minimum = folded
+		}
+	}
+	return minimum
+}
+
 // filterFoldKey is canonically equivalent to strings.EqualFold, not merely
 // ToLower. Unicode simple-fold groups include U+017F (long s) and the Kelvin
 // sign; dropping that distinction would make optimized filters incorrect.
@@ -313,13 +329,7 @@ func filterFoldKey(s string) string {
 	var out strings.Builder
 	out.Grow(len(s))
 	for _, r := range s {
-		minimum := r
-		for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
-			if folded < minimum {
-				minimum = folded
-			}
-		}
-		out.WriteRune(minimum)
+		out.WriteRune(foldRune(r))
 	}
 	return out.String()
 }

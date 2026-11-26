@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"excellens/internal/formats"
 )
 
 func (w *Workbook) SearchSheet(idx *SheetIndex, sheetName, query, mode string, limit int, cancel <-chan struct{}, progress func(int, int, []SearchResult)) ([]SearchResult, bool, error) {
@@ -111,7 +113,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 			bytes.Contains(row, []byte("<rPh")) || bytes.Contains(row, []byte(":rPh")) ||
 			bytes.Contains(row, []byte("<extLst")) || bytes.Contains(row, []byte("<mc:AlternateContent"))
 		if special {
-			parsed, parseErr := w.readRowFromFile(file, idx, i, 1, 16384)
+			parsed, parseErr := w.readRowFromFile(file, idx, i, 1, formats.ExcelColumns)
 			if parseErr != nil {
 				return state, parseErr
 			}
@@ -149,7 +151,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 					// including self-closing style-only cells, advances the
 					// implicit column position (see scanRowCells below).
 					lastColumn++
-					if lastColumn > 16384 {
+					if lastColumn > formats.ExcelColumns {
 						rowErr = fmt.Errorf("第 %d 行隐式列超出 Excel 上限", rowOff.Number)
 						return false
 					}

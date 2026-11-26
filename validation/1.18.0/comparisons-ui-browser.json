@@ -1,0 +1,29 @@
+{
+  "version": "1.18.0",
+  "result": "PASS",
+  "checks": [
+    "actual per-metric controls produce six independent exact comparisons on the captured visible source; native text/cache warnings and leading-zero labels persist; changing the builder does not relabel the completed table or saved query; workspace v4 backup/restore preserves all modes and axes",
+    "Top-N leaves whole-scope denominators unchanged; saved report reopens all metric choices; actual CSV and 19-column XLSX use exact ratios/states, and the real XLSX adapter reopens 0.12 as a numeric cell displayed as 12.00%",
+    "real tree expansion recomputes parent-range ratios, aligns column keys and keeps the exact child fractions; source drill still selects the current group; cancelled held starts cannot overwrite an immediate retry",
+    "version-3 analysis plan captures, previews and replays cumulative ratios through actual controls; 420px comparison controls fit their panel; cancelling numeric totals yield explicit zero-denominator states rather than 0%"
+  ],
+  "errors": [],
+  "screenshots": [
+    "validation/1.18.0/private/analysis-comparisons-ui/comparison-flat.png",
+    "validation/1.18.0/private/analysis-comparisons-ui/comparison-tree.png",
+    "validation/1.18.0/private/analysis-comparisons-ui/comparison-420.png",
+    "validation/1.18.0/private/analysis-comparisons-ui/comparison-controls-420.png"
+  ],
+  "desktopManualAcceptance": false,
+  "officeWpsAcceptance": false,
+  "assetSHA256": {
+    "analysis-comparisons.js": "97c1058888c8519f11c4509c06586ccd7d3caffd33c9dbabb37695c591815095",
+    "analysis-numbers.js": "bcdaa55575daadc372efd9f939baa96caa8ab2ac2b08e2a9f397216cb4cc8772",
+    "analytics.js": "88c64040683483742fdc88976b72d658e2070dd820dc631849fe79befdee8248",
+    "analytics-charts.js": "119e18b62691c36fae5cbb1f99b45fc483d876fee6db8373e0dab6885f19fdef",
+    "analysis-tree.js": "7a953f6ba0ffcbc477645b97f0e56652d76611ae569ae1fba347e888deb8cdd1",
+    "analytics.css": "fbf9f1cd18d5e1fd0b1ea682fdb746247b61a3f7646b329872cdd80c5423563a"
+  },
+  "sourceSHA256": "271e9f6211e1a7a1ed7f7d63185133801433d234622e820135c9cc7854ec82bc",
+  "sourceUnchanged": true
+}

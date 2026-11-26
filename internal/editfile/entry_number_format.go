@@ -111,11 +111,12 @@ func parseEntryFormats(ctx context.Context, data []byte) (entryFormatTable, erro
 		switch v := e.token.(type) {
 		case xml.StartElement:
 			if len(e.stack) == 3 && e.parent() == "numFmts" && e.local() == "numFmt" {
-				id, _ := strconv.Atoi(attribute(v, "", "numFmtId"))
-				if t.calendar == nil {
-					t.calendar = map[int]bool{}
+				if id, err := strconv.Atoi(attribute(v, "", "numFmtId")); err == nil && id >= 0 {
+					if t.calendar == nil {
+						t.calendar = map[int]bool{}
+					}
+					t.calendar[id] = workbook.CalendarDateNumberFormat(id, attribute(v, "", "formatCode"))
 				}
-				t.calendar[id] = workbook.CalendarDateNumberFormat(id, attribute(v, "", "formatCode"))
 			}
 			if len(e.stack) == 2 && e.local() == "cellXfs" {
 				t.start, t.tagEnd = e.from, e.to

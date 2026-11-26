@@ -167,3 +167,113 @@ func TestConditionalResolvedDifferencesClearAndInheritEachBorderAndPreserveExact
 		t.Fatal("exact signed zero was not normalized in the derived display", p)
 	}
 }
+
+func TestConditionalBoundedRangeFormulasEvaluateAndRespectBudgets(t *testing.T) {
+	isolateTestStorage(t)
+	sheet := `<worksheet><sheetData>` +
+		`<row r="1"><c r="A1" t="inlineStr"><is><t>K1</t></is></c><c r="B1"><v>10</v></c><c r="C1"><v>20</v></c><c r="D1"><v>30</v></c><c r="E1" t="inlineStr"><is><t>K1</t></is></c></row>` +
+		`<row r="2"><c r="A2" t="inlineStr"><is><t>K2</t></is></c><c r="B2"><v>5</v></c><c r="C2"><v>5</v></c><c r="D2"><v>15</v></c><c r="E2" t="inlineStr"><is><t>K9</t></is></c></row>` +
+		`<row r="3"><c r="A3" t="inlineStr"><is><t>K1</t></is></c><c r="B3"><v>50</v></c><c r="C3"><v>60</v></c><c r="D3"><v>110</v></c></row>` +
+		`</sheetData>` +
+		// Whole-column COUNTIF duplicate check (sparse indexed rows only!)
+		`<conditionalFormatting sqref="A1:A5"><cfRule type="expression" priority="1" dxfId="0"><formula>COUNTIF($A:$A,A1)&gt;1</formula></cfRule></conditionalFormatting>` +
+		// Same-row SUM cross-foot check (in-memory fast path!)
+		`<conditionalFormatting sqref="D1:D3"><cfRule type="expression" priority="2" dxfId="1"><formula>SUM($B1:$C1)&lt;&gt;$D1</formula></cfRule></conditionalFormatting>` +
+		// MATCH lookup list check + SUMIF check
+		`<conditionalFormatting sqref="B1:B3"><cfRule type="expression" priority="3" dxfId="2"><formula>AND(ISNUMBER(MATCH($A1,$E$1:$E$2,0)), SUMIF($A$1:$A$3,$A1,$B$1:$B$3)&gt;=60)</formula></cfRule></conditionalFormatting>` +
+		`</worksheet>`
+	file := sourceMetadataWorkbook(t, sheet, conditionalStylesFixture)
+	w, err := OpenWorkbook(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := w.BuildIndex(w.Sheets[0], nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := RowReadOptions{FormatValue: true, ConditionalFormats: true}
+	rows, err := w.ReadRowsByNumbersWithOptionsContext(context.Background(), idx, []int{1, 2, 3, 4}, 1, 5, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cellAt := func(rowIdx, col int) CellData {
+		for _, c := range rows[rowIdx].Cells {
+			if c.Col == col {
+				return c
+			}
+		}
+		return CellData{}
+	}
+	// Row 1 and Row 3 have duplicate "K1" in column A; Row 2 ("K2") and blank Row 4 must NOT match!
+	if c := cellAt(0, 1); c.Conditional == nil || c.Conditional.Notice != "" || c.Conditional.Visual.Color != "#FF0033" {
+		t.Fatalf("duplicate A1 not highlighted: %+v", c)
+	}
+	if c := cellAt(1, 1); c.Conditional != nil {
+		t.Fatalf("unique A2 should not match COUNTIF>1: %+v", c)
+	}
+	if c := cellAt(2, 1); c.Conditional == nil || c.Conditional.Notice != "" || c.Conditional.Visual.Color != "#FF0033" {
+		t.Fatalf("duplicate A3 not highlighted: %+v", c)
+	}
+	if c := cellAt(3, 1); c.Conditional != nil {
+		t.Fatalf("blank row A4 must not match COUNTIF($A:$A, A4)>1: %+v", c)
+	}
+	// Row 2 col D: SUM(5,5)=10 <> 15 -> highlighted! Rows 1 and 3 agree -> not highlighted.
+	if c := cellAt(0, 4); c.Conditional != nil {
+		t.Fatalf("balanced D1 should not match: %+v", c)
+	}
+	if c := cellAt(1, 4); c.Conditional == nil || c.Conditional.Notice != "" || c.Conditional.Visual.Background != "#FFFF00" {
+		t.Fatalf("unbalanced D2 not highlighted: %+v", c)
+	}
+	// Col B: K1 is in E1:E2 and SUMIF(K1, B)=10+50=60 >= 60 -> B1 and B3 match, B2 does not.
+	if c := cellAt(0, 2); c.Conditional == nil || c.Conditional.Notice != "" || c.Conditional.Visual.Color != "#008800" {
+		t.Fatalf("MATCH+SUMIF B1 not highlighted: %+v", c)
+	}
+	if c := cellAt(1, 2); c.Conditional != nil {
+		t.Fatalf("B2 should not match MATCH+SUMIF: %+v", c)
+	}
+	if c := cellAt(2, 2); c.Conditional == nil || c.Conditional.Notice != "" || c.Conditional.Visual.Color != "#008800" {
+		t.Fatalf("MATCH+SUMIF B3 not highlighted: %+v", c)
+	}
+	// Budget exhaustion on range resolution keeps honest notice without guessing false.
+	f, err := os.Open(idx.XMLPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	reader, err := w.newConditionalRead(context.Background(), idx, f, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row1, err := w.ReadRow(idx, 0, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader.dependencyReads = 0
+	if err := reader.apply(&row1, 1, 1, nil); err != nil {
+		t.Fatal(err)
+	}
+	if row1.Cells[0].Conditional == nil || !strings.Contains(row1.Cells[0].Conditional.Notice, "读取容量") || row1.Cells[0].Conditional.Visual != nil {
+		t.Fatalf("exhausted range dependency budget did not keep honest notice: %+v", row1.Cells[0])
+	}
+	// Uncached formula inside a referenced range keeps honest missing-cache notice.
+	uncachedSheet := `<worksheet><sheetData>` +
+		`<row r="1"><c r="A1"><v>1</v></c></row>` +
+		`<row r="2"><c r="A2"><f>1+1</f></c></row>` +
+		`</sheetData><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1" dxfId="0"><formula>COUNTIF($A$1:$A$2,A1)&gt;0</formula></cfRule></conditionalFormatting></worksheet>`
+	uncachedFile := sourceMetadataWorkbook(t, uncachedSheet, conditionalStylesFixture)
+	uw, err := OpenWorkbook(uncachedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uidx, err := uw.BuildIndex(uw.Sheets[0], nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	urows, err := uw.ReadRowsByNumbersWithOptionsContext(context.Background(), uidx, []int{1}, 1, 1, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if urows[0].Cells[0].Conditional == nil || !strings.Contains(urows[0].Cells[0].Conditional.Notice, "没有保存") || urows[0].Cells[0].Conditional.Visual != nil {
+		t.Fatalf("uncached formula in range became blank/zero: %+v", urows[0].Cells[0])
+	}
+}

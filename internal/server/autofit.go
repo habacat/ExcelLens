@@ -81,7 +81,7 @@ func (a *App) handleAutofit(w http.ResponseWriter, r *http.Request) {
 	} else {
 		firstCol = parseIntDefault(r.URL.Query().Get("firstCol"), 1)
 		lastCol = parseIntDefault(r.URL.Query().Get("lastCol"), firstCol)
-		if firstCol < 1 || firstCol > 16384 || lastCol < firstCol || lastCol > 16384 || lastCol-firstCol+1 > 80 {
+		if firstCol < 1 || firstCol > formats.ExcelColumns || lastCol < firstCol || lastCol > formats.ExcelColumns || lastCol-firstCol+1 > 80 {
 			writeError(w, http.StatusBadRequest, "行高自动适应最多检查80个可见列")
 			return
 		}

@@ -506,12 +506,22 @@ func (w *Workbook) resolveDifferentialStyle(s differentialStyleXML) Differential
 			case "none":
 				v := ""
 				out.Background = &v
-			case "solid":
+			case "solid", "":
+				// In OOXML <dxf>, Excel frequently omits patternType="solid" and
+				// places the solid fill color in <bgColor>.
 				source := p.foreground
-				if source == nil {
+				if p.kind == "" && p.background != nil {
+					source = p.background
+				} else if source == nil {
 					source = p.background
 				}
+				if p.kind == "" && source == nil {
+					break
+				}
 				v, auto, valid := w.resolveDifferentialColor(source)
+				if valid && auto && p.foreground != nil && p.background != nil && source == p.foreground {
+					v, auto, valid = w.resolveDifferentialColor(p.background)
+				}
 				if !valid || auto {
 					notice()
 				} else {

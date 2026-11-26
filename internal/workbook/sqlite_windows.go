@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"excellens/internal/formats"
 )
 
 // winsqlite3.dll is included with Windows 10 and Windows 11. Use the native
@@ -152,7 +154,7 @@ func (d *readonlySQLite) query(query string, header bool, emit func([]string) er
 	}
 	defer sqlFinalize.Call(stmt)
 	countRaw, _, _ := sqlColCount.Call(stmt)
-	if countRaw > 16384 {
+	if countRaw > formats.ExcelColumns {
 		return fmt.Errorf("SQLite 查询包含 %d 列，超过 Excel 单表上限", countRaw)
 	}
 	count := int(countRaw)

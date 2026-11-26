@@ -403,6 +403,17 @@ func methodNotAllowed(w http.ResponseWriter) {
 	writeError(w, http.StatusMethodNotAllowed, "请求方法不允许")
 }
 
+// Control requests are small. Validate the entire body before changing task state.
+func decodeControlRequest(w http.ResponseWriter, r *http.Request, limit int64, dst any) error {
+	body := http.MaxBytesReader(w, r.Body, limit)
+	defer body.Close()
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dst)
+}
+
 func writeJSON(w http.ResponseWriter, v any) {
 	writeJSONStatus(w, http.StatusOK, v)
 }

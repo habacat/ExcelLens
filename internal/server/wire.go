@@ -3,6 +3,7 @@ package server
 import (
 	"strconv"
 
+	"excellens/internal/formats"
 	"excellens/internal/workbook"
 )
 
@@ -31,8 +32,8 @@ type wireCell struct {
 	Conditional *workbook.ConditionalPresentation `json:"q,omitempty"`
 }
 
-var wireColumns = func() [16385]string {
-	var names [16385]string
+var wireColumns = func() [formats.ExcelColumns + 1]string {
+	var names [formats.ExcelColumns + 1]string
 	for i := 1; i < len(names); i++ {
 		names[i] = workbook.ColumnName(i)
 	}
@@ -50,7 +51,7 @@ func packViewportRows(rows []workbook.RowData) []wireRow {
 			if cell.Display != cell.Raw {
 				value.Display = &cell.Display
 			}
-			if cell.Col < 1 || cell.Col > 16384 || cell.Ref != wireColumns[cell.Col]+suffix {
+			if cell.Col < 1 || cell.Col > formats.ExcelColumns || cell.Ref != wireColumns[cell.Col]+suffix {
 				value.Ref = &cell.Ref
 			}
 			if cell.HasFormula {

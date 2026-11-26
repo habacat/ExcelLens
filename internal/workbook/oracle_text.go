@@ -6,6 +6,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 // Oracle's journal spool uses literal @ separators, not CSV quoting. A quote
@@ -44,7 +46,7 @@ func detectOracleTextLayout(sample string, delimiter rune) *oracleTextLayout {
 			columns, frequency = n, count
 		}
 	}
-	if columns < len(head)+2 || columns > 16384 || (columns-len(head))%2 != 0 || len(first) < columns {
+	if columns < len(head)+2 || columns > formats.ExcelColumns || (columns-len(head))%2 != 0 || len(first) < columns {
 		return nil
 	}
 	joined := len(first) == 2*columns-1

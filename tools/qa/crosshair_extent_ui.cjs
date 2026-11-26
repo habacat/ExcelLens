@@ -9,21 +9,23 @@ async function main(){
     await p.run(ref=>{nameBox.focus();nameBox.value=ref;nameBox.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));},ref);
     await p.wait('nameBox.value==='+JSON.stringify(ref)+' && document.querySelector(".grid-cell.selected")');
   }
-  async function measure(name,ref,enabled=true){
+  async function measure(name,ref,enabled=true,endRef=ref){
     await p.run(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-    const obs=await p.run(ref=>{
+    const obs=await p.run((ref,endRef)=>{
       const grid=document.getElementById('grid'),g=grid.getBoundingClientRect(),box=document.getElementById('crosshairTails');
       const dims=r=>({x:r.left-g.left,y:r.top-g.top,w:r.width,h:r.height});
       const cells=[...document.querySelectorAll('.grid-cell')].filter(n=>n.offsetWidth&&n.offsetHeight);
       const rects=cells.map(n=>n.getBoundingClientRect());
-      const selected=cells.find(n=>n.dataset.ref===ref && n.classList.contains('pinned-cell')) || cells.find(n=>n.dataset.ref===ref);
-      const s=selected.getBoundingClientRect();
+      const find=r=>cells.find(n=>n.dataset.ref===r && n.classList.contains('pinned-cell')) || cells.find(n=>n.dataset.ref===r);
+      const selected=find(ref),last=find(endRef)||selected;
+      const s=selected.getBoundingClientRect(),e=last.getBoundingClientRect();
+      const boxSpan={left:Math.min(s.left,e.left),top:Math.min(s.top,e.top),width:Math.max(s.right,e.right)-Math.min(s.left,e.left),height:Math.max(s.bottom,e.bottom)-Math.min(s.top,e.top)};
       const row=box?.firstElementChild,col=box?.lastElementChild;
-      return {w:grid.clientWidth,h:grid.clientHeight,x:g.left,y:g.top,scale:devicePixelRatio,selected:dims(s),pinned:selected.classList.contains('pinned-cell'),
+      return {w:grid.clientWidth,h:grid.clientHeight,x:g.left,y:g.top,scale:devicePixelRatio,selected:dims(boxSpan),pinned:selected.classList.contains('pinned-cell'),
         lastRow:Math.max(...rects.map(r=>r.bottom-g.top)),lastCol:Math.max(...rects.map(r=>r.right-g.left)),
         row:row&&dims(row.getBoundingClientRect()),col:col&&dims(col.getBoundingClientRect()),
         through:!box || getComputedStyle(box).pointerEvents==='none'};
-    },ref);
+    },ref,endRef);
     states[name]=obs;
     if(enabled){
       assert.ok(obs.w-obs.lastCol>8 && obs.h-obs.lastRow>8,'fixture must expose both margins: '+JSON.stringify(obs));
@@ -64,7 +66,7 @@ async function main(){
       await measure('dark','D4');
       await p.run(()=>{nameBox.focus();nameBox.value='B3:D4';nameBox.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));});
       await p.wait('document.querySelector(".grid-region.has-range")');
-      await measure('range','B3',false);
+      await measure('range','B3',true,'D4');
     }
     assert.deepEqual(errors,[]);
   }finally{

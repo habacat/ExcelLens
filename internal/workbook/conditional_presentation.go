@@ -23,6 +23,7 @@ type ConditionalPresentation struct {
 }
 
 type conditionalAddress struct{ row, col int }
+type conditionalRangeKey struct{ r1, c1, r2, c2 int }
 type conditionalDependencyUnavailable struct{ reason string }
 
 func (e *conditionalDependencyUnavailable) Error() string { return e.reason }
@@ -40,6 +41,7 @@ type conditionalRead struct {
 	columns                          []int
 	cells                            map[int]CellData
 	cache                            map[conditionalAddress]CellData
+	rangeCache                       map[conditionalRangeKey]conditionalRangeData
 	cacheBytes                       int
 	remainingBytes, remainingCells   int
 	dependencyReads, dependencyBytes int
@@ -73,7 +75,8 @@ func (w *Workbook) newConditionalRead(ctx context.Context, idx *SheetIndex, file
 	if len(index.groups) == 0 && index.notice == "" {
 		return nil, nil
 	}
-	r := &conditionalRead{w: w, idx: idx, ctx: ctx, index: index, evaluator: index.NewEvaluator(ctx), stream: indexedStream{f: file, idx: idx}, cache: make(map[conditionalAddress]CellData)}
+	r := &conditionalRead{w: w, idx: idx, ctx: ctx, index: index, evaluator: index.NewEvaluator(ctx), stream: indexedStream{f: file, idx: idx}, cache: make(map[conditionalAddress]CellData), rangeCache: make(map[conditionalRangeKey]conditionalRangeData)}
+	r.evaluator.SetRangeResolver(r.resolveRange)
 	r.columns = append([]int(nil), options.Columns...)
 	r.resetBudget()
 	return r, nil
@@ -90,6 +93,10 @@ func (r *conditionalRead) resetBudget() {
 	r.remainingBytes, r.remainingCells = formats.ConditionalReadBytes, formats.ConditionalReadCells
 	r.dependencyReads, r.dependencyBytes = formats.ConditionalDependencyReads, formats.ConditionalDependencyXMLBytes
 	r.evaluator.work, r.evaluator.textBytes = formats.ConditionalEvalWork, formats.ConditionalEvalTextBytes
+}
+
+func conditionalOperand(cell CellData) CellData {
+	return CellData{Raw: cell.Raw, Type: cell.Type, CacheMissing: cell.CacheMissing}
 }
 
 func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
@@ -132,10 +139,100 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 	}
 	bytes := 512 + 2*(len(cell.Raw)+len(cell.Ref)+len(cell.Type))
 	if len(r.cache) < formats.ConditionalDependencyReads && bytes <= formats.ConditionalDependencyCacheBytes-r.cacheBytes {
-		r.cache[key] = cell
+		r.cache[key] = conditionalOperand(cell)
 		r.cacheBytes += bytes
 	}
 	return cell, true, nil
+}
+
+func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData, string, error) {
+	if err := r.ctx.Err(); err != nil {
+		return conditionalRangeData{}, "", err
+	}
+	key := conditionalRangeKey{r1, c1, r2, c2}
+	if cached, ok := r.rangeCache[key]; ok {
+		return cached, "", nil
+	}
+	width := c2 - c1 + 1
+	totalArea := int64(r2-r1+1) * int64(width)
+	// Fast path: range entirely within the currently loaded row window.
+	if r1 == r2 && r1 == r.row.Number && c1 >= r.first && c2 <= r.last && r.selected == nil {
+		out := conditionalRangeData{r1: r1, c1: c1, r2: r2, c2: c2}
+		for col := c1; col <= c2; col++ {
+			cell, ok := r.cells[col]
+			if !ok || (!cell.CacheMissing && cell.Type == "" && cell.Raw == "") {
+				out.blankCount++
+				continue
+			}
+			out.cells = append(out.cells, conditionalRangeCell{row: r1, col: col, cell: conditionalOperand(cell)})
+		}
+		return out, "", nil
+	}
+	startPos := r.idx.FindRowOffset(r1)
+	endPos := r.idx.FindRowOffset(r2 + 1)
+	occupiedRows := endPos - startPos
+	if occupiedRows > formats.ConditionalDependencyReads || int64(occupiedRows)*int64(width) > int64(formats.ConditionalRangeCells) {
+		return conditionalRangeData{}, "条件格式引用范围超过本次读取容量，未扫描整表", nil
+	}
+	out := conditionalRangeData{r1: r1, c1: c1, r2: r2, c2: c2}
+	estBytes := 128
+	for pos := startPos; pos < endPos; pos++ {
+		if err := r.ctx.Err(); err != nil {
+			return conditionalRangeData{}, "", err
+		}
+		offset := r.idx.RowAt(pos)
+		rowNum := offset.Number
+		if rowNum == r.row.Number && c1 >= r.first && c2 <= r.last && r.selected == nil {
+			for col := c1; col <= c2; col++ {
+				cell, ok := r.cells[col]
+				if ok && (cell.CacheMissing || cell.Type != "" || cell.Raw != "") {
+					out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: col, cell: conditionalOperand(cell)})
+					estBytes += len(cell.Raw) + len(cell.Type)
+				}
+			}
+			continue
+		}
+		if width == 1 {
+			if cached, ok := r.cache[conditionalAddress{rowNum, c1}]; ok {
+				if cached.CacheMissing || cached.Type != "" || cached.Raw != "" {
+					out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: c1, cell: cached})
+					estBytes += len(cached.Raw) + len(cached.Type)
+				}
+				continue
+			}
+		}
+		size := offset.End - offset.Start
+		if r.dependencyReads == 0 || size <= 0 || size > int64(r.dependencyBytes) {
+			return conditionalRangeData{}, "条件格式引用超过本次读取容量，未用空白或零替代", nil
+		}
+		r.dependencyReads--
+		r.dependencyBytes -= int(size)
+		data, err := r.stream.readWithOptions(r.w, pos, c1, c2, nil, RowReadOptions{})
+		if err != nil {
+			if r.ctx.Err() != nil {
+				return conditionalRangeData{}, "", r.ctx.Err()
+			}
+			return conditionalRangeData{}, "条件格式引用读取失败，原值保留：" + conditionalNotice(err.Error()), nil
+		}
+		for _, cell := range data.Cells {
+			if cell.Col < c1 || cell.Col > c2 {
+				continue
+			}
+			if !cell.CacheMissing && cell.Type == "" && cell.Raw == "" {
+				continue
+			}
+			out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: cell.Col, cell: conditionalOperand(cell)})
+			estBytes += len(cell.Raw) + len(cell.Type)
+		}
+	}
+	// Count backing-array capacity and retained source text before caching.
+	estBytes += cap(out.cells) * 512
+	out.blankCount = totalArea - int64(len(out.cells))
+	if len(r.rangeCache) < formats.ConditionalRangeCacheEntries && estBytes <= formats.ConditionalDependencyCacheBytes-r.cacheBytes {
+		r.rangeCache[key] = out
+		r.cacheBytes += estBytes
+	}
+	return out, "", nil
 }
 
 func (r *conditionalRead) apply(row *RowData, first, last int, selected map[int]struct{}) error {

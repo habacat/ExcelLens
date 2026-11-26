@@ -120,3 +120,42 @@ func TestChartExportModulesLoadBeforeAnalytics(t *testing.T) {
 		previous = at
 	}
 }
+
+func TestExtractedModulesLoadBeforeBootstrapAndDialogsPrecedeScripts(t *testing.T) {
+	pageBytes, err := Index("token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(pageBytes)
+	appAt := strings.Index(page, `src="/assets/app.js?v=`)
+	if appAt < 0 {
+		t.Fatal("missing app.js")
+	}
+	for _, name := range []string{"grid-clipboard.js", "grid-context-menu.js", "grid-workbook-io.js", "grid-interactions.js"} {
+		at := strings.Index(page, `src="/assets/`+name+`?v=`)
+		if at < 0 || at >= appAt {
+			t.Fatalf("%s must load before app.js", name)
+		}
+		if _, _, err := ReadAsset(name); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	analyticsAt := strings.Index(page, `src="/assets/analytics.js?v=`)
+	if analyticsAt < 0 {
+		t.Fatal("missing analytics.js")
+	}
+	for _, name := range []string{"analytics-dashboard.js", "analytics-sheets.js"} {
+		at := strings.Index(page, `src="/assets/`+name+`?v=`)
+		if at < 0 || at >= analyticsAt {
+			t.Fatalf("%s must load before analytics.js", name)
+		}
+		if _, _, err := ReadAsset(name); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	firstScript := strings.Index(page, `<script src="/assets/`)
+	lastDialog := strings.LastIndex(page, `<dialog `)
+	if firstScript < 0 || lastDialog >= firstScript {
+		t.Fatalf("all <dialog> elements must precede asset <script> tags (lastDialog=%d, firstScript=%d)", lastDialog, firstScript)
+	}
+}

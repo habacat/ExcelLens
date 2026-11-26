@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"excellens/internal/formats"
 )
 
 type TextTableHeader struct {
@@ -26,7 +28,7 @@ func headerLabel(value string) string {
 }
 
 func textHeader(row int, fields []string, detected bool) *TextTableHeader {
-	labels := make([]string, min(len(fields), 16384))
+	labels := make([]string, min(len(fields), formats.ExcelColumns))
 	for i := range labels {
 		labels[i] = headerLabel(fields[i])
 	}
@@ -57,7 +59,7 @@ func (w *Workbook) detectTextTableHeader(sample string) *TextTableHeader {
 	}
 	for i := 0; i < len(rows)-1 && i < 5; i++ {
 		header := rows[i]
-		if len(header) < 2 || len(header) > 16384 {
+		if len(header) < 2 || len(header) > formats.ExcelColumns {
 			continue
 		}
 		// Before a candidate, accept only blank/single-cell report titles.
@@ -193,11 +195,11 @@ func (w *Workbook) ReadTextTableHeader(ctx context.Context, meta SheetMeta, numb
 	if number < 1 || number > idx.MaxRow || pos >= idx.RowCount() || idx.RowAt(pos).Number != number {
 		return nil, errors.New("表头行超出数据范围")
 	}
-	rows, err := w.ReadRowsContext(ctx, idx, pos, 1, 1, min(16384, max(1, idx.MaxCol)))
+	rows, err := w.ReadRowsContext(ctx, idx, pos, 1, 1, min(formats.ExcelColumns, max(1, idx.MaxCol)))
 	if err != nil {
 		return nil, err
 	}
-	fields := make([]string, min(16384, max(1, idx.MaxCol)))
+	fields := make([]string, min(formats.ExcelColumns, max(1, idx.MaxCol)))
 	if len(rows) > 0 {
 		for _, cell := range rows[0].Cells {
 			if cell.Col >= 1 && cell.Col <= len(fields) {

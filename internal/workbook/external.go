@@ -64,19 +64,25 @@ type externalSource struct {
 }
 
 func OpenDataFile(path string) (*Workbook, error) {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".ods":
-		return openODS(path)
-	case ".csv", ".tsv", ".txt":
-		return openTextWorkbook(path)
-	case ".db", ".sqlite", ".sqlite3":
-		return openSQLiteWorkbook(path)
-	case ".xls":
-		return openXLSWorkbook(path)
-	case ".xlsb":
-		return openXLSB(path)
-	case formats.DatabaseSnapshotExtension:
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == formats.DatabaseSnapshotExtension {
 		return openDatabaseSnapshot(path)
+	}
+	format, ok := formats.FormatForExtension(ext)
+	if !ok {
+		return nil, fmt.Errorf("不支持的文件类型 %q", filepath.Ext(path))
+	}
+	switch format {
+	case "ods":
+		return openODS(path)
+	case "csv", "tsv", "txt":
+		return openTextWorkbook(path)
+	case "sqlite":
+		return openSQLiteWorkbook(path)
+	case "xls":
+		return openXLSWorkbook(path)
+	case "xlsb":
+		return openXLSB(path)
 	default:
 		return nil, fmt.Errorf("不支持的文件类型 %q", filepath.Ext(path))
 	}

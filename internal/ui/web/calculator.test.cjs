@@ -163,10 +163,14 @@ test('the complete application boots with the formula table and one keyboard dis
   vm.runInNewContext(read('storage.js'),context);
   vm.runInNewContext(read('grid-columns.js'),context);
   vm.runInNewContext(read('search-panel.js'),context);
+  vm.runInNewContext(read('grid-clipboard.js'),context);
+  vm.runInNewContext(read('grid-context-menu.js'),context);
+  vm.runInNewContext(read('grid-workbook-io.js'),context);
+  vm.runInNewContext(read('grid-interactions.js'),context);
   const app=read('app.js');for(const m of app.matchAll(/new window\.(ExcelLens\w+)/g))if(!context.window[m[1]])context.window[m[1]]=class{};
   context.window.ExcelLensFormulaInspector={FormulaInspector:class{}};
   assert.doesNotThrow(()=>vm.runInNewContext(app,context));assert.equal(document.handlers.keydown.length,1);
-  assert.equal((app.match(/if\(!calculating\)\$\("grid"\)\.focus/g)||[]).length,2);
+  assert.equal((read('grid-interactions.js').match(/if\(!calculating\)\$\("grid"\)\.focus/g)||[]).length,2);
 });
 
 test('date/time suggestion waits for a click and inserts an explicit conversion formula',async()=>{

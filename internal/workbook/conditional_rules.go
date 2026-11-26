@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"excellens/internal/formats"
 )
@@ -34,23 +36,26 @@ type conditionalGroup struct {
 	notice               string
 }
 type compiledConditionalRule struct {
-	source    SourceConditionalRule
-	group     int
-	operands  []conditionalOperand
-	predicate conditionalPredicate
-	notice    string
+	source          SourceConditionalRule
+	group           int
+	exprs           []*conditionalExpr
+	exprNodes       int
+	predicateNotice string
+	styleNotice     string
 }
 type conditionalRangeEntry = sourceRangeEntry
 type conditionalRangeNode = sourceRangeNode
 
 type SourceConditionalFormats struct {
-	groups []conditionalGroup
-	rules  []compiledConditionalRule
-	nodes  []conditionalRangeNode
-	root   int
-	notice string
-	styles []DifferentialStyle
-	bytes  int64
+	groups    []conditionalGroup
+	rules     []compiledConditionalRule
+	nodes     []conditionalRangeNode
+	root      int
+	notice    string
+	styles    []DifferentialStyle
+	sheetName string
+	date1904  bool
+	bytes     int64
 }
 
 type ConditionalFormatSummary struct {
@@ -66,7 +71,7 @@ func (index *SourceConditionalFormats) Summary() ConditionalFormatSummary {
 	}
 	out := ConditionalFormatSummary{Rules: len(index.rules), Ranges: len(index.nodes), Notice: index.notice}
 	for _, rule := range index.rules {
-		if rule.notice != "" {
+		if rule.predicateNotice != "" || rule.styleNotice != "" {
 			out.Pending++
 		}
 	}
@@ -93,22 +98,45 @@ func parseConditionalRanges(raw string) ([]CellMerge, error) {
 		if strings.Contains(finish, ":") {
 			return nil, errors.New("条件格式范围无效")
 		}
-		first, ok := compileConditionalOperand(start)
-		if !ok || first.reference == nil {
-			return nil, errors.New("条件格式起点无效")
+		if a, ok := parseConditionalCellRef(start); ok {
+			b := a
+			if ranged {
+				b, ok = parseConditionalCellRef(finish)
+				if !ok {
+					return nil, errors.New("条件格式终点无效")
+				}
+			}
+			if b.row < a.row || b.col < a.col {
+				return nil, errors.New("条件格式范围顺序无效")
+			}
+			out = append(out, CellMerge{Row: a.row, Col: a.col, EndRow: b.row, EndCol: b.col})
+			continue
 		}
-		last := first
 		if ranged {
-			last, ok = compileConditionalOperand(finish)
-			if !ok || last.reference == nil {
-				return nil, errors.New("条件格式终点无效")
+			if a, ok1 := parseConditionalColRef(start); ok1 {
+				b, ok2 := parseConditionalColRef(finish)
+				if !ok2 {
+					return nil, errors.New("条件格式终点无效")
+				}
+				if b.col < a.col {
+					return nil, errors.New("条件格式范围顺序无效")
+				}
+				out = append(out, CellMerge{Row: 1, Col: a.col, EndRow: formats.ExcelRows, EndCol: b.col})
+				continue
+			}
+			if a, ok1 := parseConditionalRowRef(start); ok1 {
+				b, ok2 := parseConditionalRowRef(finish)
+				if !ok2 {
+					return nil, errors.New("条件格式终点无效")
+				}
+				if b.row < a.row {
+					return nil, errors.New("条件格式范围顺序无效")
+				}
+				out = append(out, CellMerge{Row: a.row, Col: 1, EndRow: b.row, EndCol: formats.ExcelColumns})
+				continue
 			}
 		}
-		a, b := first.reference, last.reference
-		if b.row < a.row || b.col < a.col {
-			return nil, errors.New("条件格式范围顺序无效")
-		}
-		out = append(out, CellMerge{Row: a.row, Col: a.col, EndRow: b.row, EndCol: b.col})
+		return nil, errors.New("条件格式起点无效")
 	}
 	if len(out) == 0 {
 		return nil, errors.New("条件格式适用范围为空或超限")
@@ -241,13 +269,13 @@ func readSourceConditionalRule(d *xml.Decoder, start xml.StartElement) (SourceCo
 	}
 }
 
-func compileSourceConditionalRule(source SourceConditionalRule, group int) compiledConditionalRule {
-	out := compiledConditionalRule{source: source, group: group, notice: source.Notice}
-	if out.notice != "" {
+func compileSourceConditionalRule(source SourceConditionalRule, group int, sheetName string) compiledConditionalRule {
+	out := compiledConditionalRule{source: source, group: group, predicateNotice: source.Notice}
+	if out.predicateNotice != "" {
 		return out
 	}
 	if len(source.Parameters) > 0 {
-		out.notice = "条件格式含尚未解释的参数"
+		out.predicateNotice = "条件格式含尚未解释的参数"
 		return out
 	}
 	switch source.Type {
@@ -258,37 +286,45 @@ func compileSourceConditionalRule(source SourceConditionalRule, group int) compi
 		case "between", "notBetween":
 			need = 2
 		default:
-			out.notice = "条件比较方式尚未支持"
+			out.predicateNotice = "条件比较方式尚未支持"
 			return out
 		}
 		if len(source.Formulas) != need {
-			out.notice = "条件比较的表达式数量无效"
+			out.predicateNotice = "条件比较的表达式数量无效"
 			return out
 		}
 		for _, formula := range source.Formulas {
-			operand, ok := compileConditionalOperand(strings.TrimPrefix(strings.TrimSpace(formula), "="))
-			if !ok {
-				out.notice = "条件比较表达式需要尚未支持的计算"
+			expr, nodes, notice := compileConditionalExpr(formula, sheetName)
+			if notice != "" {
+				if notice == "条件格式公式尚未求值" {
+					out.predicateNotice = "条件比较表达式需要尚未支持的计算"
+				} else {
+					out.predicateNotice = notice
+				}
+				out.exprs = nil
 				return out
 			}
-			out.operands = append(out.operands, operand)
+			out.exprs = append(out.exprs, expr)
+			out.exprNodes += nodes
 		}
 	case "expression":
 		if len(source.Formulas) != 1 {
-			out.notice = "条件格式公式数量无效"
+			out.predicateNotice = "条件格式公式数量无效"
 			return out
 		}
-		var ok bool
-		out.predicate, ok = compileConditionalPredicate(source.Formulas[0])
-		if !ok {
-			out.notice = "条件格式公式尚未求值"
+		expr, nodes, notice := compileConditionalExpr(source.Formulas[0], sheetName)
+		if notice != "" {
+			out.predicateNotice = notice
+			return out
 		}
+		out.exprs = []*conditionalExpr{expr}
+		out.exprNodes = nodes
 	case "containsBlanks", "notContainsBlanks", "containsErrors", "notContainsErrors", "containsText", "notContainsText", "beginsWith", "endsWith":
 		if len(source.Formulas) > 1 || strings.ContainsAny(source.Text, "*?~") {
-			out.notice = "文本条件的通配符或表达式尚未支持"
+			out.predicateNotice = "文本条件的通配符或表达式尚未支持"
 		}
 	default:
-		out.notice = "该条件格式需要范围统计或尚未支持的规则，不自动扫描整表"
+		out.predicateNotice = "该条件格式需要范围统计或尚未支持的规则，不自动扫描整表"
 	}
 	return out
 }
@@ -297,6 +333,11 @@ func compileSourceConditionalRule(source SourceConditionalRule, group int) compi
 // later against the group's anchor; a contradictory custom formula is never
 // silently replaced with a convenient interpretation of the type attribute.
 func canonicalConditionalFormula(source SourceConditionalRule, row, col int) bool {
+	switch source.Type {
+	case "containsBlanks", "notContainsBlanks", "containsErrors", "notContainsErrors", "containsText", "notContainsText", "beginsWith", "endsWith":
+	default:
+		return true
+	}
 	if len(source.Formulas) == 0 {
 		return true
 	}
@@ -305,6 +346,8 @@ func canonicalConditionalFormula(source SourceConditionalRule, row, col int) boo
 	}
 	ref := ColumnName(col) + strconv.Itoa(row)
 	text := `"` + strings.ReplaceAll(source.Text, `"`, `""`) + `"`
+	runeLen := strconv.Itoa(utf8.RuneCountInString(source.Text))
+	utf16Len := strconv.Itoa(len(utf16.Encode([]rune(source.Text))))
 	var expected []string
 	switch source.Type {
 	case "containsBlanks":
@@ -318,11 +361,11 @@ func canonicalConditionalFormula(source SourceConditionalRule, row, col int) boo
 	case "containsText":
 		expected = []string{"NOT(ISERROR(SEARCH(" + text + "," + ref + ")))", "ISNUMBER(SEARCH(" + text + "," + ref + "))"}
 	case "notContainsText":
-		expected = []string{"ISERROR(SEARCH(" + text + "," + ref + "))"}
+		expected = []string{"ISERROR(SEARCH(" + text + "," + ref + "))", "NOT(ISNUMBER(SEARCH(" + text + "," + ref + ")))"}
 	case "beginsWith":
-		expected = []string{"LEFT(" + ref + ",LEN(" + text + "))=" + text}
+		expected = []string{"LEFT(" + ref + ",LEN(" + text + "))=" + text, "LEFT(" + ref + "," + runeLen + ")=" + text, "LEFT(" + ref + "," + utf16Len + ")=" + text}
 	case "endsWith":
-		expected = []string{"RIGHT(" + ref + ",LEN(" + text + "))=" + text}
+		expected = []string{"RIGHT(" + ref + ",LEN(" + text + "))=" + text, "RIGHT(" + ref + "," + runeLen + ")=" + text, "RIGHT(" + ref + "," + utf16Len + ")=" + text}
 	default:
 		return true
 	}
@@ -365,7 +408,7 @@ func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, i
 	if err != nil {
 		return nil, err
 	}
-	index := &SourceConditionalFormats{root: -1, notice: layout.ConditionalNotice, styles: w.differentialStyles}
+	index := &SourceConditionalFormats{root: -1, notice: layout.ConditionalNotice, styles: w.differentialStyles, sheetName: meta.Name, date1904: w.Date1904}
 	if len(layout.ConditionalBlocks) == 0 {
 		return index, nil
 	}
@@ -460,7 +503,7 @@ func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, i
 				if err != nil {
 					return nil, err
 				}
-				index.rules = append(index.rules, compileSourceConditionalRule(rule, groupID))
+				index.rules = append(index.rules, compileSourceConditionalRule(rule, groupID, meta.Name))
 			}
 		}
 		if end, err := d.Token(); err != nil {
@@ -491,17 +534,17 @@ func finishConditionalFormats(index *SourceConditionalFormats, entries []conditi
 			index.notice = "条件格式缺少可靠优先级"
 		}
 		if group.notice != "" {
-			rule.notice = group.notice
+			rule.predicateNotice = group.notice
 		}
-		if rule.notice == "" && !canonicalConditionalFormula(rule.source, group.anchorRow, group.anchorCol) {
-			rule.notice = "条件格式公式与声明类型不一致或尚未支持"
+		if rule.predicateNotice == "" && !canonicalConditionalFormula(rule.source, group.anchorRow, group.anchorCol) {
+			rule.predicateNotice = "条件格式公式与声明类型不一致或尚未支持"
 		}
 		if rule.source.DxfID != nil {
 			id := *rule.source.DxfID
 			if id < 0 || id >= len(index.styles) {
-				rule.notice = "条件格式引用的差异样式不可用"
+				rule.styleNotice = "条件格式引用的差异样式不可用"
 			} else if index.styles[id].Notice != "" {
-				rule.notice = index.styles[id].Notice
+				rule.styleNotice = index.styles[id].Notice
 			}
 		}
 		group.ruleIndices = append(group.ruleIndices, i)
@@ -518,8 +561,8 @@ func conditionalIndexBytes(index *SourceConditionalFormats) int64 {
 	}
 	for _, r := range index.rules {
 		s := r.source
-		n += int64(cap(r.operands)*128 + cap(s.Formulas)*16)
-		n += int64(2 * (len(s.Type) + len(s.Text) + len(s.Operator) + len(s.Notice) + len(r.notice)))
+		n += int64(cap(r.exprs)*16 + r.exprNodes*128 + cap(s.Formulas)*16)
+		n += int64(2 * (len(s.Type) + len(s.Text) + len(s.Operator) + len(s.Notice) + len(r.predicateNotice) + len(r.styleNotice)))
 		for _, f := range s.Formulas {
 			n += int64(len(f)*4 + 64)
 		}

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 func (w *Workbook) resolveCell(c xmlCell, col int, anchors map[string]SharedFormulaAnchor, formatValue, includeFormula bool) CellData {
@@ -109,7 +111,7 @@ func (w *Workbook) ReadRow(idx *SheetIndex, rowIndex, firstCol, lastCol int) (Ro
 }
 
 func (w *Workbook) ReadRowAll(idx *SheetIndex, rowIndex int) (RowData, error) {
-	return w.ReadRow(idx, rowIndex, 1, 16384)
+	return w.ReadRow(idx, rowIndex, 1, formats.ExcelColumns)
 }
 
 // readRowFromFile parses a bounded XML section directly from disk. It deliberately
@@ -214,7 +216,7 @@ func (w *Workbook) readRowFromFileWithOptions(f *os.File, idx *SheetIndex, rowIn
 						return RowData{}, fmt.Errorf("第 %d 行存在无效单元格地址 %q", rowNum, ref)
 					}
 				}
-				if col < 1 || col > 16384 {
+				if col < 1 || col > formats.ExcelColumns {
 					return RowData{}, fmt.Errorf("第 %d 行单元格列超出 Excel 上限：%d", rowNum, col)
 				}
 				lastColumn = col
@@ -299,7 +301,7 @@ func (w *Workbook) ReadRowsByIndicesWithOptionsContext(ctx context.Context, idx 
 		selected = make(map[int]struct{}, len(options.Columns))
 		previous := 0
 		for _, col := range options.Columns {
-			if col <= previous || col < firstCol || col > lastCol || col > 16384 {
+			if col <= previous || col < firstCol || col > lastCol || col > formats.ExcelColumns {
 				return nil, errors.New("sparse columns must be ascending and unique")
 			}
 			selected[col] = struct{}{}

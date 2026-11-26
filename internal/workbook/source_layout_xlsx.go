@@ -4,6 +4,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 // Excel character widths depend on the installed normal font. Seven pixels
@@ -74,7 +76,7 @@ func (s *SourceLayout) captureXML(tag, name []byte, row int) {
 	case "col":
 		first, last := parsePositiveIntBytes(xmlAttribute(tag, "min")), parsePositiveIntBytes(xmlAttribute(tag, "max"))
 		size := storedColumnPixels(number("width"), s.digitWidth)
-		if first < 1 || last < first || last > 16384 || !validSourceSize(size) {
+		if first < 1 || last < first || last > formats.ExcelColumns || !validSourceSize(size) {
 			return
 		}
 		if s.Cols == nil {

@@ -9,9 +9,10 @@
   const BASE_ROW = 25;
   const MAX_BROWSER_SCROLL_PIXELS = 15000000;
   const sourceRowLimit = () => fileFormats.source(S.source?.format).maxRows;
+  const sourceColLimit = () => fileFormats.source(S.source?.format).maxColumns;
   const colName = window.ExcelLensAddress.columnName;
-  const parseColumn = text => window.ExcelLensAddress.parseColumn(text, fileFormats.maxColumns);
-  const parseRef = text => window.ExcelLensAddress.parseRef(text, sourceRowLimit(), fileFormats.maxColumns);
+  const parseColumn = text => window.ExcelLensAddress.parseColumn(text, sourceColLimit());
+  const parseRef = text => window.ExcelLensAddress.parseRef(text, sourceRowLimit(), sourceColLimit());
   // The DOM cannot represent the full external row capacity in CSS. Scale only the
   // scrollbar distance; virtualized row geometry stays true to cell heights.
   const virtualScroll = new window.ExcelLensVirtualScroll(MAX_BROWSER_SCROLL_PIXELS);
@@ -69,7 +70,7 @@
     renderedHeadersKey: "",
     decorVersion: 0,
     renderMetrics: {commits:0, reusedRows:0, createdRows:0, createdCells:0, lastMs:0},
-    lastHighlight: {col:0,ref:"",hadRange:false},
+    lastHighlight: {key:"",col:0,hadMultiCol:false,anchorCol:0,ref:"",hadRange:false},
     index: null,
     indexJob: null,
     indexReady: false,
@@ -77,9 +78,9 @@
 	previewAbort: null,
 	previewData: null,
 	previewFrame: 0,
-    maxRow: 1048576,
+    maxRow: typeof fileFormats !== 'undefined' ? fileFormats.source('xlsx').maxRows : 1048576,
     virtualScrollScale: 1,
-    maxCol: 16384,
+    maxCol: typeof fileFormats !== 'undefined' ? fileFormats.maxColumns : 16384,
     usedMaxRow: 1,
     usedMaxCol: 1,
     largeData: false,
@@ -535,276 +536,20 @@
     $('workspace').classList.toggle('source-html-view',S.showStyles&&S.source?.format==='xls-html');
   }
 
-  function renderSheetTabs() {
-    const tabs = $("sheetTabs");
-    const fragment = document.createDocumentFragment();
-    S.sheets.forEach((sheet, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "sheet-tab" + (S.sheet === sheet.name ? " active" : "") + (sheet.state && sheet.state !== "visible" ? " hidden-sheet" : "");
-      if (/^#[0-9A-Fa-f]{6}$/.test(sheet.tabColor || "")) {
-        button.classList.add("has-tab-color");
-        button.style.setProperty("--sheet-tab-color", sheet.tabColor);
-      }
-      button.textContent = sheet.name;
-      button.title = (sheet.sourceName || sheet.name) + (sheet.state && sheet.state !== "visible" ? "（隐藏工作表）" : "");
-      button.setAttribute("role", "tab");
-      button.setAttribute("aria-selected", S.sheet === sheet.name ? "true" : "false");
-      button.addEventListener("click", () => selectSheetTab(sheet.name));
-      fragment.appendChild(button);
-      if (index === S.activeTab) button.dataset.activeIndex = String(index);
-    });
-    tabs.replaceChildren(fragment);
-    const active = tabs.querySelector(".sheet-tab.active");
-    if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
-    requestAnimationFrame(updateSheetPager);
-  }
-
-  function updateSheetPager() {
-    const tabs=$("sheetTabs");
-    const hasOverflow=tabs.scrollWidth>tabs.clientWidth+2;
-    $("sheetPrevBtn").hidden=!hasOverflow;
-    $("sheetNextBtn").hidden=!hasOverflow;
-    $("sheetPrevBtn").disabled=tabs.scrollLeft<=1;
-    $("sheetNextBtn").disabled=tabs.scrollLeft>=tabs.scrollWidth-tabs.clientWidth-2;
-  }
-  function pageSheetTabs(direction) {
-    const tabs=$("sheetTabs");
-    const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    tabs.scrollBy({left:direction*Math.max(110,Math.round(tabs.clientWidth*.72)),behavior:reduced?'auto':'smooth'});
-  }
-
-  function renderSheetPicker(query = "") {
-    const list = $("sheetPickerList");
-    const q = query.trim().toLocaleLowerCase();
-    const fragment = document.createDocumentFragment();
-    let shown = 0;
-    S.sheets.forEach((sheet, index) => {
-      if (q && !sheet.name.toLocaleLowerCase().includes(q)) return;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "sheet-picker-item" + (S.sheet === sheet.name ? " active" : "");
-      const number = document.createElement("span");
-      number.className = "sheet-number";
-      number.textContent = String(index + 1).padStart(2, "0");
-      const name = document.createElement("span");
-      name.textContent = sheet.name;
-      if (/^#[0-9A-Fa-f]{6}$/.test(sheet.tabColor || "")) {
-        const swatch=document.createElement('span');swatch.className='sheet-picker-color';
-        swatch.style.backgroundColor=sheet.tabColor;
-        button.append(number,swatch,name);
-      } else button.append(number,name);
-      button.addEventListener("click", async () => {
-        $("sheetDialog").close();
-      await selectSheetTab(sheet.name);
-      });
-      fragment.appendChild(button);
-      shown++;
-    });
-    if (!shown) {
-      const empty = document.createElement("div");
-      empty.className = "dialog-summary";
-      empty.textContent = "没有匹配的工作表";
-      fragment.appendChild(empty);
-    }
-    list.replaceChildren(fragment);
-  }
-
-  function updateFileTitle() {
-    $('fileBadge').textContent=S.fileName;
-    $('fileBadge').title=S.fileName;
-    document.title=S.fileName||'ExcelLens';
-  }
-  async function loadStatus() {
-    const launch=window.ExcelLensSession?.nativeLaunch || window.ExcelLensSession?.restoring;
-    const activity=launch ? globalThis.ExcelLensActivity?.begin('正在打开文件',{priority:2}) : null;
-    if(launch){
-      S.opening=true;
-      $('openBtn').disabled=$('chooseFileBtn').disabled=true;
-      activity?.stage('正在打开文件',0,60);
-    }
-    try {
-      const data = await api("/api/status");
-      archiveCenter?.use(data.archive);
-      if (!data.opened) {
-        if(data.archive)archiveCenter.present(data.archive);
-        S.opened = false;
-	  catalogueCenter?.resetBook();
-	  dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();
-        showWelcome();
-        recentManager?.load();
-        if (data.error) {
-          $("welcomeError").textContent = data.error;
-          $("welcomeError").hidden = false;
-          setStatus("打开失败");
-        } else setStatus("等待选择文件");
-        return;
-      }
-      S.opened = true;
-      activity?.stage('正在准备工作表',60,65);
-      S.sheets = data.sheets || [];
-      S.activeTab = Number.isInteger(data.activeTab) ? data.activeTab : 0;
-      S.fileName = data.fileName || "";
-      S.book=data.book||'';
-      S.fileSize = data.fileSize || 0;
-
-      S.source = data.source || {format:"xlsx"};
-      if(S.workbookKey!==(data.workbookKey||''))bookmarkCenter?.resetBook();
-      S.workbookKey=data.workbookKey||'';calculator?.bookChanged();window.ExcelLensAnalytics?.bookChanged(S.workbookKey,S.book);
-	  catalogueCenter?.controls();
-	  dataRulesCenter?.controls();printingCenter?.controls();recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
-      updateFileTitle();
-      showWorkspace();
-      await loadStylePalette();
-      const launchParams=new URLSearchParams(window.location?.search||'');
-      const requested=launchParams.get('sourceSheet');
-      const active = S.sheets.find(sheet=>sheet.name===requested)||S.sheets[S.activeTab]||S.sheets[0];
-      if (active) await selectSheet(active.name,requested===active.name?(launchParams.get('sourceRef')||''):'', false, null, activity);
-      else { renderSheetTabs(); setStatus("工作簿中没有工作表"); }
-      bookmarkCenter.load(true).catch(() => {});
-      refreshSearchHistory().catch(() => {});
-    } catch (error) {
-      showWelcome();
-      recentManager?.load();
-      setStatus("本机服务连接失败");
-      toast(error.message,'error');
-    } finally {
-      activity?.end();
-      if(launch){finishOpening();$('openBtn').disabled=$('chooseFileBtn').disabled=false;}
-    }
-  }
-
-  // Panels that stay unavailable while a file opens are refreshed when it ends;
-  // otherwise their buttons remain disabled until the next sheet switch.
-  function finishOpening(){
-    S.opening=false;
-    dataRulesCenter?.controls();printingCenter?.controls();recordCardCenter?.controls();
-    selectionQuick?.changed();cellExplanation?.changed();profileCenter?.changed();
-  }
-
-  function chooseFile() {
-    if (!S.opening&&canOpenWorkbook()) $("fileInput").click();
-  }
-
-  function canOpenWorkbook(action='切换文件'){
-    if (S.opening) return false;
-    if (editCopy?.grid.active && editCopy.grid.blocked) {
-      toast('请先确认当前单元格的输入'); return false;
-    }
-    if(window.ExcelLensAnalytics?.hasUnsaved()){
-      toast(`分析表仍有未保存内容，请先在分析中重试保存，再${action}`,'warning');return false;
-    }
-    return true;
-  }
-
-  async function openWorkbook(load, name = '', size = 0, current = () => true) {
-    if (S.opening || !canOpenWorkbook()) return false;
-    S.opening = true;
-    $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = true;
-    $("welcomeError").hidden = true;
-    setStatus("正在打开文件");
-    const activity = window.ExcelLensActivity?.begin('正在打开文件', {priority:2});
-    activity?.stage('正在打开文件', 0, 60);
-    try {
-      await window.ExcelLensSession?.ready;
-      const data = await load(activity);
-      if (!current()) return false;
-      activity?.stage('正在准备工作表', 60, 65);
-      await acceptOpenedWorkbook(data, {fallbackName:name, fallbackSize:size, activity});
-      await activity?.paintIfDue?.();
-      return true;
-    } catch (error) {
-      if (!current()) return false;
-      $("welcomeError").textContent = error.message;
-      $("welcomeError").hidden = false;
-      setStatus("打开失败");
-      throw error;
-    } finally {
-      activity?.end();
-      finishOpening();
-      $("openBtn").disabled = $("chooseFileBtn").disabled = $("homeBtn").disabled = false;
-    }
-  }
-
-  async function uploadFile(file) {
-    if (!file) return;
-    await window.ExcelLensWorkbookReady;
-    if (S.opening) return;
-    if (!fileFormats.supports(file.name)) { toast("请选择受支持的数据文件或压缩包",'warning'); return; }
-    return openWorkbook(activity => window.ExcelLensTransport.upload(file,activity,fmtBytes), file.name, file.size).catch(error => toast(error.message,'error'));
-  }
-
-  async function acceptOpenedWorkbook(data, {fallbackName = "", fallbackSize = 0, activity, revisionRef = ""} = {}) {
-      if (editCopy?.grid.active) editCopy.grid.leave();
-      archiveCenter?.use(data.archive);
-      if(data.archiveOnly){archiveCenter.present(data.archive);setStatus("请选择压缩包内的文件");return;}
-      S.opened = true;
-      S.sheets = data.sheets || [];
-      S.activeTab = Number.isInteger(data.activeTab) ? data.activeTab : 0;
-      S.fileName = data.fileName || fallbackName;
-      S.fileSize = data.fileSize || fallbackSize;
-      ++S.sheetEpoch;
-      S.sheet = null;
-      S.indexReady = false;
-      S.index = null;
-      // Only a confirmed workbook handoff discards the old cells. In
-      // particular, don't lay out the previous grid again on leaving Home.
-      invalidateViewport();
-      frozenPanes?.reset();
-      searchPanel.resetWorkbook();
-      traceUI?.reset();
-      formulaInspector?.resetWorkbook();
-      selectionInspector?.resetWorkbook();
-      profileCenter?.resetBook();
-      exportCenter?.resetBook();
-      reconcileCenter?.resetBook();
-      relationsCenter?.resetBook();
-      namedViews?.resetBook();
-      catalogueCenter?.resetBook();
-      dataRulesCenter?.resetBook();printingCenter?.resetBook();recordCardCenter?.resetBook();selectionQuick?.resetBook();transposeCenter?.resetBook();cellExplanation?.resetBook();profileCenter?.resetBook();
-      rowViews?.resetBook();
-      if(S.filterJob)cancelFilter(S.filterJob);
-      S.history = [];
-      S.historyIndex = -1;
-      S.filtersBySheet.clear();
-      S.positionsBySheet.clear();
-      S.sheetViews.clear();S.sheetViewsBytes=0;
-      S.filterTotalsBySheet.clear();
-      S.autoFiltersBySheet.clear();
-      bookmarkCenter.resetBook();
-      S.autoFilter = null;
-      S.sortKeysBySheet.clear();
-      S.sortHeaderBySheet.clear();
-      S.lastRulesBySheet.clear();
-      selectionStats?.resetBook();
-      S.filterId = "";
-      S.filtered = false;
-
-      S.source = data.source || {format:"xlsx"};
-      S.workbookKey=data.workbookKey||'';calculator?.bookChanged();
-      S.book=data.book||'';
-	  catalogueCenter?.controls();
-	  dataRulesCenter?.controls();printingCenter?.controls();recordCardCenter?.controls();selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
-      window.ExcelLensAnalytics?.bookChanged(S.workbookKey,S.book);
-      updateFileTitle();
-      showWorkspace();
-      await loadStylePalette();
-      const active = S.sheets[S.activeTab] || S.sheets[0];
-      if (active) await selectSheet(active.name, revisionRef, false, null, activity);
-      else { renderSheetTabs(); setStatus("工作簿中没有工作表"); }
-      bookmarkCenter.load(true).catch(() => {});
-      refreshSearchHistory().catch(() => {});
-  }
-
-  async function openTaskSource(payload,current){
-    return openWorkbook(() => api('/api/tasks/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}), '', 0, current);
-  }
-
-  async function cancelIndex(jobID) {
-    if (!jobID) return;
-    try { await api("/api/index/cancel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: jobID }) }); }
-    catch { /* job may have finished */ }
-  }
+  function renderSheetTabs() { return workbookIO.renderSheetTabs(); }
+  function updateSheetPager() { return workbookIO.updateSheetPager(); }
+  function pageSheetTabs(direction) { return workbookIO.pageSheetTabs(direction); }
+  function renderSheetPicker(query = "") { return workbookIO.renderSheetPicker(query); }
+  function updateFileTitle() { return workbookIO.updateFileTitle(); }
+  function loadStatus() { return workbookIO.loadStatus(); }
+  function finishOpening() { return workbookIO.finishOpening(); }
+  function chooseFile() { return workbookIO.chooseFile(); }
+  function canOpenWorkbook(action = '切换文件') { return workbookIO.canOpenWorkbook(action); }
+  function openWorkbook(load, name = '', size = 0, current = () => true) { return workbookIO.openWorkbook(load, name, size, current); }
+  function uploadFile(file) { return workbookIO.uploadFile(file); }
+  function acceptOpenedWorkbook(data, opts) { return workbookIO.acceptOpenedWorkbook(data, opts); }
+  function openTaskSource(payload, current) { return workbookIO.openTaskSource(payload, current); }
+  function cancelIndex(jobID) { return workbookIO.cancelIndex(jobID); }
 
   const sheetPresentationKey=()=>[S.zoom,S.showStyles,S.showFormulas,window.devicePixelRatio||1].join('|');
   function rememberSheetView(){
@@ -989,8 +734,8 @@
       // Keep roughly one small overscroll cushion, not the old 2,000 extra
       // rows / 16,384 columns. Explicit Go To still extends the viewport.
       S.maxRow = Math.min(sourceRowLimit(), Math.max(S.usedMaxRow + 18,Math.ceil($('grid').clientHeight/25)+4));
-      S.maxCol = Math.min(16384, Math.max(S.usedMaxCol + 3,Math.ceil($('grid').clientWidth/132)+2));
-      if(warm){S.maxRow=Math.max(S.maxRow,warm.maxRow);S.maxCol=Math.max(S.maxCol,warm.maxCol);}
+      S.maxCol = Math.min(sourceColLimit(), Math.max(S.usedMaxCol + 3,Math.ceil($('grid').clientWidth/132)+2));
+      if(warm){S.maxRow=Math.max(S.maxRow,warm.maxRow);S.maxCol=Math.min(sourceColLimit(),Math.max(S.maxCol,warm.maxCol));}
       if(rowViews){
         const previousRows=rowViews.cache.get(name);
         try{await rowViews.prepare({signal:opening.signal});}
@@ -1182,7 +927,7 @@
   function ensureExtent(row,col){
     if(!S.indexReady)return;
     const neededRows=Math.min(sourceRowLimit(),Math.max(S.maxRow,row+18));
-    const neededCols=Math.min(16384,Math.max(S.maxCol,col+3));
+    const neededCols=Math.min(sourceColLimit(),Math.max(S.maxCol,col+3));
     if(neededRows!==S.maxRow||neededCols!==S.maxCol){
       S.maxRow=neededRows;S.maxCol=neededCols;updateCanvasSize();
     }
@@ -1280,6 +1025,7 @@
   }
   const columnController = new window.ExcelLensColumnController({
     state: S, api, toast, geometry, baseRow: BASE_ROW, baseCol: BASE_COL, colName, parseColumn,
+    colLimit: sourceColLimit,
     relayoutGrid, selectCellByAddress: (ref, visual) => selectCellByAddress(ref, visual),
     hideCellMenu: () => hideCellMenu(), selectionStats: () => selectionStats, calculator: () => calculator
   });
@@ -1794,9 +1540,15 @@
     const merge=activeMerge(point.row,point.col);
     return merge?.row===cell.row && merge.col===cell.col ? point : cell;
   }
+  function selectionHighlight(areas = window.ExcelLensMultiSelection.areas(S)) {
+    return window.ExcelLensMultiSelection.highlight(S, crosshairCell(), areas);
+  }
   function decorateMergedCell(node,row,col,focus) {
     mergedCells.decorate(node,activeMerge(row,col),row,col,colLeft,rowTop,colWidth);
-    if(node._xlMerge)mergedCells.paintCrosshair(node,focus??crosshairCell(),colLeft,rowTop);
+    if(node._xlMerge){
+      const target=focus?.mergeTarget!==undefined?focus.mergeTarget:(focus??selectionHighlight().mergeTarget);
+      mergedCells.paintCrosshair(node,target,colLeft,rowTop);
+    }
   }
 
   // Updating the text node only preserves AutoFilter buttons and existing
@@ -1951,10 +1703,12 @@
     if (S.rangeFrameRaf) { cancelAnimationFrame(S.rangeFrameRaf); S.rangeFrameRaf = 0; }
     const layer=$('rangeFrames');
     const visible=S.indexReady || S.previewOnly;
-    layer.parentElement.classList.toggle('has-range',Boolean(visible && areas.length));
-    const single=visible && !areas.length && S.selected;
+    const rangeAreas=areas;
+    layer.parentElement.classList.toggle('has-range',Boolean(visible && rangeAreas.length));
+    const single=visible && !rangeAreas.length && S.selected;
+    const hasCrosshair=Boolean(visible && (rangeAreas.length || S.selected));
     const tails=$('crosshairTails');
-    tails.hidden=!single;
+    tails.hidden=!hasCrosshair;
     layer.parentElement.classList.toggle('has-cell-selection',Boolean(single));
     if (single) {
       const merge=activeMerge(single.row,single.col);
@@ -1976,9 +1730,20 @@
     let seams;
     geometry.seams=(...bounds)=>(seams ||= selectionSeams(geometry,pinned))(...bounds);
     window.ExcelLensRangeFrame.paint(layer,visible ? areas : [],geometry);
-    if (single) {
-      const focus=crosshairCell();
-      window.ExcelLensRangeFrame.paintCrosshair(tails,focus,S.filtered ? S.selectedVisualIndex : focus.row,geometry,colTotal(S.maxCol),sheetHeight(S.filtered?S.filterTotal:S.maxRow));
+    if (hasCrosshair) {
+      let tailAreas;
+      if (single) {
+        const focus=crosshairCell(), visual=S.filtered ? S.selectedVisualIndex : focus.row;
+        const showRow=!S.filtered || focus.row<=pinned.rows || visual>0;
+        tailAreas=[{row1:showRow?focus.row:0,row2:showRow?focus.row:0,col1:focus.col,col2:focus.col,visual1:visual,visual2:visual}];
+      } else if (S.wholeRowSelected && S.selected) {
+        const visual=S.filtered ? S.selectedVisualIndex : S.selected.row;
+        const showRow=!S.filtered || S.selected.row<=pinned.rows || visual>0;
+        tailAreas=[{row1:showRow?S.selected.row:0,row2:showRow?S.selected.row:0,col1:0,col2:0,visual1:visual,visual2:visual}];
+      } else {
+        tailAreas=rangeAreas;
+      }
+      window.ExcelLensRangeFrame.paintCrosshair(tails,tailAreas,geometry,colTotal(S.maxCol),sheetHeight(S.filtered?S.filterTotal:S.maxRow));
     }
     if (references && (refs.length || references.childElementCount)) {
       const shown=window.ExcelLensEditReferenceView.visibleAreas(refs,S.filtered,pinned.rows,S.rowNumberByVisual,activeMerge);
@@ -1988,7 +1753,7 @@
 
   function decorateGridCell(cell, row, col, ref, focus) {
     cell.classList.toggle("selected",S.selected?.ref === ref);
-    cell.classList.toggle("active-column",focus?.col === col);
+    cell.classList.toggle("active-column",focus?.hasCol ? focus.hasCol(col) : focus?.col === col);
     cell.classList.toggle("precedent",S.traceRefs.length > 0 && isPrecedent(row,col));
     cell.classList.toggle("search-match",isSearchMatch(S.sheet,ref));
     paintRangeCell(cell,row,col,Number(cell.dataset.visualIndex));
@@ -2047,10 +1812,10 @@
 
     const columns=Array.isArray(data.columns)&&data.columns.length?data.columns:
       Array.from({length:data.colCount},(_,i)=>data.startCol+i);
-    const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col)),focus=crosshairCell();
+    const visibleColumns=columns.filter(col=>!S.hiddenColumns.has(col)),focus=selectionHighlight();
     const headerKey=`${visibleColumns.join(',')}|${S.zoom}|${geometry.version}|${window.devicePixelRatio}|${S.indexReady}|${S.textHeaderRevision}|${ROW_HEAD}|${S.sheetEpoch}`;
     const commitHeaders=()=>{if (S.renderedHeadersKey !== headerKey) {
-      renderColumnHeaders(visibleColumns,width,focus);
+      renderColumnHeaders(visibleColumns,width,selectionHighlight());
       S.renderedHeadersKey = headerKey;
     }};
     const rowDataByNumber = new Map();
@@ -2159,7 +1924,7 @@
       if(row.style.top!==topPx)row.style.top=topPx;
       if(row.style.height!==heightPx){row.style.height=heightPx;row.style.setProperty('--row-height',heightPx);}
       if(row.firstElementChild.style.height!==heightPx)row.firstElementChild.style.height=heightPx;
-      row.classList.toggle("active-row",focus?.row === rowNumber);
+      row.classList.toggle("active-row",focus.hasRow(rowNumber,visual));
       row.classList.toggle("whole-row-selected",S.wholeRowSelected && S.selected?.row === rowNumber);
       row.classList.toggle('table-header-row',window.ExcelLensTableHeaders.isTable(S.autoFilter)&&rowNumber===S.autoFilter.row);
       row.classList.toggle('table-band',window.ExcelLensTableHeaders.isTable(S.autoFilter)&&rowNumber>S.autoFilter.row&&(visual-S.autoFilter.row)%2===0);
@@ -2262,7 +2027,7 @@
         }
         if(fresh&&!extraMarks){
           if(S.selected?.ref===ref)cell.classList.add('selected');
-          if(focus?.col===col)cell.classList.add('active-column');
+          if(focus.hasCol(col))cell.classList.add('active-column');
         }else if(needsDecoration)decorateGridCell(cell,rowNumber,col,ref,focus);
       }
       if(!oldRow&&newCells.childNodes.length)row.appendChild(newCells);
@@ -2317,10 +2082,11 @@
     if(sliced)followGridScroll();
     if(!sliced)syncTableColumnHeaders();
     if(sliced&&S.decorVersion!==initialDecor){
-      const current=crosshairCell();
-      for(const row of next.values()){
+      const current=selectionHighlight();
+      for(const [visual,row] of next){
         const number=Number(row.dataset.row);
-        row.classList.toggle('active-row',number===current?.row);
+        row.classList.toggle('active-row',current.hasRow(number,visual));
+        row.classList.toggle('whole-row-selected',Boolean(S.wholeRowSelected && S.selected?.row === number));
         for(const [col,node] of row._xlCells){
           decorateMergedCell(node,number,col,current);decorateGridCell(node,number,col,node.dataset.ref,current);
         }
@@ -2351,7 +2117,8 @@
     for (const col of columns) {
       const head = document.createElement("div");
       const span=selectedColumnSpan();
-      head.className = "column-head" + (focus?.col === col ? " active" : "") + (span&&col>=span.start&&col<=span.end?" column-selected":"");
+      const activeCol=focus?.hasCol ? focus.hasCol(col) : focus?.col === col;
+      head.className = "column-head" + (activeCol ? " active" : "") + (span&&col>=span.start&&col<=span.end?" column-selected":"");
       head.style.left = `${ROW_HEAD + colLeft(col)}px`;
       head.style.width = `${colWidth(col)}px`;
       head.style.height = `${headerHeight()}px`;
@@ -2408,40 +2175,55 @@
     ++S.decorVersion;
     selectionQuick?.changed();transposeCenter?.changed();cellExplanation?.changed();profileCenter?.changed();
     const old=S.lastHighlight;
-    const focus=crosshairCell(),selectedRow=focus?.row||0,selectedCol=focus?.col||0;
-    const anchorCol=S.selected?.col||0;
+    const selection=window.ExcelLensMultiSelection;
+    const areas=selection.areas(S);
+    const focus=crosshairCell();
+    const hl=selection.highlight ? selection.highlight(S,focus,areas) : {
+      key:`${focus?.row||0}|${focus?.col||0}`,
+      singleCol:focus?.col||0,
+      hasMultiCol:false,
+      mergeTarget:focus,
+      hasRow:row=>row===(focus?.row||0),
+      hasCol:col=>col===(focus?.col||0)
+    };
+    const selectedCol=hl.singleCol,anchorCol=S.selected?.col||0;
     const selectedRef=S.selected?.ref||"";
+    const multiCol=Boolean(old.hadMultiCol || hl.hasMultiCol);
     // Selection on every Arrow/Tab key previously ran several document-wide
     // selector queries across thousands of cells. Only the old/new selected
     // columns and the actual visible rows can change. All other classes stay.
-    for(const row of S.renderedRows.values()){
+    for(const [visual,row] of S.renderedRows){
       const rowNumber=Number(row.dataset.row);
-      const active=rowNumber===selectedRow;
+      const active=hl.hasRow(rowNumber,visual);
       row.classList.toggle('active-row',active);
-      row.classList.toggle('whole-row-selected',active&&Boolean(S.wholeRowSelected));
+      row.classList.toggle('whole-row-selected',Boolean(S.wholeRowSelected && rowNumber===S.selected?.row));
       const cells=row._xlCells;
       if(!cells)continue;
-      if(old.col && old.col!==selectedCol)cells.get(old.col)?.classList.remove('active-column');
+      if(multiCol){
+        for(const [col,cell] of cells)cell.classList.toggle('active-column',hl.hasCol(col));
+      }else{
+        if(old.col && old.col!==selectedCol)cells.get(old.col)?.classList.remove('active-column');
+        if(selectedCol)cells.get(selectedCol)?.classList.add('active-column');
+      }
       if(old.ref && old.ref!==selectedRef){
         const previous=cells.get(old.anchorCol);
         if(previous?.dataset.ref===old.ref)previous.classList.remove('selected');
       }
-      cells.get(selectedCol)?.classList.add('active-column');
       if(rowNumber===S.selected?.row)cells.get(anchorCol)?.classList.add('selected');
     }
     // Range highlight has a bounded visible intersection; only scan its DOM
     // when entering/leaving/changing a range, never on normal arrow presses.
-    const areas=window.ExcelLensMultiSelection.areas(S);
-    if((typeof mergedCells==='undefined'||mergedCells.root)&&(old.row!==selectedRow||old.col!==selectedCol)){
-      for(const node of document.getElementsByClassName('merged-cell'))mergedCells.paintCrosshair(node,focus,colLeft,rowTop);
+    if((typeof mergedCells==='undefined'||mergedCells.root)&&old.key!==hl.key){
+      for(const node of document.getElementsByClassName('merged-cell'))mergedCells.paintCrosshair(node,hl.mergeTarget,colLeft,rowTop);
     }
     paintRangeFrames(areas);
     const hasFreeze=!S.freeze||S.freeze.rows>0||S.freeze.cols>0||(typeof frozenPanes!=='undefined'&&frozenPanes?.cells?.size>0);
     const pinnedCells=hasFreeze?document.querySelectorAll('.grid-region .pinned-cell'):[];
     for(const node of pinnedCells){
+      const row=Number(node.dataset.row),col=Number(node.dataset.col),visual=Number(node.dataset.visualIndex)||row;
       node.classList.toggle('selected',node.dataset.ref===selectedRef);
-      node.classList.toggle('crosshair-row',Number(node.dataset.row)===selectedRow);
-      node.classList.toggle('active-column',Number(node.dataset.col)===selectedCol);
+      node.classList.toggle('crosshair-row',hl.hasRow(row,visual));
+      node.classList.toggle('active-column',hl.hasCol(col));
     }
     if(old.hadRange || areas.length){
       for(const [visual,row] of S.renderedRows)
@@ -2449,16 +2231,25 @@
       for(const node of pinnedCells)
         paintRangeCell(node,Number(node.dataset.row),Number(node.dataset.col),Number(node.dataset.visualIndex),areas);
     }
-    if(old.col && old.col!==selectedCol){
-      for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${old.col}"]`))node.classList.remove('active');
-    }
-    if(selectedCol){
-      for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${selectedCol}"]`))node.classList.add('active');
+    if(multiCol){
+      for(const node of document.querySelectorAll('.grid-region .column-head[data-col]')){
+        node.classList.toggle('active',hl.hasCol(Number(node.dataset.col)));
+      }
+    }else{
+      if(old.col && old.col!==selectedCol){
+        for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${old.col}"]`))node.classList.remove('active');
+      }
+      if(selectedCol){
+        for(const node of document.querySelectorAll(`.grid-region .column-head[data-col="${selectedCol}"]`))node.classList.add('active');
+      }
     }
     if(hasFreeze){
-      for(const node of document.querySelectorAll('.grid-region .pinned-row-head'))node.classList.toggle('active',Number(node.dataset.row)===selectedRow);
+      for(const node of document.querySelectorAll('.grid-region .pinned-row-head')){
+        const r=Number(node.dataset.row);
+        node.classList.toggle('active',hl.hasRow(r,r));
+      }
     }
-    S.lastHighlight={row:selectedRow,col:selectedCol,anchorCol,ref:selectedRef,hadRange:Boolean(areas.length)};
+    S.lastHighlight={key:hl.key,col:selectedCol,hadMultiCol:hl.hasMultiCol,anchorCol,ref:selectedRef,hadRange:Boolean(areas.length)};
   }
 
   function selectCell(cell, rowNumber, colNumber, ref, visualIndex, preserveTrace = false, keepSelection = false, crosshair = null) {
@@ -2662,9 +2453,10 @@
 
   function adjacentGridPoint(targetRow,targetVisual,originCol,rowDelta,colDelta,pinned) {
     const originVisual=targetVisual;
-    let targetCol = Math.max(1, Math.min(16384, originCol + colDelta));
+    const colLimit=typeof sourceColLimit==='function'?sourceColLimit():16384;
+    let targetCol = Math.max(1, Math.min(colLimit, originCol + colDelta));
     const fromMerge=activeMerge(targetRow,originCol);
-    if(fromMerge&&colDelta===1)targetCol=Math.min(16384,fromMerge.endCol+1);
+    if(fromMerge&&colDelta===1)targetCol=Math.min(colLimit,fromMerge.endCol+1);
     if(colDelta && S.hiddenColumns.has(targetCol)) targetCol=(colDelta>0 ? nextVisibleColumn(targetCol) : previousVisibleColumn(targetCol)) || originCol;
     if (S.filtered) {
       if(rowDelta){
@@ -2840,162 +2632,12 @@
     selectionStats?.schedule();
   }
 
-  async function writeClipboardPayload(content,cut=false) {
-    if(navigator.clipboard?.write && typeof ClipboardItem!=='undefined'){
-      try {
-        await navigator.clipboard.write([new ClipboardItem({
-          'text/plain':new Blob([content.text],{type:'text/plain'}),
-          'text/html':new Blob([content.html],{type:'text/html'})
-        })]);
-        if (!cut) toast('已复制','success');
-        return true;
-      } catch { /* Some browsers only allow HTML during a native copy event. */ }
-    }
-    let rich=false;
-    const onCopy=event=>{
-      if (!event.clipboardData) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      event.clipboardData.setData('text/plain',content.text);
-      event.clipboardData.setData('text/html',content.html);
-      rich=true;
-    };
-    document.addEventListener('copy',onCopy,true);
-    try {
-      if (document.execCommand('copy') && rich) { if (!cut) toast('已复制','success'); return true; }
-    } catch { /* A text-only clipboard can still accept the TSV. */ }
-    finally { document.removeEventListener('copy',onCopy,true); }
-    if (cut) throw Error('浏览器未写入剪切区域，请重新剪切');
-    const copied=await copyText(content.text);
-    if(copied)toast('已复制为纯文本，当前浏览器未写入表格格式','warning');
-    return copied;
-  }
-
-  function clipboardIdentity(){return JSON.stringify([S.book,S.workbookKey,S.sheet,S.sheetEpoch,S.indexReady,S.filtered,S.filterId,S.rowView?.id,S.selected?.ref,S.selected?.row,S.selected?.col,S.selectedVisualIndex,S.range,S.multiRanges,S.showStyles,S.fontOverride,S.freeze,editCopy?.grid.active && editCopy.data.document.revision]);}
-  function selectionSourceIdentity(){return JSON.stringify([S.book,S.workbookKey,S.sheet,S.sheetEpoch,S.indexReady,S.filtered,S.filterId,S.rowView?.id,S.freeze]);}
-  function captureClipboardSelection({purpose='复制',limits=fileFormats.clipboard,withMerges=false}={}){
-    if(!S.indexReady||!S.selected||S.sheetLoadingEpoch)throw Error('请先选择一个已加载的单元格或区域');
-    if(editCopy?.grid.active && (editCopy.grid.stale || editCopy.pending || editCopy.abort))throw Error('请先确认当前编辑修订');
-    if(S.multiRanges.length)throw Error(`请选择一个连续区域进行${purpose}`);
-    const model=window.ExcelLensMultiSelection,visibility=S.rowVisibility;
-    let area=model.areas(S,true).at(-1);
-    if (withMerges && !S.filtered) area=mergedCells.expand(area,visibility);
-    if (withMerges && S.filtered && !S.range) {
-      const m=mergedCells.at(S.selected.row,S.selected.col);
-      if (m && m.row===S.selected.row) area={...area,col1:m.col,col2:m.endCol};
-    }
-    const points=model.points(area,colName), col1=Math.min(area.col1,area.col2), col2=Math.max(area.col1,area.col2);
-    const rowCount=S.rowVisibility?S.rowVisibility.selectionCount(area,S.filtered,frozenPanes.effective().rows):model.rowCount(area,S.filtered,frozenPanes.effective().rows);
-    const colCount=col2-col1+1;
-    if(rowCount<1)throw Error('选区没有可见行');
-    if(limits&&(rowCount>limits.rows||colCount>limits.columns||rowCount*colCount>limits.cells))throw Error(`${purpose}最多${limits.rows}行、${limits.columns}列、${limits.cells}格，请缩小选区`);
-    const sheet=S.sheet,identity=clipboardIdentity(),selected={...S.selected},viewId=S.rowView?.id||'',filterId=S.filtered?S.filterId:'',excluded=frozenPanes.effective().rows,book=S.book,workbookKey=S.workbookKey,styled=S.showStyles,styles=S.styles,fontOverride=S.fontOverride;
-    const current=()=>identity===clipboardIdentity();
-    const sourceIdentity=selectionSourceIdentity(),sourceCurrent=()=>sourceIdentity===selectionSourceIdentity();
-    const mergeAt=withMerges && mergedCells.root ? (row,col)=>mergedCells.copyAnchor(row,col,visibility) : undefined;
-    const rangeParams=()=>{
-      const params=new URLSearchParams({sheet,start:points.start,end:points.end,book,workbookKey});
-      if(viewId)params.set('viewId',viewId);
-      if(filterId){
-        params.set('filterId',filterId);
-        params.set('visualStart',String(points.visualStart));
-        params.set('visualEnd',String(points.visualEnd));
-      }
-      if(viewId||filterId)params.set('excludeThroughRow',String(excluded));
-      return params;
-    };
-    return {book,workbookKey,sheet,styled,styles,fontOverride,current,sourceCurrent,mergeAt,rows:rowCount,firstColumn:col1,lastColumn:col2,...points,maxRow:sourceRowLimit(),headerRow:S.autoFilter?.row||S.sortHeaderBySheet.get(sheet)||S.source?.tableHeader?.row||1,
-      label:`${sheet} · ${points.start}:${points.end} · ${rowCount}行 × ${colCount}列`,
-      readTSV:()=>{
-        const params=rangeParams();
-        params.set('format','tsv');
-        return api(`/api/range?${params}`,{},'text');
-      },
-      read:async({headerRow=0,richText=true,conditional=styled,force=false,portable=false}={},signal)=>{
-        if(!current())throw Error('来源或选区已变化，请重新选择');
-        // A lone cell already holds the current edit projection.
-        if(rowCount===1&&colCount===1&&!headerRow&&!force&&!portable){
-          const cell={...selected};if(!richText)delete cell.richText;if(!conditional)delete cell.conditional;
-          return {book,workbookKey,sheet,startCol:col1,endCol:col2,rows:[{row:selected.row,cells:[cell]}]};
-        }
-        const params=rangeParams();
-        params.set('format','json');params.set('richText',richText?'1':'0');params.set('conditional',conditional?'1':'0');
-        if(portable)params.set('portable','1');
-        if(headerRow)params.set('headerRow',String(headerRow));
-        const payload=await api(`/api/range?${params}`,{signal});
-        if(!current())throw Object.assign(Error('复制已取消，来源或选区已变化'),{name:'AbortError'});
-        if (editCopy?.grid.active) {
-          for (const row of payload.rows) row.cells=editCopy.grid.projectRow(sheet,row,col1,col2);
-          if (payload.header) payload.header.cells=editCopy.grid.projectRow(sheet,payload.header,col1,col2);
-        }
-        return payload;
-      }};
-  }
-  async function copySelection(plain=false,cut=false) {
-    const activity=globalThis.ExcelLensActivity?.begin(cut?'正在剪切选区':'正在复制选区');
-    const ranges=editCopy?.grid.active ? editCopy.grid.ranges : null;
-    const epoch=ranges ? (ranges.copyEpoch=(ranges.copyEpoch||0)+1) : 0;
-    try{
-      const progressive=!ranges&&!cut;
-      const snapshot=captureClipboardSelection({withMerges:!plain,limits:progressive?null:fileFormats.clipboard});
-      if(!progressive)return await copyGridPayload(snapshot,plain,cut,ranges,epoch);
-      return await window.ExcelLensClipboard.copyByBudget(snapshot,fileFormats.clipboard,plain,
-        ()=>copyGridPayload(snapshot,false,false,null,0),
-        async()=>{
-          const text=await snapshot.readTSV();
-          return snapshot.current()&&copyText(text,'已复制为纯文本');
-        },
-        ()=>{
-          if(exportCenter.running||exportCenter.busy){toast('导出中心正在处理任务，请在完成后导出选区','warning');return;}
-          exportCenter.open('selection',snapshot);
-          toast('选区超过复制容量，可导出为文件','warning');
-        });
-    }catch(err){if(err.name!=='AbortError')toast(err.message,'error');}finally{activity?.end();}
-  }
-
-  async function copyGridPayload(snapshot,plain,cut,ranges,epoch) {
-    const [payload,initial]=await Promise.all([
-      snapshot.read({richText:!plain&&snapshot.styled,conditional:!plain&&snapshot.styled,portable:!plain&&!ranges}),
-      !plain && editCopy?.grid.active && !ranges.view.mappedRows() ? editCopy.grid.ranges.copySnapshot(snapshot,cut) : null
-    ]);
-    const typed=!plain && ranges && ranges.view.mappedRows() && snapshot.current() ? await ranges.copySnapshot(snapshot,cut,payload.rows.map(r=>r.row)) : initial;
-    if(!snapshot.current() || ranges && ranges.copyEpoch!==epoch)return;
-    if(cut && !typed)throw Error('剪切需要一个连续、完整可见且未超出编辑容量的工作表区域');
-    const content=window.ExcelLensClipboard.build(payload,snapshot.styles,snapshot.styled&&!plain,snapshot.fontOverride,fileFormats.richText,fileFormats.clipboard,snapshot.mergeAt);
-    if (typed) {
-      typed.text=content.text.replaceAll('\r\n','\n');
-      content.html=content.html.replace('<table ','<table id="'+typed.marker+'"'+window.ExcelLensGridPaste.markup(typed)+' ');
-    }
-    if(!typed && payload.portable) content.html=content.html.replace('<table ','<table'+window.ExcelLensGridPaste.markup({clip:{portable:payload.portable}})+' ');
-    if((typed||payload.portable)&&window.ExcelLensClipboard.utf8Length(content.html)>fileFormats.clipboard.htmlBytes){
-      throw Object.assign(Error('复制内容超过本次容量'),{status:413});
-    }
-    if(payload.portableNotice)content.notices.push(payload.portableNotice);
-    const copied=plain ? await copyText(content.text) : await writeClipboardPayload(content,cut);
-    if (cut && !snapshot.current()) return false;
-    if (copied && snapshot.current() && editCopy?.grid.active && ranges) {
-      if (ranges.copyEpoch!==epoch) {
-        if (cut && typed && !ranges.copied) ranges.copied={...typed,inactive:true};
-        return false;
-      }
-      const repaintCut=typed?.cut || ranges.copied?.cut && !ranges.copied.inactive;
-      ranges.copied=typed;
-      if (repaintCut) editCopy.grid.view.redraw();
-    }
-    if(!plain&&content.notices.length)toast(content.notices.join('；'),'warning');
-    return copied;
-  }
-
-  function openDialog(id) {
-    const dialog = $(id);
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-  }
-
-  function closeDialog(id) {
-    const dialog = $(id);
-    if (dialog.open) dialog.close();
-  }
+  function writeClipboardPayload(content, cut = false) { return gridClipboard.writeClipboardPayload(content, cut); }
+  function clipboardIdentity() { return gridClipboard.clipboardIdentity(); }
+  function captureClipboardSelection(opts) { return gridClipboard.captureClipboardSelection(opts); }
+  function copySelection(plain = false, cut = false) { return gridClipboard.copySelection(plain, cut); }
+  function openDialog(id) { return gridControls.openDialog(id); }
+  function closeDialog(id) { return gridControls.closeDialog(id); }
 
   const searchPanel = new window.ExcelLensSearchPanel({
     state: S, api, toast, delay, copyText: (value, msg) => copyText(value, msg),
@@ -3020,25 +2662,8 @@
   const goSearchResult = index => searchPanel.goResult(index);
   const stepSearch = delta => searchPanel.step(delta);
 
-  function copyCellEvidence() {
-    const c=S.selected;
-    if(!c){toast('请先选中一个单元格','warning');return;}
-    const text=[
-      `工作簿：${S.fileName}`,
-      `工作表：${S.sheet}`,
-      `单元格：${c.ref}`,
-      `显示值：${c.display??''}`,
-      `缓存原始值：${c.raw??''}`,
-      `公式：${c.formula??'（非公式单元格）'}`,
-      `标识：${c.cacheMissing?'公式缺少缓存值':'只读读取原文件保存的值（未重算）'}`
-    ].join('\n');
-    return copyText(text);
-  }
-  function copyQualifiedAddress() {
-    if(!S.selected)return toast('请先选择单元格','warning');
-    const sheet="'"+String(S.sheet).replaceAll("'","''")+"'";
-    return copyText(`${sheet}!${S.selected.ref}`);
-  }
+  function copyCellEvidence() { return gridClipboard.copyCellEvidence(); }
+  function copyQualifiedAddress() { return gridClipboard.copyQualifiedAddress(); }
 
   async function runSearch(preferredSheet = null) {
     const input = ($('searchMode').value==='advanced'?$('searchAdvancedInput'):$('searchInput')).value.trim();
@@ -3393,7 +3018,7 @@
     if(kind==='row'){
       const first=S.window?.startCol||1;
       params.set('firstCol',String(first));
-      params.set('lastCol',String(Math.min(16384,first+79)));
+      params.set('lastCol',String(Math.min(sourceColLimit(),first+79)));
     }
     try{
       const data=await api(`/api/autofit?${params}`);
@@ -3430,11 +3055,11 @@
 
   function selectWholeRow(row,visualIndex){
     if(!Number.isSafeInteger(row)||row<1||!S.indexReady)return;
-    const ref=`A${row}`;
-    selectCell(cellAt(row,1),row,1,ref,visualIndex||row);
+    const ref=`A${row}`, visual=visualIndex||row;
+    selectCell(cellAt(row,1),row,1,ref,visual);
     S.wholeRowSelected=true;
     $("selectionStatus").textContent=`第 ${row} 行（整行）`;
-    S.range={row1:row,row2:row,col1:1,col2:S.usedMaxCol};
+    S.range={row1:row,row2:row,col1:1,col2:S.usedMaxCol,visual1:S.filtered?visual:0,visual2:S.filtered?visual:0};
     applySelectionClasses();
     selectionStats?.schedule();
     if(!calculator?.captureRange(`${row}:${row}`))$("grid").focus({preventScroll:true});
@@ -3767,292 +3392,16 @@
     return cellExplanation?.open();
   }
 
-  async function copyText(value, successMessage='已复制') {
-    const text = String(value ?? "");
-    try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-      else {
-        const helper = document.createElement("textarea");
-        helper.value = text;
-        helper.style.position = "fixed";
-        helper.style.opacity = "0";
-        document.body.appendChild(helper);
-        helper.select();
-        try {
-          if(!document.execCommand("copy"))throw new Error('浏览器未能写入剪贴板');
-        } finally { helper.remove(); }
-      }
-      toast(successMessage,'success');
-      return true;
-    } catch (error) { toast(`复制失败：${error.message}`,'error'); return false; }
-  }
-
-  let hoverRef = "";
-  function showTooltip(event) {
-    if (editCopy?.grid.active) return;
-    const cellEl=event.target.closest?.(".grid-cell");
-    const tooltip=$("cellTooltip");
-    if (dragAnchor || (S.range || S.multiRanges.length) && cellEl?.classList.contains('range-cell')) {
-      tooltip.hidden=true;hoverRef="";return;
-    }
-    if(!cellEl) {tooltip.hidden=true;hoverRef="";return;}
-    const ref=cellEl.dataset.ref;
-    if (ref!==hoverRef || tooltip.hidden) {
-      hoverRef=ref;
-      const cell=S.cellMap.get(ref)||S.frozenCellMap.get(ref)||{ref,display:"",raw:""};
-      const value=cell.display??"";
-      const head=document.createElement("b");head.textContent=ref+"  ";
-      const text=document.createElement("span");text.textContent=value===""?"（空白）":value;
-      const content=[head,text];
-      if (cell.hyperlink) {
-        const hint=document.createElement('span');hint.className='tooltip-formula tooltip-hyperlink';
-        hint.textContent='\u8df3\u8f6c\u81f3\uff1a'+linkDescription(cell.hyperlink);
-        content.push(hint);
-      }
-      if(cell.raw!==undefined&&cell.raw!==""&&String(cell.raw)!==String(value)) {
-        const raw=document.createElement("span");raw.className="tooltip-formula";raw.textContent="原始值："+cell.raw;
-        content.push(raw);
-      }
-      if(cell.hasFormula&&cell.formula) {
-        const formula=document.createElement("span");formula.className="tooltip-formula";formula.textContent=cell.formula;
-        content.push(formula);
-      }
-      tooltip.replaceChildren(...content);
-      tooltip.hidden=false;
-    }
-    // Position without forced layout; browser clamps the fixed-width tooltip.
-    tooltip.style.left=Math.max(8,Math.min(window.innerWidth-440,event.clientX+14))+"px";
-    tooltip.style.top=Math.max(8,Math.min(window.innerHeight-160,event.clientY+16))+"px";
-  }
-
-  function setZoom(next) {
-    const value = Math.max(70, Math.min(125, Math.round(next / 5) * 5));
-    if (value === S.zoom) return;
-    const grid = $("grid");
-    const row = S.selected?.row || 1;
-    const col = S.selected?.col || 1;
-    S.zoom = value;
-    pictures?.schedule();
-    $("zoomValue").textContent = `${value}%`;
-    document.documentElement.style.setProperty("--row-height", `${rowHeight()}px`);
-    document.documentElement.style.setProperty("--col-width", `${colWidth()}px`);
-    document.documentElement.style.setProperty("--header-height", `${headerHeight()}px`);
-	if(S.previewOnly&&S.previewData){resetGridDOM();updateCanvasSize();renderInitialPreview();paintRangeFrames();return;}
-    invalidateViewport({preserveDOM:true});
-    updateCanvasSize();
-    frozenPanes.reset({preserveDOM:true});
-    frozenPanes.schedule(true);
-    if (S.selected) {
-      setVirtualScrollTop(headerHeight()+rowTop(row)-rowHeight(row)*2);
-      grid.scrollLeft = ROW_HEAD+colLeft(col)-colWidth(col)*2;
-    }
-    scheduleViewport(true);
-    // A sheet that fits the window raises no scroll event when it is zoomed.
-    paintRangeFrames();
-  }
-
-  async function toggleFullscreen() {
-    try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
-    } catch (error) { toast(`无法切换全屏：${error.message}`,'error'); }
-  }
-
-  function updateFullscreenButton() {
-    const full = Boolean(document.fullscreenElement);
-    $("fullscreenBtn").innerHTML = icon('fullscreen') + (full ? '退出全屏' : '全屏');
-    setTimeout(() => scheduleViewport(true), 80);
-  }
-
-  let sizeContextTarget=null;
-  function hideCellMenu() { $("cellMenu").hidden = true; $("sizeContextMenu").hidden = true; $("editGridMenu").hidden = true; }
-
-  function positionCellMenu(menu,x,y) {
-    hideCellMenu();
-    menu.hidden=false;
-    menu.style.left=Math.max(5,Math.min(x,window.innerWidth-menu.offsetWidth-8))+'px';
-    menu.style.top=Math.max(5,Math.min(y,window.innerHeight-menu.offsetHeight-8))+'px';
-  }
-
-  function openCellMenu(event) {
-    if(!S.indexReady){hideCellMenu();return;}
-    const head=event.target.closest?.('.row-head,.pinned-row-head,.column-head[data-col]');
-    if(head){
-      const kind=head.dataset.col?'col':'row';
-      const index=Number(head.dataset.col||head.dataset.row||head.closest('.grid-row')?.dataset.row);
-      if(!Number.isInteger(index)||index<1){hideCellMenu();return;}
-      event.preventDefault();
-      hideCellMenu();
-      if(kind==='col'){
-        const previous=selectedColumnSpan();
-        if(!previous||index<previous.start||index>previous.end)selectColumnSpan(index,index);
-      }
-      const span=kind==='col'?selectedColumnSpan():null;
-      sizeContextTarget={kind,index:span?.start||index,end:span?.end||index};
-      const menu=$('sizeContextMenu');
-      const multi=span&&span.start!==span.end;
-      $('sizeContextAdjust').textContent=kind==='row'?'设置第 '+index+' 行高度…':'设置 '+colName(index)+' 列宽度…';
-      for(const id of ['sizeContextAdjust','sizeContextFit','sizeContextReset'])$(id).hidden=Boolean(multi);
-      $('sizeContextAdjust').disabled=kind==='row'&&S.filtered;
-      $('sizeContextReset').disabled=kind==='row'&&S.filtered;
-      $('sizeContextHideCol').textContent=multi?'隐藏选中列':'隐藏此列';
-      $('sizeContextShowCol').textContent='显示隐藏列';
-      $('sizeContextHideCol').hidden=kind!=='col'||!hasColumnOfType(span,false);
-      $('sizeContextShowCol').hidden=kind!=='col'||!hasColumnOfType(span,true);
-      positionCellMenu(menu,event.clientX,event.clientY);
-      return;
-    }
-    const cell = event.target.closest?.(".grid-cell,.pinned-cell");
-    if (!cell) {hideCellMenu();return;}
-    event.preventDefault();
-    const target = parseRef(cell.dataset.ref);
-    if (!target) return;
-    // Excel preserves an existing range when right-clicking inside it.
-    if (!S.range || !inSelectedRange(target.row,target.col,Number(cell.dataset.visualIndex))) {
-      selectPointedCell(cellAt(target.row,target.col),{...target,visual:Number(cell.dataset.visualIndex)},event);
-    }
-    if (editCopy?.grid.active) {
-      editCopy.grid.ranges.showMenu(event.clientX,event.clientY); return;
-    }
-    $("menuCopyFormula").disabled = !S.selected?.hasFormula;
-    $('menuFilterValue').disabled=!S.selected||S.selected.row<=(S.autoFilter?.row||1);
-    $("menuTrace").disabled = !S.selected?.hasFormula;
-    $('menuOpenHyperlink').hidden = !S.selected?.hyperlink;
-    if (S.selected?.hyperlink) {
-      $('menuOpenHyperlink').textContent = S.selected.hyperlink.kind === 'internal' ?
-        '\u8df3\u8f6c\u5230\u94fe\u63a5\u4f4d\u7f6e' : '\u6253\u5f00\u8d85\u94fe\u63a5';
-    }
-    positionCellMenu($("cellMenu"),event.clientX,event.clientY);
-  }
-
-  function selectPointedCell(cell,point,event){
-    selectCell(cell,point.row,point.col,point.ref,point.visual,false,false,mergedCells.pointerCell(event,colLeft,rowTop));
-  }
-
-  // Ctrl-click adds an independently selected cell; Ctrl-drag adds a rectangle.
-  // Shift extends the active rectangle. Source cells remain immutable.
-  function selectWithModifiers(dataCell,point,event){
-    const selection=window.ExcelLensMultiSelection;
-    const additive=Boolean(event.ctrlKey||event.metaKey),extend=Boolean(event.shiftKey);
-    const oldAnchor=extend?(S.rangeAnchor||{
-      row:S.selected?.row||point.row,col:S.selected?.col||point.col,
-      visual:S.selectedVisualIndex||point.visual}):null;
-    const previous=additive?(extend?S.multiRanges.slice():selection.areas(S,true)):
-      (extend?S.multiRanges.slice():[]);
-    if(additive&&!extend){
-      const removed=selection.removeSingleton(previous,point.row,point.col,point.visual,S.filtered);
-      if(removed&&removed.length===0){
-        // Keep one active cell: a completely empty selection is not useful.
-        selectionStats?.schedule();return;
-      }
-      if(removed&&removed.length){
-        const last=removed[removed.length-1];
-        const row=last.row2,col=last.col2;
-        const visual=last.visual2||row;
-        selectCell(cellAt(row,col),row,col,`${colName(col)}${row}`,visual);
-        S.multiRanges=removed.slice(0,-1);
-        S.range=last;
-        $('selectionStatus').textContent=removed.length>1?`${removed.length} 处选区`:'1 处选区';
-        applySelectionClasses();selectionStats?.schedule();return;
-      }
-    }
-    if(previous.length>=selection.LIMIT){toast('最多同时选择256处区域','warning');return;}
-    if(extend && oldAnchor && editCopy?.grid.active && !additive) {
-      extendRange(oldAnchor,point.row,point.col,point.visual); return;
-    }
-    selectPointedCell(dataCell,point,event);
-    S.multiRanges=previous;
-    if(extend){extendRange(oldAnchor,point.row,point.col,point.visual)}
-    else if(additive){
-      S.range=selection.rectangle(point,point,S.filtered);
-      $('selectionStatus').textContent=`${previous.length+1} 处选区`;
-      applySelectionClasses();selectionStats?.schedule();
-    }
-  }
-
-  // Drag-to-select is deliberately visual only. Selection never writes to Excel.
-  let dragAnchor=null,dragMoved=false,dragBase=[],suppressGridClick=false;
-  let dragFrame=0,dragPending=null,scrollPress=null;
-  function flushRangeDrag(){
-    dragFrame=0;
-    const pending=dragPending;dragPending=null;
-    if(!pending||!dragAnchor)return;
-    if(!dragMoved){
-      dragMoved=true;
-      selectCell(dragAnchor.cell||cellAt(dragAnchor.row,dragAnchor.col),dragAnchor.row,dragAnchor.col,dragAnchor.ref,dragAnchor.visual,false,false,dragAnchor.crosshair);
-    }
-    S.multiRanges=dragBase;
-    extendRange(dragAnchor,pending.row,pending.col,pending.visual);
-  }
-  // A styled tile may be on screen one frame before its interactive DOM.
-  // Resolve a body press against the same snapped edges and source data as
-  // the renderer. A missing tile has no known cell to select.
-  function cachedBodyPress(event){
-    if(!['rowsLayer','gridCanvas','viewportFallback','grid'].includes(event.target.id))return null;
-    const grid=$('grid'),rect=grid.getBoundingClientRect(),request=getViewportRequest();
-    const {pw,ph}=request.position;
-    const localX=event.clientX-rect.left-grid.clientLeft-ROW_HEAD;
-    const localY=event.clientY-rect.top-grid.clientTop-headerHeight();
-    if(localX<pw||localY<ph||localX+ROW_HEAD>=grid.clientWidth||localY+headerHeight()>=grid.clientHeight)return null;
-    const hit=tiles.sourceAtPoint(request,{x:request.position.x+localX,y:request.position.y+localY-(S.filtered?ph:0),
-      lastRow:S.filtered?S.filterTotal:S.maxRow,lastCol:S.maxCol,rowTop,colLeft,mergeAt:activeMerge});
-    if(hit)hit.ref=colName(hit.col)+hit.row;
-    return hit;
-  }
-  function beginRangeDrag(event){
-    scrollPress=null;
-    if(event.button!==0||!S.indexReady||event.target.closest('.column-filter,.auto-filter-button,.column-resize-grip'))return;
-    const cell=event.target.closest?.('.grid-cell');
-    const readingPress=event.pointerType==='mouse'&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&
-      !editCopy?.grid.active&&!calculator?.picking&&!S.sheetLoadingEpoch&&event.target.closest('#grid');
-    const cached=!cell&&readingPress?cachedBodyPress(event):null;
-    const parsed=cached||parseRef(cell?.dataset.ref);
-    if(!parsed)return;
-    hideCellMenu();
-    $('cellTooltip').hidden=true;
-    dragAnchor={row:parsed.row,col:parsed.col,ref:parsed.ref,visual:cached?.visual||Number(cell?.dataset.visualIndex)||parsed.row,
-      cell:cached?.cell||cell?._xlModel,crosshair:cached?.crosshair,
-      clientX:event.clientX,clientY:event.clientY};
-    dragBase=(event.ctrlKey||event.metaKey)?window.ExcelLensMultiSelection.areas(S,true):
-      (event.shiftKey?S.multiRanges.slice():[]);
-    if(dragBase.length>=window.ExcelLensMultiSelection.LIMIT){dragAnchor=null;toast('最多同时选择256处区域','warning');return;}
-    dragPending=null;
-    if(dragFrame){cancelAnimationFrame(dragFrame);dragFrame=0}
-    dragMoved=false;
-    // During native scrolling the release can land on a different row or the
-    // common rows layer. Bind a plain mouse selection to the source actually
-    // pressed. Activating a link still requires a click on the original cell.
-    if(readingPress){
-      if(cached)selectCell(cached.cell,cached.row,cached.col,cached.ref,cached.visual,false,false,cached.crosshair);
-      else selectWithModifiers(cell._xlModel||cellAt(parsed.row,parsed.col),dragAnchor,event);
-      scrollPress={ref:parsed.ref,epoch:S.sheetEpoch,context:viewportContext(),view:S.rowView?.id,filter:S.filterId};
-      $('grid').focus({preventScroll:true});
-    }
-  }
-  function updateRangeDrag(event){
-    if(!dragAnchor||!(event.buttons&1))return;
-    if(!dragMoved&&event.clientX===dragAnchor.clientX&&event.clientY===dragAnchor.clientY)return;
-    const cell=event.target.closest?.('.grid-cell');
-    const target=parseRef(cell?.dataset.ref);
-    if(!target||(target.row===dragAnchor.row&&target.col===dragAnchor.col))return;
-    dragPending={row:target.row,col:target.col,visual:Number(cell.dataset.visualIndex)||target.row};
-    if(!dragFrame)dragFrame=requestAnimationFrame(flushRangeDrag);
-  }
-  function endRangeDrag(event){
-    if(!dragAnchor)return;
-    if(dragFrame){cancelAnimationFrame(dragFrame);dragFrame=0}
-    flushRangeDrag();
-    if(dragMoved){
-      if(event?.type!=='pointercancel'&&calculator?.picking&&S.range){
-        const area=S.range;
-        calculator.captureRange(`${colName(Math.min(area.col1,area.col2))}${Math.min(area.row1,area.row2)}`,`${colName(Math.max(area.col1,area.col2))}${Math.max(area.row1,area.row2)}`);
-      }
-      suppressGridClick=true;
-      setTimeout(()=>{suppressGridClick=false},0);
-    }
-    if(dragMoved||event?.type==='pointercancel')scrollPress=null;
-    dragAnchor=null;dragBase=[];
-  }
+  function copyText(value, successMessage = '已复制') { return gridClipboard.copyText(value, successMessage); }
+  function showTooltip(event) { return gridControls.showTooltip(event); }
+  function setZoom(next) { return gridControls.setZoom(next); }
+  function toggleFullscreen() { return gridControls.toggleFullscreen(); }
+  function updateFullscreenButton() { return gridControls.updateFullscreenButton(); }
+  function hideCellMenu() { return gridControls.hideCellMenu(); }
+  function positionCellMenu(menu, x, y) { return gridControls.positionCellMenu(menu, x, y); }
+  function openCellMenu(event) { return gridControls.openCellMenu(event); }
+  function selectPointedCell(cell, point, event) { return gridInteractions.selectPointedCell(cell, point, event); }
+  function selectWithModifiers(dataCell, point, event) { return gridInteractions.selectWithModifiers(dataCell, point, event); }
 
   // Every command, including those on other tabs, is reachable by name.
   // Names match the control labels; tags carry the words people search for,
@@ -4128,513 +3477,7 @@
     reveal:id => window.ExcelLensRibbon?.reveal(id)
   });
   const openCommandPalette = () => commandPalette.open();
-
-  function selectNativeRange(kind){
-    if(!S.indexReady||!S.selected)return;
-    const row=S.selected.row,col=S.selected.col;
-    const visual=S.filtered?S.selectedVisualIndex:row;
-    if(kind==='row'){extendRange({row,col:1,visual},row,Math.max(1,S.usedMaxCol),visual);}
-    else if(kind==='column'){
-      extendRange({row:S.filtered?row:1,col,visual:S.filtered?1:1},S.filtered?row:Math.max(1,S.usedMaxRow),col,S.filtered?S.filterTotal:S.usedMaxRow);
-    }else{
-      extendRange({row:1,col:1,visual:1},Math.max(1,S.usedMaxRow),Math.max(1,S.usedMaxCol),S.filtered?S.filterTotal:S.usedMaxRow);
-    }
-    $('grid').focus({preventScroll:true});
-  }
-  function switchSheet(delta){
-    if(!S.sheet||!S.sheets.length)return;
-    const index=S.sheets.findIndex(x=>x.name===S.sheet);
-    const next=(index+delta+S.sheets.length)%S.sheets.length;
-    selectSheetTab(S.sheets[next].name).catch(error=>toast(error.message,'error'));
-  }
-
-  // Excel Home ribbon access keys: Alt+H, O, I/A/W/H. Unlike a global
-  // keylogger this tiny state machine is active only while the grid is focused
-  // and expires, so text fields and browser navigation remain unmodified.
-  let ribbonSequence='',ribbonExpires=0;
-  function handleRibbonSequence(event,key,gridFocused,take){
-    if(!gridFocused||event.ctrlKey||event.metaKey||event.shiftKey)return false;
-    const now=Date.now();
-    if(now>ribbonExpires)ribbonSequence='';
-    if(event.altKey&&key==='h'){
-      ribbonSequence='H';ribbonExpires=now+3000;
-      take(()=>{});return true;
-    }
-    if(!ribbonSequence||event.key.length!==1)return false;
-    const next=ribbonSequence+key.toUpperCase();
-    if(next==='HO'){
-      ribbonSequence=next;ribbonExpires=now+3000;
-      take(()=>{});return true;
-    }
-    if(ribbonSequence==='HO'){
-      ribbonSequence='';
-      const target={I:()=>autoFitSize('col',S.selected?.col||1),
-        A:()=>autoFitSize('row',S.selected?.row||1),
-        W:()=>promptResize('col',S.selected?.col||1),
-        H:()=>promptResize('row',S.selected?.row||1)}[key.toUpperCase()];
-      if(target){take(target);return true;}
-    }else ribbonSequence='';
-    return false;
-  }
-
-  // Name the way forward when an edit key is pressed while reading.
-  const readOnlyHint = () => $('editCopyOpen').hidden ? '当前是只读浏览，原文件不会被修改' : '当前是只读浏览。要修改内容，请选择“编辑副本”';
-
-  // Excel-style keyboard routing: do not hijack editing, browser selection or
-  // modal dialog controls. Only the grid receives caret/navigation keys;
-  // read-only application commands also work after toolbar clicks.
-  function handleSpreadsheetKeydown(event){
-    if (window.ExcelLensDisplayFormat?.isComposing?.(event) || event.isComposing || event.keyCode === 229) return;
-    if (editCopy?.grid.active && !document.querySelector('dialog:modal')) return;
-    const key=event.key.toLowerCase();
-    const ctrl=event.ctrlKey||event.metaKey;
-    const alt=event.altKey;
-    const shift=event.shiftKey;
-    const active=document.activeElement;
-    const editing=active?.matches?.('input,textarea,select,[contenteditable="true"],[role="searchbox"]')||active?.isContentEditable;
-    const modal=document.querySelector('dialog:modal');
-    const insideFormula=active===$('formulaText')||$('formulaText').contains(active);
-    const gridFocused=active===$('grid')||insideFormula||active?.closest?.('.grid-region');
-    const take=callback=>{event.preventDefault();event.stopPropagation();Promise.resolve().then(callback).catch(err=>toast(err.message,'error'));};
-    if(!modal&&ctrl&&alt&&!shift&&key==='c'){take(()=>calculator.toggle());return;}
-    if(!modal&&calculator?.handleKey(event))return;
-    if(event.key==='Escape'){
-      ribbonSequence='';
-      hideCellMenu();autoFilterUI?.hide();
-      readingMode?.close();
-      highlightMode?.close();
-      if($('traceDialog').open&&!modal)traceUI?.minimize();
-      if($('searchDialog').open && !modal){event.preventDefault();closeDialog('searchDialog');}
-      return;
-    }
-    if(modal||event.defaultPrevented){ribbonSequence='';return;}
-    if(ctrl&&!alt&&!shift&&key==='enter'&&gridFocused&&!editing&&S.selected?.hyperlink){
-      take(()=>followCellHyperlink(S.selected.hyperlink));return;
-    }
-    if(ctrl&&!alt&&!shift&&key==='o'&&!editing){take(chooseFile);return;}
-    if(!$('welcome').hidden||!S.opened||!S.indexReady)return;
-    if(ctrl&&!alt&&!shift&&key==='c'&&window.getSelection()?.toString())return;
-    if(insideFormula&&ctrl&&!alt&&!shift&&key==='a'){
-      take(()=>{const range=document.createRange();range.selectNodeContents($('formulaText'));
-        const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);});
-      return;
-    }
-    if(editing)return;
-    if(handleRibbonSequence(event,key,gridFocused,take))return;
-
-    if(ctrl&&!alt&&!shift&&key==='k'){take(openCommandPalette);return;}
-    if(ctrl&&!alt&&!shift&&key==='s'){take(()=>exportCenter.open());return;}
-    if(ctrl&&!alt&&!shift&&key==='f'){take(()=>openSearch());return;}
-    if((ctrl&&!alt&&!shift&&key==='g')||event.key==='F5'){
-      take(()=>{$('nameBox').focus();$('nameBox').select();});return;
-    }
-    if(ctrl&&!alt&&!shift&&key==='c'){take(()=>copySelection());return;}
-    if(ctrl&&alt&&shift&&key==='c'){take(()=>copySpecial.open());return;}
-    if(ctrl&&!alt&&shift&&key==='c'){
-      take(()=>S.selected?.hasFormula?copyText(S.selected.formula||''):toast('当前单元格不是公式'));return;
-    }
-    if(ctrl&&!alt&&!shift&&key==='a'&&gridFocused){take(()=>selectNativeRange('all'));return;}
-    if(ctrl&&!alt&&!shift&&event.code==='Space'&&gridFocused){take(()=>selectNativeRange('column'));return;}
-    if(ctrl&&!alt&&shift&&event.code==='Space'&&gridFocused){take(()=>selectNativeRange('row'));return;}
-    if(!ctrl&&!alt&&shift&&event.code==='Space'&&gridFocused){take(()=>selectNativeRange('row'));return;}
-    if(ctrl&&shift&&!alt&&key==='l'){take(toggleAutoFilter);return;}
-    if(ctrl&&!alt&&!shift&&(event.code==='Backquote'||event.key==='`')){take(toggleFormulaView);return;}
-    if(ctrl&&alt&&key==='g'){take(()=>selectionInspector.open('formulas'));return;}
-    if(ctrl&&shift&&!alt&&key==='d'){take(()=>selectionInspector.open('duplicates'));return;}
-    if(ctrl&&shift&&!alt&&key==='e'){take(()=>exportCenter.open());return;}
-    if(ctrl&&alt&&key==='s'){take(()=>profileCenter.open());return;}
-    if(ctrl&&alt&&key==='b'){take(()=>bookmarkCenter.open());return;}
-    if(ctrl&&!shift&&!alt&&key==='q'){take(()=>selectionQuick?.open());return;}
-    if(ctrl&&!alt&&!shift&&key==='1'){take(showCellDetail);return;}
-    if(event.key==='F2'){take(showCellDetail);return;}
-    if(ctrl&&!alt&&!shift&&(event.key==='PageUp'||event.key==='PageDown')){
-      take(()=>switchSheet(event.key==='PageUp'?-1:1));return;
-    }
-    if(!ctrl&&!alt&&event.key==='F3'){take(()=>stepSearch(shift?-1:1));return;}
-	if(ctrl&&!alt&&!shift&&event.key==='F3'){take(()=>catalogueCenter.open());return;}
-    if(alt&&!ctrl&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){
-      take(()=>goHistory(event.key==='ArrowLeft'?-1:1));return;
-    }
-    if(alt&&!ctrl&&!shift&&event.key==='ArrowDown'&&S.selected){
-      take(()=>{
-        if(!S.autoFilter){toast('先按 Ctrl+Shift+L 开启自动筛选','warning');return;}
-        const c=S.selected.col;
-        const bounds=$('grid').getBoundingClientRect();
-        const anchor=[...document.querySelectorAll(`.auto-filter-button[data-column="${c}"]`)].find(node=>{
-          const rect=node.getBoundingClientRect();
-          return rect.width>0&&rect.top>=bounds.top&&rect.bottom<=bounds.bottom&&rect.left>=bounds.left&&rect.right<=bounds.right;
-        })||$('filterOpenBtn');
-        return autoFilterUI.open(c,anchor);
-      });return;
-    }
-    if(!gridFocused)return;
-    if((ctrl&&!alt&&['x','v','z','y'].includes(key))||(!ctrl&&!alt&&(event.key==='Backspace'||event.key==='Delete'))){
-      take(()=>toast(readOnlyHint()));return;
-    }
-    if(ctrl&&!alt&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)){
-      const direction={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[event.key];
-      take(()=>jumpDataEdge(direction,shift));return;
-    }
-    if(!ctrl&&!alt&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)){
-      const [row,col]={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[event.key];
-      take(()=>moveSelection(row,col,shift));return;
-    }
-    if(!ctrl&&!alt&&(event.key==='Tab'||event.key==='Enter')){
-      const sign=shift?-1:1;
-      take(()=>event.key==='Tab'?moveSelection(0,sign):moveSelection(sign,0));return;
-    }
-    // Selection extension uses the ORIGINAL anchor, even though navigation
-    // itself refreshes the active cell and would otherwise discard the range.
-    if((event.key==='Home'||event.key==='End')&&!alt){
-      if(event.key==='End'&&!ctrl)return;
-      const targetRow=event.key==='End'?S.usedMaxRow:(ctrl?1:S.selected?.row||1);
-      const targetCol=event.key==='End'?S.usedMaxCol:1;
-      take(async()=>{
-        const anchor=shift?(S.rangeAnchor||{row:S.selected.row,col:S.selected.col,visual:S.selectedVisualIndex}):null;
-        if(anchor&&S.filtered){toast('筛选后请通过可见行拖选扩展区域','warning');return;}
-        await navigateToCell(S.sheet,`${colName(targetCol)}${targetRow}`);
-        if(anchor)extendRange(anchor,targetRow,targetCol);
-      });return;
-    }
-    if(alt&&!ctrl&&(event.key==='PageUp'||event.key==='PageDown')){
-      const width=$('grid').clientWidth-ROW_HEAD;
-      const count=Math.max(1,Math.floor(width/Math.max(32,colWidth(S.selected?.col||1)))-1);
-      take(()=>moveSelection(0,(event.key==='PageUp'?-1:1)*count,shift));return;
-    }
-    if(!ctrl&&!alt&&(event.key==='PageUp'||event.key==='PageDown')){
-      const step=Math.max(1,Math.floor($('grid').clientHeight/rowHeight())-2);
-      take(()=>moveSelection(event.key==='PageDown'?step:-step,0,shift));return;
-    }
-  }
-
-  function bindEvents() {
-    const homeMenu = $('homeDataMenu');
-    const menuTrigger = $('homeDataTrigger');
-    homeMenu.addEventListener('click', event => {
-      if (!event.target.closest('[role="button"]')) return;
-      const selection = window.getSelection();
-      if (event.detail && !selection.isCollapsed && homeMenu.contains(selection.anchorNode)) {
-        event.stopPropagation();
-        return;
-      }
-      homeMenu.open = false;
-      menuTrigger.focus();
-    }, true);
-    homeMenu.addEventListener('keydown', event => {
-      if (event.target.matches('[role="button"]') && (event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!event.repeat) event.target.click();
-        return;
-      }
-      if (event.key === 'Escape' && homeMenu.open) {
-        event.preventDefault();
-        event.stopPropagation();
-        homeMenu.open = false;
-        menuTrigger.focus();
-      }
-    });
-    document.addEventListener('pointerdown', event => {
-      if (homeMenu.open && !homeMenu.contains(event.target)) homeMenu.open = false;
-    });
-    window.ExcelLensStorage({api, openDialog, background: window.ExcelLensBackground({
-      api, state:S, openDialog, toast, adoptTask:adoptRecoveredTask,
-      analysis:(job,status)=>window.ExcelLensAnalytics.reopenJob(job,status),
-      reconcile:(job,status)=>reconcileCenter.reopenJob(job,status)
-    })});
-    window.addEventListener("excellens:session-expired", event => { setStatus(event.detail); toast(event.detail, "warning"); });
-    document.addEventListener('toolbar-setting-error', event => toast(event.detail, 'error'));
-    commandPalette.bind();
-    $("openLocalMenuBtn").addEventListener("click", chooseFile);
-    const databasePanel = new window.ExcelLensDatabasePanel({api, onOpened:async result=>{
-      const current = await api('/api/status');
-      if (!current.opened || current.workbookKey !== result.workbookKey) throw new Error('工作簿已切换');
-      await acceptOpenedWorkbook(current);
-    }});
-    for (const id of ['openDatabaseBtn','openDatabaseHome']) {
-      $(id).addEventListener('click', () => { if (canOpenWorkbook('连接数据库')) void databasePanel.open(); });
-    }
-    const databaseSnapshots = new window.ExcelLensDatabaseSnapshots({
-      api, fmtBytes, openWorkbook,
-      onRetained: key => { if (S.workbookKey === key) $('retainDatabaseSnapshot').hidden = true; }
-    });
-    for (const id of ['databaseSnapshotsBtn', 'databaseSnapshotsHome']) {
-      $(id).addEventListener('click', () => databaseSnapshots.show());
-    }
-    $('retainDatabaseSnapshot').addEventListener('click', () => databaseSnapshots.show(S.workbookKey));
-    $("homeBtn").addEventListener("click",()=>{if(canOpenWorkbook('返回首页')){showWelcome();recentManager.load();}});
-    $("chooseFileBtn").addEventListener("click", chooseFile);
-    $("fileInput").addEventListener("change", event => {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      uploadFile(file);
-    });
-    const isComposing = event => window.ExcelLensDisplayFormat?.isComposing?.(event) ?? (event.isComposing || event.keyCode === 229);
-    $("nameBox").addEventListener("keydown", event => {
-      if (isComposing(event)) return;
-      if (event.key === "Enter") {
-        event.preventDefault();
-        const address = $("nameBox").value;
-        const navigate = () => navigateNameBox(address).then(()=>editCopy?.grid.active ? editCopy.grid.focus() : $('grid').focus({preventScroll:true}));
-        if (editCopy?.grid.active) editCopy.grid.navigate(navigate);
-        else navigate().catch(err=>toast(err.message,'error'));
-      } else if (event.key === "Escape") {
-        $("nameBox").value = S.selected?.ref || "";
-        $("nameBox").blur();
-      }
-    });
-    searchPanel.bind?.();
-    $("multiSortBtn").addEventListener("click",()=>multiSort.show());
-    $("inspectOpenBtn").addEventListener("click",()=>selectionInspector.open());
-    $("duplicateOpenBtn").addEventListener("click",()=>selectionInspector.open("duplicates"));
-    $("formulaViewBtn").addEventListener("click",toggleFormulaView);
-    $("exportOpenBtn").addEventListener("click", () => exportCenter.open());
-    $("profileOpenBtn").addEventListener("click", () => profileCenter.open());
-    $("commandOpenBtn").addEventListener("click", () => openCommandPalette());
-    $("selectionStatus").addEventListener("click", () => profileCenter.open());
-    $("filterOpenBtn").addEventListener("click", toggleAutoFilter);
-    $('textHeaderBtn').addEventListener('click',()=>{
-      if(!S.indexReady)return;
-      $('textHeaderRow').value=String(S.autoFilter?.row||S.selected?.row||1);
-      $('textHeaderAuto').disabled=!S.source?.tableHeader;
-      openDialog('textHeaderDialog');
-    });
-    $('textHeaderApply').addEventListener('click',()=>applyTextTableHeader(Number($('textHeaderRow').value)));
-    $('textHeaderRow').addEventListener('keydown',event=>{if(!isComposing(event)&&event.key==='Enter'){event.preventDefault();applyTextTableHeader(Number(event.target.value));}});
-    $('textHeaderAuto').addEventListener('click',()=>applyTextTableHeader(0,true));
-    $('textHeaderPlain').addEventListener('click',disableTextTableHeader);
-    $("advancedFilterBtn").addEventListener("click", () => openFilter());
-    $("freezeBtn").addEventListener("click", openFreezeDialog);
-    $("formatBtn").addEventListener("click", toggleOriginalFormat);
-    $("fontSelect").addEventListener("change", event => changeDisplayFont(event.target.value));
-    $("freezeFirstRowBtn").addEventListener("click", () => applyFreeze(1,S.freeze.cols));
-    $("freezeFirstColBtn").addEventListener("click", () => applyFreeze(S.freeze.rows,1));
-    $("freezeAtCellBtn").addEventListener("click", () => applyFreeze(Math.max(0,(S.selected?.row||1)-1),Math.max(0,(S.selected?.col||1)-1)));
-    $("freezeResetBtn").addEventListener("click", () => applyFreeze(0,0));
-    $("freezeApplyBtn").addEventListener("click", () => applyFreeze($("freezeRowsInput").value,$("freezeColsInput").value));
-    $("historyBackBtn").addEventListener("click", () => goHistory(-1));
-    $("historyForwardBtn").addEventListener("click", () => goHistory(1));
-    $("helpBtn").addEventListener("click", () => openDialog("helpDialog"));
-    $("addFilterRuleBtn").addEventListener("click", () => addFilterRule());
-    $("applyFilterBtn").addEventListener("click", applyFilter);
-    $("cancelFilterJobBtn").addEventListener("click", async () => {
-      const jobID = S.filterJob;
-      await cancelFilter(jobID);
-      $("filterProgressText").textContent = "已请求取消筛选任务";
-      $("applyFilterBtn").disabled = false;
-      $("cancelFilterJobBtn").hidden = true;
-    });
-    $("clearFilterBtn").addEventListener("click", () => clearFilter().catch(error => toast(error.message,'error')));
-    $("sheetListBtn").addEventListener("click", () => { renderSheetPicker(); openDialog("sheetDialog"); $("sheetPickerSearch").focus(); });
-    $("sheetPrevBtn").addEventListener("click",()=>pageSheetTabs(-1));
-    $("sheetNextBtn").addEventListener("click",()=>pageSheetTabs(1));
-    $("sheetTabs").addEventListener("scroll",updateSheetPager,{passive:true});
-    new ResizeObserver(updateSheetPager).observe($("sheetTabs"));
-    $("sheetPickerSearch").addEventListener("input", event => renderSheetPicker(event.target.value));
-    $("tracePrecedentsBtn").addEventListener("click", tracePrecedents);
-    $("traceDependentsBtn").addEventListener("click", traceDependents);
-    $("cellDetailBtn").addEventListener("click", showCellDetail);
-    $("copyFormulaBtn").addEventListener("click", () => copyText(S.selected?.formula || ""));
-    $("copyValueBtn").addEventListener("click", () => copyText(S.selected?.display ?? S.selected?.raw ?? ""));
-    $('copySelectionBtn').addEventListener('click', () => copySelection());
-    $('copyPlainBtn').addEventListener('click', () => copySelection(true));
-    $('copySpecialBtn').addEventListener('click', () => copySpecial.open());
-    $('copyAddressBtn').addEventListener('click', () => copyQualifiedAddress());
-    $('copyEvidenceBtn').addEventListener('click', () => copyCellEvidence());
-    $('selectionQuickBtn').addEventListener('click', () => selectionQuick?.open());
-    $('transposeOpenBtn').addEventListener('click', () => transposeCenter?.open());
-    $('snapshotsOpenBtn').addEventListener('click', () => window.ExcelLensSnapshots?.open());
-    $('taskRecoveryOpenBtn').addEventListener('click', () => taskRecovery.open());
-    $("fullscreenBtn").addEventListener("click", toggleFullscreen);
-    document.addEventListener("fullscreenchange", updateFullscreenButton);
-    $("zoomOutBtn").addEventListener("click", () => setZoom(S.zoom - 5));
-    $("zoomInBtn").addEventListener("click", () => setZoom(S.zoom + 5));
-    $("retryIndexBtn").addEventListener("click", () => selectSheet(S.sheet));
-    for (const id of ["exitBtn", "homeExitBtn"]) $(id).addEventListener("click", async () => {
-      if(!canOpenWorkbook('退出程序'))return;
-      try { await api("/api/exit", { method: "POST" }); } catch { /* process may close immediately */ }
-      setStatus("程序已退出");
-    });
-
-    $("grid").addEventListener("wheel", event => {
-      if(event.ctrlKey){
-        event.preventDefault();
-        setZoom(S.zoom + (event.deltaY < 0 ? 5 : -5));
-        return;
-      }
-      if(virtualScroll.scale===1||!event.cancelable)return;
-      event.preventDefault();
-      const grid=$('grid');
-      const next=virtualScroll.wheel(event,grid.scrollTop,rowHeight(),grid.clientHeight-headerHeight());
-      grid.scrollLeft+=next.left;
-      grid.scrollTop=next.top;
-      followGridScroll();
-    }, { passive:false });
-    $("grid").addEventListener("scroll", () => {
-      scheduleRangeFrames();
-      if(S.sheetLoadingEpoch)return;
-      if(!$("cellMenu").hidden||!$("sizeContextMenu").hidden||!$("editGridMenu").hidden)hideCellMenu();
-      followGridScroll();
-      syncTableColumnHeaders();
-      frozenPanes?.followScroll();
-      if(S.freeze.rows||S.freeze.cols)frozenPanes.schedule();
-      if(hoverRef||!$("cellTooltip").hidden){$("cellTooltip").hidden = true;hoverRef = "";}
-      motion.sample($('grid').scrollLeft,getVirtualScrollTop(),performance.now());
-      scheduleViewport(false);
-    }, { passive: true });
-    $("grid").addEventListener("click", event => {
-      if (suppressGridClick) {suppressGridClick=false;return;}
-      const rowHead=event.target.closest?.(".row-head");
-      if(rowHead){
-        if(event.target.closest?.('.row-resize-grip'))return;
-        const owner=rowHead.closest(".grid-row");
-        selectWholeRow(Number(owner?.dataset.row),Number(owner?.dataset.visualIndex));
-        return;
-      }
-      const cell = event.target.closest?.(".grid-cell");
-      if (!cell) return;
-      const ref = cell.dataset.ref;
-      const parsed = parseRef(ref);
-      if (!parsed) return;
-      const visual=Number(cell.dataset.visualIndex);
-      const dataCell=cellAt(parsed.row,parsed.col),pressed=scrollPress;scrollPress=null;
-      if(pressed&&event.detail){
-        if(pressed.epoch!==S.sheetEpoch||pressed.context!==viewportContext()||pressed.view!==S.rowView?.id||pressed.filter!==S.filterId||pressed.ref!==ref)return;
-      }else selectWithModifiers(dataCell,{...parsed,visual},event);
-      const calculating=calculator?.captureCell(parsed.ref,event);
-      if (!calculator?.picking && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && dataCell.hyperlink) {
-        followCellHyperlink(dataCell.hyperlink).catch(error=>toast(error.message,'error'));
-      }
-      if(!calculating)$("grid").focus({ preventScroll: true });
-      $("cellTooltip").hidden = true;
-    });
-    document.querySelector(".grid-region").addEventListener("click", event => {
-      if (suppressGridClick) {suppressGridClick=false;return;}
-      if (event.target.closest("#grid")) return;
-      const frozenRowHead=event.target.closest(".pinned-row-head");
-      if(frozenRowHead){if(!event.target.closest?.('.row-resize-grip'))selectWholeRow(Number(frozenRowHead.dataset.row));return;}
-      const column = event.target.closest(".pinned-head");
-      if (column) {
-        if(event.target.closest?.('.column-resize-grip,.column-filter,.auto-filter-button'))return;
-        const col = Number(column.dataset.col), row = S.selected?.row || 1;
-        if(event.detail===0||!S.columnSelection){selectColumnSpan(event.shiftKey?(S.columnAnchor||col):col,col);captureColumnSelection();}
-        return;
-      }
-      const cell = event.target.closest(".pinned-cell");
-      if (!cell) return;
-      const parsed = parseRef(cell.dataset.ref); if (!parsed) return;
-      const visual=Number(cell.dataset.visualIndex)||parsed.row;
-      const dataCell=cellAt(parsed.row,parsed.col);
-      selectWithModifiers(dataCell,{...parsed,visual},event);
-      const calculating=calculator?.captureCell(parsed.ref,event);
-      if(!calculator?.picking&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&dataCell.hyperlink){
-        followCellHyperlink(dataCell.hyperlink).catch(error=>toast(error.message,'error'));
-      }
-      if(!calculating)$("grid").focus({preventScroll:true});
-    });
-    document.querySelector(".grid-region").addEventListener("pointermove", event => {
-      if (event.target.closest("#grid")) return;
-      showTooltip(event);
-    });
-    const region = document.querySelector(".grid-region");
-    region.addEventListener("contextmenu", openCellMenu);
-    region.addEventListener("dblclick", event => {
-      if(calculator?.picking){event.preventDefault();return;}
-      if (event.target.closest?.(".grid-cell")) showCellDetail();
-    });
-    columnController.bind?.(region);
-    region.addEventListener("pointerdown", beginRangeDrag);
-    document.addEventListener("pointermove", updateRangeDrag);
-    document.addEventListener("pointerup", endRangeDrag);
-    document.addEventListener("pointercancel", endRangeDrag);
-    document.addEventListener("click", event => {if (!event.target.closest?.(".cell-context-menu")) hideCellMenu();});
-    $('sizeContextAdjust').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)promptResize(target.kind,target.index);});
-    $('sizeContextReset').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)commitResize(target.kind,target.index,0);});
-    $('sizeContextFit').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target)autoFitSize(target.kind,target.index);});
-    $('sizeContextHideCol').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target?.kind==='col')setColumnVisibility(target.index===target.end?'column':'range',target.index,true,target.end);});
-    $('sizeContextShowCol').addEventListener('click',()=>{const target=sizeContextTarget;hideCellMenu();if(target?.kind==='col')setColumnVisibility(target.index===target.end?'column':'range',target.index,false,target.end);});
-    $("menuCopyValue").addEventListener("click", () => {copySelection();hideCellMenu();});
-    $('menuCopyPlain').addEventListener('click',()=>{copySelection(true);hideCellMenu();});
-    $('menuCopySpecial').addEventListener('click',()=>{hideCellMenu();copySpecial.open();});
-    $('menuFilterValue').addEventListener('click',()=>{hideCellMenu();filterSelectedValue();});
-    $("menuCopyFormula").addEventListener("click", () => {copyText(S.selected?.formula||"");hideCellMenu();});
-    $('menuOpenHyperlink').addEventListener('click',()=>{
-      const link=S.selected?.hyperlink;hideCellMenu();
-      followCellHyperlink(link).catch(error=>toast(error.message,'error'));
-    });
-    $("menuCopyAddress").addEventListener("click", () => {hideCellMenu();copyQualifiedAddress();});
-    $("menuCopyEvidence").addEventListener("click", () => {hideCellMenu();copyCellEvidence();});
-    $("menuSearchValue").addEventListener("click", () => {const q=S.selected?.display ?? "";hideCellMenu();openSearch("value",q);});
-    $("menuTrace").addEventListener("click", () => {hideCellMenu();tracePrecedents();});
-    $("menuInspect").addEventListener("click", () => {hideCellMenu();selectionInspector.open('formulas');});
-    $("menuDuplicates").addEventListener("click", () => {hideCellMenu();selectionInspector.open('duplicates');});
-	$('menuDataRules').addEventListener('click',()=>{hideCellMenu();dataRulesCenter.open();});
-	$('menuRecordCard').addEventListener('click',()=>{hideCellMenu();recordCardCenter?.open();});
-	$('menuPrintPreview').addEventListener('click',()=>{hideCellMenu();printingCenter?.open();});
-    $("menuFreezeHere").addEventListener("click", () => {hideCellMenu();applyFreeze(Math.max(0,(S.selected?.row||1)-1),Math.max(0,(S.selected?.col||1)-1));});
-    $("menuExportRange").addEventListener("click", () => {hideCellMenu();exportCenter.open("selection");});
-    $("menuProfileRange").addEventListener("click", () => {hideCellMenu();profileCenter.open();});
-	$('menuSelectionQuick').addEventListener('click',()=>{hideCellMenu();selectionQuick?.open();});
-	$('menuTranspose').addEventListener('click',()=>{hideCellMenu();transposeCenter?.open();});
-	$('profileQuickBtn').addEventListener('click',()=>{$('profileDialog').close();selectionQuick?.open();});
-    $("menuBookmark").addEventListener("click", () => {hideCellMenu();bookmarkCenter.open();});
-    $("grid").addEventListener("pointermove", showTooltip);
-    $("grid").addEventListener("pointerleave", () => { $("cellTooltip").hidden = true; });
-
-
-    const dropZone = $("dropZone");
-    for (const type of ["dragenter", "dragover"]) dropZone.addEventListener(type, event => {
-      event.preventDefault(); event.stopPropagation(); dropZone.classList.add("dragging");
-    });
-    for (const type of ["dragleave", "dragend"]) dropZone.addEventListener(type, event => {
-      event.preventDefault(); event.stopPropagation(); dropZone.classList.remove("dragging");
-    });
-    dropZone.addEventListener("drop", event => {
-      event.preventDefault(); event.stopPropagation(); dropZone.classList.remove("dragging");
-      uploadFile(event.dataTransfer.files?.[0]);
-    });
-    document.addEventListener("dragover", event => event.preventDefault());
-    document.addEventListener("drop", event => {
-      if (event.target.closest("#dropZone")) return;
-      event.preventDefault();
-      const file = event.dataTransfer?.files?.[0];
-      if (file) uploadFile(file);
-    });
-    new ResizeObserver(() => {syncFreezeScrollGutters();scheduleRangeFrames();}).observe($("grid"));
-    let gridPixelRatio = window.devicePixelRatio || 1, resizeFrame = 0;
-    function resizeWorkspace() {
-      const ratio = window.devicePixelRatio || 1, changed = ratio !== gridPixelRatio;
-      gridPixelRatio = ratio;
-      if (S.previewOnly) { updateCanvasSize(); scheduleInitialPreview(); return; }
-      if (!S.indexReady) return;
-      updateCanvasSize();
-      if (changed) {
-        renderGridFromCurrentWindow();
-        paintRangeFrames();
-      } else {
-        scheduleRangeFrames();
-      }
-      // Ordinary window resizes reuse existing buffered tiles whenever they
-      // still cover the visible area; only a DPR change forces a full repaint.
-      scheduleViewport(changed);
-      frozenPanes.schedule(changed);
-    }
-    function scheduleResizeWorkspace() {
-      if (resizeFrame) return;
-      resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resizeWorkspace(); });
-    }
-    function watchPixelRatio() {
-      if ((window.devicePixelRatio || 1) !== gridPixelRatio) resizeWorkspace();
-      window.matchMedia?.(`(resolution: ${gridPixelRatio}dppx)`).addEventListener('change', watchPixelRatio, {once:true});
-    }
-    watchPixelRatio();
-    window.addEventListener("resize", scheduleResizeWorkspace);
-    // Exactly one keyboard dispatcher. Grid shortcuts bubble here, so a
-    // non-modal search panel cannot trigger two actions or open a JS prompt.
-    document.addEventListener('keydown',handleSpreadsheetKeydown);
-
-
-  }
+  let gridClipboard = null, gridControls = null, workbookIO = null, gridInteractions = null;
 
   document.addEventListener('excellens:readingchange',scheduleStylePaint);
   readingMode=new window.ExcelLensReadingMode({button:$('readingModeBtn'),panel:$('readingModePanel'),veil:$('readingVeil'),textureToggle:$('gridTextureToggle'),onTextureChange:syncGridBackdrop});
@@ -4678,7 +3521,7 @@
             return row ? {...point,row} : null;
           });
         },
-        dragged:()=>suppressGridClick,
+        dragged:()=>gridInteractions.suppressGridClick,
         selectPoint:(node,event)=>{
           const p=parseRef(node.dataset.ref);
           if (p) selectWithModifiers(cellAt(p.row,p.col),{...p,visual:Number(node.dataset.visualIndex)||p.row},event);
@@ -4787,7 +3630,7 @@
     }
   });
   selectionInspector = new window.ExcelLensSelectionInspector({
-    state:S,api,colName,parseColumn,toast,navigate:navigateToCell,copy:copyText,rowLimit:sourceRowLimit,largeDataRows:fileFormats.largeDataRows,excludeThroughRow:()=>frozenPanes.effective().rows,
+    state:S,api,colName,parseColumn,toast,navigate:navigateToCell,copy:copyText,rowLimit:sourceRowLimit,colLimit:sourceColLimit,largeDataRows:fileFormats.largeDataRows,excludeThroughRow:()=>frozenPanes.effective().rows,
     onChange:()=>{++S.decorVersion;renderGridFromCurrentWindow();
       for(const node of document.querySelectorAll('.grid-region .pinned-cell'))selectionInspector.decorateCell(node,node.dataset.ref,S.sheet);
     }
@@ -4887,12 +3730,73 @@
     foregroundHits,foregroundLookups,requests:{...scheduler.stats},
     hasVisibleCoverage:S.indexReady && viewportCoversVisible(S.window,getViewportRequest())
   });
+  window.ExcelLensStorage({api, openDialog, background: window.ExcelLensBackground({
+    api, state:S, openDialog, toast, adoptTask:adoptRecoveredTask,
+    analysis:(job,status)=>window.ExcelLensAnalytics.reopenJob(job,status),
+    reconcile:(job,status)=>reconcileCenter.reopenJob(job,status)
+  })});
+  const databasePanel = new window.ExcelLensDatabasePanel({api, onOpened:async result=>{
+    const current = await api('/api/status');
+    if (!current.opened || current.workbookKey !== result.workbookKey) throw new Error('工作簿已切换');
+    await acceptOpenedWorkbook(current);
+  }});
+  const databaseSnapshots = new window.ExcelLensDatabaseSnapshots({
+    api, fmtBytes, openWorkbook,
+    onRetained: key => { if (S.workbookKey === key) $('retainDatabaseSnapshot').hidden = true; }
+  });
+  const panels = {
+    editCopy, calculator, frozenPanes, archiveCenter, recentManager, profileCenter,
+    exportCenter, copySpecial, bookmarkCenter, autoFilterUI, traceUI, selectionInspector,
+    multiSort, selectionStats, pictures, readingMode, highlightMode, rowViews,
+    reconcileCenter, relationsCenter, namedViews, catalogueCenter, dataRulesCenter,
+    printingCenter, recordCardCenter, selectionQuick, transposeCenter, cellExplanation,
+    taskRecovery, formulaInspector, searchPanel, commandPalette, columnController,
+    databasePanel, databaseSnapshots,
+  };
+  gridClipboard = new window.ExcelLensGridClipboard({
+    S, api, colName, fileFormats, mergedCells, sourceRowLimit, toast,
+    getEditCopy: () => editCopy,
+    getFrozenPanes: () => frozenPanes,
+    getExportCenter: () => exportCenter,
+  });
+  gridControls = new window.ExcelLensGridControls({
+    $, S, icon, toast, colName, parseRef, cellAt, inSelectedRange, linkDescription,
+    selectedColumnSpan, selectColumnSpan, hasColumnOfType, selectPointedCell,
+    rowHeight, colWidth, headerHeight, rowTop, colLeft, rowHead: () => ROW_HEAD,
+    resetGridDOM, updateCanvasSize, renderInitialPreview, paintRangeFrames,
+    invalidateViewport, setVirtualScrollTop, scheduleViewport,
+    getEditCopy: () => editCopy,
+    getPictures: () => pictures,
+    getFrozenPanes: () => frozenPanes,
+    isDragging: () => gridInteractions?.isDragging?.() || false,
+  });
+  workbookIO = new window.ExcelLensWorkbookIO({
+    $, S, api, toast, fmtBytes, fileFormats, setStatus, showWelcome, showWorkspace,
+    loadStylePalette, selectSheet, selectSheetTab, refreshSearchHistory,
+    invalidateViewport, cancelFilter, panels,
+  });
+  gridInteractions = new window.ExcelLensGridInteractions({
+    $, S, api, toast, setStatus, colName, parseRef, cellAt, tiles, mergedCells,
+    virtualScroll, motion, controls: gridControls, clipboard: gridClipboard, workbookIO, panels,
+    rowHead: () => ROW_HEAD, rowHeight, colWidth, headerHeight, rowTop, colLeft,
+    getVirtualScrollTop, getViewportRequest, viewportContext, activeMerge,
+    selectCell, extendRange, applySelectionClasses, selectWholeRow, selectColumnSpan, captureColumnSelection,
+    selectSheet, selectSheetTab, navigateToCell, navigateNameBox, moveSelection, jumpDataEdge, goHistory,
+    followCellHyperlink, showWelcome, showCellDetail, openCommandPalette, openSearch, stepSearch,
+    toggleAutoFilter, toggleFormulaView, toggleOriginalFormat, changeDisplayFont,
+    openFilter, addFilterRule, applyFilter, cancelFilter, clearFilter, filterSelectedValue,
+    openFreezeDialog, applyFreeze, applyTextTableHeader, disableTextTableHeader,
+    promptResize, commitResize, autoFitSize, setColumnVisibility,
+    tracePrecedents, traceDependents, followGridScroll, scheduleRangeFrames, syncTableColumnHeaders,
+    syncFreezeScrollGutters, updateCanvasSize, scheduleInitialPreview,
+    renderGridFromCurrentWindow, paintRangeFrames, scheduleViewport,
+  });
   window.addEventListener('excellens:analysis-navigate', event => {
     const detail=event.detail||{};
     if(typeof detail.sheet==='string'&&typeof detail.ref==='string'){
       navigateToCell(detail.sheet,detail.ref).catch(err=>toast(err.message,'error'));
     }
   });
-  bindEvents();
+  gridInteractions.bindEvents();
   window.ExcelLensWorkbookReady=loadStatus();
 })();

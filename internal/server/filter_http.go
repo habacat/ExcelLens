@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -359,7 +358,7 @@ func (a *App) handleFilterCancel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "请求内容无效")
 		return
 	}
@@ -386,7 +385,7 @@ func (a *App) handleFilterClear(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "请求内容无效")
 		return
 	}

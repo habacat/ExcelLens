@@ -4,6 +4,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 // Read only fixed dimensions declared by the document. A percentage is useful
@@ -42,7 +44,7 @@ func (m *htmlStyleMetadata) dimension(token htmlTableToken, name string, referen
 }
 
 func (s *htmlDocumentSheet) addColumns(first, count int, size float64, explicit ...bool) {
-	if size < 10 || size > 1200 || first < 1 || first+count-1 > 16384 {
+	if size < 10 || size > 1200 || first < 1 || first+count-1 > formats.ExcelColumns {
 		return
 	}
 	if s.Cols == nil {

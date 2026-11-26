@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"excellens/internal/formats"
 )
 
 type countingReader struct {
@@ -555,12 +557,12 @@ func parseColumnBytes(ref []byte) int {
 			break
 		}
 		col = col*26 + int(c-'A'+1)
-		if col > 16384 {
+		if col > formats.ExcelColumns {
 			return 0
 		}
 		i++
 	}
-	if col < 1 || col > 16384 {
+	if col < 1 || col > formats.ExcelColumns {
 		return 0
 	}
 	return col

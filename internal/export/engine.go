@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"excellens/internal/formats"
 	"excellens/internal/separated"
 	"excellens/internal/workbook"
 	"fmt"
@@ -105,7 +106,7 @@ func Validate(opts Options, selections []Selection) error {
 		if s.Index != nil && s.Index.SourceFormat == "ods" && opts.Format == "xlsx" && opts.Mode == "formula" {
 			return errors.New("OpenFormula 无法直接写为 Excel 公式，请导出缓存值或显示文字")
 		}
-		if s.Index == nil || s.FirstCol < 1 || s.LastCol > 16384 || s.LastCol < s.FirstCol || s.FirstRow < 1 || s.LastRow > workbook.MaxRowsForIndex(s.Index) || s.LastRow < s.FirstRow {
+		if s.Index == nil || s.FirstCol < 1 || s.LastCol > formats.ExcelColumns || s.LastCol < s.FirstCol || s.FirstRow < 1 || s.LastRow > workbook.MaxRowsForIndex(s.Index) || s.LastRow < s.FirstRow {
 			return errors.New("导出区域超出 Excel 允许范围")
 		}
 		if s.Order != nil && s.Order.SourceRows() != s.Index.RowCount() {
@@ -128,10 +129,10 @@ func Validate(opts Options, selections []Selection) error {
 		}
 		// Only XLSX has the OOXML row ceiling; streaming text/ZIP can
 		// preserve millions of source rows without silent truncation.
-		if opts.Format == "xlsx" && s.RowCount() > 1048576 {
+		if opts.Format == "xlsx" && s.RowCount() > formats.ExcelRows {
 			return errors.New("XLSX 单个工作表最多 1,048,576 行；请改用 CSV、TSV、JSONL 或 ZIP CSV 导出完整数据")
 		}
-		if opts.Format == "xlsx" && !s.Compact && !s.Filtered && s.LastRow > 1048576 {
+		if opts.Format == "xlsx" && !s.Compact && !s.Filtered && s.LastRow > formats.ExcelRows {
 			return errors.New("XLSX 无法保留超过 1,048,576 的原始行号；请选择从 A1 紧凑导出，或改用 CSV、TSV、JSONL")
 		}
 		if s.RowCount() > math.MaxInt64/int64(s.LastCol-s.FirstCol+1) {

@@ -5,10 +5,11 @@
   'use strict';
   const $=id=>document.getElementById(id);
   class SelectionInspector {
-    constructor({state,api,colName,parseColumn,toast,navigate,onChange,copy,rowLimit=()=>Number.MAX_SAFE_INTEGER,largeDataRows=Number.MAX_SAFE_INTEGER,excludeThroughRow=()=>0}) {
+    constructor({state,api,colName,parseColumn,toast,navigate,onChange,copy,rowLimit=()=>Number.MAX_SAFE_INTEGER,colLimit=()=>window.ExcelLensFileFormats?.current?.()?.maxColumns||16384,largeDataRows=Number.MAX_SAFE_INTEGER,excludeThroughRow=()=>0}) {
       this.state=state;this.api=api;this.colName=colName;this.parseColumn=parseColumn;
       this.toast=toast;this.navigate=navigate;this.onChange=onChange;this.copy=copy;
       this.rowLimit=rowLimit;
+      this.colLimit=colLimit;
       this.largeDataRows=largeDataRows;
       this.excludeThroughRow=excludeThroughRow;
       this.matches=[];this.hits=new Set();this.sheet='';this.abort=null;
@@ -72,7 +73,7 @@
         }
       }
       // Clamp to actual content extents, not the grid's optional blank margin.
-      row2=Math.min(row2,this.rowLimit());col2=Math.min(col2,16384);
+      row2=Math.min(row2,this.rowLimit());col2=Math.min(col2,this.colLimit());
       const opt={sheet:s.sheet,mode,start:this.colName(col1)+row1,end:this.colName(col2)+row2,
         filterId:s.filtered?s.filterId:'',limit:1200};
       const selected=s.range&&(mode==='duplicates'?s.range.col1===col1&&s.range.col2===col1:$('inspectScope').value==='selection');

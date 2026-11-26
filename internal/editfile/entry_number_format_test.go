@@ -105,3 +105,41 @@ func TestNativeFormulaEntryFormats(t *testing.T) {
 	}
 	t.Logf("compared %d formulas, %d outside the editable grammar, %d differences", checked, unsupported, mismatches)
 }
+
+func TestParseEntryFormatsIgnoresMalformedNumFmtID(t *testing.T) {
+	xmlData := `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="bad" formatCode="yyyy-mm-dd"/></numFmts><cellXfs count="1"><xf numFmtId="0"/></cellXfs></styleSheet>`
+	styles, err := parseEntryFormats(t.Context(), []byte(xmlData))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if styles.calendar[0] {
+		t.Fatal("malformed numFmtId overwrote General format id 0")
+	}
+}
+
+func TestSheetCollectionRejectsMalformedWorkbookIndices(t *testing.T) {
+	base := &xlsxPackage{
+		links:    map[string]map[string]string{workbookPart: {}},
+		sheetIDs: map[string]bool{"1": true, "2": true},
+		layout:   XLSXLayout{Sheets: []XLSXSheet{{Name: "S1"}, {Name: "S2"}}},
+	}
+	for _, tc := range []struct {
+		name string
+		xml  string
+	}{
+		{"invalid localSheetId", `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S1" sheetId="1" r:id="rId1"/><sheet name="S2" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="N1" localSheetId="oops">S1!$A$1</definedName></definedNames></workbook>`},
+		{"invalid firstSheet", `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0" firstSheet="bad"/></bookViews><sheets><sheet name="S1" sheetId="1" r:id="rId1"/><sheet name="S2" sheetId="2" r:id="rId2"/></sheets></workbook>`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			edit := &sheetCollectionEdit{
+				p:           base,
+				op:          editdoc.Structure{Kind: "deleteSheet", Sheet: "S1"},
+				index:       0,
+				activeViews: []int{0},
+			}
+			if _, err := edit.workbook(t.Context(), []byte(tc.xml)); err == nil {
+				t.Fatalf("%s: expected error, got nil", tc.name)
+			}
+		})
+	}
+}

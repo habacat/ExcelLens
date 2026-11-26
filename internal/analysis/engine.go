@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"excellens/internal/formats"
 )
 
 const (
@@ -405,7 +407,7 @@ func DrillScope(ctx context.Context, q Query, fields []Field, keys []string, col
 	if err := Validate(q, fields); err != nil {
 		return res, err
 	}
-	if validateDetailKeys(q, keys) != nil || column != nil && len(q.Columns) == 0 || offset < 0 || offset > 1_048_576 || limit < 1 || limit > 200 {
+	if validateDetailKeys(q, keys) != nil || column != nil && len(q.Columns) == 0 || offset < 0 || offset > formats.ExcelRows || limit < 1 || limit > 200 {
 		return res, errors.New("下钻范围无效")
 	}
 	// The UI displays a bounded number of columns, but filters and pivot

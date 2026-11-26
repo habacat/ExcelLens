@@ -1,0 +1,124 @@
+{
+  "version": "1.18.0",
+  "result": "PASS",
+  "scope": "Targeted condition evaluation, dashboard report reopen, column visibility and task controls",
+  "excelComparison": {
+    "method": "Microsoft Excel DisplayFormat, nine source cells compared through both workbook adapters on cold load and reopen",
+    "matchingCellsPerRead": 9,
+    "readsPerFormat": 2,
+    "sourceSHA256": {
+      "xlsx": "aa12ff127cd51d3c9080d1819197cc3deb4de497b39dc0225ede5219af579b05",
+      "xlsb": "3038f796c2d4ef7eb92f2043965bbb68c3e058e850fde1e813f80c6a3e679ebf"
+    },
+    "cells": [
+      {
+        "ref": "A1",
+        "value": 7,
+        "operator": "between",
+        "formulas": [
+          "10",
+          "5"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A2",
+        "value": 12,
+        "operator": "between",
+        "formulas": [
+          "10",
+          "5"
+        ],
+        "highlight": false
+      },
+      {
+        "ref": "A3",
+        "value": 7,
+        "operator": "notBetween",
+        "formulas": [
+          "10",
+          "5"
+        ],
+        "highlight": false
+      },
+      {
+        "ref": "A4",
+        "value": 12,
+        "operator": "notBetween",
+        "formulas": [
+          "10",
+          "5"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A5",
+        "value": 2,
+        "operator": "",
+        "formulas": [
+          "DATE(1900,2,29)=60"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A6",
+        "value": 4,
+        "operator": "",
+        "formulas": [
+          "WEEKDAY(1)=1"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A7",
+        "value": 8,
+        "operator": "",
+        "formulas": [
+          "IFERROR(SEARCH(\"\",\"abc\",4),4)=4"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A8",
+        "value": 1,
+        "operator": "",
+        "formulas": [
+          "ISERROR(SEARCH(\"*\",\"\"))"
+        ],
+        "highlight": true
+      },
+      {
+        "ref": "A9",
+        "value": 12,
+        "operator": "",
+        "formulas": [
+          "AND(ISBLANK($K$1),NOT(\"FALSE\"))"
+        ],
+        "highlight": true
+      }
+    ]
+  },
+  "regressions": [
+    "Seven Excel formula boundary assertions failed before repair and passed afterward",
+    "Numeric overflow, evaluation budgets, filter/index/export request parsing, task cancellation and worksheet layout checks passed",
+    "Isolated Chromium saved a report, reopened it twice through the dashboard and retained exact ratios and source SHA-256",
+    "BIFF8 and OOXML column visibility use the active source limit"
+  ],
+  "browser": {
+    "dashboard": "comparisons-ui-browser.json",
+    "conditionalRenderingAndExport": "conditional-browser.json",
+    "mergedPixelComparisons": 23,
+    "crosshairExtentStates": [
+      "reading",
+      "off",
+      "zoom",
+      "resized",
+      "frozen",
+      "editing",
+      "dark",
+      "range"
+    ]
+  },
+  "desktopManualAcceptance": false,
+  "wpsAcceptance": false
+}

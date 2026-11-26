@@ -96,7 +96,7 @@ func (s SourceLayout) valid() bool {
 	if s.DefaultRowZeroSize && s.DefaultRow != 0 || s.DefaultColZeroSize && s.DefaultCol != 0 {
 		return false
 	}
-	if len(s.Merges) > 100000 || len(s.Rows) > 100000 || len(s.Cols) > 16384 || (s.DefaultRow != 0 && !validSourceSize(s.DefaultRow)) || (s.DefaultCol != 0 && !validSourceSize(s.DefaultCol)) {
+	if len(s.Merges) > 100000 || len(s.Rows) > 100000 || len(s.Cols) > formats.ExcelColumns || (s.DefaultRow != 0 && !validSourceSize(s.DefaultRow)) || (s.DefaultCol != 0 && !validSourceSize(s.DefaultCol)) {
 		return false
 	}
 	last := 0
@@ -107,12 +107,12 @@ func (s SourceLayout) valid() bool {
 		last = r.Max
 	}
 	for c, size := range s.Cols {
-		if c < 1 || c > 16384 || !validSourceSize(size) {
+		if c < 1 || c > formats.ExcelColumns || !validSourceSize(size) {
 			return false
 		}
 	}
 	for _, m := range s.Merges {
-		if m.Row < 1 || m.Col < 1 || m.EndRow < m.Row || m.EndCol < m.Col || m.EndRow > maxExternalRows || m.EndCol > 16384 {
+		if m.Row < 1 || m.Col < 1 || m.EndRow < m.Row || m.EndCol < m.Col || m.EndRow > maxExternalRows || m.EndCol > formats.ExcelColumns {
 			return false
 		}
 	}

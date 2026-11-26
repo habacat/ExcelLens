@@ -71,6 +71,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.18.0.md](releases/1.18.0.md) | 条件格式、选区高亮、模块拆分与审计修复 |
 | [releases/1.17.2.md](releases/1.17.2.md) | 快照容量与删除、采集证据导出、暂存恢复和首页复制 |
 | [releases/1.17.1.md](releases/1.17.1.md) | 数据库快照留存与核验、XLSB 同源样本和兼容性矩阵 |
 | [releases/1.17.0.md](releases/1.17.0.md) | XLSB、RAR、在线数据库、依赖升级和验收范围 |

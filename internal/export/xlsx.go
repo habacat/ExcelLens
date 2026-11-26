@@ -176,7 +176,7 @@ func writeXLSXSheet(ctx context.Context, dst io.Writer, wb *workbook.Workbook, s
 			if s.Compact {
 				col -= s.FirstCol - 1
 			}
-			if col < 1 || col > 16384 {
+			if col < 1 || col > formats.ExcelColumns {
 				continue
 			}
 			ref := workbook.ColumnName(col) + strconv.Itoa(outRow)

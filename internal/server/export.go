@@ -431,7 +431,7 @@ func (a *App) handleExportCancel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
 		writeError(w, 400, "请求无效")
 		return
 	}

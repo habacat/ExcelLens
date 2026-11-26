@@ -4,8 +4,8 @@
   const $ = id => document.getElementById(id);
 
   class ColumnController {
-    constructor({state, api, toast, geometry, baseRow, baseCol, colName, parseColumn, relayoutGrid, selectCellByAddress, hideCellMenu, selectionStats, calculator}) {
-      Object.assign(this, {s: state, api, toast, geometry, baseRow, baseCol, colName, parseColumn, relayoutGrid, selectCellByAddress, hideCellMenu, selectionStats, calculator});
+    constructor({state, api, toast, geometry, baseRow, baseCol, colName, parseColumn, colLimit, relayoutGrid, selectCellByAddress, hideCellMenu, selectionStats, calculator}) {
+      Object.assign(this, {s: state, api, toast, geometry, baseRow, baseCol, colName, parseColumn, colLimit, relayoutGrid, selectCellByAddress, hideCellMenu, selectionStats, calculator});
       this.dragAnchor = 0;
       this.dragEnd = 0;
       this.dragFrame = 0;
@@ -59,7 +59,8 @@
     }
 
     selectSpan(anchor, end) {
-      if (!this.s.indexReady || !Number.isInteger(anchor) || !Number.isInteger(end) || anchor < 1 || end < 1 || anchor > 16384 || end > 16384) return;
+      const limit = this.colLimit();
+      if (!this.s.indexReady || !Number.isInteger(anchor) || !Number.isInteger(end) || anchor < 1 || end < 1 || anchor > limit || end > limit) return;
       this.s.columnSelection = {start: anchor, end};
       this.s.columnAnchor = anchor;
       this.s.range = null; this.s.multiRanges = []; this.s.rangeAnchor = null; this.s.wholeRowSelected = false;
@@ -117,18 +118,18 @@
     // are independent of visibility. A zero-size override removes a column
     // from geometry rather than merely making its text transparent.
     applyVisibility() {
-      const hidden = new Set();
+      const hidden = new Set(), maxCol = this.colLimit();
       if (this.s.columnMode === 'hide-all') {
-        for (let c = 1; c <= 16384; c++) hidden.add(c);
+        for (let c = 1; c <= maxCol; c++) hidden.add(c);
       } else if (this.s.columnMode !== 'show-all') {
         for (const range of this.s.columnSourceRanges) {
-          const min = Math.max(1, Number(range.min) || 1), max = Math.min(16384, Number(range.max) || 0);
+          const min = Math.max(1, Number(range.min) || 1), max = Math.min(maxCol, Number(range.max) || 0);
           for (let c = min; c <= max; c++) hidden.add(c);
         }
       }
       for (const [raw, flag] of Object.entries(this.s.columnOverrides)) {
         const c = Number(raw);
-        if (!Number.isInteger(c) || c < 1 || c > 16384) continue;
+        if (!Number.isInteger(c) || c < 1 || c > maxCol) continue;
         if (flag) hidden.add(c); else hidden.delete(c);
       }
       this.s.hiddenColumns = hidden;
@@ -144,7 +145,7 @@
       for (let c = Math.max(1, Math.trunc(from) || 1); c <= Math.max(1, this.s.maxCol); c++) {
         if (!this.s.hiddenColumns.has(c)) return c;
       }
-      return Math.min(16384, Math.max(1, Math.trunc(from) || 1));
+      return Math.min(this.colLimit(), Math.max(1, Math.trunc(from) || 1));
     }
 
     previousVisible(from) {
@@ -192,7 +193,7 @@
       const previousMode = this.s.columnMode, previousOverrides = {...this.s.columnOverrides};
       if (mode === 'column' || mode === 'range') {
         const first = Math.min(index, end), last = Math.max(index, end);
-        if (!Number.isInteger(first) || !Number.isInteger(last) || first < 1 || last > 16384) return;
+        if (!Number.isInteger(first) || !Number.isInteger(last) || first < 1 || last > this.colLimit()) return;
         for (let col = first; col <= last; col++) this.s.columnOverrides[String(col)] = Boolean(hidden);
         index = first; end = last;
       } else { this.s.columnMode = mode; this.s.columnOverrides = {}; }

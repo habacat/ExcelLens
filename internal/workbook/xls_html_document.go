@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"excellens/internal/formats"
 )
 
 // HTMLMerge describes a source range. Covered cells remain empty and keep
@@ -102,11 +104,11 @@ func readStyledHTMLTables(src io.Reader, target int, emit func([]string) error, 
 			return nil
 		}
 		cellOpen = false
-		for col <= 16384 && occupied[col] >= row {
+		for col <= formats.ExcelColumns && occupied[col] >= row {
 			col++
 		}
 		last := col + colspan - 1
-		if last > 16384 || row+rowspan-1 > maxExternalRows {
+		if last > formats.ExcelColumns || row+rowspan-1 > maxExternalRows {
 			return errors.New("HTML 合并单元格超出行列安全上限")
 		}
 		for c := col; c <= last; c++ {
@@ -248,7 +250,7 @@ func readStyledHTMLTables(src io.Reader, target int, emit func([]string) error, 
 		if inside && !rowOpen && t.kind == 's' && t.name == "col" && metadata != nil && target < 0 {
 			span := 1
 			if value, ok := t.attr("span"); ok {
-				if parsed, e := strconv.Atoi(value); e == nil && parsed > 0 && parsed <= 16384 {
+				if parsed, e := strconv.Atoi(value); e == nil && parsed > 0 && parsed <= formats.ExcelColumns {
 					span = parsed
 				}
 			}
@@ -331,7 +333,7 @@ func readStyledHTMLTables(src io.Reader, target int, emit func([]string) error, 
 				name string
 				span *int
 				max  int
-			}{{"colspan", &colspan, 16384}, {"rowspan", &rowspan, maxExternalRows}} {
+			}{{"colspan", &colspan, formats.ExcelColumns}, {"rowspan", &rowspan, maxExternalRows}} {
 				if value, ok := t.attr(item.name); ok {
 					span, e := strconv.Atoi(value)
 					if e != nil || span < 1 || span > item.max {

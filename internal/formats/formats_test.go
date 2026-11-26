@@ -46,3 +46,22 @@ func TestExternalBillionRowCapacityKeepsNativeExcelCeilings(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatForExtensionResolvesRegistry(t *testing.T) {
+	want := map[string]string{
+		".xlsx": "xlsx", ".XLSM": "xlsx", ".xlsb": "xlsb", ".xls": "xls",
+		".ods": "ods", ".csv": "csv", ".tsv": "tsv", ".txt": "txt",
+		".db": "sqlite", ".sqlite": "sqlite", ".SQLITE3": "sqlite",
+	}
+	for ext, expected := range want {
+		got, ok := FormatForExtension(ext)
+		if !ok || got != expected {
+			t.Fatalf("FormatForExtension(%q) = (%q, %v), want (%q, true)", ext, got, ok, expected)
+		}
+	}
+	for _, ext := range []string{".zip", ".rar", ".tar", ".exe", ""} {
+		if got, ok := FormatForExtension(ext); ok {
+			t.Fatalf("FormatForExtension(%q) unexpectedly returned %q", ext, got)
+		}
+	}
+}

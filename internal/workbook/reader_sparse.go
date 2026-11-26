@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+
+	"excellens/internal/formats"
 )
 
 // ReadRowsSparseContext reads at most the requested columns. It preserves
@@ -18,7 +20,7 @@ func (w *Workbook) ReadRowsSparseContext(ctx context.Context, idx *SheetIndex, i
 	selected := make(map[int]struct{}, len(columns))
 	prev := 0
 	for _, col := range columns {
-		if col <= prev || col > 16384 {
+		if col <= prev || col > formats.ExcelColumns {
 			return nil, errors.New("sparse columns must be ascending and unique")
 		}
 		selected[col] = struct{}{}

@@ -84,3 +84,69 @@ test('selection row counts include frozen headers and retain reversed drag endpo
   assert.equal(S.rowCount({row1:8,row2:4,visual1:1,visual2:2},true,3),2);
   assert.equal(S.rowCount({row1:3,row2:1,visual1:3,visual2:1},true,3),3);
 });
+
+test('highlight spans extend to ranges, multi-ranges, filtered frozen crossings and exclude columns on whole-row selection',()=>{
+  const plain=v=>JSON.parse(JSON.stringify(v));
+  const rangeHl=S.highlight({range:S.rectangle(S.cell(5,8),S.cell(8,11)),multiRanges:[],selected:{row:5,col:8}});
+  assert.deepEqual(plain(rangeHl.rowSpans),[[5,8]]);
+  assert.deepEqual(plain(rangeHl.colSpans),[[8,11]]);
+  assert.equal(rangeHl.hasMultiCol,true);
+  assert.equal(rangeHl.singleCol,0);
+  for(const r of [5,6,7,8])assert.equal(rangeHl.hasRow(r,r),true);
+  assert.equal(rangeHl.hasRow(4,4),false);assert.equal(rangeHl.hasRow(9,9),false);
+  for(const c of [8,9,10,11])assert.equal(rangeHl.hasCol(c),true);
+  assert.equal(rangeHl.hasCol(7),false);assert.equal(rangeHl.hasCol(12),false);
+
+  const multiHl=S.highlight({
+    multiRanges:[S.rectangle(S.cell(2,2),S.cell(3,3)),S.rectangle(S.cell(4,5),S.cell(5,6))],
+    range:S.rectangle(S.cell(7,3),S.cell(8,4)),
+    selected:{row:7,col:3}
+  });
+  assert.deepEqual(plain(multiHl.rowSpans),[[2,5],[7,8]]);
+  assert.deepEqual(plain(multiHl.colSpans),[[2,6]]);
+  assert.equal(multiHl.hasRow(6,6),false);assert.equal(multiHl.hasRow(7,7),true);
+
+  const filteredRange=S.rectangle(S.cell(2,2,2),S.cell(98,4,3),true);
+  const filteredHl=S.highlight({filtered:true,selectedFrozenThrough:2,range:filteredRange,multiRanges:[],selected:{row:2,col:2}});
+  assert.equal(filteredHl.hasRow(1,1),false);
+  assert.equal(filteredHl.hasRow(2,2),true);
+  assert.equal(filteredHl.hasRow(83,1),true);
+  assert.equal(filteredHl.hasRow(98,3),true);
+  assert.equal(filteredHl.hasRow(77,4),false);
+
+  const wholeRowHl=S.highlight({wholeRowSelected:true,selected:{row:5,col:1},range:{row1:5,row2:5,col1:1,col2:20},multiRanges:[]});
+  assert.deepEqual(plain(wholeRowHl.rowSpans),[[5,5]]);
+  assert.deepEqual(plain(wholeRowHl.colSpans),[]);
+  assert.equal(wholeRowHl.hasRow(5,5),true);
+  assert.equal(wholeRowHl.hasCol(1),false);
+  assert.equal(wholeRowHl.hasCol(8),false);
+
+  // Filtered-out whole-row selection (selectedVisualIndex===0) must not fall back
+  // to highlighting an unrelated visible row, while pinned rows ignore visual===0.
+  const hiddenWholeRow=S.highlight({filtered:true,selectedFrozenThrough:2,wholeRowSelected:true,selected:{row:9,col:1},selectedVisualIndex:0,multiRanges:[]});
+  assert.deepEqual(plain(hiddenWholeRow.rowSpans),[]);
+  assert.equal(hiddenWholeRow.hasRow(9,9),false);
+  assert.equal(S.containsRow(filteredRange,2,0,true,2),true);
+  assert.equal(filteredHl.hasRow(2,0),true);
+  assert.equal(filteredHl.hasRow(83,0),false);
+});
+
+test('paintCrosshair projects range and multi-range tails without overlapping strips',()=>{
+  const layer={children:[],appendChild(node){this.children.push(node);return node;},get lastElementChild(){return this.children.at(-1);}};
+  const document={createElement:()=>({style:{},hidden:false,className:'',remove(){layer.children.splice(layer.children.indexOf(this),1);}})};
+  const paintCrosshair=vm.runInNewContext(fs.readFileSync(__dirname+'/range-frame.js','utf8')+';window.ExcelLensRangeFrame.paintCrosshair',{window:{},document});
+  const view={width:300,height:200,left:0,top:0,rowHead:20,header:20,frozenWidth:0,frozenHeight:0,
+    colLeft:c=>(c-1)*30,rowBounds:r=>[(r-1)*20,r*20]};
+  paintCrosshair(layer,[S.rectangle(S.cell(2,2),S.cell(4,3))],view,150,120);
+  assert.equal(layer.children.length,2);
+  assert.equal(layer.children[0].className,'row-tail');
+  assert.equal(layer.children[0].hidden,false);
+  assert.equal(layer.children[0].style.cssText,'left:170px;top:40px;width:130px;height:60px');
+  assert.equal(layer.children[1].className,'column-tail');
+  assert.equal(layer.children[1].hidden,false);
+  assert.equal(layer.children[1].style.cssText,'left:50px;top:140px;width:60px;height:60px');
+
+  paintCrosshair(layer,[S.rectangle(S.cell(1,1),S.cell(2,2)),S.rectangle(S.cell(4,4),S.cell(5,4))],view,150,120);
+  assert.equal(layer.children.filter(n=>n.className==='row-tail').length,2);
+  assert.equal(layer.children.filter(n=>n.className==='column-tail').length,2);
+});

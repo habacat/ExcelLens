@@ -7,7 +7,7 @@ function harness(override){
   node('fontSelect').selectedOptions=[{text:'原表字体'}];
   const ctx={paintRangeFrames(){},transposeCenter:{resetBook(){},changed(){}},profileCenter:{resetBook(){},changed(){}},window:{ExcelLensTableHeaders:{fromHeader:()=>null}},traceUI:null,rowViews:null,cellExplanation:{resetBook:()=>detailResets.push(ctx.S.sheet),changed(){}},selectionQuick:{resetBook:()=>quickResets.push(ctx.S.sheet),changed(){}},recordCardCenter:{resetBook:()=>cardResets.push(ctx.S.sheet),controls(){}},geometry:{rows:{setHidden(){}}},Map,Set,Math,AbortController,URLSearchParams,encodeURIComponent,
     $:node,editCopy:null,setTimeout:()=>++timer,clearTimeout(){},cancelAnimationFrame(){},FONT_STACKS:{},
-    sourceRowLimit:()=>50000000,rowVisible:()=>true,colName:n=>String.fromCharCode(64+n),getVirtualScrollTop:()=>node('grid').scrollTop,setVirtualScrollTop:v=>node('grid').scrollTop=v,
+    sourceRowLimit:()=>50000000,sourceColLimit:()=>16384,rowVisible:()=>true,colName:n=>String.fromCharCode(64+n),getVirtualScrollTop:()=>node('grid').scrollTop,setVirtualScrollTop:v=>node('grid').scrollTop=v,
     frozenPanes:{cache:new Map(),cachePart(key,data){this.cache.set(key,data);},reset(){this.cache.clear();},schedule(){},async refresh(){}},pictures:{reset(){},load:async()=>{},schedule(){}},mergedCells:{load(){}},
     selectionStats:{clear(){}},formulaInspector:{clear(){}},cancelIndex(){},updateSourceAppearance(){},updateAutoFilterButton(){},updateFreezeUI(){},updateGeometryBase(){},updateCanvasSize(){},applyColumnVisibility(){},renderSheetTabs(){},setStatus(){},toast:(...args)=>notices.push(args),
     invalidateViewport(options){assert.equal(options.preserveDOM,true);ctx.tiles.clear();ctx.S.viewportData=null;ctx.S.window=null;},

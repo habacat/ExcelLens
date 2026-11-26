@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"excellens/internal/formats"
 )
 
 // PivotTable describes user-facing report output. NumericValues identifies
@@ -237,7 +239,7 @@ func zipWrite(z *zip.Writer, name, data string) error {
 	return err
 }
 func ExportPivotXLSX(w io.Writer, grid PivotTable) error {
-	if len(grid.Headers) == 0 || len(grid.Headers) > 16384 || len(grid.Rows) > 1_048_575 {
+	if len(grid.Headers) == 0 || len(grid.Headers) > formats.ExcelColumns || len(grid.Rows) > formats.ExcelRows-1 {
 		return fmt.Errorf("报表尺寸超过Excel限制")
 	}
 	zw := zip.NewWriter(w)
@@ -327,7 +329,7 @@ func ExportPivotXLSX(w io.Writer, grid PivotTable) error {
 		}
 	}
 	b.WriteString(`</sheetData>`)
-	if len(grid.Headers) <= 16384 && len(grid.Rows) > 0 {
+	if len(grid.Headers) <= formats.ExcelColumns && len(grid.Rows) > 0 {
 		fmt.Fprintf(&b, `<autoFilter ref="A1:%s%d"/>`, xlsxCol(len(grid.Headers)), len(grid.Rows)+1)
 	}
 	b.WriteString(`</worksheet>`)
