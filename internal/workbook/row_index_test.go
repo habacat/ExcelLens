@@ -10,16 +10,13 @@ import (
 	"testing"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 func releaseTestIndex(t testing.TB, idx *SheetIndex) {
 	t.Helper()
 	if idx.RowsMapped() {
-		mapping := idx.mapping
-		t.Cleanup(func() {
-			runtime.SetFinalizer(mapping, nil)
-			mapping.release()
-		})
+		t.Cleanup(idx.ReleaseMapping)
 	}
 }
 
@@ -33,13 +30,13 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer writer.offsets.close()
+	defer writer.offsets.Close()
 	for i := 0; i <= MaxResidentRowOffsets; i++ {
 		if err := writer.row([]string{"ordinary", "0000123"}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if writer.offsets.file == nil || writer.offsets.rows != nil {
+	if writer.offsets.SpillFile() == nil || writer.offsets.Rows() != nil {
 		t.Fatal("offsets did not spill")
 	}
 	// This is a sparse boundary fixture, not a billion-record throughput test.
@@ -60,7 +57,7 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	idx := &SheetIndex{XMLPath: f.Name(), IndexPath: filepath.Join(dir, "data.idx"), Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols, XMLSize: writer.count, HyperlinkStart: -1}
-	if err := writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
+	if err := writeIndex(idx, writer.offsets.Count(), writer.offsets.SpillFile()); err != nil {
 		t.Fatal(err)
 	}
 	releaseTestIndex(t, idx)
@@ -88,7 +85,7 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	if owner.HasMappedIndexes() {
 		t.Fatal("discarded snapshot remained owned")
 	}
-	if !loaded.RowsMapped() || loaded.resident != nil || loaded.RowCount() != MaxResidentRowOffsets+2 {
+	if !loaded.RowsMapped() || loaded.RowCount() != MaxResidentRowOffsets+2 {
 		t.Fatal("large index was materialized", loaded.RowCount())
 	}
 	last := loaded.RowCount() - 1
@@ -128,9 +125,9 @@ func TestSpilledIndexPreservesBillionthRowAndCacheCompatibility(t *testing.T) {
 	// Reject a plausible but corrupt row offset and forged huge count before
 	// any large heap allocation. The fixed-width row record stays unchanged.
 	for name, mutate := range map[string]func([]byte){
-		"checksum": func(b []byte) { b[indexRowsStart(idx.Dimension)+4] ^= 1 },
+		"checksum": func(b []byte) { b[rowindex.IndexRowsStart(idx.Dimension)+4] ^= 1 },
 		"count": func(b []byte) {
-			binary.LittleEndian.PutUint64(b[indexRowsStart(idx.Dimension)-8:], uint64(formats.ExternalRows))
+			binary.LittleEndian.PutUint64(b[rowindex.IndexRowsStart(idx.Dimension)-8:], uint64(formats.ExternalRows))
 		},
 	} {
 		copy := append([]byte(nil), data...)

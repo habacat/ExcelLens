@@ -160,7 +160,7 @@ func readCellExplanation(ctx context.Context, wb *workbook.Workbook, idx *workbo
 		}
 		return nil, err
 	}
-	rows, err := wb.ReadRowsByNumbersWithOptionsContext(ctx, idx, []int{row}, col, col, workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: true})
+	rows, err := wb.ReadRowsByNumbersWithOptionsContext(ctx, idx, []int{row}, col, col, workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: true, ConditionalStatsReadOnly: true})
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ type analysisSelectionCoordinates struct {
 }
 
 func analysisSelectionRows(idx *workbook.SheetIndex, filter *FilterResult, row1, row2 int, coords analysisSelectionCoordinates, limit int, views ...*sheetRowView) ([]int, error) {
-	if coords.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].closed.Load() || views[0].data.id != coords.ViewID) {
+	if coords.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != coords.ViewID) {
 		return nil, errors.New("分析选区的可见行视图已失效，请重新选择")
 	}
 	visual := coords.ViewID != "" || coords.VisualStart != 0 || coords.VisualEnd != 0 || coords.ExcludeThroughRow != 0
@@ -96,7 +96,7 @@ func newSelectionRowView(idx *workbook.SheetIndex, filter *FilterResult, through
 	}
 	if len(views) == 1 && views[0] != nil {
 		v.visible = views[0]
-		if v.visible.closed.Load() || v.visible.data.idx != idx || filter != nil && filter.ID != v.visible.data.filterID {
+		if v.visible.isClosed() || v.visible.data.idx != idx || filter != nil && filter.ID != v.visible.data.filterID {
 			return v, errors.New("可见行视图的来源已变化，请重新选择")
 		}
 		v.order, v.sorted = nil, v.visible.data.sorted

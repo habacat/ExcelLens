@@ -139,8 +139,8 @@ func TestConditionalDependencyBudgetAndMissingFormulaCacheRemainUnknown(t *testi
 	if err != nil || !available || !cell.CacheMissing {
 		t.Fatal("missing formula cache was replaced", cell, available, err)
 	}
-	value, notice := r.evaluator.value(cell)
-	if notice == "" || value.kind != "" {
+	value, notice := r.evaluator.engine.CellValue(toConditionalOperand(cell))
+	if notice == "" || value.Kind != "" {
 		t.Fatal("missing cache became a valid operand", value, notice)
 	}
 }

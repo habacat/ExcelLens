@@ -46,7 +46,7 @@ func TestODSRunsPreserveSourceTypesSparseCoordsAndReopen(t *testing.T) {
 		if err != nil || idx == nil {
 			t.Fatal(err, "missing index", pass)
 		}
-		if idx.RowCount() != 800000001 || idx.MaxCol != 200 || len(idx.odsRuns) != 2 || idx.XMLSize > 2048 || idx.FirstRows(2).RowCount() != 2 {
+		if idx.RowCount() != 800000001 || idx.MaxCol != 200 || len(idx.ODSRuns()) != 2 || idx.XMLSize > 2048 || idx.FirstRows(2).RowCount() != 2 {
 			t.Fatal("repeat index expanded or lost coordinates", idx.RowCount(), idx.XMLSize)
 		}
 		rows, err := w.ReadRowsByNumbersWithOptionsContext(ctx, idx, []int{799999999, 800000001}, 1, 4, RowReadOptions{FormatValue: true, IncludeFormula: true})

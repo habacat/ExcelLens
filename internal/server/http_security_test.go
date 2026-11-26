@@ -140,6 +140,8 @@ func TestControlEndpointsRejectOversizedBodies(t *testing.T) {
 	for _, endpoint := range []string{
 		"/api/index/start",
 		"/api/index/cancel",
+		"/api/conditional-stats/start",
+		"/api/conditional-stats/cancel",
 		"/api/search/cancel",
 		"/api/filter/cancel",
 		"/api/filter/clear",

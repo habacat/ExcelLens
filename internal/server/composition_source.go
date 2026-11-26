@@ -9,13 +9,15 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"excellens/internal/composition"
 	"excellens/internal/formats"
 	"excellens/internal/sourceview"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
+
+var errCompositionSourceReleased = errors.New("多表来源快照已释放")
 
 type compositionSourceInfo struct {
 	Ref    sourceview.TableRef `json:"ref"`
@@ -28,12 +30,11 @@ type compositionSourceInfo struct {
 }
 
 type compositionSnapshot struct {
-	data   *compositionSnapshotData
-	closed atomic.Bool
+	data  *compositionSnapshotData
+	lease *taskmanager.Lease[*compositionSnapshotData]
 }
 
 type compositionSnapshotData struct {
-	refs    atomic.Int64
 	plan    *composition.Append
 	info    []compositionSourceInfo
 	books   []*workbook.Workbook
@@ -41,32 +42,38 @@ type compositionSnapshotData struct {
 	bytes   int64
 }
 
+func ownCompositionSnapshot(data *compositionSnapshotData) *compositionSnapshot {
+	lease := taskmanager.NewLease(data, func() {
+		for i := len(data.release) - 1; i >= 0; i-- {
+			data.release[i]()
+		}
+	})
+	return &compositionSnapshot{data: data, lease: lease}
+}
+
+func (s *compositionSnapshot) refs() int64 {
+	if s == nil || s.lease == nil {
+		return 0
+	}
+	return s.lease.Refs()
+}
+
 func (s *compositionSnapshot) retain() (*compositionSnapshot, error) {
-	if s == nil || s.closed.Load() {
-		return nil, errors.New("多表来源快照已释放")
+	if s == nil || s.lease == nil {
+		return nil, errCompositionSourceReleased
 	}
-	for {
-		n := s.data.refs.Load()
-		if n <= 0 || s.closed.Load() {
-			return nil, errors.New("多表来源快照已释放")
-		}
-		if s.data.refs.CompareAndSwap(n, n+1) {
-			if s.closed.Load() {
-				(&compositionSnapshot{data: s.data}).close()
-				return nil, errors.New("多表来源快照已释放")
-			}
-			return &compositionSnapshot{data: s.data}, nil
-		}
+	next, err := s.lease.Retain(errCompositionSourceReleased)
+	if err != nil {
+		return nil, err
 	}
+	return &compositionSnapshot{data: next.Value(), lease: next}, nil
 }
 
 func (s *compositionSnapshot) close() {
-	if s == nil || !s.closed.CompareAndSwap(false, true) || s.data.refs.Add(-1) != 0 {
+	if s == nil || s.lease == nil {
 		return
 	}
-	for i := len(s.data.release) - 1; i >= 0; i-- {
-		s.data.release[i]()
-	}
+	s.lease.Close()
 }
 
 func (s *compositionSnapshot) scan(ctx context.Context, columns []int, visit func(composition.Record) error) error {
@@ -86,8 +93,7 @@ func (a *App) captureComposition(ctx context.Context, input sourceview.Append) (
 		return nil, err
 	}
 	data := &compositionSnapshotData{books: make([]*workbook.Workbook, len(definition.Inputs))}
-	data.refs.Store(1)
-	owner := &compositionSnapshot{data: data}
+	owner := ownCompositionSnapshot(data)
 	accepted := false
 	defer func() {
 		if !accepted {

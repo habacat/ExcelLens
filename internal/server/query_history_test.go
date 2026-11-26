@@ -222,9 +222,7 @@ func TestQueryHistoryCapacityRejectsNewWorkWithoutLeakingOrDeletingRecovery(t *t
 				} else if len(entries) != 0 {
 					t.Fatal("rejected start leaked an unpublished recovery task", entries)
 				}
-				a.sourceMu.Lock()
-				pins := len(a.sourcePins)
-				a.sourceMu.Unlock()
+				pins := a.sourcePins.Len()
 				if pins != 0 || len(a.querySem) != 0 || len(a.recoverySem) != 0 {
 					t.Fatal("rejected admission leaked a source or shared slot", pins)
 				}

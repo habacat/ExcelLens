@@ -71,7 +71,7 @@ func TestReadRowsSparseContextGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 	idx.XMLPath = path
-	idx.resident = []RowOffset{{Number: 1, Start: 0, End: int64(len(`<row r="1"><c r="A1"><v>3</v></c></row>`))}}
+	idx.RowIndex = NewRowIndex([]RowOffset{{Number: 1, Start: 0, End: int64(len(`<row r="1"><c r="A1"><v>3</v></c></row>`))}})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := w.ReadRowsSparseContext(ctx, idx, []int{0}, []int{1})

@@ -36,6 +36,7 @@ type group struct {
 func (r Roots) groups() []group {
 	rows := []group{
 		{"工作簿索引", "可重建缓存", "local", []string{"cache"}, false},
+		{"条件统计缓存", "可重建缓存", "local", []string{formats.ConditionalStatsDirectory}, false},
 		{"数据库快照", "审计来源", "local", []string{formats.DatabaseSnapshotDirectory}, true},
 		{"上传副本", "来源副本", "local", []string{"temp"}, true},
 		{"导出文件", "工作成果", "local", []string{"exports"}, true},

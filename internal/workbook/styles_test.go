@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/styles"
 )
 
 const visualStylesFixture = `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -100,7 +102,7 @@ func TestVisualStylesFromActualOOXML(t *testing.T) {
 }
 
 func TestNumberFormatFontColor(t *testing.T) {
-	values := sectionTextColors(165, `#,##0.00;[Red](#,##0.00);[Blue]"-"`)
+	values := styles.SectionTextColors(165, `#,##0.00;[Red](#,##0.00);[Blue]"-"`)
 	if values[0] != "" || values[1] != "#FF0000" || values[2] != "#0000FF" {
 		t.Fatalf("format color directives: %#v", values)
 	}
@@ -110,7 +112,7 @@ func TestNumberFormatFontColor(t *testing.T) {
 			t.Errorf("%s color = %s, want %s", tc.raw, got, tc.want)
 		}
 	}
-	if got := sectionTextColors(40, "")[1]; got != "#FF0000" {
+	if got := styles.SectionTextColors(40, "")[1]; got != "#FF0000" {
 		t.Errorf("builtin red negative: %s", got)
 	}
 }
@@ -119,17 +121,17 @@ func TestVisualColorTolerance(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		{"FF112233", "#112233"}, {"00AABBCC", "#AABBCC"}, {"#aAbBcC", "#AABBCC"}, {"broken", ""}, {"12345", ""},
 	} {
-		if got := parseHexColor(tc.in); got != tc.want {
+		if got := styles.ParseHexColor(tc.in); got != tc.want {
 			t.Errorf("%s => %s, want %s", tc.in, got, tc.want)
 		}
 	}
-	if got := tintHex("#000000", 1); got != "#FFFFFF" {
+	if got := styles.TintHex("#000000", 1); got != "#FFFFFF" {
 		t.Errorf("positive tint: %s", got)
 	}
-	if got := tintHex("#FFFFFF", -1); got != "#000000" {
+	if got := styles.TintHex("#FFFFFF", -1); got != "#000000" {
 		t.Errorf("negative tint: %s", got)
 	}
-	if got := tintHex("#112233", 0); got != "#112233" {
+	if got := styles.TintHex("#112233", 0); got != "#112233" {
 		t.Errorf("zero tint: %s", got)
 	}
 }

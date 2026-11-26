@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
 func styledText(t *testing.T, w *Workbook, input string) (string, *RichText, error) {
@@ -63,7 +64,7 @@ func TestRichTextPlainAndPhoneticOnlyContentAllocatesNoStyledResult(t *testing.T
 func TestRichTextThemeIndexedAutoAndTintColorsUseWorkbookPalette(t *testing.T) {
 	w := &Workbook{ThemeColors: []string{"#224466"}, IndexedColors: []string{"#ABCDEF"}}
 	text, rich, err := styledText(t, w, `<is><r><rPr><color theme="0" tint="0.5"/></rPr><t>甲</t></r><r><rPr><color indexed="0"/></rPr><t>乙</t></r><r><rPr><color auto="1"/></rPr><t>丙</t></r></is>`)
-	if err != nil || rich.Notice != "" || text != "甲乙丙" || rich.Runs[0].Font.Color != tintHex("#224466", 0.5) || rich.Runs[1].Font.Color != "#ABCDEF" || !rich.Runs[2].Font.AutoColor || rich.Runs[2].Font.Color != "" {
+	if err != nil || rich.Notice != "" || text != "甲乙丙" || rich.Runs[0].Font.Color != styles.TintHex("#224466", 0.5) || rich.Runs[1].Font.Color != "#ABCDEF" || !rich.Runs[2].Font.AutoColor || rich.Runs[2].Font.Color != "" {
 		t.Fatal(text, rich, err)
 	}
 	if err := ValidateRichText(text, rich); err != nil {

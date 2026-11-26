@@ -262,9 +262,7 @@ func TestProfileDistributionQueuedCancellationEvictionAndMaintenanceReleasePins(
 			a, _ := quickFixture(t)
 			req := profileSource(t, a, "First", "A2", "B6", rowViewRequest{})
 			wb := a.currentWorkbook()
-			a.sourceMu.Lock()
-			baseline := a.sourcePins[wb]
-			a.sourceMu.Unlock()
+			baseline := a.sourcePins.Count(wb)
 			for at := 0; at < cap(a.querySem); at++ {
 				a.querySem <- struct{}{}
 			}
@@ -277,9 +275,7 @@ func TestProfileDistributionQueuedCancellationEvictionAndMaintenanceReleasePins(
 			go func() { defer close(done); a.handleProfile(response, request) }()
 			deadline := time.Now().Add(2 * time.Second)
 			for {
-				a.sourceMu.Lock()
-				pins := a.sourcePins[wb]
-				a.sourceMu.Unlock()
+				pins := a.sourcePins.Count(wb)
 				if pins > baseline {
 					break
 				}
@@ -317,9 +313,7 @@ func TestProfileDistributionQueuedCancellationEvictionAndMaintenanceReleasePins(
 			if kind == "cancel" && response.Body.Len() != 0 || kind != "cancel" && response.Code != 409 {
 				t.Fatal(kind, response.Code, response.Body.String())
 			}
-			a.sourceMu.Lock()
-			pins := a.sourcePins[wb]
-			a.sourceMu.Unlock()
+			pins := a.sourcePins.Count(wb)
 			expected := baseline
 			if kind == "evict" {
 				expected--

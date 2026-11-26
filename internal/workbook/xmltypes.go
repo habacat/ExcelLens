@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"io"
 	"strings"
+
+	"excellens/internal/styles"
 )
 
 type workbookSheetXML struct {
@@ -112,10 +114,10 @@ func decodeRichText(d *xml.Decoder, start xml.StartElement) (string, error) {
 	return value, err
 }
 
-func decodeRichTextContent(d *xml.Decoder, start xml.StartElement, observe func(string, *richFontXML, bool)) (string, bool, error) {
+func decodeRichTextContent(d *xml.Decoder, start xml.StartElement, observe func(string, *styles.RichFontXML, bool)) (string, bool, error) {
 	var result strings.Builder
 	parents := []string{start.Name.Local}
-	var font *richFontXML
+	var font *styles.RichFontXML
 	hasRuns := false
 	for len(parents) > 0 {
 		tok, err := d.Token()
@@ -134,12 +136,12 @@ func decodeRichTextContent(d *xml.Decoder, start xml.StartElement, observe func(
 			}
 			if observe != nil && len(parents) == 2 && parent == "r" && t.Name.Local == "rPr" {
 				previous := font
-				font = new(richFontXML)
+				font = new(styles.RichFontXML)
 				if err := d.DecodeElement(font, &t); err != nil {
 					return "", false, err
 				}
 				if previous != nil {
-					font.unsupported = true
+					font.Unsupported = true
 				}
 				continue
 			}

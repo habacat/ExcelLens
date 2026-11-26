@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 // filterScanner is shared by the original single-pass filter/sort and durable
@@ -190,19 +191,19 @@ func filterOrderDirectory(w *Workbook) string {
 	return filepath.Join(root, "queries")
 }
 
-func addFilterSortRecord(ctx context.Context, sorter *rowSorter, scanner *filterScanner, keys []SortKey, scratch []sortValue, position int) error {
+func addFilterSortRecord(ctx context.Context, sorter *rowindex.RowSorter, scanner *filterScanner, keys []SortKey, scratch []sortValue, position int) error {
 	clear(scratch)
 	var bytes int64
 	for k, slot := range scanner.sortSlots {
 		if scanner.exists[slot] {
 			scratch[k] = makeSortValue(scanner.cells[slot], keys[k].Mode)
 		}
-		bytes += sortValueBytes(scratch[k])
-		if bytes > sorter.maxRecord {
+		bytes += rowindex.SortValueBytes(scratch[k])
+		if bytes > sorter.MaxRecord() {
 			return errors.New("单行排序比较键过长，请减少排序列或缩小范围；此次排序未发布结果")
 		}
 	}
-	return sorter.add(ctx, position, scratch)
+	return sorter.Add(ctx, position, scratch)
 }
 
 func (w *Workbook) filterRowOrder(ctx context.Context, idx *SheetIndex, rules []FilterRule, opts FilterOptions, progress func(int, int)) (*RowOrder, error) {
@@ -215,24 +216,24 @@ func (w *Workbook) filterRowOrder(ctx context.Context, idx *SheetIndex, rules []
 		return nil, err
 	}
 	defer scanner.close()
-	order, err := newRowOrderBuilder(filterOrderDirectory(w), idx.RowCount(), residentOrderRows, &processQueryQuota)
+	order, err := rowindex.NewRowOrderBuilder(filterOrderDirectory(w), idx.RowCount(), residentOrderRows, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer order.abort()
-	var sorter *rowSorter
+	defer order.Abort()
+	var sorter *rowindex.RowSorter
 	if len(keys) > 0 {
-		sorter, err = newRowSorter(filterOrderDirectory(w), idx.RowCount(), keys, formats.QuerySortMemoryBytes, &processQueryQuota)
+		sorter, err = rowindex.NewRowSorter(filterOrderDirectory(w), idx.RowCount(), keys, formats.QuerySortMemoryBytes, nil)
 		if err != nil {
 			return nil, err
 		}
-		defer sorter.abort()
+		defer sorter.Abort()
 	}
 	rowKeys := make([]sortValue, len(keys))
 	lastReport := time.Now()
 	err = scanner.scan(ctx, 0, opts.HeaderRow, func(position int, header bool) error {
 		if header || sorter == nil {
-			return order.add(ctx, position)
+			return order.Add(ctx, position)
 		}
 		return addFilterSortRecord(ctx, sorter, scanner, keys, rowKeys, position)
 	}, func(next int) error {
@@ -247,12 +248,12 @@ func (w *Workbook) filterRowOrder(ctx context.Context, idx *SheetIndex, rules []
 	}
 	if sorter != nil {
 		clear(rowKeys)
-		if err := sorter.finish(ctx, func(position int) error { return order.add(ctx, position) }, opts.Phase); err != nil {
+		if err := sorter.Finish(ctx, func(position int) error { return order.Add(ctx, position) }, opts.Phase); err != nil {
 			return nil, err
 		}
 		if opts.Phase != nil {
 			opts.Phase("正在建立行号定位", 0, 0)
 		}
 	}
-	return order.finish(ctx)
+	return order.Finish(ctx)
 }

@@ -17,7 +17,7 @@ func BenchmarkNativeJournalWriter(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer w.offsets.close()
+	defer w.offsets.Close()
 	fields := []string{"费控系统", "11110000 210923 费控系统 A 101016", "00000000000000000022", "记账", "23-09-21", "记账", "人员,", "人员,", "不需要审批", "CNY", "123456.78", "", "CNY", "123456.78", ""}
 	for segment := 0; segment < 12; segment++ {
 		fields = append(fields, "000000", "缺省科目")
@@ -59,7 +59,7 @@ func BenchmarkNativeViewportRead(b *testing.B) {
 	if err := f.Close(); err != nil {
 		b.Fatal(err)
 	}
-	idx := &SheetIndex{XMLPath: path, RowIndex: NewRowIndex(w.offsets.rows), XMLSize: w.count, MaxRow: w.rows, MaxCol: w.cols}
+	idx := &SheetIndex{XMLPath: path, RowIndex: NewRowIndex(w.offsets.Rows()), XMLSize: w.count, MaxRow: w.rows, MaxCol: w.cols}
 	wb := &Workbook{}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -96,7 +96,7 @@ func makeNativeScanBenchmark(b *testing.B) (*Workbook, *SheetIndex) {
 	if err := f.Close(); err != nil {
 		b.Fatal(err)
 	}
-	return &Workbook{}, &SheetIndex{XMLPath: f.Name(), XMLSize: w.count, RowIndex: NewRowIndex(w.offsets.rows), MaxRow: w.rows, MaxCol: w.cols}
+	return &Workbook{}, &SheetIndex{XMLPath: f.Name(), XMLSize: w.count, RowIndex: NewRowIndex(w.offsets.Rows()), MaxRow: w.rows, MaxCol: w.cols}
 }
 
 func BenchmarkNativeColdFilter(b *testing.B) {

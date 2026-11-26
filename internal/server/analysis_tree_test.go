@@ -99,7 +99,7 @@ func TestTreeSourceIsRetainedBeforeQueueAndSurvivesAllOriginalOwners(t *testing.
 	if root.Result.Tree == nil || root.Result.Grand.Exact != "11.3" || root.Result.Included != 5 || len(root.Result.Rows) != 2 || root.Result.InvalidNumbers != 1 || root.Result.MissingFormulaCaches != 1 {
 		t.Fatal(root.Result)
 	}
-	data := root.SourceRows.data
+	source := root.SourceRows
 	for i := 0; i < cap(a.analysisSem); i++ {
 		a.analysisSem <- struct{}{}
 	}
@@ -119,7 +119,7 @@ func TestTreeSourceIsRetainedBeforeQueueAndSurvivesAllOriginalOwners(t *testing.
 	delete(a.analysisJobs, root.ID)
 	a.analysisMu.Unlock()
 	root.closeSourceRows()
-	if data.refs.Load() < 1 {
+	if source.refs() < 1 {
 		t.Fatal("queued child did not retain its source")
 	}
 	release()
@@ -127,8 +127,8 @@ func TestTreeSourceIsRetainedBeforeQueueAndSurvivesAllOriginalOwners(t *testing.
 	if r.Grand.Exact != "0.3" || r.MetricGrand[1].Exact != "0.15" || r.MetricGrand[2].Exact != "1" || r.Included != 2 || len(r.Rows) != 2 || !reflect.DeepEqual(r.Rows[0].Keys, []string{"北", "001"}) || !reflect.DeepEqual(r.Rows[1].Keys, []string{"北", "1"}) || !r.Tree.HasChildren {
 		t.Fatal("child widened, changed leading-zero labels or summed child averages", r)
 	}
-	if data.refs.Load() != 0 {
-		t.Fatal("last source reference was not released", data.refs.Load())
+	if source.refs() != 0 {
+		t.Fatal("last source reference was not released", source.refs())
 	}
 	a.analysisMu.Lock()
 	parents := len(a.analysisJobs)
@@ -227,9 +227,7 @@ func TestTreeQueueCancelClearAndAppCloseReleaseEverySourceReference(t *testing.T
 	default:
 		t.Fatal("App close returned before child exit")
 	}
-	a.rootApp().sourceMu.Lock()
-	pins := len(a.rootApp().sourcePins)
-	a.rootApp().sourceMu.Unlock()
+	pins := a.rootApp().sourcePins.Len()
 	if pins != 0 {
 		t.Fatal("tree leaked a source pin", pins)
 	}

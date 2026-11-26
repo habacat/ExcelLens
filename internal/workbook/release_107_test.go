@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/styles"
 )
 
 func TestAccountingZeroSectionsWithQuestionMarkPlaceholders(t *testing.T) {
@@ -47,12 +49,12 @@ func TestAccountingZeroSectionsWithQuestionMarkPlaceholders(t *testing.T) {
 		`0;-0;"-"??"元"`, `0;-0;"-"??"万"`, `0;-0;"-"??)`,
 		`0;-0;"-"??%`, `0;-0;"-"??\元`,
 	} {
-		if dash, ok := formatZeroSectionDash(splitFormatSections(format)[2]); ok {
-			t.Fatalf("incorrectly dropped literal from %q to %q", format, dash)
+		if got := styles.FormatCustomNumber(0, format, false); got == "-" {
+			t.Fatalf("incorrectly dropped literal from %q to %q", format, got)
 		}
 	}
 	for _, format := range []string{`0.00;[Red](0.00);0.00`, `0.0;0.0;"none"`, `0.00;-0.00;0.00`} {
-		if got := formatCustomNumber(0, format, false); got == "-" {
+		if got := styles.FormatCustomNumber(0, format, false); got == "-" {
 			t.Fatalf("unrelated zero format %s changed to dash", format)
 		}
 	}

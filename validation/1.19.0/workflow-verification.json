@@ -1,0 +1,38 @@
+{
+  "version": "1.19.0",
+  "scope": "Targeted conditional evaluation, cache publication, lease lifetime and ordered UI control requests",
+  "result": "PASS",
+  "targetedPackages": [
+    "conditional",
+    "workbook",
+    "taskmanager",
+    "server"
+  ],
+  "cases": [
+    "single process concurrent cache publication respects the directory budget",
+    "cleanup preserves unrelated DB files",
+    "closing a shared lease releases the payload once",
+    "source-ordered sliding sum recovers after an outlier leaves",
+    "queued cancellation precedes a subsequent retry"
+  ],
+  "conditionalCellBenchmark": {
+    "samplesPerRevision": 5,
+    "beforeBytesPerOperation": 280,
+    "afterBytesPerOperation": 264,
+    "beforeAllocations": 4,
+    "afterAllocations": 3
+  },
+  "manualDesktopAcceptance": false,
+  "wpsAcceptance": false,
+  "realWorkbook": {
+    "sourceDigestUnchanged": true,
+    "originalScreenshotNoticeAbsent": true,
+    "nativeDateAndFillMatch": true
+  },
+  "syntheticBrowser": "conditional-browser.json",
+  "nativeFixtures": {
+    "fileCount": 4,
+    "observations": 272,
+    "source": "internal/workbook/testdata/conditional-native"
+  }
+}

@@ -15,6 +15,7 @@ import (
 	"sort"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 const (
@@ -251,7 +252,7 @@ func writeIndex(idx *SheetIndex, count int, spill *os.File) error {
 		return err
 	}
 	if count > MaxResidentRowOffsets {
-		rows, err := mapIndexRows(idx.IndexPath, indexRowsStart(idx.Dimension), count)
+		rows, err := rowindex.MapIndexRows(idx.IndexPath, rowindex.IndexRowsStart(idx.Dimension), count)
 		if err != nil {
 			return err
 		}
@@ -303,7 +304,7 @@ func writeIndexFile(idx *SheetIndex, count int, spill *os.File, digest io.Writer
 	} else {
 		var record [diskRowOffsetBytes]byte
 		for _, row := range idx.RowOffsets() {
-			if err := writeRowOffset(payload, &record, row); err != nil {
+			if err := rowindex.WriteRowOffset(payload, &record, row); err != nil {
 				return fail(err)
 			}
 		}
@@ -474,7 +475,7 @@ func loadIndex(indexPath, xmlPath, sheetPath string) (*SheetIndex, error) {
 	}
 	idx := &SheetIndex{SheetPath: sheetPath, XMLPath: xmlPath, IndexPath: indexPath, Dimension: dim, MaxRow: int(maxRow), MaxCol: int(maxCol), XMLSize: int64(xmlSize), RowIndex: NewRowIndex(rows), SharedAnchors: anchors, HyperlinkStart: hyperlinkStart}
 	if count > MaxResidentRowOffsets {
-		idx.RowIndex, err = mapIndexRows(indexPath, indexRowsStart(dim), int(count))
+		idx.RowIndex, err = rowindex.MapIndexRows(indexPath, rowindex.IndexRowsStart(dim), int(count))
 		if err != nil {
 			return nil, err
 		}

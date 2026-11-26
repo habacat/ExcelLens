@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"sync"
+
+	"excellens/internal/taskmanager"
 )
 
 // Each browser session shares these process-wide capacities. Background
@@ -14,32 +16,24 @@ type workAdmission struct {
 }
 
 func newWorkAdmission() workAdmission {
+	adm := taskmanager.NewAdmission()
 	return workAdmission{
-		indexSem: make(chan struct{}, 2), querySem: make(chan struct{}, 2), exportSem: make(chan struct{}, 2),
-		inspectSem: make(chan struct{}, 1), analysisSem: make(chan struct{}, 1),
-		scanQueries: make(chan struct{}, 1), scanIndexes: make(chan struct{}, 1),
+		indexSem:    adm.Index,
+		querySem:    adm.Query,
+		exportSem:   adm.Export,
+		inspectSem:  adm.Inspect,
+		analysisSem: adm.Analysis,
+		scanQueries: adm.ScanQueries,
+		scanIndexes: adm.ScanIndexes,
 	}
 }
 
 func (work workAdmission) backgroundQuery(ctx context.Context) (func(), error) {
-	return acquireBackground(ctx, work.scanQueries, work.querySem)
+	return taskmanager.AcquireBackground(ctx, work.scanQueries, work.querySem)
 }
 
 func (work workAdmission) backgroundIndex(ctx context.Context) (func(), error) {
-	return acquireBackground(ctx, work.scanIndexes, work.indexSem)
-}
-
-func acquireBackground(ctx context.Context, background, total chan struct{}) (func(), error) {
-	releaseBudget, err := acquireWorkSlot(ctx, background)
-	if err != nil {
-		return nil, err
-	}
-	releaseSlot, err := acquireWorkSlot(ctx, total)
-	if err != nil {
-		releaseBudget()
-		return nil, err
-	}
-	return func() { releaseSlot(); releaseBudget() }, nil
+	return taskmanager.AcquireBackground(ctx, work.scanIndexes, work.indexSem)
 }
 
 // Capture and pin the source under the cache read lock. A request that needs
@@ -56,18 +50,7 @@ func (a *App) acquireQuerySlot(ctx context.Context) (func(), error) {
 }
 
 func acquireWorkSlot(ctx context.Context, slots chan struct{}) (func(), error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if slots == nil {
-		return func() {}, nil
-	}
-	select {
-	case slots <- struct{}{}:
-		return sync.OnceFunc(func() { <-slots }), nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return taskmanager.AcquireSlot(ctx, slots)
 }
 
 func (a *App) lockQueryRead(ctx context.Context) (func(), error) {

@@ -230,9 +230,7 @@ func TestCatalogueHTTPQueueCancellationPinsHistoryAndWorkbookReplacement(t *test
 	if response := reconcilePost(t, a, "/api/catalogue/start", catalogueStartRequest{WorkbookKey: wb.Fingerprint, Book: sourceBookID(wb), Mode: "read"}); response.Code != 429 {
 		t.Fatal("active directory capacity not enforced", response.Code)
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 2 {
 		t.Fatal("queued task did not pin source", pins)
 	}
@@ -263,9 +261,7 @@ func TestCatalogueHTTPQueueCancellationPinsHistoryAndWorkbookReplacement(t *test
 	if len(a.catalogueJobs) != 0 || second.Snapshot != nil || second.Status != "cancelled" {
 		t.Fatal("replaced source retained task/result")
 	}
-	a.sourceMu.Lock()
-	pins = a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins = a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("cancelled/replaced task leaked source pin", pins)
 	}

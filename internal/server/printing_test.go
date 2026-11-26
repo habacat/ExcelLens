@@ -224,9 +224,7 @@ func TestPrintHTTPQueueCancellationPinsReplacementAndLateCompletion(t *testing.T
 	if response := reconcilePost(t, a, "/api/printing/start", printStartRequest{wb.Fingerprint, sourceBookID(wb), "明细", printOptions()}); response.Code != 429 {
 		t.Fatal("print active task limit not enforced", response.Code)
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 2 {
 		t.Fatal("queued previews did not pin source", pins)
 	}
@@ -255,9 +253,7 @@ func TestPrintHTTPQueueCancellationPinsReplacementAndLateCompletion(t *testing.T
 	default:
 		t.Fatal("workbook replacement left print worker running")
 	}
-	a.sourceMu.Lock()
-	pins = a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins = a.sourcePins.Count(wb)
 	if pins != 0 || len(a.printJobs) != 0 || second.Snapshot != nil {
 		t.Fatal("replacement leaked print pins or snapshots", pins)
 	}
@@ -507,9 +503,7 @@ func TestPrintHTTPQueuedPageClearAndRequestCancellationReleasePins(t *testing.T)
 			go func() { a.routes().ServeHTTP(response, request); close(done) }()
 			deadline := time.Now().Add(time.Second)
 			for {
-				a.sourceMu.Lock()
-				pins := a.sourcePins[job.Workbook]
-				a.sourceMu.Unlock()
+				pins := a.sourcePins.Count(job.Workbook)
 				if pins == 1 {
 					break
 				}
@@ -533,9 +527,7 @@ func TestPrintHTTPQueuedPageClearAndRequestCancellationReleasePins(t *testing.T)
 			case <-time.After(time.Second):
 				t.Fatal("obsolete page waited for a query slot after cancellation")
 			}
-			a.sourceMu.Lock()
-			pins := a.sourcePins[job.Workbook]
-			a.sourceMu.Unlock()
+			pins := a.sourcePins.Count(job.Workbook)
 			if pins != 0 {
 				t.Fatal("page request leaked source pin", pins)
 			}

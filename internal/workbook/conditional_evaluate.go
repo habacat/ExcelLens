@@ -6,16 +6,20 @@ import (
 	"sort"
 	"strings"
 
+	"excellens/internal/conditional"
+	"excellens/internal/excelformula"
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
-const conditionalWorkNotice = "条件格式超过本次求值预算"
+const conditionalWorkNotice = conditional.WorkNotice
 
 type ConditionalFormatResult struct {
 	Style      DifferentialStyle `json:"style"`
 	Matched    int               `json:"matched,omitempty"`
 	Priorities []int             `json:"priorities,omitempty"`
 	Notice     string            `json:"notice,omitempty"`
+	Pending    bool              `json:"pending,omitempty"`
 }
 
 // available=false means not read, rather than a fabricated blank or zero.
@@ -23,41 +27,56 @@ type ConditionalFormatResult struct {
 type ConditionalCellResolver func(row, col int) (cell CellData, available bool, err error)
 
 type ConditionalEvaluator struct {
-	indexed         func(*conditionalExpr, *conditionalGroup) (conditionalValue, string, error, bool)
+	engine          *conditional.Engine
 	index           *SourceConditionalFormats
 	ctx             context.Context
-	work, textBytes int
 	groups, rules   []int
 	marked          []uint64
-	row, col        int
-	cell            CellData
-	current         conditionalValue
-	currentReady    bool
-	currentNotice   string
 	resolver        ConditionalCellResolver
-	foreignCell     func(string, int, int) (CellData, string, error)
-	rangeResolver   ConditionalRangeResolver
+	operandResolver conditional.CellResolver
 }
 
-func (e *ConditionalEvaluator) SetRangeResolver(r ConditionalRangeResolver) {
-	e.rangeResolver = r
+func (e *ConditionalEvaluator) SetRangeResolver(r conditional.RangeResolver) {
+	e.engine.RangeResolver = r
 }
 
 func (index *SourceConditionalFormats) NewEvaluator(ctx context.Context) *ConditionalEvaluator {
 	count := 0
+	date1904 := false
 	if index != nil {
 		count = len(index.groups)
+		date1904 = index.date1904
 	}
-	return &ConditionalEvaluator{index: index, ctx: ctx, work: formats.ConditionalEvalWork, textBytes: formats.ConditionalEvalTextBytes, marked: make([]uint64, (count+63)/64)}
+	e := &ConditionalEvaluator{
+		engine: conditional.NewEngine(ctx, date1904),
+		index:  index,
+		ctx:    ctx,
+		marked: make([]uint64, (count+63)/64),
+	}
+	e.operandResolver = func(row, col int) (conditional.CellOperand, bool, error) {
+		cell, available, err := e.resolver(row, col)
+		return toConditionalOperand(cell), available, err
+	}
+	return e
+}
+
+func toConditionalOperand(cell CellData) conditional.CellOperand {
+	return conditional.CellOperand{Raw: cell.Raw, Type: cell.Type, CacheMissing: cell.CacheMissing}
+}
+
+func groupAreas(ranges []CellMerge) []conditional.Area {
+	if len(ranges) == 0 {
+		return nil
+	}
+	areas := make([]conditional.Area, len(ranges))
+	for i, r := range ranges {
+		areas[i] = conditional.Area{Row: r.Row, Col: r.Col, EndRow: r.EndRow, EndCol: r.EndCol}
+	}
+	return areas
 }
 
 func (e *ConditionalEvaluator) spend(n int) bool {
-	if n < 0 || n > e.work {
-		e.work = 0
-		return false
-	}
-	e.work -= n
-	return true
+	return e.engine.Spend(n)
 }
 
 func (e *ConditionalEvaluator) query(at int, row, col int) bool {
@@ -126,9 +145,12 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 		return &ConditionalFormatResult{Notice: "条件格式超过本次求值预算，原值保留"}, nil
 	}
 	sort.Ints(e.rules)
-	e.row, e.col, e.cell, e.resolver = row, col, cell, resolver
-	e.currentReady = false
-	e.currentNotice = ""
+	e.resolver = resolver
+	var operand conditional.CellResolver
+	if resolver != nil {
+		operand = e.operandResolver
+	}
+	e.engine.ResetCell(row, col, toConditionalOperand(cell), operand)
 	out := &ConditionalFormatResult{}
 	for _, id := range e.rules {
 		if err := e.ctx.Err(); err != nil {
@@ -139,12 +161,16 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 			out.Notice = "条件格式超过本次求值预算，低优先级样式未应用"
 			break
 		}
+		e.engine.Pending = false
 		matched, notice, err := e.match(rule)
 		if err != nil {
 			return nil, err
 		}
 		if notice != "" {
 			out.Notice = fmt.Sprintf("条件规则%d：%s；低优先级样式未应用", rule.source.Priority, notice)
+			if e.engine.Pending {
+				out.Pending = true
+			}
 			break
 		}
 		if !matched {
@@ -159,7 +185,7 @@ func (e *ConditionalEvaluator) Evaluate(row, col int, cell CellData, resolver Co
 			out.Priorities = append(out.Priorities, rule.source.Priority)
 		}
 		if rule.source.DxfID != nil {
-			mergeDifferentialStyle(&out.Style, index.styles[*rule.source.DxfID])
+			styles.MergeDifferentialStyle(&out.Style, index.styles[*rule.source.DxfID])
 		}
 		if rule.source.StopIfTrue {
 			break
@@ -180,49 +206,6 @@ func conditionalSortCost(n int) int {
 	return cost
 }
 
-func (e *ConditionalEvaluator) value(cell CellData) (conditionalValue, string) {
-	if cell.CacheMissing {
-		return conditionalValue{}, "所引用公式没有保存计算结果"
-	}
-	if len(cell.Raw) > formats.ConditionalOperandBytes || len(cell.Raw) > e.textBytes {
-		return conditionalValue{}, "条件操作数超过本次文本容量"
-	}
-	e.textBytes -= len(cell.Raw)
-	switch cell.Type {
-	case "e":
-		return conditionalValue{kind: "error", text: cell.Raw}, ""
-	case "s", "str", "inlineStr", "text", "string":
-		return conditionalText(cell.Raw), ""
-	case "b":
-		switch strings.ToUpper(cell.Raw) {
-		case "TRUE", "1":
-			return conditionalValue{kind: "boolean", boolean: true}, ""
-		case "FALSE", "0":
-			return conditionalValue{kind: "boolean"}, ""
-		}
-		return conditionalValue{}, "布尔源值无效"
-	case "", "n":
-		if cell.Raw == "" {
-			return conditionalValue{kind: "blank"}, ""
-		}
-		number, ok := parseConditionalDecimal(cell.Raw)
-		if !ok {
-			return conditionalValue{}, "数值源值无效，未按文本或零替代"
-		}
-		return conditionalValue{kind: "number", number: number}, ""
-	default:
-		return conditionalValue{}, "条件规则遇到尚未支持的源类型"
-	}
-}
-
-func (e *ConditionalEvaluator) currentValue() (conditionalValue, string) {
-	if !e.currentReady {
-		e.current, e.currentNotice = e.value(e.cell)
-		e.currentReady = true
-	}
-	return e.current, e.currentNotice
-}
-
 func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, string, error) {
 	s := rule.source
 	group := &e.index.groups[rule.group]
@@ -240,31 +223,31 @@ func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, strin
 		if len(rule.exprs) < need {
 			return false, "条件比较的表达式数量无效", nil
 		}
-		left, notice := e.currentValue()
+		left, notice := e.engine.CurrentValue()
 		if notice != "" {
 			return false, notice, nil
 		}
-		right, notice, err := e.evalExpr(rule.exprs[0], group)
+		right, notice, err := e.engine.Eval(rule.exprs[0], group.anchorRow, group.anchorCol, group.areas)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
-		cmp, valid := compareConditionalValues(left, right)
+		cmp, valid := conditional.CompareValues(left, right)
 		if !valid {
 			return false, "", nil
 		}
 		if s.Operator != "between" && s.Operator != "notBetween" {
-			return matchConditionalComparison(cmp, s.Operator), "", nil
+			return excelformula.MatchesComparison(cmp, s.Operator), "", nil
 		}
-		other, notice, err := e.evalExpr(rule.exprs[1], group)
+		other, notice, err := e.engine.Eval(rule.exprs[1], group.anchorRow, group.anchorCol, group.areas)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
-		upper, valid := compareConditionalValues(left, other)
+		upper, valid := conditional.CompareValues(left, other)
 		if !valid {
 			return false, "", nil
 		}
 		// Excel allows reversed bounds in between/notBetween (e.g. 10 and 5).
-		if boundCmp, ok := compareConditionalValues(right, other); ok && boundCmp > 0 {
+		if boundCmp, ok := conditional.CompareValues(right, other); ok && boundCmp > 0 {
 			cmp, upper = upper, cmp
 		}
 		match := cmp >= 0 && upper <= 0
@@ -276,147 +259,68 @@ func (e *ConditionalEvaluator) match(rule *compiledConditionalRule) (bool, strin
 		if len(rule.exprs) < 1 {
 			return false, "条件格式公式数量无效", nil
 		}
-		val, notice, err := e.evalExpr(rule.exprs[0], group)
+		val, notice, err := e.engine.Eval(rule.exprs[0], group.anchorRow, group.anchorCol, group.areas)
 		if notice != "" || err != nil {
 			return false, notice, err
 		}
-		switch val.kind {
+		switch val.Kind {
 		case "number":
-			return conditionalValueIsNonZero(val), "", nil
+			return conditional.IsNonZero(val), "", nil
 		case "boolean":
-			return val.boolean, "", nil
+			return val.Boolean, "", nil
 		case "blank", "error":
 			return false, "", nil
 		}
 		return false, "文本条件公式结果不能默认为布尔值", nil
 	case "containsErrors", "notContainsErrors":
-		if e.cell.CacheMissing {
+		if e.engine.Cell.CacheMissing {
 			return false, "所引用公式没有保存计算结果", nil
 		}
-		match := e.cell.Type == "e"
+		match := e.engine.Cell.Type == "e"
 		if s.Type == "notContainsErrors" {
 			match = !match
 		}
 		return match, "", nil
 	case "containsBlanks", "notContainsBlanks":
-		value, notice := e.currentValue()
+		value, notice := e.engine.CurrentValue()
 		if notice != "" {
 			return false, notice, nil
 		}
-		if value.kind == "error" {
+		if value.Kind == "error" {
 			return false, "", nil
 		}
-		match := value.kind == "blank" || value.kind == "text" && strings.Trim(value.text, " ") == ""
+		match := value.Kind == "blank" || (value.Kind == "text" && strings.Trim(value.Text, " ") == "")
 		if s.Type == "notContainsBlanks" {
 			match = !match
 		}
 		return match, "", nil
 	case "containsText", "notContainsText", "beginsWith", "endsWith":
-		value, notice := e.currentValue()
+		value, notice := e.engine.CurrentValue()
 		if notice != "" {
 			return false, notice, nil
 		}
-		if value.kind == "error" {
+		if value.Kind == "error" {
 			return s.Type == "notContainsText", "", nil
 		}
-		if value.kind == "blank" {
-			value = conditionalText("")
+		if value.Kind == "blank" {
+			value = conditional.TextValue("")
 		}
-		if value.kind != "text" {
+		if value.Kind != "text" {
 			return false, "文本条件需要尚未支持的数值或布尔转文本语义", nil
 		}
-		needle := filterFoldKey(s.Text)
+		needle := excelformula.FoldString(s.Text)
 		matched := false
 		switch s.Type {
 		case "containsText":
-			matched = strings.Contains(value.folded, needle)
+			matched = strings.Contains(value.Folded, needle)
 		case "notContainsText":
-			matched = !strings.Contains(value.folded, needle)
+			matched = !strings.Contains(value.Folded, needle)
 		case "beginsWith":
-			matched = strings.HasPrefix(value.folded, needle)
+			matched = strings.HasPrefix(value.Folded, needle)
 		case "endsWith":
-			matched = strings.HasSuffix(value.folded, needle)
+			matched = strings.HasSuffix(value.Folded, needle)
 		}
 		return matched, "", nil
 	}
 	return false, "该条件格式需要范围统计或尚未支持的规则，不自动扫描整表", nil
-}
-
-// First (higher-priority) property wins. Copy containers before adding lower
-// properties so evaluated cells never mutate the immutable workbook palette.
-func mergeDifferentialStyle(dst *DifferentialStyle, src DifferentialStyle) {
-	a, b := &dst.Font, src.Font
-	if a.Name == "" {
-		a.Name = b.Name
-	}
-	if a.Size == 0 {
-		a.Size = b.Size
-	}
-	if a.Color == "" && !a.AutoColor {
-		a.Color, a.AutoColor = b.Color, b.AutoColor
-	}
-	if a.Bold == nil {
-		a.Bold = copyConditionalProperty(b.Bold)
-	}
-	if a.Italic == nil {
-		a.Italic = copyConditionalProperty(b.Italic)
-	}
-	if a.Strike == nil {
-		a.Strike = copyConditionalProperty(b.Strike)
-	}
-	if a.Underline == "" {
-		a.Underline = b.Underline
-	}
-	if a.Vertical == "" {
-		a.Vertical = b.Vertical
-	}
-	if dst.Background == nil {
-		dst.Background = copyConditionalProperty(src.Background)
-	}
-	if dst.NumberFormat == nil {
-		dst.NumberFormat = copyConditionalProperty(src.NumberFormat)
-	}
-	if dst.Horizontal == nil {
-		dst.Horizontal = copyConditionalProperty(src.Horizontal)
-	}
-	if dst.Vertical == nil {
-		dst.Vertical = copyConditionalProperty(src.Vertical)
-	}
-	if dst.Wrap == nil {
-		dst.Wrap = copyConditionalProperty(src.Wrap)
-	}
-	if dst.Rotation == nil {
-		dst.Rotation = copyConditionalProperty(src.Rotation)
-	}
-	if src.Border != nil {
-		if dst.Border == nil {
-			dst.Border = &DifferentialBorders{}
-		}
-		for _, side := range []struct {
-			target **DifferentialBorderSide
-			source *DifferentialBorderSide
-		}{{&dst.Border.Top, src.Border.Top}, {&dst.Border.Bottom, src.Border.Bottom}, {&dst.Border.Left, src.Border.Left}, {&dst.Border.Right, src.Border.Right}} {
-			if side.source == nil {
-				continue
-			}
-			if *side.target == nil {
-				*side.target = &DifferentialBorderSide{}
-			}
-			a, b := *side.target, side.source
-			if a.Style == nil {
-				a.Style = copyConditionalProperty(b.Style)
-			}
-			if a.Color == nil && !a.AutoColor {
-				a.Color, a.AutoColor = copyConditionalProperty(b.Color), b.AutoColor
-			}
-		}
-	}
-}
-
-func copyConditionalProperty[T any](source *T) *T {
-	if source == nil {
-		return nil
-	}
-	value := *source
-	return &value
 }

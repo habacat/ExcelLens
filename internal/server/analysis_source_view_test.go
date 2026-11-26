@@ -291,8 +291,8 @@ func TestAnalysisSourceConcurrentConsumersKeepIndependentLeasesAcrossClearAndApp
 	for err := range failures {
 		t.Error(err)
 	}
-	if owner.data.refs.Load() != 0 {
-		t.Fatal("final concurrent source lease did not close", owner.data.refs.Load())
+	if owner.refs() != 0 {
+		t.Fatal("final concurrent source lease did not close", owner.refs())
 	}
 }
 
@@ -409,8 +409,8 @@ func TestAnalysisSourcePoolEvictionAndQueuedCancellationReleaseOnlyTheirOwnLease
 		t.Fatal("cancelled job retained source rows", status)
 	}
 	lease.close()
-	if lease.data.refs.Load() != 0 {
-		t.Fatal("final scoped-source reference was not reclaimed", lease.data.refs.Load())
+	if lease.refs() != 0 {
+		t.Fatal("final scoped-source reference was not reclaimed", lease.refs())
 	}
 }
 

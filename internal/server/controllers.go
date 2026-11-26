@@ -3,6 +3,8 @@ package server
 import (
 	"sync"
 
+	"excellens/internal/formats"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
@@ -19,17 +21,18 @@ type archiveController struct {
 // sourcePinController lives on the root App; child sessions share pins and
 // cross-session byte budgets through a.rootApp().
 type sourcePinController struct {
-	sourceMu         sync.Mutex
-	sourcePins       map[*workbook.Workbook]int
-	sourceUploads    map[string]int
-	compositionBytes int64
-	relationBytes    int64
+	sourcePins        *taskmanager.PinSet[*workbook.Workbook]
+	sourceUploads     *taskmanager.PinSet[string]
+	compositionBudget *taskmanager.ByteBudget
+	relationBudget    *taskmanager.ByteBudget
 }
 
 func newSourcePinController() sourcePinController {
 	return sourcePinController{
-		sourcePins:    make(map[*workbook.Workbook]int),
-		sourceUploads: make(map[string]int),
+		sourcePins:        taskmanager.NewPinSet[*workbook.Workbook](),
+		sourceUploads:     taskmanager.NewPinSet[string](),
+		compositionBudget: taskmanager.NewByteBudget(formats.CompositionRetainedBytes),
+		relationBudget:    taskmanager.NewByteBudget(formats.RelationRetainedBytes),
 	}
 }
 

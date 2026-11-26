@@ -12,36 +12,44 @@ import (
 // Each workbook binding owns its queries, filtered orders and row-view leases.
 // Registration and detachment use the same session mutex as the workbook switch.
 type queryController struct {
-	navigationCache map[string][]occupiedRun
-	distinctCache   map[string]DistinctCache
-	indexJobs       map[string]*IndexJob
-	indexBySheet    map[string]string
-	searchJobs      map[string]*SearchJob
-	filterJobs      map[string]*FilterJob
-	filterResults   map[string]*FilterResult
-	rowViews        map[string]*sheetRowView
-	rowViewJobs     map[string]*rowViewTask
-	rowViewLatest   map[string]string
+	navigationCache         map[string][]occupiedRun
+	distinctCache           map[string]DistinctCache
+	indexJobs               map[string]*IndexJob
+	indexBySheet            map[string]string
+	conditionalStatsJobs    map[string]*ConditionalStatsJob
+	conditionalStatsBySheet map[string]string
+	searchJobs              map[string]*SearchJob
+	filterJobs              map[string]*FilterJob
+	filterResults           map[string]*FilterResult
+	rowViews                map[string]*sheetRowView
+	rowViewJobs             map[string]*rowViewTask
+	rowViewLatest           map[string]string
 }
 
 func newQueryController() queryController {
 	return queryController{
-		navigationCache: make(map[string][]occupiedRun),
-		distinctCache:   make(map[string]DistinctCache),
-		indexJobs:       make(map[string]*IndexJob),
-		indexBySheet:    make(map[string]string),
-		searchJobs:      make(map[string]*SearchJob),
-		filterJobs:      make(map[string]*FilterJob),
-		filterResults:   make(map[string]*FilterResult),
-		rowViews:        make(map[string]*sheetRowView),
-		rowViewJobs:     make(map[string]*rowViewTask),
-		rowViewLatest:   make(map[string]string),
+		navigationCache:         make(map[string][]occupiedRun),
+		distinctCache:           make(map[string]DistinctCache),
+		indexJobs:               make(map[string]*IndexJob),
+		indexBySheet:            make(map[string]string),
+		conditionalStatsJobs:    make(map[string]*ConditionalStatsJob),
+		conditionalStatsBySheet: make(map[string]string),
+		searchJobs:              make(map[string]*SearchJob),
+		filterJobs:              make(map[string]*FilterJob),
+		filterResults:           make(map[string]*FilterResult),
+		rowViews:                make(map[string]*sheetRowView),
+		rowViewJobs:             make(map[string]*rowViewTask),
+		rowViewLatest:           make(map[string]string),
 	}
 }
 
 func (q *queryController) cancelIndexSearchLocked() []<-chan struct{} {
-	done := make([]<-chan struct{}, 0, len(q.indexJobs)+len(q.searchJobs))
+	done := make([]<-chan struct{}, 0, len(q.indexJobs)+len(q.conditionalStatsJobs)+len(q.searchJobs))
 	for _, job := range q.indexJobs {
+		job.cancel()
+		done = append(done, job.done)
+	}
+	for _, job := range q.conditionalStatsJobs {
 		job.cancel()
 		done = append(done, job.done)
 	}
@@ -54,6 +62,9 @@ func (q *queryController) cancelIndexSearchLocked() []<-chan struct{} {
 
 func (q *queryController) cancelLocked() {
 	for _, job := range q.indexJobs {
+		job.cancel()
+	}
+	for _, job := range q.conditionalStatsJobs {
 		job.cancel()
 	}
 	for _, job := range q.searchJobs {
@@ -80,6 +91,9 @@ func (q *queryController) waitAndRelease() {
 	for _, job := range q.indexJobs {
 		<-job.done
 	}
+	for _, job := range q.conditionalStatsJobs {
+		<-job.done
+	}
 	for _, job := range q.searchJobs {
 		<-job.done
 		job.Results.Close()
@@ -96,6 +110,24 @@ func (q *queryController) waitAndRelease() {
 	for _, result := range q.filterResults {
 		result.close()
 	}
+}
+
+type ConditionalStatsJob struct {
+	mu        sync.RWMutex
+	ID        string
+	Sheet     string
+	Path      string
+	Status    string
+	Stage     string
+	Progress  float64
+	DoneRows  int
+	TotalRows int
+	Damaged   bool
+	Error     string
+	Started   time.Time
+	cancel    context.CancelFunc
+	ctx       context.Context
+	done      chan struct{}
 }
 
 type IndexJob struct {

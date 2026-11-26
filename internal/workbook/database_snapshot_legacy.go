@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
-	"runtime"
 	"slices"
 
 	"excellens/internal/formats"
@@ -93,11 +92,10 @@ func (w *Workbook) legacyDatabaseDef(ctx context.Context, rows, index, path stri
 	if err != nil {
 		return def, 0, err
 	}
-	if m := idx.RowIndex.mapping; m != nil {
+	if idx.RowIndex.RowsMapped() {
 		// Nobody else holds this provisional read-only mapping. Release it
 		// before publishing the staging directory, including on Windows.
-		runtime.SetFinalizer(m, nil)
-		defer m.release()
+		defer idx.RowIndex.ReleaseMapping()
 	}
 	if err := ctx.Err(); err != nil {
 		return def, 0, err

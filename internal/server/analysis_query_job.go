@@ -95,7 +95,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	if len(captured) == 1 {
 		base = captured[0]
 	}
-	if base != nil && base.closed.Load() {
+	if base != nil && base.isClosed() {
 		return nil, errors.New("分析来源快照已释放")
 	}
 	var err error
@@ -115,7 +115,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	}
 	var rows *analysisSourceSnapshot
 	if base != nil {
-		if base.closed.Load() || base.data.wb != wb || base.data.source != q.Source || q.SourceScope != nil && q.SourceScope.Digest() != base.data.scope.Digest() {
+		if base.isClosed() || base.data.wb != wb || base.data.source != q.Source || q.SourceScope != nil && q.SourceScope.Digest() != base.data.scope.Digest() {
 			return nil, errors.New("分析来源快照与查询范围不一致")
 		}
 		var err error

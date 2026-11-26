@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"excellens/internal/formats"
 	"excellens/internal/localstore"
 	"excellens/internal/workbook"
 )
@@ -50,16 +51,31 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer a.storageView.RUnlock()
-		writeJSON(w, map[string]any{"roots": roots, "groups": roots.Inventory(r.Context())})
+		groups := roots.Inventory(r.Context())
+		usage, usageErr := workbook.InspectConditionalStatsCache(a.conditionalStatsProtector())
+		condStats := map[string]any{
+			"budgetBytes":    loadConditionalStatsBudget(),
+			"minBudgetBytes": formats.ConditionalStatsMinBudgetBytes,
+			"maxBudgetBytes": formats.ConditionalStatsMaxBudgetBytes,
+			"usedBytes":      usage.Bytes,
+			"files":          usage.Files,
+			"protectedFiles": usage.ProtectedFiles,
+			"protectedBytes": usage.ProtectedBytes,
+		}
+		if usageErr != nil {
+			condStats["error"] = usageErr.Error()
+		}
+		writeJSON(w, map[string]any{"roots": roots, "groups": groups, "conditionalStats": condStats})
 		return
 	}
 	var req struct {
-		Action    string `json:"action"`
-		Directory string `json:"directory"`
-		Password  string `json:"password,omitempty"`
-		Stage     string `json:"stage,omitempty"`
-		Revision  string `json:"revision,omitempty"`
-		Confirm   bool   `json:"confirm,omitempty"`
+		Action      string `json:"action"`
+		Directory   string `json:"directory"`
+		Password    string `json:"password,omitempty"`
+		Stage       string `json:"stage,omitempty"`
+		Revision    string `json:"revision,omitempty"`
+		Confirm     bool   `json:"confirm,omitempty"`
+		BudgetBytes int64  `json:"budgetBytes,omitempty"`
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<10))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
@@ -112,6 +128,10 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		message = "已清理未完成备份"
 	case "clear-cache":
 		message, err = a.ClearUnusedCaches()
+	case "clear-conditional-stats":
+		message, err = a.ClearUnusedConditionalStats()
+	case "set-conditional-stats-budget":
+		message, err = a.UpdateConditionalStatsBudget(req.BudgetBytes)
 	case "clear-uploads":
 		message, err = a.ClearUnusedUploads()
 	default:

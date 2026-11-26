@@ -310,7 +310,7 @@ func (c *calculatorCollector) add(row workbook.RowData) error {
 // Four million cells for an explicit contiguous selection. Multi-area
 // selections reuse the existing deduplicated, 400k-cell selection planner.
 func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *workbook.SheetIndex, filter *FilterResult, req selectionStatRequest, c *calculatorCollector, views ...*sheetRowView) error {
-	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].closed.Load() || views[0].data.id != req.ViewID) {
+	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != req.ViewID) {
 		return errors.New("计算选区的可见行视图已失效，请重新选择")
 	}
 	if len(req.Ranges) == 1 {

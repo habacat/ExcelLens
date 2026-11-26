@@ -11,6 +11,7 @@
       for (const button of buttons) button.disabled = value;
       $('storageDirectory').disabled = value;
       $('storagePassword').disabled=value;
+      if ($('storageConditionalBudget')) $('storageConditionalBudget').disabled = value;
       dialog.setAttribute('aria-busy', String(value));
     }
     function show(message, failed = false) {
@@ -18,8 +19,22 @@
       status.classList.toggle('inline-error', failed);
     }
     async function refresh() {
-      const {roots, groups} = await api('/api/storage');
+      const {roots, groups, conditionalStats} = await api('/api/storage');
       $('storageRoots').textContent = '用户配置　' + roots.config + '\n本机数据　' + roots.local;
+      if (conditionalStats && $('storageConditionalBudget')) {
+        const fmt = window.ExcelLensDisplayFormat.bytes;
+        const budgetMB = Math.round((conditionalStats.budgetBytes || 0) / (1024 * 1024));
+        if (document.activeElement !== $('storageConditionalBudget')) {
+          $('storageConditionalBudget').value = String(budgetMB);
+        }
+        const summary = $('storageConditionalSummary');
+        if (summary) {
+          const used = fmt(conditionalStats.usedBytes || 0);
+          const limit = fmt(conditionalStats.budgetBytes || 0);
+          const active = conditionalStats.protectedFiles ? `（在用 ${conditionalStats.protectedFiles} 个）` : '';
+          summary.textContent = `当前 ${used} / 上限 ${limit}${active}`;
+        }
+      }
       const fragment = document.createDocumentFragment();
       for (const group of groups) {
         const row = document.createElement('tr');
@@ -46,6 +61,7 @@
     const askConfirm = options => window.ExcelLensOverlays?.confirm ? window.ExcelLensOverlays.confirm(options) : Promise.resolve(window.confirm(options.message));
     const confirmations = {
       'clear-cache': {title:'清理历史索引', message:'清理未使用的工作簿索引？', confirmLabel:'清理', danger:true},
+      'clear-conditional-stats': {title:'清理条件统计缓存', message:'清理未使用的条件统计索引？正在使用的索引会保留。', confirmLabel:'清理', danger:true},
       'clear-uploads': {title:'清理闲置上传副本', message:'删除未使用的上传副本？仅存于此处的文件将无法从这里找回。', confirmLabel:'删除', danger:true}
     };
     const commands={backup:'备份',restore:'迁入备份',migrate:'迁入旧设置','verify-source':'核验来源','relocate-source':'更新来源'};
@@ -126,6 +142,12 @@
           }
           if(!stages.length)holder.textContent='没有未完成的备份';
           working(false);show('');return;
+        }
+        if(action==='set-conditional-stats-budget'){
+          const mb=Number($('storageConditionalBudget')?.value);
+          if(!Number.isFinite(mb)||mb<64||mb>65536){show('请输入 64 到 65536 MB 之间的上限',true);$('storageConditionalBudget')?.focus();working(false);return;}
+          const item=await post('/api/storage',{action,budgetBytes:Math.round(mb)*1024*1024});
+          await refresh();show(item.message);working(false);return;
         }
         $('storagePassword').value='';
         const item=await post('/api/storage',{action,directory,password:(action==='backup'||action==='restore')?password:''});

@@ -340,6 +340,9 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 		if clearErr == nil {
 			clearErr = os.MkdirAll(wb.CacheDir, 0700)
 		}
+		if clearErr == nil {
+			clearErr = workbook.ClearWorkbookConditionalStats(wb.Fingerprint)
+		}
 	}
 	if clearErr == nil {
 		wb.ClearIndexes()
@@ -352,6 +355,8 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 		}
 		a.indexJobs = make(map[string]*IndexJob)
 		a.indexBySheet = make(map[string]string)
+		a.conditionalStatsJobs = make(map[string]*ConditionalStatsJob)
+		a.conditionalStatsBySheet = make(map[string]string)
 		a.searchJobs = make(map[string]*SearchJob)
 	}
 	a.maintenance = false

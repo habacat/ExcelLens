@@ -38,7 +38,7 @@ const reading=smoke?{csv:[1001],xlsx:[1001]}:{csv:[1000000,5000000,10000000],xls
 const ledgerRows=smoke?1000:1000000,editRows=smoke?1001:100000,scrollSeconds=smoke?2:60,cycles=smoke?3:100;
 const gitInfo=args=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 const checkout=fs.existsSync(path.join(root,'.git'));
-const report={schema:1,profile:only?'diagnostic':smoke?'smoke':'release',version:config.version(),
+const report={schema:2,profile:only?'diagnostic':smoke?'smoke':'release',version:config.version(),
   checkoutHead:checkout?gitInfo(['rev-parse','HEAD']):null,modifiedBuildInputs:checkout?Boolean(gitInfo(['status','--porcelain','--','internal','vendor','tools/bench','tools/uiprobe','tools/qa','go.mod','go.sum'])):null,
   started:new Date().toISOString(),host:{platform:process.platform,os:os.release(),cpu:os.cpus()[0].model,logicalCPUs:os.cpus().length,ramBytes:os.totalmem(),node:process.version,go:execFileSync(go,['version'],{encoding:'utf8'}).trim()},samples:[],readings:[],cleanup:[],result:'RUNNING'};
 function save(){fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output+'.tmp',JSON.stringify(report,null,2)+'\n');fs.renameSync(output+'.tmp',output);}
@@ -256,8 +256,11 @@ async function editCase(){
  try{
    execFileSync(go,['build','-mod=vendor','-o',exe,'./tools/uiprobe'],{cwd:root,windowsHide:true,stdio:'inherit'});
    report.productionSHA256=componentHash('internal','tools/uiprobe','go.mod','go.sum','vendor');
-   report.suiteSHA256=componentHash('tools/bench','tools/qa/browser_harness.cjs','tools/qa/project_config.cjs');
-   const scenarios={reading:readingCases,reconcile:reconcileCase,tabs:tabCases,lifecycle,edit:editCase};
+   report.suiteSHA256=componentHash('tools/bench','tools/qa/browser_harness.cjs','tools/qa/project_config.cjs',
+     'tools/qa/conditional_scroll_qa.cjs','tools/qa/conditional_scroll_fixture.cjs','tools/qa/generated_workbook.cjs',
+     'internal/workbook/conditional_statistics_test.go','internal/workbook/conditional_bench_test.go');
+   const scenarios={reading:readingCases,reconcile:reconcileCase,tabs:tabCases,lifecycle,edit:editCase,
+     conditional:async()=>{report.conditional=await require('./conditional.cjs').measureConditional({root,temp,go,exe,meter,smoke});}};
    if(only&&!scenarios[only])throw Error('Unknown performance scenario: '+only);
    save();
    for(const [name,work] of Object.entries(scenarios)){if(!only||name===only){await work();console.log(name+' complete');}}

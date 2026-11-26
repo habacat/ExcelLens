@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/styles"
 )
 
 func TestEveryFormulaResultUsesSameZeroNormalization(t *testing.T) {
@@ -76,7 +78,7 @@ func TestNumericZeroVsNonzeroAndTextFidelity(t *testing.T) {
 			t.Errorf("text/error of type %q was normalized: %+v", typ, got)
 		}
 	}
-	if got := formatCustomNumber(math.Copysign(0, -1), `0.00;(0.00);"-"`, false); got != "-" {
+	if got := styles.FormatCustomNumber(math.Copysign(0, -1), `0.00;(0.00);"-"`, false); got != "-" {
 		t.Fatal(got)
 	}
 }
@@ -140,7 +142,7 @@ func TestBorderWidthsRefinedButStillDistinct(t *testing.T) {
 		{"thick", "3px solid #000000"}, {"double", "3px double #000000"},
 	}
 	for _, tc := range cases {
-		if got := borderCSS(styleSideXML{Style: tc.style}, "#000000"); got != tc.want {
+		if got := styles.BorderCSS(tc.style, "#000000"); got != tc.want {
 			t.Errorf("%s=%q want %q", tc.style, got, tc.want)
 		}
 	}

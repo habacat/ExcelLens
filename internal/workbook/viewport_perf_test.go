@@ -14,6 +14,7 @@ func makeViewportBenchmark(b *testing.B) (*Workbook, *SheetIndex) {
 	file := filepath.Join(b.TempDir(), "viewport.xml")
 	var buf strings.Builder
 	idx := &SheetIndex{XMLPath: file, SharedAnchors: make(map[string]SharedFormulaAnchor)}
+	offsets := make([]RowOffset, 0, 6000)
 	for row := 1; row <= 6000; row++ {
 		start := int64(buf.Len())
 		fmt.Fprintf(&buf, `<row r="%d">`, row)
@@ -21,8 +22,9 @@ func makeViewportBenchmark(b *testing.B) (*Workbook, *SheetIndex) {
 			fmt.Fprintf(&buf, `<c r="%s%d"><v>%d.%02d</v></c>`, ColumnName(col), row, row*col, col)
 		}
 		buf.WriteString("</row>")
-		idx.resident = append(idx.resident, RowOffset{Number: row, Start: start, End: int64(buf.Len())})
+		offsets = append(offsets, RowOffset{Number: row, Start: start, End: int64(buf.Len())})
 	}
+	idx.RowIndex = NewRowIndex(offsets)
 	idx.XMLSize = int64(buf.Len())
 	if err := os.WriteFile(file, []byte(buf.String()), 0600); err != nil {
 		b.Fatal(err)
@@ -57,13 +59,16 @@ func BenchmarkFilteredSortThreeKeys(b *testing.B) {
 
 func BenchmarkCachedSort100k(b *testing.B) {
 	const n = 100000
-	idx := &SheetIndex{RowIndex: NewRowIndex(make([]RowOffset, n)), XMLSize: 1}
+	offsets := make([]RowOffset, n)
+	for i := range offsets {
+		offsets[i].Number = i + 1
+	}
+	idx := &SheetIndex{RowIndex: NewRowIndex(offsets), XMLSize: 1}
 	wb := &Workbook{}
 	cols := []int{2, 4, 9}
 	for _, col := range cols {
 		view := beginColumnCache(n)
-		for i := range idx.resident {
-			idx.resident[i].Number = i + 1
+		for i := 0; i < n; i++ {
 			value := fmt.Sprintf("%06d", (i*1789+col*11)%20000)
 			view = writeColumnCache(view, i, CellData{Display: value}, true)
 		}

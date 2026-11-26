@@ -37,13 +37,13 @@ func TestCompositionActiveScanKeepsItsOwnReferenceWhenOwnerCloses(t *testing.T) 
 		t.Fatal("scan did not start")
 	}
 	snapshot.close()
-	if snapshot.data.refs.Load() != 1 {
+	if snapshot.refs() != 1 {
 		t.Fatal("active scan did not retain an independent reference")
 	}
 	release()
 	select {
 	case err := <-finished:
-		if err != nil || snapshot.data.refs.Load() != 0 {
+		if err != nil || snapshot.refs() != 0 {
 			t.Fatal("owner close interrupted a retained scan or leaked its reference", err)
 		}
 	case <-time.After(5 * time.Second):
@@ -53,9 +53,7 @@ func TestCompositionActiveScanKeepsItsOwnReferenceWhenOwnerCloses(t *testing.T) 
 
 func TestCompositionConcurrentRetainCloseNeverResurrectsReleasedSources(t *testing.T) {
 	var releases atomic.Int64
-	data := &compositionSnapshotData{release: []func(){func() { releases.Add(1) }}}
-	data.refs.Store(1)
-	owner := &compositionSnapshot{data: data}
+	owner := ownCompositionSnapshot(&compositionSnapshotData{release: []func(){func() { releases.Add(1) }}})
 	start := make(chan struct{})
 	var workers sync.WaitGroup
 	for range 32 {
@@ -73,7 +71,7 @@ func TestCompositionConcurrentRetainCloseNeverResurrectsReleasedSources(t *testi
 	close(start)
 	owner.close()
 	workers.Wait()
-	if releases.Load() != 1 || data.refs.Load() != 0 {
-		t.Fatal("source ownership was resurrected or released more than once", releases.Load(), data.refs.Load())
+	if releases.Load() != 1 || owner.refs() != 0 {
+		t.Fatal("source ownership was resurrected or released more than once", releases.Load(), owner.refs())
 	}
 }

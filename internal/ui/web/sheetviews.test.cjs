@@ -9,7 +9,7 @@ function harness(override){
     $:node,editCopy:null,setTimeout:()=>++timer,clearTimeout(){},cancelAnimationFrame(){},FONT_STACKS:{},
     sourceRowLimit:()=>50000000,sourceColLimit:()=>16384,rowVisible:()=>true,colName:n=>String.fromCharCode(64+n),getVirtualScrollTop:()=>node('grid').scrollTop,setVirtualScrollTop:v=>node('grid').scrollTop=v,
     frozenPanes:{cache:new Map(),cachePart(key,data){this.cache.set(key,data);},reset(){this.cache.clear();},schedule(){},async refresh(){}},pictures:{reset(){},load:async()=>{},schedule(){}},mergedCells:{load(){}},
-    selectionStats:{clear(){}},formulaInspector:{clear(){}},cancelIndex(){},updateSourceAppearance(){},updateAutoFilterButton(){},updateFreezeUI(){},updateGeometryBase(){},updateCanvasSize(){},applyColumnVisibility(){},renderSheetTabs(){},setStatus(){},toast:(...args)=>notices.push(args),
+    selectionStats:{clear(){}},formulaInspector:{clear(){}},cancelIndex(){},cancelConditionalStats(){},startConditionalStats(){},updateSourceAppearance(){},updateAutoFilterButton(){},updateFreezeUI(){},updateGeometryBase(){},updateCanvasSize(){},applyColumnVisibility(){},renderSheetTabs(){},setStatus(){},toast:(...args)=>notices.push(args),
     invalidateViewport(options){assert.equal(options.preserveDOM,true);ctx.tiles.clear();ctx.S.viewportData=null;ctx.S.window=null;},
     viewportKey:()=>ctx.S.sheet,
     async api(path,options={}){const url=new URL(path,'http://qa'),sheet=options.body?JSON.parse(options.body).sheet:url.searchParams.get('sheet');calls.push({path:url.pathname,sheet});const custom=override?.(url.pathname,sheet);if(custom!==undefined)return custom;

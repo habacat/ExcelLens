@@ -17,21 +17,11 @@ import (
 )
 
 func relationUsed(a *App) int64 {
-	root := a.rootApp()
-	root.sourceMu.Lock()
-	defer root.sourceMu.Unlock()
-	return root.relationBytes
+	return a.rootApp().relationBudget.Used()
 }
 
 func relationPins(a *App) int {
-	root := a.rootApp()
-	root.sourceMu.Lock()
-	defer root.sourceMu.Unlock()
-	var count int
-	for _, pins := range root.sourcePins {
-		count += pins
-	}
-	return count
+	return a.rootApp().sourcePins.Total()
 }
 
 func relationSnapshotFixture(t *testing.T) (*App, [2]reconcileSourceRef) {
@@ -51,7 +41,7 @@ func relationPinInputs(t *testing.T, a *App, refs [2]reconcileSourceRef, query r
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(inputs.close)
+	t.Cleanup(inputs.Close)
 	return inputs
 }
 
@@ -72,11 +62,11 @@ func TestRelationSnapshotPinsBothSourcesBeforePreparationAndSurvivesAllOriginalO
 	beforePins := relationPins(a)
 	query := relationServerQuery()
 	inputs := relationPinInputs(t, a, refs, query)
-	if relationPins(a) != beforePins+3 || relationUsed(a) != inputs.data.value.bytes {
+	if relationPins(a) != beforePins+3 || relationUsed(a) != inputs.Value().bytes {
 		t.Fatal("queue input did not retain both exact book objects and its budget")
 	}
 	query.Keys[0].Left, query.LeftColumns[0] = 12, 12
-	if inputs.data.value.query.Keys[0].Left != 1 || inputs.data.value.query.LeftColumns[0] != 1 {
+	if inputs.Value().query.Keys[0].Left != 1 || inputs.Value().query.LeftColumns[0] != 1 {
 		t.Fatal("queued configuration shares a mutable request slice")
 	}
 	// Attachment removal is allowed once the input owns its independent pins.
@@ -87,25 +77,25 @@ func TestRelationSnapshotPinsBothSourcesBeforePreparationAndSurvivesAllOriginalO
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(snapshot.close)
-	consumer, err := snapshot.retain()
+	t.Cleanup(snapshot.Close)
+	consumer, err := snapshot.Retain(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(consumer.close)
-	inputs.close()
-	snapshot.close()
+	t.Cleanup(consumer.Close)
+	inputs.Close()
+	snapshot.Close()
 	a.Close()
-	if relationPins(a) != 3 || relationUsed(a) != consumer.data.value.bytes+consumer.data.value.inputs.data.value.bytes {
+	if relationPins(a) != 3 || relationUsed(a) != consumer.Value().bytes+consumer.Value().inputs.Value().bytes {
 		t.Fatal("owner shutdown reclaimed a consumer's resources", relationPins(a), relationUsed(a))
 	}
 	a.cacheMu.RLock()
-	preview, err := consumer.data.value.plan.Preview(context.Background(), "left")
+	preview, err := consumer.Value().plan.Preview(context.Background(), "left")
 	a.cacheMu.RUnlock()
 	if err != nil || len(preview.Rows) != 2 || preview.Rows[0].Left.Values[2].Raw != "9007199254740993.31" || preview.Rows[0].Right.Values[2].Raw != "保持右文" {
 		t.Fatal("retained exact source failed after every original owner closed", preview, err)
 	}
-	consumer.close()
+	consumer.Close()
 	if relationPins(a) != 0 || relationUsed(a) != 0 {
 		t.Fatal("final consumer leaked pins/budget", relationPins(a), relationUsed(a))
 	}
@@ -114,7 +104,7 @@ func TestRelationSnapshotPinsBothSourcesBeforePreparationAndSurvivesAllOriginalO
 func TestRelationSnapshotBudgetSharedAcrossTabsAndFailedPreparationRestoresInputReservation(t *testing.T) {
 	a, refs := relationSnapshotFixture(t)
 	inputs := relationPinInputs(t, a, refs, relationServerQuery())
-	beforePins, inputBytes := relationPins(a), inputs.data.value.bytes
+	beforePins, inputBytes := relationPins(a), inputs.Value().bytes
 	child, err := a.sessionFor(randomID())
 	if err != nil {
 		t.Fatal(err)
@@ -142,8 +132,8 @@ func TestRelationSnapshotBudgetSharedAcrossTabsAndFailedPreparationRestoresInput
 	if err != nil {
 		t.Fatal("rejected preparation damaged a valid retry", err)
 	}
-	snapshot.close()
-	inputs.close()
+	snapshot.Close()
+	inputs.Close()
 	if relationUsed(a) != 0 {
 		t.Fatal("retry retained a detached budget")
 	}
@@ -171,16 +161,16 @@ func TestRelationSnapshotCancelledFailedOrClosedInputsNeverPublishAndReturnEvery
 				cancel()
 			}
 			if kind == "closed" {
-				inputs.close()
+				inputs.Close()
 			}
 			failed, err := relationPrepareSnapshot(a, ctx, inputs, nil)
 			if err == nil || failed != nil || kind == "cancelled" && !errors.Is(err, context.Canceled) {
 				t.Fatal("invalid input published an apparently complete source", failed, err)
 			}
-			if kind != "closed" && (inputs.data.refs.Load() != 1 || relationPins(a) != before || relationUsed(a) != inputs.data.value.bytes) {
+			if kind != "closed" && (inputs.Refs() != 1 || relationPins(a) != before || relationUsed(a) != inputs.Value().bytes) {
 				t.Fatal("failed worker retained a borrow or budget", relationPins(a), relationUsed(a))
 			}
-			inputs.close()
+			inputs.Close()
 			if relationUsed(a) != 0 || workbook.QueryFilesInUse(filepath.Join(a.currentWorkbook().CacheDir, "queries")) {
 				t.Fatal("failed preparation left temporary or retained source resources")
 			}
@@ -203,8 +193,8 @@ func TestRelationSnapshotScratchProjectionIsChargedAndSameSizeEditsAreRejected(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(snapshot.close)
-	if snapshot.data.value.bytes <= int64(len(strings.Repeat("精确", 1000))) {
+	t.Cleanup(snapshot.Close)
+	if snapshot.Value().bytes <= int64(len(strings.Repeat("精确", 1000))) {
 		t.Fatal("detached scratch source values escaped retained accounting")
 	}
 	if err := a.editAnalysis(wb, func(ws *analysis.Workspace) error {
@@ -214,13 +204,13 @@ func TestRelationSnapshotScratchProjectionIsChargedAndSameSizeEditsAreRejected(t
 		t.Fatal(err)
 	}
 	a.cacheMu.RLock()
-	_, err = snapshot.data.value.plan.Preview(context.Background(), "right_unmatched")
+	_, err = snapshot.Value().plan.Preview(context.Background(), "right_unmatched")
 	a.cacheMu.RUnlock()
 	if err == nil || !strings.Contains(err.Error(), "已修改") {
 		t.Fatal("same row count/byte length edit reused an old source snapshot", err)
 	}
-	snapshot.close()
-	inputs.close()
+	snapshot.Close()
+	inputs.Close()
 	if relationUsed(a) != 0 {
 		t.Fatal("rejected edited scratch source leaked budget")
 	}
@@ -233,12 +223,12 @@ func TestRelationSnapshotActiveExtractionOutlivesAllItsQueueAndResultOwners(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(snapshot.close)
-	consumer, err := snapshot.retain()
+	t.Cleanup(snapshot.Close)
+	consumer, err := snapshot.Retain(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(consumer.close)
+	t.Cleanup(consumer.Close)
 	entered, resume := make(chan struct{}), make(chan struct{})
 	var once sync.Once
 	unblock := func() { once.Do(func() { close(resume) }) }
@@ -248,7 +238,7 @@ func TestRelationSnapshotActiveExtractionOutlivesAllItsQueueAndResultOwners(t *t
 		a.cacheMu.RLock()
 		defer a.cacheMu.RUnlock()
 		var count int
-		_, err := consumer.data.value.plan.Stream(context.Background(), "left", 100, func(row reconcile.RelationRow) error {
+		_, err := consumer.Value().plan.Stream(context.Background(), "left", 100, func(row reconcile.RelationRow) error {
 			count++
 			if count == 1 {
 				close(entered)
@@ -259,7 +249,7 @@ func TestRelationSnapshotActiveExtractionOutlivesAllItsQueueAndResultOwners(t *t
 		if err == nil && count != 2 {
 			err = errors.New("retained extraction lost source rows")
 		}
-		consumer.close()
+		consumer.Close()
 		finished <- err
 	}()
 	select {
@@ -267,9 +257,9 @@ func TestRelationSnapshotActiveExtractionOutlivesAllItsQueueAndResultOwners(t *t
 	case <-time.After(5 * time.Second):
 		t.Fatal("retained source extraction did not enter")
 	}
-	inputs.close()
-	snapshot.close()
-	if relationUsed(a) == 0 || consumer.data.refs.Load() != 1 {
+	inputs.Close()
+	snapshot.Close()
+	if relationUsed(a) == 0 || consumer.Refs() != 1 {
 		t.Fatal("active export-like consumer lost the last source lease")
 	}
 	unblock()
@@ -290,13 +280,13 @@ func TestRelationSnapshotRejectsChangedUnvisitedFileAndOversizedSourceAccounting
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(snapshot.close)
-	right := inputs.data.value.books[1]
+	t.Cleanup(snapshot.Close)
+	right := inputs.Value().books[1]
 	if err := os.WriteFile(right.Path, []byte("changed source"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	a.cacheMu.RLock()
-	err = snapshot.data.value.plan.Check(context.Background())
+	err = snapshot.Value().plan.Check(context.Background())
 	a.cacheMu.RUnlock()
 	if err == nil {
 		t.Fatal("source revalidation omitted an unvisited other file")

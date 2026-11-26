@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"excellens/internal/conditional"
 	"fmt"
 	"os"
 	"reflect"
@@ -113,7 +114,7 @@ func TestConditionalUnknownRulesAndUncachedReferencesDoNotBecomeFalseOrZero(t *t
 	rules := `<conditionalFormatting sqref="A1:A8"><cfRule type="aboveAverage" dxfId="0" priority="1"/><cfRule type="expression" dxfId="1" priority="2"><formula>TRUE()</formula></cfRule></conditionalFormatting><conditionalFormatting sqref="B1:B8"><cfRule type="cellIs" dxfId="999" operator="greaterThan" priority="3"><formula>100</formula></cfRule><cfRule type="expression" dxfId="1" priority="4"><formula>TRUE()</formula></cfRule></conditionalFormatting><conditionalFormatting sqref="C1:C8"><cfRule type="cellIs" dxfId="0" operator="greaterThan" priority="5"><formula>0</formula></cfRule></conditionalFormatting>`
 	_, _, index := conditionalFixture(t, rules)
 	unknown := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil)
-	if unknown == nil || unknown.Notice == "" || unknown.Matched != 0 || !unknown.Style.empty() {
+	if unknown == nil || unknown.Notice == "" || unknown.Matched != 0 || !unknown.Style.Empty() {
 		t.Fatal("unknown predicate was treated as false", unknown)
 	}
 	falseRule := evaluateConditional(t, index, 1, 2, CellData{Raw: "1"}, nil)
@@ -121,11 +122,11 @@ func TestConditionalUnknownRulesAndUncachedReferencesDoNotBecomeFalseOrZero(t *t
 		t.Fatal("unused unsupported DXF blocked a proven false predicate", falseRule)
 	}
 	trueRule := evaluateConditional(t, index, 2, 2, CellData{Raw: "200"}, nil)
-	if trueRule == nil || trueRule.Notice == "" || !trueRule.Style.empty() {
+	if trueRule == nil || trueRule.Notice == "" || !trueRule.Style.Empty() {
 		t.Fatal("missing DXF silently became a default style", trueRule)
 	}
 	missing := evaluateConditional(t, index, 1, 3, CellData{Raw: "", HasFormula: true, CacheMissing: true}, nil)
-	if missing == nil || !strings.Contains(missing.Notice, "没有保存") || !missing.Style.empty() {
+	if missing == nil || !strings.Contains(missing.Notice, "没有保存") || !missing.Style.Empty() {
 		t.Fatal("missing cache became blank/zero", missing)
 	}
 }
@@ -274,13 +275,13 @@ func TestConditionalCacheWorkAndTextBudgetsAreBoundedAndUncertainStateSurvives(t
 		t.Fatal("worksheet range expanded into cells", len(index.nodes), index.bytes)
 	}
 	e := index.NewEvaluator(context.Background())
-	e.work = 0
+	e.engine.Work = 0
 	out, err := e.Evaluate(1, 1, CellData{Raw: "1"}, nil)
 	if err != nil || out == nil || out.Notice == "" {
 		t.Fatal(out, err)
 	}
 	e = index.NewEvaluator(context.Background())
-	e.textBytes = 0
+	e.engine.TextBytes = 0
 	out, err = e.Evaluate(1, 1, CellData{Raw: "1"}, nil)
 	if err != nil || out == nil || out.Notice == "" {
 		t.Fatal(out, err)
@@ -320,7 +321,7 @@ func TestMalformedConditionalMetadataKeepsItsCauseAndDoesNotGuessPriorityOrFormu
 			t.Fatal(summary)
 		}
 		out := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil)
-		if out == nil || out.Notice == "" || !out.Style.empty() {
+		if out == nil || out.Notice == "" || !out.Style.Empty() {
 			t.Fatal("malformed metadata was applied", out)
 		}
 		if _, err := json.Marshal(summary); err != nil {
@@ -557,13 +558,13 @@ func TestConditionalFormulasExcelBoundaryResults(t *testing.T) {
 		t.Run(tc.formula, func(t *testing.T) {
 			index := SourceConditionalFormats{date1904: tc.date1904}
 			e := index.NewEvaluator(context.Background())
-			e.row, e.col = 1, 1
+			e.engine.Row, e.engine.Col = 1, 1
 			expr, _, notice := (*Workbook)(nil).compileConditionalExpr(tc.formula, "Sheet1")
 			if notice != "" {
 				t.Fatal(notice)
 			}
-			result, notice, err := e.evalExpr(expr, &conditionalGroup{anchorRow: 1, anchorCol: 1})
-			if err != nil || notice != "" || result.kind != "boolean" || !result.boolean {
+			result, notice, err := e.engine.Eval(expr, 1, 1, nil)
+			if err != nil || notice != "" || result.Kind != "boolean" || !result.Boolean {
 				t.Fatalf("Excel returned TRUE, got %+v, notice %q, error %v", result, notice, err)
 			}
 		})
@@ -578,27 +579,29 @@ func TestConditionalLimitsPreserveUnknownResults(t *testing.T) {
 		`IFERROR(MATCH("*z",A1,0), 0)`,
 	} {
 		e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
-		e.row, e.col, e.work = 1, 1, 18
-		e.cell = CellData{Raw: "ordinary worksheet text", Type: "s"}
+		e.engine.Row, e.engine.Col, e.engine.Work = 1, 1, 18
+		e.engine.Cell = conditional.CellOperand{Raw: "ordinary worksheet text", Type: "s"}
 		node, _, notice := (*Workbook)(nil).compileConditionalExpr(formula, "Sheet1")
 		if notice != "" {
 			t.Fatal(notice)
 		}
-		_, notice, err := e.evalExpr(node, group)
+		_, notice, err := e.engine.Eval(node, group.anchorRow, group.anchorCol, group.areas)
 		if err != nil || notice != conditionalWorkNotice {
 			t.Errorf("%s must retain the work-limit notice, got %q, %v", formula, notice, err)
 		}
 	}
 
 	e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
-	e.row, e.col = 1, 2
-	e.resolver = func(row, col int) (CellData, bool, error) { return CellData{Raw: "0.9"}, true, nil }
+	e.engine.Row, e.engine.Col = 1, 2
+	e.engine.Resolver = func(row, col int) (conditional.CellOperand, bool, error) {
+		return conditional.CellOperand{Raw: "0.9"}, true, nil
+	}
 	node, _, _ := (*Workbook)(nil).compileConditionalExpr("IFERROR(PRODUCT(A1:A750),0)", "Sheet1")
-	if _, notice, err := e.evalExpr(node, group); err != nil || !strings.Contains(notice, "容量") {
+	if _, notice, err := e.engine.Eval(node, group.anchorRow, group.anchorCol, group.areas); err != nil || !strings.Contains(notice, "容量") {
 		t.Errorf("bounded exact product lost its limit: %q, %v", notice, err)
 	}
 	node, _, _ = (*Workbook)(nil).compileConditionalExpr("ISERROR(PRODUCT(1E300,1E300,0))", "Sheet1")
-	if result, notice, err := e.evalExpr(node, group); err != nil || notice != "" || !result.boolean {
+	if result, notice, err := e.engine.Eval(node, group.anchorRow, group.anchorCol, group.areas); err != nil || notice != "" || !result.Boolean {
 		t.Errorf("Excel numeric overflow lost: %+v, %q, %v", result, notice, err)
 	}
 }

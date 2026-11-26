@@ -371,7 +371,7 @@ func TestSearchCheckpointQueuedCancellationLeaseAcrossTabsAndStaleDiscard(t *tes
 	checkpointCall(t, child.app, "/api/tasks/discard", request, 409)
 	checkpointCall(t, a, "/api/search/cancel", map[string]string{"id": job.ID}, 200)
 	checkpointWait(t, job)
-	if job.Status != "cancelled" || len(a.rootApp().sourcePins) != 0 {
+	if job.Status != "cancelled" || a.rootApp().sourcePins.Len() != 0 {
 		t.Fatal("queued cancellation leaked its source or lease", job.Status)
 	}
 	resumed := checkpointResume(t, child.app, m)

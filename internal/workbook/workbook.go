@@ -3,6 +3,7 @@ package workbook
 import (
 	"excellens/internal/fileidentity"
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 
 	"archive/zip"
 	"context"
@@ -112,7 +113,7 @@ func OpenWorkbook(filePath string) (*Workbook, error) {
 			return nil, fmt.Errorf("共享字符串表过大：%d MB", f.UncompressedSize64>>20)
 		}
 	}
-	wb.ThemeColors = loadTheme(entries["xl/theme/theme1.xml"])
+	wb.ThemeColors = styles.LoadTheme(entries["xl/theme/theme1.xml"], maxMetadataPart)
 	if f := entries["xl/styles.xml"]; f != nil {
 		if f.UncompressedSize64 > maxMetadataPart {
 			return nil, errors.New("单元格样式定义文件过大")

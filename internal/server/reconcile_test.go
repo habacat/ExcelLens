@@ -304,9 +304,7 @@ func TestReconcileCancellationAndWorkbookReplacementReleaseEveryPin(t *testing.T
 	if err := a.OpenPath(newPath); err != nil {
 		t.Fatal(err)
 	}
-	a.sourceMu.Lock()
-	pins, uploads := len(a.sourcePins), len(a.sourceUploads)
-	a.sourceMu.Unlock()
+	pins, uploads := a.sourcePins.Len(), a.sourceUploads.Len()
 	if pins != 0 || uploads != 0 || len(a.reconcileJobs) != 0 || a.cacheMu == nil {
 		t.Fatal("replacement retained orphan source leases", pins, uploads)
 	}

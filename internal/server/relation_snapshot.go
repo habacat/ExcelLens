@@ -7,15 +7,17 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 
 	"excellens/internal/formats"
 	"excellens/internal/reconcile"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
-type relationInputs = sourceLease[relationInputData]
-type relationSnapshot = sourceLease[relationSnapshotData]
+var errRelationBudgetFull = errors.New("关联结果占用已满，请关闭不用的结果后重试")
+
+type relationInputs = taskmanager.Lease[relationInputData]
+type relationSnapshot = taskmanager.Lease[relationSnapshotData]
 
 type relationInputData struct {
 	primary *workbook.Workbook
@@ -34,21 +36,7 @@ type relationSnapshotData struct {
 // Shared across browser sessions. Reservations follow the final independent
 // borrower, rather than the UI task entry which originally published a plan.
 func (a *App) reserveRelationBytes(bytes int64) (func(), error) {
-	root := a.rootApp()
-	root.sourceMu.Lock()
-	defer root.sourceMu.Unlock()
-	if bytes < 0 || bytes > formats.RelationRetainedBytes-root.relationBytes {
-		return nil, errors.New("关联结果占用已满，请关闭不用的结果后重试")
-	}
-	root.relationBytes += bytes
-	var once sync.Once
-	return func() {
-		once.Do(func() {
-			root.sourceMu.Lock()
-			root.relationBytes -= bytes
-			root.sourceMu.Unlock()
-		})
-	}, nil
+	return a.rootApp().relationBudget.Reserve(bytes, errRelationBudgetFull)
 }
 
 // Caller holds cacheMu.RLock, but not App.mu. Capture and pin both exact book
@@ -81,7 +69,7 @@ func (a *App) pinRelationInputs(primary *workbook.Workbook, refs [2]reconcileSou
 		return nil, err
 	}
 	releasePins := a.pinWorkbooks(primary, input.books[0], input.books[1])
-	return newSourceLease(input, func() { releasePins(); releaseBytes() }), nil
+	return taskmanager.NewLease(input, func() { releasePins(); releaseBytes() }), nil
 }
 
 func relationSourceHeapBytes(source reconcile.Source) (int64, error) {
@@ -108,7 +96,7 @@ func relationSourceHeapBytes(source reconcile.Source) (int64, error) {
 // Preparation retains its input first: cancellation/clearing the queue owner
 // cannot release source pins before this worker or a published borrower exits.
 func (a *App) prepareRelationSnapshot(ctx context.Context, inputs *relationInputs, progress reconcile.Progress) (*relationSnapshot, error) {
-	borrowed, err := inputs.retain()
+	borrowed, err := inputs.Retain(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +113,10 @@ func (a *App) prepareRelationSnapshot(ctx context.Context, inputs *relationInput
 			for i := len(releases) - 1; i >= 0; i-- {
 				releases[i]()
 			}
-			borrowed.close()
+			borrowed.Close()
 		}
 	}()
-	input := borrowed.data.value
+	input := borrowed.Value()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -181,13 +169,13 @@ func (a *App) prepareRelationSnapshot(ctx context.Context, inputs *relationInput
 	}
 	accepted = true
 	data := relationSnapshotData{inputs: borrowed, plan: plan, bytes: retained}
-	return newSourceLease(data, func() {
+	return taskmanager.NewLease(data, func() {
 		if err := plan.Close(); err != nil {
 			log.Printf("回收关联行序失败：%v", err)
 		}
 		for i := len(releases) - 1; i >= 0; i-- {
 			releases[i]()
 		}
-		borrowed.close()
+		borrowed.Close()
 	}), nil
 }

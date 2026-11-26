@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 // FilterCheckpoint counts complete immutable source-index records. Matched
@@ -91,22 +92,22 @@ func (w *Workbook) SortFilteredRowOrder(ctx context.Context, idx *SheetIndex, fi
 	if rows.SourceRows() != idx.RowCount() {
 		return nil, errors.New("排序阶段行序与来源索引不一致")
 	}
-	whole := rows.Len() == idx.RowCount() && rows.data.increasing
+	whole := rows.Len() == idx.RowCount() && rows.Increasing()
 	scanner, err := newFilterScanner(w, idx, nil, keys, whole)
 	if err != nil {
 		return nil, err
 	}
 	defer scanner.close()
-	order, err := newRowOrderBuilder(filterOrderDirectory(w), idx.RowCount(), residentOrderRows, &processQueryQuota)
+	order, err := rowindex.NewRowOrderBuilder(filterOrderDirectory(w), idx.RowCount(), residentOrderRows, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer order.abort()
-	sorter, err := newRowSorter(filterOrderDirectory(w), idx.RowCount(), keys, formats.QuerySortMemoryBytes, &processQueryQuota)
+	defer order.Abort()
+	sorter, err := rowindex.NewRowSorter(filterOrderDirectory(w), idx.RowCount(), keys, formats.QuerySortMemoryBytes, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer sorter.abort()
+	defer sorter.Abort()
 	rowKeys := make([]sortValue, len(keys))
 	previous, visited := -1, 0
 	lastReport := time.Now()
@@ -122,7 +123,7 @@ func (w *Workbook) SortFilteredRowOrder(ctx context.Context, idx *SheetIndex, fi
 			return nil, err
 		}
 		if idx.RowAt(position).Number <= opts.HeaderRow {
-			err = order.add(ctx, position)
+			err = order.Add(ctx, position)
 		} else {
 			err = addFilterSortRecord(ctx, sorter, scanner, keys, rowKeys, position)
 		}
@@ -137,11 +138,11 @@ func (w *Workbook) SortFilteredRowOrder(ctx context.Context, idx *SheetIndex, fi
 	}
 	scanner.publishColumns()
 	clear(rowKeys)
-	if err := sorter.finish(ctx, func(position int) error { return order.add(ctx, position) }, opts.Phase); err != nil {
+	if err := sorter.Finish(ctx, func(position int) error { return order.Add(ctx, position) }, opts.Phase); err != nil {
 		return nil, err
 	}
 	if opts.Phase != nil {
 		opts.Phase("正在建立行号定位", 0, 0)
 	}
-	return order.finish(ctx)
+	return order.Finish(ctx)
 }

@@ -224,6 +224,10 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	}
 	readOptions := workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: format == "json" && r.URL.Query().Get("richText") != "0"}
 	readOptions.ConditionalFormats = format == "json" && r.URL.Query().Get("conditional") != "0" && (readOptions.RichText || r.URL.Query().Get("conditional") == "1")
+	if readOptions.ConditionalFormats {
+		readOptions.ConditionalStatsReadOnly = true
+		readOptions.ConditionalStatsStatus = a.conditionalStatsSheetStatus(meta.Path)
+	}
 	byRow := make(map[int]workbook.RowData, len(readNumbers))
 	textBytes, styleBytes := 0, 0
 	tooLarge := false

@@ -440,6 +440,7 @@
         <span id="viewportActivitySlot" class="activity-slot"></span>
         <span id="gridStatus">未选择工作表</span>
         <span id="largeDataStatus" class="large-data-status" hidden>超大数据模式</span>
+        <span id="conditionalStatsStatus" class="conditional-stats-status" role="status" aria-live="polite" hidden><span id="conditionalStatsText"></span><button id="conditionalStatsCancel" type="button" class="selection-link">取消</button><button id="conditionalStatsRetry" type="button" class="selection-link" hidden>重试</button></span>
         <span id="freezeStatus" class="freeze-status" hidden></span>
         <span id="filterStatus" class="filter-status" hidden>已筛选</span>
         <button id="selectionStatus" class="selection-status selection-link" type="button" title="统计选区"></button>
@@ -826,8 +827,16 @@
       <div class="storage-actions">
         <button class="mini-button" data-storage="refresh" type="button">刷新</button>
         <button class="mini-button" data-storage="clear-cache" type="button">清理历史索引</button>
+        <button class="mini-button" data-storage="clear-conditional-stats" type="button">清理条件统计缓存</button>
         <button class="mini-button" data-storage="clear-uploads" type="button">清理闲置上传副本</button>
         <button class="mini-button" data-storage="migrate" type="button">迁入旧标记与布局</button>
+      </div>
+      <label for="storageConditionalBudget">条件统计缓存上限</label>
+      <div class="storage-actions storage-budget-row">
+        <input id="storageConditionalBudget" class="field-control" type="number" min="64" max="65536" step="64" aria-label="条件统计缓存上限（MB）">
+        <span class="storage-budget-unit">MB</span>
+        <button class="mini-button" data-storage="set-conditional-stats-budget" type="button">保存上限</button>
+        <span id="storageConditionalSummary" class="storage-budget-summary"></span>
       </div>
       <label for="storageDirectory">备份目录</label>
       <div class="storage-actions"><input id="storageDirectory" class="field-control" type="text" placeholder="目录完整路径"><button class="mini-button" data-storage="backup" type="button">备份到此处</button><button class="mini-button" data-storage="restore" type="button">从此处迁入</button></div>

@@ -3,6 +3,8 @@ package workbook
 import (
 	"math"
 	"testing"
+
+	"excellens/internal/styles"
 )
 
 func TestNumericDisplayPreservesZeroSectionsAndRawAudit(t *testing.T) {
@@ -55,7 +57,7 @@ func TestNumericRawRemainsPreciseAndUnderflowIsNotMisrepresented(t *testing.T) {
 	if got := wb.formatNumeric("NaN", 0); got != "NaN" {
 		t.Fatal(got)
 	}
-	if got := formatCustomNumber(math.Copysign(0, -1), `0.00;[Red](0.00);"-"`, false); got != "-" {
+	if got := styles.FormatCustomNumber(math.Copysign(0, -1), `0.00;[Red](0.00);"-"`, false); got != "-" {
 		t.Fatalf("negative signed zero custom = %q", got)
 	}
 }

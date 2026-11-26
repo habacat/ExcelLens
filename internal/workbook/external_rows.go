@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 const (
@@ -41,7 +42,7 @@ type externalCell struct {
 type externalRowWriter struct {
 	out        *bufio.Writer
 	count      int64
-	offsets    rowOffsetBuilder
+	offsets    rowindex.RowOffsetBuilder
 	rows, cols int
 	scratch    []byte
 }
@@ -51,7 +52,7 @@ func newExternalRowWriter(f *os.File) (*externalRowWriter, error) {
 }
 
 func newExternalRowWriterTo(out io.Writer, dir string) (*externalRowWriter, error) {
-	w := &externalRowWriter{out: bufio.NewWriterSize(out, 1<<20), offsets: rowOffsetBuilder{rows: make([]RowOffset, 0, 4096), dir: dir}}
+	w := &externalRowWriter{out: bufio.NewWriterSize(out, 1<<20), offsets: rowindex.NewRowOffsetBuilder(dir, 4096)}
 	if err := w.bytes([]byte(nativeRowMagic)); err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (w *externalRowWriter) complete(start int64) error {
 	if w.count-start > maxExternalRowBytes {
 		return fmt.Errorf("第 %d 行超过 128MB 安全上限", w.rows)
 	}
-	return w.offsets.append(RowOffset{Number: w.rows, Start: start, End: w.count})
+	return w.offsets.Append(RowOffset{Number: w.rows, Start: start, End: w.count})
 }
 func (w *externalRowWriter) row(fields []string) error {
 	if w.rows >= maxExternalRows {
@@ -257,7 +258,7 @@ func (w *externalRowWriter) finish() error {
 	if err := w.out.Flush(); err != nil {
 		return err
 	}
-	return w.offsets.finish()
+	return w.offsets.Finish()
 }
 func (w *externalRowWriter) dimension() string {
 	if w.rows == 0 || w.cols == 0 {

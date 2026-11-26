@@ -117,9 +117,7 @@ func TestAnalysisTaskCapacityAndCloseWaitForCancelledSourcePins(t *testing.T) {
 		t.Fatal("close did not unwind queued analysis tasks")
 	}
 	<-a.analysisSem
-	a.sourceMu.Lock()
-	pins := len(a.sourcePins)
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Len()
 	if pins != 0 || len(a.analysisJobs) != 0 {
 		t.Fatal("close returned before its source references were released", pins, len(a.analysisJobs))
 	}

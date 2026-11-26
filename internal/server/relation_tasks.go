@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/formats"
 	"excellens/internal/reconcile"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
@@ -35,7 +36,7 @@ type relationTask struct {
 	Created                        time.Time
 	Done, Total                    int64
 	Source                         *relationSnapshot
-	Result                         *sourceLease[json.RawMessage]
+	Result                         *taskmanager.Lease[json.RawMessage]
 	discarded                      bool
 	ctx                            context.Context
 	cancel                         context.CancelFunc
@@ -58,10 +59,10 @@ type relationTaskResult struct {
 
 type relationCleanup struct {
 	source *relationSnapshot
-	result *sourceLease[json.RawMessage]
+	result *taskmanager.Lease[json.RawMessage]
 }
 
-func (c relationCleanup) close() { c.source.close(); c.result.close() }
+func (c relationCleanup) close() { c.source.Close(); c.result.Close() }
 
 func decodeRelationRequest(w http.ResponseWriter, r *http.Request, value any) error {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.RelationRequestBytes))
@@ -109,8 +110,8 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 	accepted := false
 	defer func() {
 		if !accepted {
-			inputs.close()
-			source.close()
+			inputs.Close()
+			source.Close()
 		}
 	}()
 	if req.Mode == "prepare" {
@@ -178,7 +179,7 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source *relationSnapshot) {
-	var result *sourceLease[json.RawMessage]
+	var result *taskmanager.Lease[json.RawMessage]
 	var err error
 	defer func() {
 		a.mu.Lock()
@@ -195,9 +196,9 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 			job.Done, job.Total = 1, 1
 		}
 		a.mu.Unlock()
-		source.close()
-		result.close()
-		inputs.close()
+		source.Close()
+		result.Close()
+		inputs.Close()
 		close(job.done)
 	}()
 	releaseScan, admissionErr := a.backgroundQuery(job.ctx)
@@ -226,7 +227,7 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 			return
 		}
 	}
-	plan := source.data.value.plan
+	plan := source.Value().plan
 	var preview reconcile.RelationPreview
 	preview, err = plan.Preview(job.ctx, job.OutputMode)
 	if err != nil {
@@ -248,7 +249,7 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 	if err != nil {
 		return
 	}
-	result = newSourceLease(json.RawMessage(encoded), release)
+	result = taskmanager.NewLease(json.RawMessage(encoded), release)
 	if err = job.Primary.CheckSourceUnchanged(); err != nil {
 		return
 	}
@@ -316,7 +317,7 @@ func (a *App) borrowRelationTask(id string, primary *workbook.Workbook) (*relati
 	if job == nil || job.Status != "done" || job.Source == nil || job.ctx.Err() != nil || job.discarded || job.Primary != primary || a.wb != primary {
 		return nil, errors.New("关联预检尚未完成或已失效，请重新运行")
 	}
-	return job.Source.retain()
+	return job.Source.Retain(nil)
 }
 
 func (a *App) handleRelationStatus(w http.ResponseWriter, r *http.Request) {
@@ -389,35 +390,35 @@ func (a *App) handleRelationResult(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, "关联结果已失效")
 		return
 	}
-	source, err := job.Source.retain()
+	source, err := job.Source.Retain(nil)
 	if err != nil {
 		a.mu.RUnlock()
 		writeError(w, 409, err.Error())
 		return
 	}
-	result, err := job.Result.retain()
+	result, err := job.Result.Retain(nil)
 	primary := job.Primary
 	a.mu.RUnlock()
-	defer source.close()
+	defer source.Close()
 	if err != nil {
 		writeError(w, 409, err.Error())
 		return
 	}
-	defer result.close()
+	defer result.Close()
 	if err := primary.CheckSourceUnchanged(); err != nil {
 		writeError(w, 409, err.Error())
 		return
 	}
-	if err := source.data.value.plan.Check(r.Context()); err != nil {
+	if err := source.Value().plan.Check(r.Context()); err != nil {
 		writeError(w, 409, err.Error())
 		return
 	}
 	// The independently retained JSON owns every response byte. A slow client
 	// must not hold a query slot/cache lock while receiving its immutable body.
-	source.close()
+	source.Close()
 	a.cacheMu.RUnlock()
 	<-a.querySem
 	workDone = true
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write(result.data.value)
+	_, _ = w.Write(result.Value())
 }

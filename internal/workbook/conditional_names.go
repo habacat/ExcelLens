@@ -53,13 +53,6 @@ func (w *Workbook) conditionalDefinedName(sheetName, name string) (conditionalRe
 	return ref, ""
 }
 
-func (e *ConditionalEvaluator) readForeignCell(sheet string, row, col int) (CellData, string, error) {
-	if e.foreignCell == nil {
-		return CellData{}, "定义名称引用的源单元格尚未读取", nil
-	}
-	return e.foreignCell(sheet, row, col)
-}
-
 type conditionalForeignAddress struct {
 	sheet    string
 	row, col int

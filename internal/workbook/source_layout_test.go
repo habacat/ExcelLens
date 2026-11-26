@@ -49,7 +49,7 @@ func TestOOXMLSourceLayoutUsesIndexPassAndUpgradesOldCaches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.GridLines == nil || *first.GridLines || first.DefaultRow != 20 || first.DefaultCol != 75 || first.Cols[1] != 140 || first.Cols[2] != 56 || len(first.Rows) != 2 || first.Rows[0] != (SourceSizeRange{1, 2, 40}) || first.Rows[1] != (SourceSizeRange{4, 4, 29}) {
+	if first.GridLines == nil || *first.GridLines || first.DefaultRow != 20 || first.DefaultCol != 75 || first.Cols[1] != 140 || first.Cols[2] != 56 || len(first.Rows) != 2 || first.Rows[0] != (SourceSizeRange{Min: 1, Max: 2, Size: 40}) || first.Rows[1] != (SourceSizeRange{Min: 4, Max: 4, Size: 29}) {
 		t.Fatalf("bad source dimensions %+v", first)
 	}
 	if !reflect.DeepEqual(first.Merges, []CellMerge{{Row: 1, Col: 1, EndRow: 1, EndCol: 2}, {Row: 4, Col: 2, EndRow: 5, EndCol: 3}}) {
@@ -106,7 +106,7 @@ func TestBIFFSourceLayoutUsesTheSameSizeContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.DefaultRow != 20 || l.DefaultCol != 75 || l.Cols[1] != 140 || len(l.Rows) != 1 || l.Rows[0] != (SourceSizeRange{2, 2, 40}) || l.GridLines == nil || *l.GridLines {
+	if l.DefaultRow != 20 || l.DefaultCol != 75 || l.Cols[1] != 140 || len(l.Rows) != 1 || l.Rows[0] != (SourceSizeRange{Min: 2, Max: 2, Size: 40}) || l.GridLines == nil || *l.GridLines {
 		t.Fatalf("bad BIFF dimensions %+v", l)
 	}
 	reopened, err := OpenWorkbook(file)

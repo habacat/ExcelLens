@@ -83,7 +83,7 @@ func mergeStatIntervals(items []statColInterval) []statColInterval {
 // Selection coordinates are source row numbers for ordinary views and visual
 // row indexes for filtered/sorted views. Only actual filtered rows may be read.
 func makeStatRows(req selectionStatRequest, idx *workbook.SheetIndex, filter *FilterResult, views ...*sheetRowView) (map[int][]statColInterval, int64, error) {
-	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].closed.Load() || views[0].data.id != req.ViewID) {
+	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != req.ViewID) {
 		return nil, 0, errors.New("选区的可见行视图已失效，请重新选择")
 	}
 	if len(req.Ranges) == 0 || len(req.Ranges) > maxSelectionRects {

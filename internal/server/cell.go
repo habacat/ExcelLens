@@ -43,7 +43,18 @@ func (a *App) handleCell(w http.ResponseWriter, r *http.Request) {
 	cell := workbook.CellData{Ref: ref, Col: col, Raw: "", Display: ""}
 	presentationNotice := ""
 	{
-		rows, readErr := wb.ReadRowsByNumbersWithOptionsContext(r.Context(), idx, []int{rowNumber}, col, col, workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: r.URL.Query().Get("conditional") != "0"})
+		conditionalOn := r.URL.Query().Get("conditional") != "0"
+		readOpts := workbook.RowReadOptions{
+			FormatValue:              true,
+			IncludeFormula:           true,
+			RichText:                 true,
+			ConditionalFormats:       conditionalOn,
+			ConditionalStatsReadOnly: conditionalOn,
+		}
+		if conditionalOn {
+			readOpts.ConditionalStatsStatus = a.conditionalStatsSheetStatus(meta.Path)
+		}
+		rows, readErr := wb.ReadRowsByNumbersWithOptionsContext(r.Context(), idx, []int{rowNumber}, col, col, readOpts)
 		if readErr != nil {
 			writeError(w, http.StatusInternalServerError, "读取单元格失败："+readErr.Error())
 			return

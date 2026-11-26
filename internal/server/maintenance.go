@@ -82,11 +82,15 @@ func (a *App) ClearUnusedCaches() (string, error) {
 		}
 		count++
 	}
+	statsReport, statsErr := workbook.ClearUnusedConditionalStats(rootApp.conditionalStatsProtector())
 	info := fmt.Sprintf("已清理 %d 组历史工作簿缓存。当前打开工作簿的缓存已保留。", count)
-	if len(failed) > 0 {
-		return info, fmt.Errorf("%d 组缓存清理失败：%s", len(failed), strings.Join(failed, ", "))
+	if statsReport.RemovedFiles > 0 {
+		info = fmt.Sprintf("已清理 %d 组历史工作簿缓存与 %d 个条件统计索引（释放 %s）。当前打开工作簿的缓存已保留。", count, statsReport.RemovedFiles, formatReadableBytes(statsReport.FreedBytes))
 	}
-	return info, nil
+	if len(failed) > 0 {
+		return info, errors.Join(fmt.Errorf("%d 组缓存清理失败：%s", len(failed), strings.Join(failed, ", ")), statsErr)
+	}
+	return info, statsErr
 }
 
 // ClearUnusedUploads deletes only files created by ExcelLens browser uploads,
@@ -102,11 +106,9 @@ func (a *App) ClearUnusedUploads() (string, error) {
 	rootApp.cacheMu.Lock()
 	defer rootApp.cacheMu.Unlock()
 	active := make(map[string]struct{})
-	rootApp.sourceMu.Lock()
-	for path := range rootApp.sourceUploads {
+	for _, path := range rootApp.sourceUploads.Snapshot() {
 		active[filepath.Clean(path)] = struct{}{}
 	}
-	rootApp.sourceMu.Unlock()
 	for _, viewer := range rootApp.activeBrowserWorkbooks() {
 		viewer.archiveMu.Lock()
 		if view := viewer.archiveView; view != nil {

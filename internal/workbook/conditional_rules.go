@@ -34,6 +34,7 @@ type SourceConditionalRule struct {
 
 type conditionalGroup struct {
 	ranges               []CellMerge
+	areas                []conditional.Area
 	ruleIndices          []int
 	anchorRow, anchorCol int
 	notice               string
@@ -50,7 +51,7 @@ type conditionalRangeEntry = sourceRangeEntry
 type conditionalRangeNode = sourceRangeNode
 
 type SourceConditionalFormats struct {
-	statistics []conditionalStatPlan
+	statistics []conditional.StatPlan
 	statsMu    sync.Mutex
 	statsIssue string
 	statsRetry time.Time
@@ -555,6 +556,9 @@ func finishConditionalFormats(index *SourceConditionalFormats, entries []conditi
 			}
 		}
 		group.ruleIndices = append(group.ruleIndices, i)
+	}
+	for i := range index.groups {
+		index.groups[i].areas = groupAreas(index.groups[i].ranges)
 	}
 	index.nodes, index.root = buildSourceRangeTree(entries)
 	index.statistics = index.statisticPlans()

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
@@ -110,7 +111,7 @@ func TestRelationTasksSevenModesShareOneCompletePlanAndKeepStatusLightweight(t *
 		waitRelation(t, a, job, "done")
 		result := relationResult(t, a, job.ID)
 		total, _ := result.Counts.Rows(mode)
-		if result.Preview.Total != total || int64(len(result.Preview.Rows)) != total || result.Preview.Truncated || result.OutputMode != mode || job.Source.data != root.Source.data {
+		if result.Preview.Total != total || int64(len(result.Preview.Rows)) != total || result.Preview.Truncated || result.OutputMode != mode || !job.Source.Same(root.Source) {
 			t.Fatal("preview repeated/replaced the complete preflight", mode, result)
 		}
 		a.mu.RLock()
@@ -243,7 +244,7 @@ func TestRelationFailedReplacementAndChangedSourceNeverPublishPartialExportOrDis
 	if response := reconcilePost(t, a, "/api/relation/export", map[string]any{"jobId": root.ID, "mode": "left", "maximum": "1"}); response.Code != 413 {
 		t.Fatal("inflated output was admitted past the chosen bound", response.Code)
 	}
-	right := root.Source.data.value.inputs.data.value.books[1]
+	right := root.Source.Value().inputs.Value().books[1]
 	if err := os.WriteFile(right.Path, []byte("changed other source"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -316,13 +317,13 @@ func TestRelationTaskCleanupReleasesSourceAndResultOutsideApplicationLock(t *tes
 	close(done)
 	var sourceOutside, resultOutside bool
 	job := &relationTask{ID: randomID(), Primary: a.currentWorkbook(), Status: "done", ctx: ctx, cancel: cancel, done: done}
-	job.Source = newSourceLease(relationSnapshotData{}, func() {
+	job.Source = taskmanager.NewLease(relationSnapshotData{}, func() {
 		sourceOutside = a.mu.TryLock()
 		if sourceOutside {
 			a.mu.Unlock()
 		}
 	})
-	job.Result = newSourceLease(json.RawMessage(`{}`), func() {
+	job.Result = taskmanager.NewLease(json.RawMessage(`{}`), func() {
 		resultOutside = a.mu.TryLock()
 		if resultOutside {
 			a.mu.Unlock()

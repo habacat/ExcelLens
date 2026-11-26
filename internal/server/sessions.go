@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/browserlease"
+	"excellens/internal/workbook"
 )
 
 // Each browser tab has an independent application state: workbook, indexes,
@@ -431,14 +432,9 @@ func (a *App) rootApp() *App {
 
 func (a *App) otherTabUsesCache(target string) bool {
 	root := a.rootApp()
-	root.sourceMu.Lock()
-	for wb := range root.sourcePins {
-		if wb.CacheDir == target {
-			root.sourceMu.Unlock()
-			return true
-		}
+	if root.sourcePins.Any(func(wb *workbook.Workbook) bool { return wb.CacheDir == target }) {
+		return true
 	}
-	root.sourceMu.Unlock()
 	for _, other := range root.activeBrowserWorkbooks() {
 		if other == a {
 			continue

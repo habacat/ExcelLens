@@ -251,9 +251,7 @@ func TestRecipeScaleRealSources(t *testing.T) {
 	if cancelled.Status != "cancelled" || status["result"] != nil {
 		t.Fatal("cancelled replay published partial result", cancelled.Status)
 	}
-	a.sourceMu.Lock()
-	pins := len(a.sourcePins)
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Len()
 	if pins != 0 {
 		t.Fatal("finished jobs retained source pins", pins)
 	}

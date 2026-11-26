@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"math/big"
 	"os"
 	"sort"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"excellens/internal/excelformula"
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 	"excellens/internal/sourceview"
 )
 
@@ -140,21 +140,6 @@ type compiledFilterRule struct {
 	hasNumeric   bool
 }
 
-type sortValue struct {
-	text     string
-	folded   string
-	number   float64
-	isNumber bool
-}
-
-// A narrow row record indexes a tightly-packed, contiguous comparison-key
-// buffer. One-key sorts no longer reserve four unused keys per row (which
-// wasted ~200 MB per million matching rows). Sorting remains stable.
-type sortItem struct {
-	index  int
-	offset int
-}
-
 func (w *Workbook) FilterSheetWithOptions(idx *SheetIndex, rules []FilterRule, opts FilterOptions, cancel <-chan struct{}, progress func(done, total int)) ([]int, error) {
 	ctx := filterCancelContext{Context: context.Background(), cancel: cancel}
 	rows, err := w.FilterRowOrder(ctx, idx, rules, opts, progress)
@@ -260,62 +245,18 @@ func makeSortValue(cell CellData, mode string) sortValue {
 	}
 	// Own only the key bytes: a small cached substring can otherwise retain
 	// a whole source record/dictionary in every spilled chunk.
-	key := sortValue{text: strings.Clone(value), number: n, isNumber: numeric}
+	key := sortValue{Text: strings.Clone(value), Number: n, IsNumber: numeric}
 	if !numeric {
-		key.folded = strings.ToLower(key.text)
+		key.Folded = strings.ToLower(key.Text)
 	}
 	return key
-}
-
-func compareSortNumeric(a, b string, af, bf float64) int {
-	// Percent scaling can introduce a second floating-point rounding. Resolve
-	// close scaled values exactly as well as ordinary float ties.
-	percent := strings.HasSuffix(strings.TrimSpace(a), "%") || strings.HasSuffix(strings.TrimSpace(b), "%")
-	magnitude := math.Max(math.Abs(af), math.Abs(bf))
-	closeScaled := percent && math.Abs(af-bf) <= 8*(math.Nextafter(magnitude, math.Inf(1))-magnitude)
-	if af < bf && !closeScaled {
-		return -1
-	}
-	if af > bf && !closeScaled {
-		return 1
-	}
-	if a == b {
-		return 0
-	}
-	ar, aok := exactNumericRat(a)
-	br, bok := exactNumericRat(b)
-	if aok && bok {
-		if strings.HasSuffix(strings.TrimSpace(a), "%") {
-			ar.Quo(ar, big.NewRat(100, 1))
-		}
-		if strings.HasSuffix(strings.TrimSpace(b), "%") {
-			br.Quo(br, big.NewRat(100, 1))
-		}
-		return ar.Cmp(br)
-	}
-	return 0
 }
 
 // filterFoldKey is canonically equivalent to strings.EqualFold, not merely
 // ToLower. Unicode simple-fold groups include U+017F (long s) and the Kelvin
 // sign; dropping that distinction would make optimized filters incorrect.
 func filterFoldKey(s string) string {
-	ascii := true
-	for i := 0; i < len(s); i++ {
-		if s[i] >= 0x80 {
-			ascii = false
-			break
-		}
-	}
-	if ascii {
-		return strings.ToUpper(s)
-	}
-	var out strings.Builder
-	out.Grow(len(s))
-	for _, r := range s {
-		out.WriteRune(excelformula.FoldRune(r))
-	}
-	return out.String()
+	return excelformula.FoldString(s)
 }
 
 func isTextCell(cell CellData) bool {
@@ -400,36 +341,12 @@ func compareFilterNumeric(a, b string, af, bf float64) int {
 	if a == b {
 		return 0
 	}
-	ar, aok := exactNumericRat(a)
-	br, bok := exactNumericRat(b)
+	ar, aok := rowindex.ExactNumericRat(a)
+	br, bok := rowindex.ExactNumericRat(b)
 	if aok && bok {
 		return ar.Cmp(br)
 	}
 	return 0 // same representable number, e.g. rounding in formatting
-}
-
-func exactNumericRat(value string) (*big.Rat, bool) {
-	s := strings.TrimSpace(value)
-	negative := false
-	if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
-		negative = true
-		s = strings.TrimSpace(s[1 : len(s)-1])
-	}
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.ReplaceAll(s, "￥", "")
-	s = strings.ReplaceAll(s, "¥", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, "元", "")
-	s = strings.ReplaceAll(s, "人民币", "")
-	s = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(s), "%"))
-	r, ok := new(big.Rat).SetString(s)
-	if !ok {
-		return nil, false
-	}
-	if negative {
-		r.Neg(r)
-	}
-	return r, true
 }
 
 func validFilterOperator(operator string) bool {

@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"excellens/internal/rowindex"
 )
 
 func TestTextAmountSortModesExactAndStable(t *testing.T) {
@@ -83,7 +85,7 @@ func TestSortUsesUnroundedRawAndDateSerialOnColdAndWarmQueries(t *testing.T) {
 func TestPercentageSortExactTies(t *testing.T) {
 	for _, pair := range [][2]string{{"57%", "0.57"}, {"28.5%", "0.285"}, {"9007199254740993%", "90071992547409.93"}} {
 		a, b := makeSortValue(CellData{Type: "s", Raw: pair[0]}, "number"), makeSortValue(CellData{Type: "s", Raw: pair[1]}, "number")
-		if got := compareSortNumeric(a.text, b.text, a.number, b.number); got != 0 {
+		if got := rowindex.CompareSortNumeric(a.Text, b.Text, a.Number, b.Number); got != 0 {
 			t.Fatalf("%v compared %d", pair, got)
 		}
 	}

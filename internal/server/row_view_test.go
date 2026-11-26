@@ -318,9 +318,7 @@ func TestRowViewRejectsOtherSheetIndexAndSourceAndPinsRetainedSnapshots(t *testi
 	if response := rowViewCall(t, a, "POST", "/api/row-view/start", string(stale)); response.Code != 409 {
 		t.Fatal("same-content source path switch accepted stale operation", response.Code)
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 1 {
 		t.Fatal("retained snapshot did not pin original source", pins)
 	}
@@ -333,9 +331,7 @@ func TestRowViewRejectsOtherSheetIndexAndSourceAndPinsRetainedSnapshots(t *testi
 		t.Fatal("old snapshot stopped after source replacement", rows, err)
 	}
 	lease.close()
-	a.sourceMu.Lock()
-	pins = a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins = a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("last snapshot reference leaked its source pin", pins)
 	}
@@ -606,9 +602,7 @@ func TestRowViewIndependentConsumersSurviveClearAndAppClose(t *testing.T) {
 		})
 	}
 	group.Wait()
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("parallel final release leaked source pin", pins)
 	}

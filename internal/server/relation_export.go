@@ -51,10 +51,10 @@ func (a *App) handleRelationExport(w http.ResponseWriter, r *http.Request) {
 	accepted := false
 	defer func() {
 		if !accepted {
-			snapshot.close()
+			snapshot.Close()
 		}
 	}()
-	plan := snapshot.data.value.plan
+	plan := snapshot.Value().plan
 	total, err := plan.Counts().Rows(req.Mode)
 	if err != nil {
 		writeError(w, 400, err.Error())
@@ -72,7 +72,7 @@ func (a *App) handleRelationExport(w http.ResponseWriter, r *http.Request) {
 	accepted = true
 	go func() {
 		defer close(job.done)
-		defer snapshot.close()
+		defer snapshot.Close()
 		select {
 		case a.exportSem <- struct{}{}:
 			defer func() { <-a.exportSem }()

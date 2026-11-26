@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/styles"
 )
 
 func TestScanWorksheetOffsetsAndSharedFormula(t *testing.T) {
@@ -135,7 +137,7 @@ func TestFormatCustomNumber(t *testing.T) {
 		{1234.5, `[$¥-804]#,##0.00`, "¥1,234.50"},
 	}
 	for _, tc := range cases {
-		if got := formatCustomNumber(tc.value, tc.format, false); got != tc.want {
+		if got := styles.FormatCustomNumber(tc.value, tc.format, false); got != tc.want {
 			t.Errorf("format %q value %v: got %q want %q", tc.format, tc.value, got, tc.want)
 		}
 	}
@@ -210,11 +212,11 @@ func TestTranslateSharedFormulaWholeAxes(t *testing.T) {
 }
 
 func TestCustomDateAndElapsedTimeFormats(t *testing.T) {
-	date := excelSerialTime(45930.5, false)
-	if got := formatCustomDate(45930.5, `m/d/yy h:mm:ss AM/PM`, false); got != "9/30/25 12:00:00 PM" {
+	date := styles.ExcelSerialTime(45930.5, false)
+	if got := styles.FormatCustomDate(45930.5, `m/d/yy h:mm:ss AM/PM`, false); got != "9/30/25 12:00:00 PM" {
 		t.Fatalf("date/time format = %q (date %s)", got, date.Format("2006-01-02 15:04:05"))
 	}
-	if got := formatCustomDate(1.5, `[h]:mm:ss`, false); got != "36:00:00" {
+	if got := styles.FormatCustomDate(1.5, `[h]:mm:ss`, false); got != "36:00:00" {
 		t.Fatalf("elapsed time format = %q", got)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
@@ -32,15 +33,9 @@ type metadataTaskLimits struct {
 }
 
 func activeMetadataTasks[T any](jobs map[string]*sourceMetadataTask[T]) int {
-	active := 0
-	for _, job := range jobs {
-		select {
-		case <-job.done:
-		default:
-			active++
-		}
-	}
-	return active
+	return taskmanager.ActiveCount(jobs, func(job *sourceMetadataTask[T]) <-chan struct{} {
+		return job.done
+	})
 }
 
 func runSourceMetadataTask[T any](a *App, job *sourceMetadataTask[T], unpin func(), label string, current func() bool, prune func(), load func(func(int64, int64, string)) (*T, error)) {
@@ -91,28 +86,22 @@ func runSourceMetadataTask[T any](a *App, job *sourceMetadataTask[T], unpin func
 }
 
 func pruneMetadataTasks[T any](jobs map[string]*sourceMetadataTask[T], keep string, limits metadataTaskLimits, size func(*T) int64) {
-	for {
-		count, bytes := 0, int64(0)
-		oldest := ""
-		for id, job := range jobs {
-			if job.Snapshot != nil {
-				count++
-				bytes += size(job.Snapshot)
-			}
-			select {
-			case <-job.done:
-				if id != keep && (oldest == "" || job.Created.Before(jobs[oldest].Created)) {
-					oldest = id
-				}
-			default:
-			}
+	taskmanager.PruneBudgeted(jobs, keep, taskmanager.BudgetLimits{
+		History:   limits.history,
+		Snapshots: limits.snapshots,
+		Bytes:     limits.bytes,
+	}, func(job *sourceMetadataTask[T]) taskmanager.BudgetEntry {
+		entry := taskmanager.BudgetEntry{
+			Created:  job.Created,
+			Done:     job.done,
+			Cancel:   job.cancel,
+			Retained: job.Snapshot != nil,
 		}
-		if len(jobs) <= limits.history && count <= limits.snapshots && bytes <= limits.bytes || oldest == "" {
-			return
+		if job.Snapshot != nil {
+			entry.Bytes = size(job.Snapshot)
 		}
-		jobs[oldest].cancel()
-		delete(jobs, oldest)
-	}
+		return entry
+	})
 }
 
 func clearMetadataTasks[T any](jobs map[string]*sourceMetadataTask[T]) []*sourceMetadataTask[T] {

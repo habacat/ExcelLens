@@ -56,7 +56,7 @@
 | 原优先级 | 原文件（拆分前） | 拆分后文件与规模 | 状态与顺带工程优化 |
 | --- | --- | --- | --- |
 | **P1** | [`internal/workbook/xls_biff.go`](../../internal/workbook/xls_biff.go)（**1,101 行**） | [`xls_biff.go`](../../internal/workbook/xls_biff.go)（275 行）、[`xls_biff_styles.go`](../../internal/workbook/xls_biff_styles.go)（328 行）、[`xls_biff_rows.go`](../../internal/workbook/xls_biff_rows.go)（276 行）、[`xls_biff_formula.go`](../../internal/workbook/xls_biff_formula.go)（255 行） | **已完成**。按记录流/SST、全局表与样式、行流解码、公式反编译四层分离；顺手清理 `xlsSegments.nextBytes` 长期未使用的 `continueFlag` 参数。 |
-| **P1** | [`internal/workbook/format.go`](../../internal/workbook/format.go)（**877 行**） | [`cell_ref.go`](../../internal/workbook/cell_ref.go)（82 行）、[`format.go`](../../internal/workbook/format.go)（479 行）、[`format_date.go`](../../internal/workbook/format_date.go)（300 行） | **已完成**。A1 坐标解析、数字/会计格式、Excel 1900/1904 日期格式化彻底解耦；将 `formatHasToken` 收敛为复用 `firstFormatToken >= 0`，消除 20+ 行重复扫描逻辑。 |
+| **P1** | [`internal/workbook/format.go`](../../internal/styles/format.go)（原 **877 行**） | [`cell_ref.go`](../../internal/workbook/cell_ref.go)（82 行）、[`internal/styles/format.go`](../../internal/styles/format.go)、[`internal/styles/format_date.go`](../../internal/styles/format_date.go) | **已完成并升格入 `internal/styles`**。A1 坐标解析留驻 `workbook`，数字/会计/定点十进制/Excel 日期格式化与样式表统一收口至 `internal/styles`；将 `formatHasToken` 收敛为复用 `firstFormatToken >= 0`，消除 20+ 行重复扫描逻辑。 |
 | **P1** | [`internal/calculator/formula.go`](../../internal/calculator/formula.go)（**832 行**） | [`formula_value.go`](../../internal/calculator/formula_value.go)（173 行）、[`formula.go`](../../internal/calculator/formula.go)（456 行）、[`formula_eval.go`](../../internal/calculator/formula_eval.go)（246 行） | **已完成**。值模型、Pratt 语法解析、AST 求值分离；将 `compareFormulaValues` 中每次调用重建 map 的排序改为零分配 `formulaKindRank` switch。 |
 | **P1** | [`internal/editfile/xlsx_package.go`](../../internal/editfile/xlsx_package.go)（**800 行**） | [`xlsx_package.go`](../../internal/editfile/xlsx_package.go)（561 行）、[`xlsx_layout.go`](../../internal/editfile/xlsx_layout.go)（250 行） | **已完成**。ZIP/XML 包读取与 `XLSXLayout` 预检/网格布局升级分离。 |
 | **P1** | [`internal/editfile/xlsx_write.go`](../../internal/editfile/xlsx_write.go)（**761 行**） | [`xlsx_write.go`](../../internal/editfile/xlsx_write.go)（597 行）、[`xlsx_verify.go`](../../internal/editfile/xlsx_verify.go)（177 行） | **已完成**。写出补丁流水线与生成后回读核验（`VerifyXLSX`）分离。 |
@@ -66,8 +66,8 @@
 | **P1** | [`internal/reconcile/relation.go`](../../internal/reconcile/relation.go)（**690 行**） | [`relation.go`](../../internal/reconcile/relation.go)（332 行）、[`relation_stream.go`](../../internal/reconcile/relation_stream.go)（368 行） | **已完成**。关系声明/校验与外排归并流式输出分离。 |
 | **P1** | [`internal/workbook/external_text.go`](../../internal/workbook/external_text.go)（**675 行**） | [`external_text.go`](../../internal/workbook/external_text.go)（301 行）、[`external_text_encoding.go`](../../internal/workbook/external_text_encoding.go)（387 行） | **已完成**。文本工作簿行流与编码嗅探/UTF-16/GB18030 转码/分隔定宽探测分离。 |
 | **P2** | [`internal/searchdsl/query.go`](../../internal/searchdsl/query.go)（**661 行**） | [`lex.go`](../../internal/searchdsl/lex.go)（118 行）、[`parse.go`](../../internal/searchdsl/parse.go)（331 行）、[`query.go`](../../internal/searchdsl/query.go)（236 行） | **已完成**。词法分析、语法与 Schema 解析、AST 求值三层清晰拆分；提取 `evalOrderCmp` 消除数字/日期/字符串比较分支重复。 |
-| **P2** | [`internal/workbook/conditional_expr_funcs.go`](../../internal/workbook/conditional_expr_funcs.go) / [`conditional_formula.go`](../../internal/workbook/conditional_formula.go)（979 / 963 行） | 保持现状 | **后续按需演进**：已在架构审阅中从 2,105 行单体初步拆开，待后续扩充新函数族时再按文本/日期细分。 |
-| **P2** | [`internal/export/xlsx_style_xml.go`](../../internal/export/xlsx_style_xml.go) / [`xlsx_conditional_styles.go`](../../internal/export/xlsx_conditional_styles.go) / [`internal/workbook/styles.go`](../../internal/workbook/styles.go)（674 / 649 / 654 行） | 保持现状 | **后续按需演进**：样式 XML 解析与映射整体内聚，待修改样式引擎时再评估拆分。 |
+| **P2** | `internal/workbook/conditional_expr_funcs.go` / [`conditional_formula.go`](../../internal/workbook/conditional_formula.go)（原 979 / 963 行） | 迁入独立包 [`internal/conditional`](../../internal/conditional/funcs.go)（4,829 行，含求值、成本规划、滑动窗口、统计索引与容量管理） | **已完成包级抽离**，共享十进制类型与解析下沉至 [`internal/excelformula/decimal.go`](../../internal/excelformula/decimal.go)。 |
+| **P2** | [`internal/export/xlsx_style_xml.go`](../../internal/export/xlsx_style_xml.go) / [`xlsx_conditional_styles.go`](../../internal/export/xlsx_conditional_styles.go) / 原 `workbook/styles.go`（674 / 649 / 654 行） | `workbook` 样式与数字/日期格式整体抽离至 [`internal/styles`](../../internal/styles/styles.go)（3,105 行）；`export` 写出侧保持内聚 | **已完成 `styles` 包级收口**，未将颜色/字体/边框/数字格式拆碎为过多微包。 |
 
 ---
 
@@ -86,7 +86,7 @@
 | **322** | [`internal/workbook/scanner.go`](../../internal/workbook/scanner.go) | `scanWorksheetWithSharedHint` | 字节流扫描工作表行偏移、维度、合并与共享公式提示。 |
 | **307** | [`internal/calculator/functions.go`](../../internal/calculator/functions.go) | `scalarFunction` | 标量函数大 `switch` 派发（同类还有 `functions_dates.go:dateFunction`、`functions_math.go:mathFunction`、`functions_text.go:textFunction`）。 |
 | **294** | [`internal/editfile/structure_xml.go`](../../internal/editfile/structure_xml.go) | `editPart` | 行列增删改对公式/合并/表格/验证/筛选等 XML 区域的统一重写循环。 |
-| **291** | [`internal/workbook/conditional_expr_funcs.go`](../../internal/workbook/conditional_expr_funcs.go) | `evalTextFunc` | 17 个条件格式文本函数集中在单个 `switch`。 |
+| **291** | [`internal/conditional/funcs.go`](../../internal/conditional/funcs.go) | `evalTextFunc` | 17 个条件格式文本函数集中在单个 `switch`（已随引擎迁入 `internal/conditional`）。 |
 | **256** | [`internal/workbook/print_settings_xml.go`](../../internal/workbook/print_settings_xml.go) | `scanPrintSourceXML` | 打印元数据 XML 扫描器（同类还有 `data_rules_xml.go:scanDataRuleXML`）。 |
 | **255** | [`internal/server/range.go`](../../internal/server/range.go) | `handleRange` | 范围查询多路径分派与响应编码。 |
 | **249** | [`internal/workbook/search_fast.go`](../../internal/workbook/search_fast.go) | `searchSimpleResumable` | 断点恢复搜索主循环。 |
@@ -100,14 +100,25 @@
 以下文件虽然行数在 550–680 行区间，但**边界清晰、职责单一**，本轮刻意保持原样，避免过度拆分造成碎片化：
 
 - [`internal/workbook/xlsb_function_table.go`](../../internal/workbook/xlsb_function_table.go)（679 行 / 9.4 KB / 0 函数）：纯 MS-XLSB 规范函数 ID 到名称的静态查表数据。
-- [`internal/workbook/axis_visibility.go`](../../internal/workbook/axis_visibility.go)（616 行）、[`hyperlinks.go`](../../internal/workbook/hyperlinks.go)（610 行）、[`catalogue.go`](../../internal/workbook/catalogue.go)（602 行）、[`internal/checkpoint/store.go`](../../internal/checkpoint/store.go)（603 行）、[`internal/editdoc/document.go`](../../internal/editdoc/document.go)（630 行）：单一领域模型与算法实现，内聚度高。
+- [`internal/rowindex/axis_visibility.go`](../../internal/rowindex/axis_visibility.go)（616 行，已随 `rowindex` 成包）、[`hyperlinks.go`](../../internal/workbook/hyperlinks.go)（610 行）、[`catalogue.go`](../../internal/workbook/catalogue.go)（602 行）、[`internal/checkpoint/store.go`](../../internal/checkpoint/store.go)（603 行）、[`internal/editdoc/document.go`](../../internal/editdoc/document.go)（630 行）：单一领域模型与算法实现，内聚度高。
 - [`internal/ui/web/style.css`](../../internal/ui/web/style.css)（812 行）：被多个单测与 QA 夹具直接作为单文件内联读取。
 
 ---
 
-## 五、后续可选演进方向
+## 五、第二阶段包级职责治理（2026-11-26）
 
-第一阶段的高收益前后端拆分已全部落盘并通过全仓验证。后续仅在业务触及对应模块或启动专项重构时再按需推进：
+围绕 `internal/workbook`、`internal/server`、`internal/editfile` 三个大型核心包，先按 Go AST 扫描实测内部符号依赖，再遵循“高内聚、低耦合、单向依赖、最小公开接口、不增加热路径转换/动态接口/额外锁”的原则完成以下包级抽取与审慎边界决策：
+
+| 目标包 | 抽取/治理前 | 抽取/治理后 | 落盘结构与工程收益 |
+| --- | --- | --- | --- |
+| [`internal/workbook`](../../internal/workbook/workbook.go) | 39,397 行（1.18.1 起点） | **30,820 行**（净减 **8,577 行 / -21.8%**） | 抽离三个单向依赖、零拷贝内聚包（`workbook` 侧通过 Go 类型别名零开销桥接）：<br>1. [`internal/conditional`](../../internal/conditional/eval.go)（4,829 行，依赖 `formats`、`excelformula`）：条件表达式求值、成本规划、滑动窗口、统计磁盘索引与容量预算；共享十进制类型/解析下沉至 [`internal/excelformula/decimal.go`](../../internal/excelformula/decimal.go)。<br>2. [`internal/rowindex`](../../internal/rowindex/row_index.go)（3,611 行，依赖 `formats`、`sourceview`、`excelformula`）：`RowOffset`/`RowIndex`、OS `mmap`、进程临时查询文件配额、`RowOrder`/`RowSet`、`AxisVisibility`、`RowProjection`、`RowSorter` 外部归并排序与 `SortKeyStream`/`SortRationalKeyStream`。<br>3. [`internal/styles`](../../internal/styles/styles.go)（3,105 行，依赖 `formats`、`excelformula`）：将 `VisualStyle`、OOXML `styles.xml`/`theme1.xml` 解析、主题色与着色、`RichFont`/`DifferentialStyle` 合并与应用、数字/会计/定点十进制/Excel 日期格式化、区域短日期与系统字体度量统一收口于单一高内聚样式包，避免拆碎为过多微包。 |
+| [`internal/server`](../../internal/server/app.go) | 31,972 行 | **32,276 行**（含新增后台条件统计能力）+ 新增 [`internal/taskmanager`](../../internal/taskmanager/lease.go)（455 行，纯 Go 标准库零内部依赖） | 抽离进程内并发与任务生命周期基元：`Admission` 并发槽池、`Lease[T]` 无锁原子引用计数快照租约（统一替换原分散在 `source_lease.go`、`composition_source.go`、`analysis_source_view.go`、`row_view.go` 四处的重复 CAS 租约实现）、`PinSet[K]` 资源固定集、`ByteBudget` 字节预算（消除 `composition_budget.go` 与 `relation_snapshot.go` 重复计费并移除共享 `sourceMu` 假共享）以及 `PruneFinished`/`PruneBudgeted` 确定性任务历史淘汰。 |
+| [`internal/editfile`](../../internal/editfile/text.go) | 26,147 行（114 文件） | **26,147 行（审慎保持内聚，不强拆）** | Go AST 符号级耦合矩阵显示：`xlsx`（6,692 行）、`pivot`（6,804 行）、`table`（1,932 行）、`structure`（1,299 行）、`recalculation`（1,289 行）、`sheet`（1,142 行）等核心子域围绕同一 OOXML 修订事务存在双向依赖（如 `pivot` 出边指向 `xlsx(31)/recalculation(8)/entry_format(6)/array(4)/chart(3)`，同时被 `xlsx/chart/array/table/range/transfer` 反向引用）。现阶段强拆会迫使引入大量动态接口、数据拷贝或 `editcommon` 杂烩包，且让单次编辑改动波及 4–5 个包；因此明确保留整体内聚，待未来沉淀稳定的不可变 OOXML 部件游标与修订叠加层后再评估外迁。 |
+
+## 六、后续可选演进方向
+
+前两阶段的高收益前后端拆分与包级治理已全部落盘。后续仅在业务触及对应模块或启动专项重构时再按需推进：
 
 1. **前端持续去切片化**：继续将 `app.js` 其余存量切片测试逐步迁向独立纯模块，再考虑分离虚拟网格渲染流水线（`gridSteps`）与非首屏 `<dialog>` 模板。
-2. **后端会话模型与跨包复用**：将 `server.App` 在类型层拆分为 `RootServer` 与 `TabSession`；在 [`tools/project/architecture.go`](../../tools/project/architecture.go) 评估新增零依赖叶包统一 `calculator`/`workbook`/`editfile` 三处的 Excel 1900/1904 日期序列换算；以及按需将 `calculator/functions_*.go` 巨型 `switch` 改为直绑注册表。
+2. **`workbook` 剩余格式适配器边界**：当前 `xlsb`（4,047 行）、`xls`（2,849 行）、`ods`（799 行）、`external`（1,669 行）直接操作 `Workbook`/`SheetIndex`/`CellData`/`ELNROW02`；后续若要拆出独立 `formats/xlsx|xlsb|xls` 解析包，应先设计零拷贝 `cellmodel` 与 `ELNROW02` 编解码叶包，避免在数据读取热路径引入结构体复制或虚函数分发。
+3. **后端会话模型与公式注册表**：将 `server.App` 在类型层进一步区分 `RootServer` 与 `TabSession`；按需将 `calculator/functions_*.go` 巨型 `switch` 改为直绑注册表。

@@ -44,12 +44,12 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 	lastReport := time.Now()
 	for i := state.Next; i < total; i++ {
 		off := idx.RowAt(i)
-		if i&63 == 0 || idx.odsRuns != nil {
+		if i&63 == 0 || idx.ODSRuns() != nil {
 			if err := ctx.Err(); err != nil {
 				return state, err
 			}
 		}
-		sameTemplate := idx.odsRuns != nil && len(buf) > 0 && off.End == offset && off.Start == offset-int64(len(buf))
+		sameTemplate := idx.ODSRuns() != nil && len(buf) > 0 && off.End == offset && off.Start == offset-int64(len(buf))
 		if skip := off.Start - offset; skip > 0 {
 			if _, err = io.CopyN(io.Discard, br, skip); err != nil {
 				return state, err
@@ -107,10 +107,10 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 				return state, nil
 			}
 		}
-		if idx.odsRuns != nil && budget.hits == hitsBefore {
+		if idx.ODSRuns() != nil && budget.hits == hitsBefore {
 			// Simple search compares the stored values and formula text. Only
 			// the result coordinate changes inside a repeated ODS template.
-			run := idx.odsRunAt(i)
+			run := idx.ODSRunAt(i)
 			i = min(total, run.Position+run.Count) - 1
 		}
 		state.Next, state.Matches, state.Complete = i+1, results, i+1 == total

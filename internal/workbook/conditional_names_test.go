@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"errors"
+	"excellens/internal/conditional"
 	"strings"
 	"testing"
 )
@@ -21,14 +22,14 @@ func TestConditionalNameScopeAndUnavailableSource(t *testing.T) {
 		t.Fatal(why)
 	}
 	e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
-	e.row, e.col = 7, 4
-	e.foreignCell = func(sheet string, row, col int) (CellData, string, error) {
+	e.engine.Row, e.engine.Col = 7, 4
+	e.engine.ForeignCell = func(sheet string, row, col int) (conditional.CellOperand, string, error) {
 		if sheet != "O'Brien" || row != 1 || col != 2 {
 			t.Fatalf("bound %s %d %d", sheet, row, col)
 		}
-		return CellData{CacheMissing: true}, "", nil
+		return conditional.CellOperand{CacheMissing: true}, "", nil
 	}
-	if _, why, err := e.evalExpr(expr, &conditionalGroup{anchorRow: 1, anchorCol: 1}); err != nil || !strings.Contains(why, "没有保存") {
+	if _, why, err := e.engine.Eval(expr, 1, 1, nil); err != nil || !strings.Contains(why, "没有保存") {
 		t.Fatalf("missing formula cache swallowed: %q %v", why, err)
 	}
 }

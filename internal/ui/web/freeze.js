@@ -156,7 +156,7 @@
       this.abort?.abort(); // invalidate the previous composite, keeping unchanged part reads
       const abort = new AbortController();
       this.abort = abort;
-      const build = (init) => new URLSearchParams({sheet:s.sheet,rowWindow:'1',...(viewId?{viewId,filterId:s.filtered?s.filterId:'',pinnedThroughRow:String(nr)}:{}), ...init});
+      const build = (init) => new URLSearchParams({sheet:s.sheet,rowWindow:'1',...(s.showStyles?{}:{conditional:'0'}),...(viewId?{viewId,filterId:s.filtered?s.filterId:'',pinnedThroughRow:String(nr)}:{}), ...init});
       const jobs = [];
       if (nr && nc) jobs.push(this.fetchPart('corner', build({row:'1',limit:String(nr),col:'1',cols:String(nc)}), req));
       else jobs.push(Promise.resolve(null));

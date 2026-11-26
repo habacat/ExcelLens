@@ -13,14 +13,8 @@ import (
 	"strconv"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
-
-// One span describes any number of identical physical rows; logical positions
-// keep the existing sparse index contract used by browsing, sort and search.
-type odsRowSpan struct {
-	First, Position, Count int
-	Start, End             int64
-}
 
 func decodeODSColumns(raw []byte) ([]odsColumn, error) {
 	var cols []odsColumn
@@ -61,7 +55,7 @@ func (w *Workbook) buildODSIndex(meta SheetMeta, progress func(int64, int64, str
 		return nil, err
 	}
 	idx := &SheetIndex{SheetPath: meta.Path, SourceFormat: "ods", IndexPath: idxPath, XMLPath: rowsPath, XMLSize: int64(len(marker)), HyperlinkStart: -1, odsLayout: &SourceLayout{}}
-	idx.odsRuns = []odsRowSpan{}
+	odsRuns := []odsRowSpan{}
 	number, position, colPos := 1, 0, 1
 	var hiddenScope []bool
 	for {
@@ -128,7 +122,7 @@ func (w *Workbook) buildODSIndex(meta SheetMeta, progress func(int64, int64, str
 					return nil, e
 				}
 				if len(cols) > 0 || used > 0 {
-					if len(idx.odsRuns) >= formats.ODSRowTemplates {
+					if len(odsRuns) >= formats.ODSRowTemplates {
 						return nil, errors.New("ODS 物理行模板超限")
 					}
 					raw, e := json.Marshal(cols)
@@ -145,14 +139,14 @@ func (w *Workbook) buildODSIndex(meta SheetMeta, progress func(int64, int64, str
 					if end > formats.MaxQueryTempBytes {
 						return nil, errors.New("ODS 行缓存超过可用容量")
 					}
-					idx.odsRuns = append(idx.odsRuns, odsRowSpan{number, position, n, idx.XMLSize, end})
+					odsRuns = append(odsRuns, odsRowSpan{First: number, Position: position, Count: n, Start: idx.XMLSize, End: end})
 					idx.XMLSize = end
 					position += n
 					idx.MaxRow = number + n - 1
 					idx.MaxCol = max(idx.MaxCol, used)
 				}
 				number += n
-				if progress != nil && len(idx.odsRuns)&1023 == 0 {
+				if progress != nil && len(odsRuns)&1023 == 0 {
 					progress(d.InputOffset(), 0, "正在索引 ODS 源行")
 				}
 			default:
@@ -171,7 +165,7 @@ func (w *Workbook) buildODSIndex(meta SheetMeta, progress func(int64, int64, str
 	if !idx.odsLayout.valid() {
 		return nil, errors.New("ODS 源布局超过容量或无效")
 	}
-	idx.odsCount = position
+	idx.RowIndex = rowindex.NewODSRowIndex(odsRuns, position)
 	idx.Dimension = "A1"
 	if idx.MaxCol > 0 {
 		idx.Dimension = "A1:" + ColumnName(idx.MaxCol) + strconv.Itoa(idx.MaxRow)
@@ -220,11 +214,12 @@ func writeODSIndex(idx *SheetIndex, bodyCRC uint32) error {
 	if _, err = io.WriteString(w, "ODSIX002"); err != nil {
 		return err
 	}
-	header := [7]uint64{uint64(idx.MaxRow), uint64(idx.MaxCol), uint64(idx.XMLSize), uint64(len(idx.odsRuns)), uint64(len(raw)), uint64(bodyCRC), uint64(idx.odsCount)}
+	runs := idx.ODSRuns()
+	header := [7]uint64{uint64(idx.MaxRow), uint64(idx.MaxCol), uint64(idx.XMLSize), uint64(len(runs)), uint64(len(raw)), uint64(bodyCRC), uint64(idx.RowCount())}
 	if err = binary.Write(w, binary.LittleEndian, header); err != nil {
 		return err
 	}
-	for _, r := range idx.odsRuns {
+	for _, r := range runs {
 		if err = binary.Write(w, binary.LittleEndian, [4]uint64{uint64(r.First), uint64(r.Count), uint64(r.Start), uint64(r.End)}); err != nil {
 			return err
 		}
@@ -271,9 +266,9 @@ func loadODSIndex(indexPath, rowsPath, sheet string) (*SheetIndex, error) {
 		return nil, errors.New("ODS 索引容量或长度无效")
 	}
 	idx := &SheetIndex{XMLPath: rowsPath, IndexPath: indexPath, SheetPath: sheet, SourceFormat: "ods", MaxRow: int(h[0]), MaxCol: int(h[1]), XMLSize: int64(h[2]), HyperlinkStart: -1, odsLayout: &SourceLayout{}}
-	idx.odsRuns = make([]odsRowSpan, int(h[3]))
+	odsRuns := make([]odsRowSpan, int(h[3]))
 	prev, last, position := uint64(0), uint64(8), 0
-	for i := range idx.odsRuns {
+	for i := range odsRuns {
 		var v [4]uint64
 		if err = binary.Read(r, binary.LittleEndian, &v); err != nil {
 			return nil, err
@@ -281,7 +276,7 @@ func loadODSIndex(indexPath, rowsPath, sheet string) (*SheetIndex, error) {
 		if v[0] <= prev || v[1] == 0 || v[0] > h[0] || v[1] > h[0]-v[0]+1 || v[2] != last || v[3] <= last || v[3] > h[2] || v[3]-last > maxExternalRowBytes {
 			return nil, errors.New("ODS 索引跨度无效")
 		}
-		idx.odsRuns[i] = odsRowSpan{int(v[0]), position, int(v[1]), int64(last), int64(v[3])}
+		odsRuns[i] = odsRowSpan{First: int(v[0]), Position: position, Count: int(v[1]), Start: int64(last), End: int64(v[3])}
 		position += int(v[1])
 		prev = v[0] + v[1] - 1
 		last = v[3]
@@ -289,7 +284,7 @@ func loadODSIndex(indexPath, rowsPath, sheet string) (*SheetIndex, error) {
 	if last != h[2] || uint64(position) != h[6] {
 		return nil, errors.New("ODS 索引条数不符")
 	}
-	idx.odsCount = position
+	idx.RowIndex = rowindex.NewODSRowIndex(odsRuns, position)
 	layout := make([]byte, int(h[4]))
 	if _, err = io.ReadFull(r, layout); err != nil {
 		return nil, err

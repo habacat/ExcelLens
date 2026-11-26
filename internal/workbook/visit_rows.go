@@ -14,12 +14,14 @@ func (w *Workbook) VisitRowsContext(ctx context.Context, idx *SheetIndex, positi
 }
 
 type RowReadOptions struct {
-	FormatValue        bool
-	IncludeFormula     bool
-	RichText           bool
-	ConditionalFormats bool
-	Columns            []int
-	richBudget         *richReadBudget
+	FormatValue              bool
+	IncludeFormula           bool
+	RichText                 bool
+	ConditionalFormats       bool
+	ConditionalStatsReadOnly bool
+	ConditionalStatsStatus   string
+	Columns                  []int
+	richBudget               *richReadBudget
 }
 
 // VisitRowsWithOptionsContext streams source rows with one descriptor and a

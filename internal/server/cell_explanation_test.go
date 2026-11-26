@@ -235,9 +235,7 @@ func TestCellExplanationQueuedCancellationAndEvictionReleasePins(t *testing.T) {
 			a, file := cellExplanationFixture(t)
 			req := cellExplanationSource(t, a, "First", "A2", rowViewRequest{})
 			wb := a.currentWorkbook()
-			a.sourceMu.Lock()
-			baseline := a.sourcePins[wb]
-			a.sourceMu.Unlock()
+			baseline := a.sourcePins.Count(wb)
 			for i := 0; i < cap(a.querySem); i++ {
 				a.querySem <- struct{}{}
 			}
@@ -250,9 +248,7 @@ func TestCellExplanationQueuedCancellationAndEvictionReleasePins(t *testing.T) {
 			go func() { defer close(done); a.handleCellExplanation(w, r) }()
 			deadline := time.Now().Add(2 * time.Second)
 			for {
-				a.sourceMu.Lock()
-				pins := a.sourcePins[wb]
-				a.sourceMu.Unlock()
+				pins := a.sourcePins.Count(wb)
 				if pins > baseline {
 					break
 				}
@@ -299,9 +295,7 @@ func TestCellExplanationQueuedCancellationAndEvictionReleasePins(t *testing.T) {
 			if action == "cancel" && w.Body.Len() != 0 || action != "cancel" && w.Code != 409 {
 				t.Fatal(action, w.Code, w.Body.String())
 			}
-			a.sourceMu.Lock()
-			pins := a.sourcePins[wb]
-			a.sourceMu.Unlock()
+			pins := a.sourcePins.Count(wb)
 			expected := baseline
 			if action == "evict" || action == "switch" {
 				expected--

@@ -82,6 +82,12 @@ func (a *App) installWorkbook(wb, expected *workbook.Workbook, guarded bool) boo
 	oldQueries := a.queryController.detachLocked()
 	oldExports := a.exports.cancelAllLocked()
 	a.edits.releaseBinding()
+	if wb != nil {
+		root := a.rootApp()
+		wb.SetConditionalStatsPolicy(func() (int64, func(string) bool) {
+			return loadConditionalStatsBudget(), root.conditionalStatsProtector()
+		})
+	}
 	a.wb = wb
 	a.startupError = ""
 	a.exports = make(exportController)

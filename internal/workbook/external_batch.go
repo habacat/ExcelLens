@@ -73,14 +73,20 @@ func (w *Workbook) readIndexedBatchWithOptions(ctx context.Context, f *os.File, 
 			if err != nil {
 				return nil, err
 			}
-			if presentation != nil {
-				if err := presentation.apply(&row, first, last, selected); err != nil {
-					return nil, err
-				}
-			}
 			rows = append(rows, row)
 		}
 		start = stop
+	}
+	if presentation != nil {
+		presentation.setBatchRows(rows, first, last, selected)
+		for i := range rows {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if err := presentation.apply(&rows[i], first, last, selected); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return rows, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"excellens/internal/conditional"
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
 // ConditionalPresentation is a derived view. Source Raw, Display, Type,
@@ -25,14 +25,16 @@ type ConditionalPresentation struct {
 
 type conditionalAddress struct{ row, col int }
 type conditionalRangeKey struct{ r1, c1, r2, c2 int }
-type conditionalDependencyUnavailable struct{ reason string }
-
-func (e *conditionalDependencyUnavailable) Error() string { return e.reason }
 
 type conditionalRead struct {
 	statBindings                     map[boundStatKey]boundStatQuery
 	statistics                       *conditional.Index
 	statNotice                       string
+	statPending                      bool
+	statNeedsBuild                   bool
+	statDamaged                      bool
+	readOnlyStats                    bool
+	statsStatus                      string
 	statProgress                     func(int, int)
 	w                                *Workbook
 	idx                              *SheetIndex
@@ -45,10 +47,13 @@ type conditionalRead struct {
 	selected                         map[int]struct{}
 	columns                          []int
 	cells                            map[int]CellData
+	batchRows                        map[int]map[int]CellData
+	batchFirst, batchLast            int
+	batchSelected                    map[int]struct{}
 	cache                            map[conditionalAddress]CellData
 	foreignValues                    map[conditionalForeignAddress]CellData
 	foreignOpens                     int
-	rangeCache                       map[conditionalRangeKey]conditionalRangeData
+	rangeCache                       map[conditionalRangeKey]conditional.RangeData
 	cacheBytes                       int
 	remainingBytes, remainingCells   int
 	dependencyReads, dependencyBytes int
@@ -82,15 +87,52 @@ func (w *Workbook) newConditionalRead(ctx context.Context, idx *SheetIndex, file
 	if len(index.groups) == 0 && index.notice == "" {
 		return nil, nil
 	}
-	r := &conditionalRead{w: w, idx: idx, ctx: ctx, index: index, evaluator: index.NewEvaluator(ctx), stream: indexedStream{f: file, idx: idx}, cache: make(map[conditionalAddress]CellData), rangeCache: make(map[conditionalRangeKey]conditionalRangeData)}
+	r := &conditionalRead{
+		w:             w,
+		idx:           idx,
+		ctx:           ctx,
+		index:         index,
+		evaluator:     index.NewEvaluator(ctx),
+		stream:        indexedStream{f: file, idx: idx},
+		cache:         make(map[conditionalAddress]CellData),
+		rangeCache:    make(map[conditionalRangeKey]conditional.RangeData),
+		readOnlyStats: options.ConditionalStatsReadOnly,
+		statsStatus:   options.ConditionalStatsStatus,
+	}
 	r.evaluator.SetRangeResolver(r.resolveRange)
-	r.evaluator.foreignCell = r.resolveForeignCell
+	r.evaluator.engine.ForeignCell = func(sheet string, row, col int) (conditional.CellOperand, string, error) {
+		cell, notice, err := r.resolveForeignCell(sheet, row, col)
+		return toConditionalOperand(cell), notice, err
+	}
 	if len(index.statistics) > 0 && idx.RowCount() >= formats.ConditionalStatsMinRows {
-		r.evaluator.indexed = r.indexedStatistic
+		r.evaluator.engine.StatHandler = r.indexedStatistic
 	}
 	r.columns = append([]int(nil), options.Columns...)
 	r.resetBudget()
 	return r, nil
+}
+
+func (r *conditionalRead) setBatchRows(rows []RowData, first, last int, selected map[int]struct{}) {
+	if r == nil {
+		return
+	}
+	r.batchFirst, r.batchLast, r.batchSelected = first, last, selected
+	if len(rows) == 0 {
+		r.batchRows = nil
+		return
+	}
+	if r.batchRows == nil {
+		r.batchRows = make(map[int]map[int]CellData, len(rows))
+	} else {
+		clear(r.batchRows)
+	}
+	for i := range rows {
+		cols := make(map[int]CellData, len(rows[i].Cells))
+		for _, c := range rows[i].Cells {
+			cols[c.Col] = c
+		}
+		r.batchRows[rows[i].Number] = cols
+	}
 }
 
 func conditionalNotice(s string) string {
@@ -104,11 +146,34 @@ func (r *conditionalRead) resetBudget() {
 	r.foreignOpens = formats.ConditionalForeignOpens
 	r.remainingBytes, r.remainingCells = formats.ConditionalReadBytes, formats.ConditionalReadCells
 	r.dependencyReads, r.dependencyBytes = formats.ConditionalDependencyReads, formats.ConditionalDependencyXMLBytes
-	r.evaluator.work, r.evaluator.textBytes = formats.ConditionalEvalWork, formats.ConditionalEvalTextBytes
+	r.evaluator.engine.ResetBudget()
 }
 
 func conditionalOperand(cell CellData) CellData {
 	return CellData{Raw: cell.Raw, Type: cell.Type, CacheMissing: cell.CacheMissing}
+}
+
+func (r *conditionalRead) batchHasColumn(col int) bool {
+	if col < r.batchFirst || col > r.batchLast {
+		return false
+	}
+	if r.batchSelected == nil {
+		return true
+	}
+	_, ok := r.batchSelected[col]
+	return ok
+}
+
+func (r *conditionalRead) cacheSingleCell(rowNum, col int, cell CellData) {
+	key := conditionalAddress{rowNum, col}
+	if _, exists := r.cache[key]; exists {
+		return
+	}
+	cost := 512 + 2*(len(cell.Raw)+len(cell.Ref)+len(cell.Type))
+	if len(r.cache) < formats.ConditionalDependencyReads && cost <= formats.ConditionalDependencyCacheBytes-r.cacheBytes {
+		r.cache[key] = conditionalOperand(cell)
+		r.cacheBytes += cost
+	}
 }
 
 func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
@@ -118,6 +183,11 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 	if row == r.row.Number && col >= r.first && col <= r.last {
 		if _, included := r.selected[col]; r.selected == nil || included {
 			return r.cells[col], true, nil // an omitted, read column is a proven blank
+		}
+	}
+	if r.batchRows != nil && r.batchHasColumn(col) {
+		if cols, ok := r.batchRows[row]; ok {
+			return conditionalOperand(cols[col]), true, nil
 		}
 	}
 	key := conditionalAddress{row, col}
@@ -131,7 +201,7 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 	offset := r.idx.RowAt(position)
 	size := offset.End - offset.Start
 	if r.dependencyReads == 0 || size <= 0 || size > int64(r.dependencyBytes) {
-		return CellData{}, false, &conditionalDependencyUnavailable{reason: "条件格式引用超过本次读取容量，未用空白或零替代"}
+		return CellData{}, false, &conditional.DependencyUnavailableError{Reason: "条件格式引用超过本次读取容量，未用空白或零替代"}
 	}
 	r.dependencyReads--
 	r.dependencyBytes -= int(size)
@@ -140,7 +210,7 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 		if r.ctx.Err() != nil {
 			return CellData{}, false, r.ctx.Err()
 		}
-		return CellData{}, false, &conditionalDependencyUnavailable{reason: "条件格式引用读取失败，原值保留：" + conditionalNotice(err.Error())}
+		return CellData{}, false, &conditional.DependencyUnavailableError{Reason: "条件格式引用读取失败，原值保留：" + conditionalNotice(err.Error())}
 	}
 	cell := CellData{}
 	for _, candidate := range data.Cells {
@@ -149,17 +219,13 @@ func (r *conditionalRead) resolve(row, col int) (CellData, bool, error) {
 			break
 		}
 	}
-	bytes := 512 + 2*(len(cell.Raw)+len(cell.Ref)+len(cell.Type))
-	if len(r.cache) < formats.ConditionalDependencyReads && bytes <= formats.ConditionalDependencyCacheBytes-r.cacheBytes {
-		r.cache[key] = conditionalOperand(cell)
-		r.cacheBytes += bytes
-	}
+	r.cacheSingleCell(row, col, cell)
 	return cell, true, nil
 }
 
-func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData, string, error) {
+func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditional.RangeData, string, error) {
 	if err := r.ctx.Err(); err != nil {
-		return conditionalRangeData{}, "", err
+		return conditional.RangeData{}, "", err
 	}
 	key := conditionalRangeKey{r1, c1, r2, c2}
 	if cached, ok := r.rangeCache[key]; ok {
@@ -169,14 +235,14 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData
 	totalArea := int64(r2-r1+1) * int64(width)
 	// Fast path: range entirely within the currently loaded row window.
 	if r1 == r2 && r1 == r.row.Number && c1 >= r.first && c2 <= r.last && r.selected == nil {
-		out := conditionalRangeData{r1: r1, c1: c1, r2: r2, c2: c2}
+		out := conditional.RangeData{R1: r1, C1: c1, R2: r2, C2: c2}
 		for col := c1; col <= c2; col++ {
 			cell, ok := r.cells[col]
 			if !ok || (!cell.CacheMissing && cell.Type == "" && cell.Raw == "") {
-				out.blankCount++
+				out.BlankCount++
 				continue
 			}
-			out.cells = append(out.cells, conditionalRangeCell{row: r1, col: col, cell: conditionalOperand(cell)})
+			out.Cells = append(out.Cells, conditional.RangeCell{Row: r1, Col: col, Cell: toConditionalOperand(cell)})
 		}
 		return out, "", nil
 	}
@@ -184,13 +250,14 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData
 	endPos := r.idx.FindRowOffset(r2 + 1)
 	occupiedRows := endPos - startPos
 	if occupiedRows > formats.ConditionalDependencyReads || int64(occupiedRows)*int64(width) > int64(formats.ConditionalRangeCells) {
-		return conditionalRangeData{}, "条件格式引用范围超过本次读取容量，未扫描整表", nil
+		return conditional.RangeData{}, "条件格式引用范围超过本次读取容量，未扫描整表", nil
 	}
-	out := conditionalRangeData{r1: r1, c1: c1, r2: r2, c2: c2}
+	out := conditional.RangeData{R1: r1, C1: c1, R2: r2, C2: c2}
 	estBytes := 128
+	batchCoversCols := r.batchRows != nil && c1 >= r.batchFirst && c2 <= r.batchLast && r.batchSelected == nil
 	for pos := startPos; pos < endPos; pos++ {
 		if err := r.ctx.Err(); err != nil {
-			return conditionalRangeData{}, "", err
+			return conditional.RangeData{}, "", err
 		}
 		offset := r.idx.RowAt(pos)
 		rowNum := offset.Number
@@ -198,16 +265,28 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData
 			for col := c1; col <= c2; col++ {
 				cell, ok := r.cells[col]
 				if ok && (cell.CacheMissing || cell.Type != "" || cell.Raw != "") {
-					out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: col, cell: conditionalOperand(cell)})
+					out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: col, Cell: toConditionalOperand(cell)})
 					estBytes += len(cell.Raw) + len(cell.Type)
 				}
 			}
 			continue
 		}
+		if batchCoversCols {
+			if cols, ok := r.batchRows[rowNum]; ok {
+				for col := c1; col <= c2; col++ {
+					cell, exists := cols[col]
+					if exists && (cell.CacheMissing || cell.Type != "" || cell.Raw != "") {
+						out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: col, Cell: toConditionalOperand(cell)})
+						estBytes += len(cell.Raw) + len(cell.Type)
+					}
+				}
+				continue
+			}
+		}
 		if width == 1 {
 			if cached, ok := r.cache[conditionalAddress{rowNum, c1}]; ok {
 				if cached.CacheMissing || cached.Type != "" || cached.Raw != "" {
-					out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: c1, cell: cached})
+					out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: c1, Cell: toConditionalOperand(cached)})
 					estBytes += len(cached.Raw) + len(cached.Type)
 				}
 				continue
@@ -215,31 +294,38 @@ func (r *conditionalRead) resolveRange(r1, c1, r2, c2 int) (conditionalRangeData
 		}
 		size := offset.End - offset.Start
 		if r.dependencyReads == 0 || size <= 0 || size > int64(r.dependencyBytes) {
-			return conditionalRangeData{}, "条件格式引用超过本次读取容量，未用空白或零替代", nil
+			return conditional.RangeData{}, "条件格式引用超过本次读取容量，未用空白或零替代", nil
 		}
 		r.dependencyReads--
 		r.dependencyBytes -= int(size)
 		data, err := r.stream.readWithOptions(r.w, pos, c1, c2, nil, RowReadOptions{})
 		if err != nil {
 			if r.ctx.Err() != nil {
-				return conditionalRangeData{}, "", r.ctx.Err()
+				return conditional.RangeData{}, "", r.ctx.Err()
 			}
-			return conditionalRangeData{}, "条件格式引用读取失败，原值保留：" + conditionalNotice(err.Error()), nil
+			return conditional.RangeData{}, "条件格式引用读取失败，原值保留：" + conditionalNotice(err.Error()), nil
 		}
+		var singleFound CellData
 		for _, cell := range data.Cells {
 			if cell.Col < c1 || cell.Col > c2 {
 				continue
 			}
+			if width == 1 && cell.Col == c1 {
+				singleFound = cell
+			}
 			if !cell.CacheMissing && cell.Type == "" && cell.Raw == "" {
 				continue
 			}
-			out.cells = append(out.cells, conditionalRangeCell{row: rowNum, col: cell.Col, cell: conditionalOperand(cell)})
+			out.Cells = append(out.Cells, conditional.RangeCell{Row: rowNum, Col: cell.Col, Cell: toConditionalOperand(cell)})
 			estBytes += len(cell.Raw) + len(cell.Type)
+		}
+		if width == 1 {
+			r.cacheSingleCell(rowNum, c1, singleFound)
 		}
 	}
 	// Count backing-array capacity and retained source text before caching.
-	estBytes += cap(out.cells) * 512
-	out.blankCount = totalArea - int64(len(out.cells))
+	estBytes += cap(out.Cells) * 512
+	out.BlankCount = totalArea - int64(len(out.Cells))
 	if len(r.rangeCache) < formats.ConditionalRangeCacheEntries && estBytes <= formats.ConditionalDependencyCacheBytes-r.cacheBytes {
 		r.rangeCache[key] = out
 		r.cacheBytes += estBytes
@@ -319,106 +405,21 @@ func (r *conditionalRead) apply(row *RowData, first, last int, selected map[int]
 
 func (w *Workbook) conditionalPresentation(cell CellData, result ConditionalFormatResult) *ConditionalPresentation {
 	p := &ConditionalPresentation{ConditionalFormatResult: result}
-	if result.Style.empty() {
+	if result.Style.Empty() {
 		return p
 	}
 	visual := VisualStyle{}
 	if cell.Style >= 0 && cell.Style < len(w.VisualStyles) {
 		visual = w.VisualStyles[cell.Style]
 	}
-	d := result.Style
-	f := d.Font
-	if f.Name != "" {
-		visual.FontName = f.Name
+	v, display, valueColor, notice := styles.ApplyDifferential(visual, result.Style, cell.Raw, cell.Type, cell.CacheMissing, w.Date1904)
+	p.Visual = v
+	p.Display = display
+	p.ValueColor = valueColor
+	if notice != "" {
+		p.Notice = joinConditionalNotice(p.Notice, notice)
 	}
-	if f.Size != 0 {
-		visual.FontSize = f.Size
-	}
-	if f.Color != "" || f.AutoColor {
-		visual.Color = f.Color
-		empty := ""
-		p.ValueColor = &empty
-	}
-	if f.Bold != nil {
-		visual.Bold = *f.Bold
-	}
-	if f.Italic != nil {
-		visual.Italic = *f.Italic
-	}
-	if f.Strike != nil {
-		visual.Strike = *f.Strike
-	}
-	if f.Underline != "" {
-		visual.Underline = f.Underline != "none"
-		visual.UnderlineStyle = f.Underline
-	}
-	if f.Vertical != "" {
-		visual.FontVertical = f.Vertical
-	}
-	if d.Background != nil {
-		visual.Background = *d.Background
-	}
-	if d.Horizontal != nil {
-		visual.Horizontal = *d.Horizontal
-	}
-	if d.Vertical != nil {
-		visual.Vertical = *d.Vertical
-	}
-	if d.Wrap != nil {
-		visual.Wrap = *d.Wrap
-	}
-	if d.Rotation != nil {
-		visual.Rotation = *d.Rotation
-	}
-	if d.Border != nil {
-		for _, side := range []struct {
-			target *string
-			diff   *DifferentialBorderSide
-		}{{&visual.BorderTop, d.Border.Top}, {&visual.BorderBottom, d.Border.Bottom}, {&visual.BorderLeft, d.Border.Left}, {&visual.BorderRight, d.Border.Right}} {
-			*side.target = conditionalBorder(*side.target, side.diff, visual.Color)
-		}
-	}
-	if d.NumberFormat != nil && !cell.CacheMissing && (cell.Type == "" || cell.Type == "n") && cell.Raw != "" {
-		format := d.NumberFormat.Code
-		display := cell.Raw
-		if !strings.EqualFold(strings.TrimSpace(format), "General") {
-			value, err := strconv.ParseFloat(cell.Raw, 64)
-			if err == nil && !math.IsNaN(value) && !math.IsInf(value, 0) && (value != 0 || isDecimalZero(cell.Raw)) {
-				if value == 0 {
-					value = 0
-				} // normalize an exact signed zero like the source formatter
-				if exact, ok := formatDecimalDisplay(cell.Raw, format, d.NumberFormat.ID); ok {
-					display = exact
-				} else {
-					display = formatCustomNumber(value, format, w.Date1904)
-				}
-			} else {
-				p.Notice = joinConditionalNotice(p.Notice, "条件数字格式未应用：源数值超出显示计算范围")
-			}
-		}
-		p.Display = &display
-		color := conditionalNumberColor(cell.Raw, sectionTextColors(d.NumberFormat.ID, format))
-		if f.Color != "" || f.AutoColor {
-			color = ""
-		}
-		p.ValueColor = &color
-	}
-	p.Visual = &visual
 	return p
-}
-
-func conditionalNumberColor(raw string, colors [3]string) string {
-	n, ok := parseConditionalDecimal(raw)
-	if !ok {
-		return ""
-	}
-	if n.digits == "0" && colors[2] != "" {
-		return colors[2]
-	}
-	if n.negative {
-		return colors[1]
-	}
-	return colors[0]
 }
 
 func joinConditionalNotice(a, b string) string {
@@ -426,37 +427,4 @@ func joinConditionalNotice(a, b string) string {
 		return b
 	}
 	return conditionalNotice(a + "；" + b)
-}
-
-func conditionalBorder(base string, diff *DifferentialBorderSide, foreground string) string {
-	if diff == nil {
-		return base
-	}
-	color := foreground
-	if color == "" {
-		color = "#000000"
-	}
-	if at := strings.LastIndexByte(base, ' '); at >= 0 {
-		color = base[at+1:]
-	}
-	if diff.Color != nil {
-		color = *diff.Color
-	} else if diff.AutoColor {
-		color = foreground
-		if color == "" {
-			color = "#000000"
-		}
-	}
-	if diff.Style != nil {
-		if *diff.Style == "" || *diff.Style == "none" {
-			return ""
-		}
-		return borderCSS(styleSideXML{Style: *diff.Style}, color)
-	}
-	if base != "" && (diff.Color != nil || diff.AutoColor) {
-		if at := strings.LastIndexByte(base, ' '); at >= 0 {
-			return base[:at+1] + color
-		}
-	}
-	return base
 }

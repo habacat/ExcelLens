@@ -13,6 +13,7 @@ import (
 
 	"excellens/internal/fileidentity"
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
 const xlsbCacheDomain = "xlsb-biff12-v3"
@@ -25,7 +26,7 @@ type xlsbBook struct {
 	externals                              []xlsbXTI
 	names                                  []xlsbName
 	tables                                 map[uint32]*xlsbTable
-	fonts                                  []styleFontXML
+	fonts                                  []styles.FontXML
 	baseDXFCount                           int
 	metaMu                                 sync.Mutex
 	metadata                               map[string]*xlsbSheetData
@@ -172,7 +173,7 @@ func openXLSB(file string) (*Workbook, error) {
 	}
 	w.source.fingerprintDomain, w.source.xlsb = xlsbCacheDomain, b
 	w.SourceInfo = SourceInfo{Format: "xlsb", ReadOnly: true}
-	w.ThemeColors = loadTheme(parts[b.theme])
+	w.ThemeColors = styles.LoadTheme(parts[b.theme], maxMetadataPart)
 	if err := w.readXLSBBook(parts[b.workbook], rels); err != nil {
 		return nil, err
 	}

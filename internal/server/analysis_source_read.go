@@ -86,7 +86,7 @@ func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis
 	}
 	var snapshot *analysisSourceSnapshot
 	if borrowed != nil {
-		if borrowed.closed.Load() || borrowed.data.wb != wb || borrowed.data.source != q.Source || borrowed.data.scope.Digest() != scope.Digest() {
+		if borrowed.isClosed() || borrowed.data.wb != wb || borrowed.data.source != q.Source || borrowed.data.scope.Digest() != scope.Digest() {
 			return analysisSource{}, errors.New("分析来源快照与范围规则不一致，请重新捕获")
 		}
 		meta, found := wb.FindSheet(strings.TrimPrefix(q.Source, "wb:"))

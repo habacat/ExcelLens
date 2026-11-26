@@ -20,6 +20,7 @@ func BenchmarkInlinePresentationViewport(b *testing.B) {
 		}
 		var source strings.Builder
 		idx := &SheetIndex{XMLPath: filepath.Join(b.TempDir(), "viewport.xml"), MaxRow: 300, MaxCol: 16}
+		var offsets []RowOffset
 		for row := 1; row <= 300; row++ {
 			start := source.Len()
 			fmt.Fprintf(&source, `<row r="%d">`, row)
@@ -27,8 +28,9 @@ func BenchmarkInlinePresentationViewport(b *testing.B) {
 				fmt.Fprintf(&source, `<c r="%s%d" t="inlineStr"><is>%s</is></c>`, ColumnName(col), row, body)
 			}
 			source.WriteString(`</row>`)
-			idx.resident = append(idx.resident, RowOffset{Number: row, Start: int64(start), End: int64(source.Len())})
+			offsets = append(offsets, RowOffset{Number: row, Start: int64(start), End: int64(source.Len())})
 		}
+		idx.RowIndex = NewRowIndex(offsets)
 		idx.XMLSize = int64(source.Len())
 		if err := os.WriteFile(idx.XMLPath, []byte(source.String()), 0600); err != nil {
 			b.Fatal(err)

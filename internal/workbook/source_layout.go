@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
+	"excellens/internal/styles"
 )
 
 const sourceLayoutCacheVersion = 7
@@ -51,7 +53,7 @@ func (w *Workbook) normalDigitWidth() float64 {
 		if font.FontName == "" && len(w.VisualStyles) > 0 {
 			font = w.VisualStyles[0]
 		}
-		w.sourceDigitWidth = measureSourceDigits(font)
+		w.sourceDigitWidth = styles.MeasureSourceDigits(font)
 	})
 	return w.sourceDigitWidth
 }
@@ -65,13 +67,7 @@ type CellMerge struct {
 	EndCol int `json:"endCol"`
 }
 
-type SourceSizeRange struct {
-	Min  int     `json:"min"`
-	Max  int     `json:"max"`
-	Size float64 `json:"size"`
-}
-
-func validSourceSize(size float64) bool { return size >= 10 && size <= 1200 }
+func validSourceSize(size float64) bool { return rowindex.ValidSourceSize(size) }
 
 func appendSourceRowSize(rows *[]SourceSizeRange, row int, size float64) {
 	if row < 1 || row > maxExternalRows || !validSourceSize(size) {
@@ -88,7 +84,7 @@ func appendSourceRowSize(rows *[]SourceSizeRange, row int, size float64) {
 		}
 	}
 	if len(*rows) < 100000 {
-		*rows = append(*rows, SourceSizeRange{row, row, size})
+		*rows = append(*rows, SourceSizeRange{Min: row, Max: row, Size: size})
 	}
 }
 

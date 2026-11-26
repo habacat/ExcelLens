@@ -56,7 +56,7 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cacheMu.RLock()
 	cachedIndex := wb.GetCachedIndex(meta.Path)
-	ready := cachedIndex != nil && !wb.ConditionalStatisticsPending(r.Context(), meta, cachedIndex)
+	ready := cachedIndex != nil
 	a.cacheMu.RUnlock()
 	if ready {
 		writeJSON(w, indexPayload(true, "", meta.Name, cachedIndex))
@@ -132,17 +132,6 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 		job.mu.Unlock()
 	}
 	idx, err := wb.BuildIndex(meta, update, job.ctx.Done())
-	if err == nil {
-		err = wb.PrepareConditionalStatistics(job.ctx, meta, idx, func(done, total int) {
-			job.mu.Lock()
-			defer job.mu.Unlock()
-			job.Stage = "正在建立条件统计索引"
-			job.DoneRows, job.TotalRows = done, total
-			if total > 0 {
-				job.Progress = float64(done) * 100 / float64(total)
-			}
-		})
-	}
 	job.mu.Lock()
 	defer job.mu.Unlock()
 	if err != nil {
@@ -358,7 +347,17 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	var rows []workbook.RowData
 	var err error
-	readOptions := workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: true, ConditionalFormats: query.Get("conditional") != "0"}
+	conditionalOn := query.Get("conditional") != "0"
+	readOptions := workbook.RowReadOptions{
+		FormatValue:              true,
+		IncludeFormula:           true,
+		RichText:                 true,
+		ConditionalFormats:       conditionalOn,
+		ConditionalStatsReadOnly: conditionalOn,
+	}
+	if conditionalOn {
+		readOptions.ConditionalStatsStatus = a.conditionalStatsSheetStatus(meta.Path)
+	}
 	if visible != nil {
 		var numbers []int
 		if pinnedThrough > 0 {
@@ -438,6 +437,18 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	if r.Context().Err() != nil {
 		return
 	}
+	conditionalStatsPending := false
+	if conditionalOn {
+	pendingCheck:
+		for i := range rows {
+			for j := range rows[i].Cells {
+				if rows[i].Cells[j].Conditional != nil && rows[i].Cells[j].Conditional.Pending {
+					conditionalStatsPending = true
+					break pendingCheck
+				}
+			}
+		}
+	}
 	payload := map[string]any{
 		"hyperlinkError": linkError,
 		"sheet":          meta.Name, "dimension": idx.Dimension,
@@ -446,6 +457,9 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		"maxRow": idx.MaxRow, "maxCol": idx.MaxCol,
 		"startCol": startCol, "colCount": colCount, "columns": sparseCols,
 		"rows": rows,
+	}
+	if conditionalStatsPending {
+		payload["conditionalStatsPending"] = true
 	}
 	if visible != nil {
 		payload["viewId"] = visible.data.id

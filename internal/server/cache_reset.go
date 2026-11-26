@@ -45,6 +45,10 @@ func (a *App) ClearAllCaches() (string, error) {
 	defer root.cacheMu.Unlock()
 	cache, err := os.OpenRoot(dir)
 	if errors.Is(err, os.ErrNotExist) {
+		_, statsErr := workbook.ClearAllConditionalStats()
+		if statsErr != nil {
+			return "已关闭当前工作簿，部分条件统计缓存未能清理。", statsErr
+		}
 		return "缓存目录为空，已返回首页。", nil
 	}
 	if err != nil {
@@ -56,6 +60,8 @@ func (a *App) ClearAllCaches() (string, error) {
 	runtime.GC()
 	for attempt := 0; ; attempt++ {
 		err = clearCacheEntries(cache, ".", keep)
+		_, statsErr := workbook.ClearAllConditionalStats()
+		err = errors.Join(err, statsErr)
 		if err == nil {
 			return "已清除全部工作簿缓存，已返回首页。", nil
 		}

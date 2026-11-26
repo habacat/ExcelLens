@@ -170,7 +170,7 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 		_ = tmp.Close()
 		return nil, err
 	}
-	defer writer.offsets.close()
+	defer writer.offsets.Close()
 	emit := func(fields []string) error {
 		if cancel != nil {
 			select {
@@ -275,7 +275,7 @@ func (w *Workbook) buildExternalIndex(meta SheetMeta, progress func(int64, int64
 func (w *Workbook) publishExternalIndex(meta SheetMeta, rowsPath, idxPath string, writer *externalRowWriter) (*SheetIndex, error) {
 	idx := externalSheetIndex(meta, rowsPath, idxPath, writer)
 	idx.SourceFormat = w.Format
-	if err := writeIndex(idx, writer.offsets.count, writer.offsets.file); err != nil {
+	if err := writeIndex(idx, writer.offsets.Count(), writer.offsets.SpillFile()); err != nil {
 		return nil, err
 	}
 	w.indexMu.Lock()
@@ -288,7 +288,7 @@ func externalSheetIndex(meta SheetMeta, rowsPath, idxPath string, writer *extern
 	return &SheetIndex{
 		SheetPath: meta.Path, XMLPath: rowsPath, IndexPath: idxPath,
 		Dimension: writer.dimension(), MaxRow: writer.rows, MaxCol: writer.cols,
-		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.rows), HyperlinkStart: -1,
+		XMLSize: writer.count, RowIndex: NewRowIndex(writer.offsets.Rows()), HyperlinkStart: -1,
 		SharedAnchors: make(map[string]SharedFormulaAnchor),
 	}
 }

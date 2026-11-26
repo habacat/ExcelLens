@@ -45,9 +45,7 @@ func compositionResult(t *testing.T, a *App, job *compositionTask) compositionTa
 
 func compositionUsed(a *App) int64 {
 	root := a.rootApp()
-	root.sourceMu.Lock()
-	defer root.sourceMu.Unlock()
-	return root.compositionBytes
+	return root.compositionBudget.Used()
 }
 
 func clearComposition(t *testing.T, a *App, id string) {
@@ -260,9 +258,7 @@ func TestCompositionCrossTabBudgetAndShutdownReleaseAllTaskOwners(t *testing.T) 
 	if compositionUsed(a) != 0 {
 		t.Fatal("application close leaked source/result budget", compositionUsed(a))
 	}
-	a.rootApp().sourceMu.Lock()
-	pins := len(a.rootApp().sourcePins)
-	a.rootApp().sourceMu.Unlock()
+	pins := a.rootApp().sourcePins.Len()
 	if pins != 0 {
 		t.Fatal("application close leaked source pins", pins)
 	}

@@ -5,6 +5,8 @@ import (
 	"encoding/xml"
 	"io"
 	"strconv"
+
+	"excellens/internal/styles"
 )
 
 // readSheetTabColor reads only the XML prefix of one worksheet, stopping at
@@ -35,7 +37,7 @@ func (w *Workbook) readSheetTabColor(f *zip.File) string {
 			if t.Name.Local != "tabColor" || sheetPrDepth == 0 || depth != sheetPrDepth+1 {
 				continue
 			}
-			var c styleColorXML
+			var c styles.ColorXML
 			for _, a := range t.Attr {
 				switch a.Name.Local {
 				case "rgb":
@@ -52,7 +54,7 @@ func (w *Workbook) readSheetTabColor(f *zip.File) string {
 					c.Tint = parseColorTint(a.Value)
 				}
 			}
-			return w.resolveColor(&c, defaultIndexed)
+			return w.resolveColor(&c, nil)
 		case xml.EndElement:
 			if depth == sheetPrDepth {
 				sheetPrDepth = 0

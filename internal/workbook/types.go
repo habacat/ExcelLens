@@ -38,6 +38,7 @@ type Workbook struct {
 	differentialStyles   []DifferentialStyle
 	differentialNotice   string
 	conditionalMu        sync.Mutex
+	conditionalPolicy    func() (int64, func(string) bool)
 	conditionalCache     map[string]conditionalCacheEntry
 	conditionalLoading   map[string]*conditionalLoad
 	conditionalClock     uint64
@@ -87,11 +88,6 @@ type ArchiveOrigin struct {
 	Partial            bool
 }
 
-type StyleInfo struct {
-	NumFmtID      int
-	SectionColors [3]string
-}
-
 type SheetIndex struct {
 	odsLayout *SourceLayout
 	RowIndex
@@ -110,12 +106,6 @@ type SheetIndex struct {
 type SharedFormulaAnchor struct {
 	Ref     string
 	Formula string
-}
-
-type RowOffset struct {
-	Number int
-	Start  int64
-	End    int64
 }
 
 type RowData struct {

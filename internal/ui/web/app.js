@@ -74,6 +74,11 @@
     index: null,
     indexJob: null,
     indexReady: false,
+    conditionalStatsJob: null,
+    conditionalStatsTimer: 0,
+    conditionalStatsSeq: 0,
+    conditionalStatsState: "",
+    tilesSkippedConditional: false,
 	previewOnly: false,
 	previewAbort: null,
 	previewData: null,
@@ -523,11 +528,157 @@
     updateSourceAppearance();
     $("formatBtn").classList.toggle("format-active", S.showStyles);
     $("formatBtn").setAttribute("aria-pressed", String(S.showStyles));
+    if (!S.showStyles) {
+      if (S.conditionalStatsJob) cancelConditionalStats(true, false);
+      else updateConditionalStatsUI("");
+    }
     // Repaint the existing data; changing visual formatting must never cause
-    // another file read or flash a blank viewport.
+    // another file read or flash a blank viewport unless conditional data was deferred.
     resetGridDOM();
     renderGridFromCurrentWindow();
     frozenPanes.schedule(true);
+    if (S.showStyles && S.indexReady && S.sheet) {
+      const skipped = S.tilesSkippedConditional;
+      if (skipped) refreshViewportForConditionalStats(S.sheetEpoch);
+      if (S.conditionalStatsState !== "done" && S.conditionalStatsState !== "not_needed") {
+        void startConditionalStats(S.sheet, S.sheetEpoch, {
+          refreshOnReady: !skipped && Boolean(S.viewportData?.data?.conditionalStatsPending),
+        });
+      }
+    }
+  }
+
+  function updateConditionalStatsUI(state, text = "", { canCancel = false, canRetry = false } = {}) {
+    const box = $("conditionalStatsStatus");
+    S.conditionalStatsState = state || "";
+    if (!box) return;
+    const visible = Boolean(S.opened && S.showStyles && state && state !== "done" && state !== "not_needed");
+    box.hidden = !visible;
+    box.dataset.state = state || "";
+    if (!visible) return;
+    $("conditionalStatsText").textContent = text;
+    $("conditionalStatsCancel").hidden = !canCancel;
+    $("conditionalStatsRetry").hidden = !canRetry;
+  }
+
+  function refreshViewportForConditionalStats(epoch) {
+    if (epoch !== S.sheetEpoch || !S.indexReady || !S.sheet || !S.showStyles) return;
+    S.tilesSkippedConditional = false;
+    const cached = S.sheetViews.get(S.sheet);
+    if (cached) { S.sheetViewsBytes -= cached.bytes; S.sheetViews.delete(S.sheet); }
+    invalidateViewport({ preserveDOM: true });
+    frozenPanes.reset({ preserveDOM: true });
+    loadViewport(true, epoch).catch(error => {
+      if (epoch === S.sheetEpoch && error?.name !== "AbortError") toast(error.message, "error");
+    });
+    frozenPanes.schedule(true);
+    if (S.selected?.ref) {
+      const ref = S.selected.ref, row = S.selected.row, col = S.selected.col, visual = S.selectedVisualIndex;
+      getCell(S.sheet, ref).then(cell => {
+        if (epoch === S.sheetEpoch && S.selected?.ref === ref) selectCell(cell, row, col, ref, visual);
+      }).catch(() => {});
+    }
+  }
+
+  let statsRequests;
+  function conditionalStatsRequests() {
+    return statsRequests ??= window.ExcelLensConditional.createStatsRequests((action, body) =>
+      api('/api/conditional-stats/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), activity: false })
+    );
+  }
+
+  function cancelConditionalStats(sendCancel = true, showCancelled = false) {
+    const epoch = S.sheetEpoch;
+    ++S.conditionalStatsSeq;
+    if (S.conditionalStatsTimer) { clearTimeout(S.conditionalStatsTimer); S.conditionalStatsTimer = 0; }
+    const jobID = S.conditionalStatsJob && S.conditionalStatsJob !== "starting" ? S.conditionalStatsJob : null;
+    const hadActive = Boolean(S.conditionalStatsJob);
+    S.conditionalStatsJob = null;
+    let cancelPromise = Promise.resolve();
+    if (sendCancel && hadActive) {
+      cancelPromise = conditionalStatsRequests().cancel(jobID).catch(() => {});
+    }
+    if (showCancelled && S.showStyles && S.indexReady) {
+      updateConditionalStatsUI("cancelled", "条件统计已取消", { canRetry: true });
+      cancelPromise.then(() => {
+        if (epoch === S.sheetEpoch && S.showStyles && S.conditionalStatsState === "cancelled") {
+          refreshViewportForConditionalStats(epoch);
+        }
+      });
+    } else {
+      updateConditionalStatsUI("");
+    }
+  }
+
+  async function startConditionalStats(sheetName, epoch, { refreshOnReady = false } = {}) {
+    if (!S.showStyles || !S.indexReady || !sheetName || epoch !== S.sheetEpoch || S.conditionalStatsJob) return;
+    const seq = ++S.conditionalStatsSeq;
+    S.conditionalStatsJob = "starting";
+    try {
+      const start = await conditionalStatsRequests().start(sheetName);
+      if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) {
+        return;
+      }
+      if (!start.needed) {
+        S.conditionalStatsJob = null;
+        updateConditionalStatsUI("not_needed");
+        if (refreshOnReady) refreshViewportForConditionalStats(epoch);
+        return;
+      }
+      if (start.ready) {
+        S.conditionalStatsJob = null;
+        updateConditionalStatsUI("done");
+        if (refreshOnReady) refreshViewportForConditionalStats(epoch);
+        return;
+      }
+      if (start.status === "error" || !start.jobId) {
+        S.conditionalStatsJob = null;
+        updateConditionalStatsUI("error", start.error ? `条件统计失败：${start.error}` : "条件统计失败", { canRetry: true });
+        return;
+      }
+      S.conditionalStatsJob = start.jobId;
+      const baseLabel = start.damaged ? "条件统计重建中" : "条件统计计算中";
+      updateConditionalStatsUI(start.status || "running", baseLabel, { canCancel: true });
+      const poll = async () => {
+        if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) return;
+        try {
+          const st = await api(`/api/conditional-stats/status?id=${encodeURIComponent(start.jobId)}`, { activity: false });
+          if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) return;
+          if (st.status === "done") {
+            S.conditionalStatsJob = null;
+            updateConditionalStatsUI("done");
+            refreshViewportForConditionalStats(epoch);
+            return;
+          }
+          if (st.status === "cancelled") {
+            S.conditionalStatsJob = null;
+            updateConditionalStatsUI("cancelled", "条件统计已取消", { canRetry: true });
+            refreshViewportForConditionalStats(epoch);
+            return;
+          }
+          if (st.status === "error") {
+            S.conditionalStatsJob = null;
+            updateConditionalStatsUI("error", st.error ? `条件统计失败：${st.error}` : "条件统计失败", { canRetry: true });
+            refreshViewportForConditionalStats(epoch);
+            return;
+          }
+          const label = st.damaged ? "条件统计重建中" : "条件统计计算中";
+          const pct = st.totalRows > 0 ? ` ${Math.min(99, Math.floor((st.doneRows * 100) / st.totalRows))}%` : "";
+          const rowsText = st.totalRows > 0 ? `（${st.doneRows.toLocaleString()} / ${st.totalRows.toLocaleString()} 行）` : "";
+          updateConditionalStatsUI(st.status || "running", `${label}${pct}${rowsText}`, { canCancel: true });
+          S.conditionalStatsTimer = setTimeout(poll, 280);
+        } catch (error) {
+          if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) return;
+          S.conditionalStatsJob = null;
+          updateConditionalStatsUI("error", `条件统计状态读取失败：${error.message}`, { canRetry: true });
+        }
+      };
+      S.conditionalStatsTimer = setTimeout(poll, 120);
+    } catch (error) {
+      if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch) return;
+      S.conditionalStatsJob = null;
+      if (S.showStyles) updateConditionalStatsUI("error", `条件统计启动失败：${error.message}`, { canRetry: true });
+    }
   }
 
   function updateSourceAppearance(){
@@ -554,7 +705,7 @@
   const sheetPresentationKey=()=>[S.zoom,S.showStyles,S.showFormulas,window.devicePixelRatio||1].join('|');
   function rememberSheetView(){
     if (editCopy?.grid.active) return;
-    if(!S.sheet||!S.indexReady||!S.sheetLayout||!S.viewportData||S.filterJob)return;
+    if(!S.sheet||!S.indexReady||!S.sheetLayout||!S.viewportData||S.filterJob||S.viewportData.data?.conditionalStatsPending)return;
     const layout={...S.sheetLayout,rows:S.rowSizes,cols:S.columnWidths,font:S.fontOverride,
       columnMode:S.columnMode,columnVisibility:S.columnOverrides};
     const frozen=new Map([...(frozenPanes?.cache||[])].slice(-3));
@@ -576,7 +727,8 @@
     if(bytes>16*1024*1024)return;
     S.sheetViews.set(S.sheet,{bytes,index:S.index,layout,freeze:{...S.freeze},entry:S.viewportData,
       frozen,selected:S.selected,filterId:S.filterId,maxRow:S.maxRow,maxCol:S.maxCol,
-      rows:S.renderedRows,presentation:sheetPresentationKey()});
+      rows:S.renderedRows,presentation:sheetPresentationKey(),hasConditionalData:!S.tilesSkippedConditional,
+      conditionalStatsReady:S.conditionalStatsState==="done"||S.conditionalStatsState==="not_needed"});
     S.sheetViewsBytes+=bytes;
     while(S.sheetViews.size>6||S.sheetViewsBytes>16*1024*1024){
       const key=S.sheetViews.keys().next().value;S.sheetViewsBytes-=S.sheetViews.get(key).bytes;S.sheetViews.delete(key);
@@ -619,6 +771,8 @@
     const opening=new AbortController();S.sheetLoadAbort=opening;
     if (S.indexJob) cancelIndex(S.indexJob);
     if (S.filterJob) cancelFilter(S.filterJob);
+    cancelConditionalStats(true, false);
+    S.tilesSkippedConditional = false;
     invalidateViewport({preserveDOM:true});
     S.reusableSheetRows=warm?.presentation===sheetPresentationKey()?warm.rows:null;
     S.reusableSheetData=S.reusableSheetRows?warm.entry.data:null;
@@ -762,7 +916,7 @@
       }else{
         setVirtualScrollTop(0);$('grid').scrollLeft=0;
       }
-      if(warm&&(!S.rowView||warm.entry.request.viewId===S.rowView.id)){
+      if(warm&&(!S.showStyles||warm.hasConditionalData)&&(!S.rowView||warm.entry.request.viewId===S.rowView.id)){
         for(const [key,data]of warm.frozen)frozenPanes.cachePart(key,data);
         tiles.store(viewportKey(warm.entry.request),warm.entry.data,warm.entry.request);
       }
@@ -810,6 +964,11 @@
       if(warm)await frozenPanes.refresh(true);else frozenPanes.schedule(true);
       if(epoch!==S.sheetEpoch)return;
       finishSheetSwitch(epoch);
+      if(S.showStyles&&(!warm||!warm.conditionalStatsReady||!warm.hasConditionalData)){
+        void startConditionalStats(name,epoch,{refreshOnReady:Boolean(S.viewportData?.data?.conditionalStatsPending)});
+      }else if(warm?.conditionalStatsReady){
+        S.conditionalStatsState="done";
+      }
       return arrived;
     } catch (error) {
       if (epoch !== S.sheetEpoch) return;
@@ -1427,7 +1586,9 @@
 
   async function readViewportTile(job,signal){
     const request=job.request, t=performance.now();
+    const withConditional=S.showStyles;
     const params=new URLSearchParams({sheet:job.sheet,limit:request.limit,col:request.startCol,cols:request.cols,compact:'1',rowWindow:'1'});
+    if(!withConditional)params.set('conditional','0');
     if(request.selectedCols)params.set('columns',request.selectedCols.join(','));
     if(request.viewId)params.set('viewId',request.viewId);
     if(request.filtered){
@@ -1436,6 +1597,10 @@
     const data=await api('/api/sheet?'+params,{signal,activity:false});
     if(signal.aborted||job.epoch!==S.sheetEpoch||request.context!==viewportContext())return;
     if(data.sheet!==job.sheet||(data.viewId||'')!==request.viewId||(data.filterId||'')!==request.filterId)throw Error('工作表视口已变化，请重新读取');
+    if(!withConditional){
+      if(S.showStyles)return;
+      S.tilesSkippedConditional=true;
+    }
     if(!job.foreground && estimateViewportBytes(data)>VIEWPORT_CACHE_BUDGET/4)return;
     const entry=tiles.store(job.key,data,request);
     bytesPerCell=bytesPerCell*.75+Math.max(64,entry.bytes/(request.cols*request.limit))*.25;
@@ -1443,6 +1608,9 @@
     const b=entry.bounds;
     for(const tile of styleTiles.values())if(b.displayEnd>=tile.minVisual&&b.displayStart<=tile.maxVisual&&b.endCol>=tile.firstCol&&b.startCol<=tile.lastCol)tile.dirty=true;
     scheduleStylePaint();
+    if(S.showStyles && data.conditionalStatsPending && !S.conditionalStatsJob && S.conditionalStatsState!=='cancelled' && S.conditionalStatsState!=='error'){
+      void startConditionalStats(job.sheet,job.epoch,{refreshOnReady:true});
+    }
     return entry;
   }
 
@@ -2427,6 +2595,7 @@
 
   async function getCell(sheet, ref) {
     const params = new URLSearchParams({ sheet, ref });
+    if (!S.showStyles) params.set('conditional', '0');
     const data = await api(`/api/cell?${params.toString()}`);
     return data.cell || { ref, raw: "", display: "", hasFormula: false };
   }
@@ -3725,6 +3894,8 @@
     cachedSheetViews:S.sheetViews.size,
     cachedSheetBytes:S.sheetViewsBytes,
     sheetLoading:Boolean(S.sheetLoadingEpoch),
+    conditionalStatsState:S.conditionalStatsState,
+    conditionalStatsRunning:Boolean(S.conditionalStatsJob),
     hasPendingRequest:scheduler.active.size>0,
     foregroundHits,foregroundLookups,requests:{...scheduler.stats},
     hasVisibleCoverage:S.indexReady && viewportCoversVisible(S.window,getViewportRequest())
@@ -3772,7 +3943,7 @@
   workbookIO = new window.ExcelLensWorkbookIO({
     $, S, api, toast, fmtBytes, fileFormats, setStatus, showWelcome, showWorkspace,
     loadStylePalette, selectSheet, selectSheetTab, refreshSearchHistory,
-    invalidateViewport, cancelFilter, panels,
+    invalidateViewport, cancelFilter, cancelConditionalStats, panels,
   });
   gridInteractions = new window.ExcelLensGridInteractions({
     $, S, api, toast, setStatus, colName, parseRef, cellAt, tiles, mergedCells,
@@ -3795,6 +3966,12 @@
     if(typeof detail.sheet==='string'&&typeof detail.ref==='string'){
       navigateToCell(detail.sheet,detail.ref).catch(err=>toast(err.message,'error'));
     }
+  });
+  $('conditionalStatsCancel')?.addEventListener('click', () => cancelConditionalStats(true, true));
+  $('conditionalStatsRetry')?.addEventListener('click', () => {
+    if (!S.indexReady || !S.sheet || !S.showStyles) return;
+    S.conditionalStatsState = '';
+    void startConditionalStats(S.sheet, S.sheetEpoch, { refreshOnReady: true });
   });
   gridInteractions.bindEvents();
   window.ExcelLensWorkbookReady=loadStatus();

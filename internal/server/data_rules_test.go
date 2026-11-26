@@ -177,9 +177,7 @@ func TestDataRuleHTTPQueuedCancelLimitsPinsReplacementAndLateCompletion(t *testi
 	if response := reconcilePost(t, a, "/api/data-rules/start", dataRuleStartRequest{wb.Fingerprint, sourceBookID(wb), "明细"}); response.Code != 429 {
 		t.Fatal("active rule capacity not enforced", response.Code)
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 2 {
 		t.Fatal("queued rule tasks did not pin source", pins)
 	}
@@ -211,9 +209,7 @@ func TestDataRuleHTTPQueuedCancelLimitsPinsReplacementAndLateCompletion(t *testi
 	if len(a.dataRuleJobs) != 0 || second.Snapshot != nil || second.Status != "cancelled" {
 		t.Fatal("replacement kept old rules")
 	}
-	a.sourceMu.Lock()
-	pins = a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins = a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("cancelled rule task leaked source pins", pins)
 	}

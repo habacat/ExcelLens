@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"excellens/internal/workbook"
 )
@@ -22,49 +21,13 @@ func (a *App) openPinnedWorkbook(path string) (*workbook.Workbook, func(), error
 }
 
 func (a *App) pinUploadPath(path string) func() {
-	root := a.rootApp()
-	root.sourceMu.Lock()
-	root.sourceUploads[path]++
-	root.sourceMu.Unlock()
-	var once sync.Once
-	return func() {
-		once.Do(func() {
-			root.sourceMu.Lock()
-			defer root.sourceMu.Unlock()
-			root.sourceUploads[path]--
-			if root.sourceUploads[path] <= 0 {
-				delete(root.sourceUploads, path)
-			}
-		})
-	}
+	return a.rootApp().sourceUploads.Pin(path)
 }
 
 // Register while holding the shared cache read lock, before exposing a source
 // snapshot. Pin operations themselves never acquire App/cache/session locks.
 func (a *App) pinWorkbooks(books ...*workbook.Workbook) func() {
-	root := a.rootApp()
-	root.sourceMu.Lock()
-	for _, wb := range books {
-		if wb != nil {
-			root.sourcePins[wb]++
-		}
-	}
-	root.sourceMu.Unlock()
-	var once sync.Once
-	return func() {
-		once.Do(func() {
-			root.sourceMu.Lock()
-			defer root.sourceMu.Unlock()
-			for _, wb := range books {
-				if wb != nil {
-					root.sourcePins[wb]--
-					if root.sourcePins[wb] <= 0 {
-						delete(root.sourcePins, wb)
-					}
-				}
-			}
-		})
-	}
+	return a.rootApp().sourcePins.Pin(books...)
 }
 
 func (a *App) referencedWorkbooks() []*workbook.Workbook {
@@ -75,11 +38,9 @@ func (a *App) referencedWorkbooks() []*workbook.Workbook {
 			seen[wb] = true
 		}
 	}
-	root.sourceMu.Lock()
-	for wb := range root.sourcePins {
+	for _, wb := range root.sourcePins.Snapshot() {
 		seen[wb] = true
 	}
-	root.sourceMu.Unlock()
 	books := make([]*workbook.Workbook, 0, len(seen))
 	for wb := range seen {
 		books = append(books, wb)

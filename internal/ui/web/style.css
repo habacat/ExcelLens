@@ -566,6 +566,8 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .quick-stats-menu .stat-result { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .quick-stats-menu .stat-status { margin: 3px 8px; color: var(--muted); font-size: var(--fs-2); }
 .filter-status { flex: none; padding: 0 6px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); line-height: 1.5; }
+.conditional-stats-status { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 0 7px; border-radius: 9px; background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent)); color: var(--accent); white-space: nowrap; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.conditional-stats-status[hidden] { display: none; }
 .freeze-status, .large-data-status { flex: none; white-space: nowrap; }
 .large-data-status { color: var(--accent); }
 .selection-status { white-space: nowrap; }
@@ -780,6 +782,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .grid-region .grid-cell.rich-text-cell { text-decoration: none; }
 .cell-rich-text { display: inline-block; flex: none; max-width: none; white-space: inherit; line-height: inherit; }
 .grid-cell.rich-text-notice, .grid-cell.cell-presentation-notice { text-decoration: underline dotted var(--mark); text-underline-offset: 3px; }
+.grid-cell.cell-conditional-pending { background-image: radial-gradient(circle at calc(100% - 4px) 4px, var(--accent) 2px, transparent 2.5px); }
 /* One owner per grid seam. Fractional CSS borders stay one device pixel on
    common panels; source borders override these defaults. */
 .grid-cell { --grid-default-seam: .4px solid var(--grid-line-color); }
@@ -803,6 +806,9 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .storage-usage th:last-child, .storage-usage td:last-child {text-align: right; font-variant-numeric: tabular-nums;}
 .storage-usage th {border-bottom: 1px solid var(--line);}
 .storage-actions {display: flex; flex-wrap: wrap; gap: .35rem;}
+.storage-budget-row {align-items: center;}
+#storageConditionalBudget {width: 6.5rem; flex: none;}
+.storage-budget-unit, .storage-budget-summary {color: var(--muted); font-size: var(--fs-2); font-variant-numeric: tabular-nums;}
 #storageDirectory {flex: 1; min-width: 10rem;}
 .storage-paths, #storageRoots, #storageStatus {white-space: pre-line; overflow-wrap: anywhere;}
 #storageStatus:empty {display: none;}

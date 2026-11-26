@@ -10,20 +10,8 @@ import (
 	"unicode"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
-
-// SourceAxisRange retains visibility separately from size and source values.
-// HiddenSet distinguishes an explicit visible row from the sheet's zeroHeight.
-type SourceAxisRange struct {
-	Min          int   `json:"min"`
-	Max          int   `json:"max"`
-	Hidden       bool  `json:"hidden,omitempty"`
-	HiddenSet    bool  `json:"hiddenSet,omitempty"`
-	Level        uint8 `json:"level,omitempty"`
-	Collapsed    bool  `json:"collapsed,omitempty"`
-	ZeroSize     bool  `json:"zeroSize,omitempty"`
-	PositiveSize bool  `json:"positiveSize,omitempty"`
-}
 
 // Byte ranges refer to the already-verified, unchanged worksheet XML cache.
 type SourceXMLRange struct {
@@ -42,17 +30,7 @@ type sourceMetadataCapture struct {
 }
 
 func validSourceAxisRanges(ranges []SourceAxisRange, maximum int) bool {
-	if len(ranges) > formats.SourceAxisRanges {
-		return false
-	}
-	previous := 0
-	for _, r := range ranges {
-		if r.Min <= previous || r.Max < r.Min || r.Max > maximum || r.Level > 7 || r.ZeroSize && r.PositiveSize {
-			return false
-		}
-		previous = r.Max
-	}
-	return true
+	return rowindex.ValidSourceAxisRanges(ranges, maximum)
 }
 
 func validSourceXMLRanges(ranges []SourceXMLRange) bool {

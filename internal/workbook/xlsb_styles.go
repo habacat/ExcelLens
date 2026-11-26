@@ -9,18 +9,19 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
 var xlsbBorders = [...]string{"", "thin", "medium", "dashed", "dotted", "thick", "double", "hair", "mediumDashed", "dashDot", "mediumDashDot", "dashDotDot", "mediumDashDotDot", "slantDashDot"}
 var xlsbHorizontal = [...]string{"general", "left", "center", "right", "fill", "justify", "centerContinuous", "distributed"}
 var xlsbVertical = [...]string{"top", "center", "bottom", "justify", "distributed"}
 
-func xlsbColor(f *xlsbFields) *styleColorXML {
+func xlsbColor(f *xlsbFields) *styles.ColorXML {
 	kind, index := f.u8()>>1, int(f.u8())
 	tint := int16(f.u16())
 	r, g, b := f.u8(), f.u8(), f.u8()
 	f.u8() // alpha; the grid uses the same RGB semantics as its OOXML styles
-	c := &styleColorXML{Tint: float64(tint) / 32767}
+	c := &styles.ColorXML{Tint: float64(tint) / 32767}
 	if tint < 0 {
 		c.Tint = float64(tint) / 32768
 	}
@@ -41,28 +42,28 @@ func xlsbColor(f *xlsbFields) *styleColorXML {
 	return c
 }
 
-func xlsbFont(f *xlsbFields) styleFontXML {
+func xlsbFont(f *xlsbFields) styles.FontXML {
 	size, bits, weight, script := f.u16(), f.u16(), f.u16(), f.u16()
 	underline := f.u8()
 	f.take(3) // family, character set, reserved
 	color := xlsbColor(f)
 	f.u8() // font scheme, with the source's resolved fallback name below
 	name := f.wide(false, 255)
-	out := styleFontXML{
-		Name: valXML{Val: name}, Size: valXML{Val: strconv.FormatFloat(float64(size)/20, 'f', -1, 64)},
+	out := styles.FontXML{
+		Name: styles.ValXML{Val: name}, Size: styles.ValXML{Val: strconv.FormatFloat(float64(size)/20, 'f', -1, 64)},
 		Color: color,
 	}
 	if weight >= 700 {
-		out.Bold = &flagXML{}
+		out.Bold = &styles.FlagXML{}
 	}
 	if bits&2 != 0 {
-		out.Italic = &flagXML{}
+		out.Italic = &styles.FlagXML{}
 	}
 	if bits&8 != 0 {
-		out.Strike = &flagXML{}
+		out.Strike = &styles.FlagXML{}
 	}
 	if label := xlsbUnderline(underline); label != "none" {
-		out.Underline = &flagXML{Val: label}
+		out.Underline = &styles.FlagXML{Val: label}
 	}
 	if script == 1 {
 		out.Vertical.Val = "superscript"
@@ -88,7 +89,7 @@ func xlsbUnderline(value byte) string {
 	}
 }
 
-func xlsbBorderSide(f *xlsbFields) styleSideXML {
+func xlsbBorderSide(f *xlsbFields) styles.SideXML {
 	kind := int(f.u8())
 	f.u8()
 	color := xlsbColor(f)
@@ -96,13 +97,13 @@ func xlsbBorderSide(f *xlsbFields) styleSideXML {
 		if f.err == nil {
 			f.err = errors.New("BIFF12 边框种类无效")
 		}
-		return styleSideXML{}
+		return styles.SideXML{}
 	}
-	return styleSideXML{Style: xlsbBorders[kind], Color: color}
+	return styles.SideXML{Style: xlsbBorders[kind], Color: color}
 }
 
-func xlsbStyleXF(f *xlsbFields, cell bool) (styleXFXML, bool) {
-	xf := styleXFXML{
+func xlsbStyleXF(f *xlsbFields, cell bool) (styles.XFXML, bool) {
+	xf := styles.XFXML{
 		XFID: int(f.u16()), NumFmtID: int(f.u16()), FontID: int(f.u16()), FillID: int(f.u16()), BorderID: int(f.u16()),
 	}
 	rot := f.u8()
@@ -129,7 +130,7 @@ func xlsbStyleXF(f *xlsbFields, cell bool) (styleXFXML, bool) {
 }
 
 func (w *Workbook) readXLSBStyles(file *zip.File) error {
-	var sx stylesXML
+	var sx styles.StyleSheetXML
 	var diffs, extendedDiffs [][]byte
 	var zone uint16
 	var seen, ended bool
@@ -151,14 +152,11 @@ func (w *Workbook) readXLSBStyles(file *zip.File) error {
 			zone = 0
 		case brtFmt:
 			id, code := int(f.u16()), f.wide(false, 255)
-			sx.NumFmts.Items = append(sx.NumFmts.Items, struct {
-				ID   int    `xml:"numFmtId,attr"`
-				Code string `xml:"formatCode,attr"`
-			}{id, code})
+			sx.NumFmts.Items = append(sx.NumFmts.Items, styles.NumFmtXML{ID: id, Code: code})
 		case brtFont:
 			sx.Fonts = append(sx.Fonts, xlsbFont(&f))
 		case brtFill:
-			var fill styleFillXML
+			var fill styles.FillXML
 			pattern := f.u32()
 			if pattern == 1 {
 				fill.Pattern.Type = "solid"
@@ -171,7 +169,7 @@ func (w *Workbook) readXLSBStyles(file *zip.File) error {
 			top, bottom, left, right := xlsbBorderSide(&f), xlsbBorderSide(&f), xlsbBorderSide(&f), xlsbBorderSide(&f)
 			xlsbBorderSide(&f)
 			decoratedBorders = append(decoratedBorders, diag&3 != 0)
-			sx.Borders = append(sx.Borders, styleBorderXML{Left: left, Right: right, Top: top, Bottom: bottom})
+			sx.Borders = append(sx.Borders, styles.BorderXML{Left: left, Right: right, Top: top, Bottom: bottom})
 		case brtXF:
 			switch zone {
 			case brtBeginCellXFs:
@@ -189,16 +187,11 @@ func (w *Workbook) readXLSBStyles(file *zip.File) error {
 		case brtStyle:
 			ixfe, flags, builtin := int(f.u32()), f.u16(), int(f.u8())
 			if flags&1 != 0 {
-				sx.CellStyles = append(sx.CellStyles, struct {
-					BuiltinID *int `xml:"builtinId,attr"`
-					XfID      int  `xml:"xfId,attr"`
-				}{&builtin, ixfe})
+				sx.CellStyles = append(sx.CellStyles, styles.CellStyleXML{BuiltinID: &builtin, XfID: ixfe})
 			}
 		case brtIndexedColor:
 			red, green, blue := f.u8(), f.u8(), f.u8()
-			sx.IndexedColors = append(sx.IndexedColors, struct {
-				RGB string `xml:"rgb,attr"`
-			}{fmt.Sprintf("%02X%02X%02X", red, green, blue)})
+			sx.IndexedColors = append(sx.IndexedColors, styles.IndexedColorXML{RGB: fmt.Sprintf("%02X%02X%02X", red, green, blue)})
 		case brtDXF:
 			diffs = append(diffs, append([]byte(nil), data...))
 		case brtDXF14:
@@ -214,9 +207,7 @@ func (w *Workbook) readXLSBStyles(file *zip.File) error {
 		return errors.New("XLSB 样式表结构不完整")
 	}
 	w.source.xlsb.fonts = sx.Fonts
-	if err := w.applyStyleTable(sx); err != nil {
-		return err
-	}
+	w.applyStyleTable(sx)
 	w.source.xlsb.baseDXFCount = len(diffs)
 	w.differentialStyles = make([]DifferentialStyle, 0, len(diffs)+len(extendedDiffs))
 	for _, raw := range append(diffs, extendedDiffs...) {
@@ -228,7 +219,7 @@ func (w *Workbook) readXLSBStyles(file *zip.File) error {
 	}
 	var layeredFill, decoratedBorder bool
 	for _, xf := range sx.CellXfs {
-		style := inheritSourceXF(xf, sx.CellStyleXfs)
+		style := styles.InheritXF(xf, sx.CellStyleXfs)
 		layeredFill = layeredFill || style.FillID < len(layeredFills) && layeredFills[style.FillID]
 		decoratedBorder = decoratedBorder || style.BorderID < len(decoratedBorders) && decoratedBorders[style.BorderID]
 	}

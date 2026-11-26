@@ -16,6 +16,7 @@ import (
 	"runtime"
 
 	"excellens/internal/formats"
+	"excellens/internal/rowindex"
 )
 
 // ELRICH01 is a separate presentation sidecar, not a row/value cache change.
@@ -31,7 +32,7 @@ type richTextStore struct {
 	count, indexStart int
 }
 
-func (s *richTextStore) release() { _ = unmapIndexFile(s.data); s.data = nil }
+func (s *richTextStore) release() { _ = rowindex.UnmapFile(s.data); s.data = nil }
 
 func openRichTextStore(path string, stringsCount int) (*richTextStore, error) {
 	f, err := os.Open(path)
@@ -46,14 +47,14 @@ func openRichTextStore(path string, stringsCount int) (*richTextStore, error) {
 	if stat.Size() < richStoreHeader || stat.Size() > formats.MaxRichCacheBytes {
 		return nil, errors.New("富文本样式缓存大小无效")
 	}
-	data, err := mapIndexFile(f, stat.Size())
+	data, err := rowindex.MapFile(f, stat.Size())
 	if err != nil {
 		return nil, err
 	}
 	valid := false
 	defer func() {
 		if !valid {
-			_ = unmapIndexFile(data)
+			_ = rowindex.UnmapFile(data)
 		}
 	}()
 	if string(data[:8]) != richStoreMagic || binary.LittleEndian.Uint32(data[28:32]) != crc32.ChecksumIEEE(data[:28]) {

@@ -294,9 +294,7 @@ func TestRecordQueuedCancellationAndExpiredOwnerReleaseSourcePins(t *testing.T) 
 	req := recordSource(t, a, "First", rowViewRequest{})
 	wb := a.currentWorkbook()
 	for _, cancelRequest := range []bool{true, false} {
-		a.rootApp().sourceMu.Lock()
-		baselinePins := a.rootApp().sourcePins[wb]
-		a.rootApp().sourceMu.Unlock()
+		baselinePins := a.rootApp().sourcePins.Count(wb)
 		a.querySem <- struct{}{}
 		a.querySem <- struct{}{}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -307,9 +305,7 @@ func TestRecordQueuedCancellationAndExpiredOwnerReleaseSourcePins(t *testing.T) 
 		go func() { defer close(done); a.handleRecord(w, r) }()
 		deadline := time.Now().Add(2 * time.Second)
 		for {
-			a.rootApp().sourceMu.Lock()
-			pins := a.rootApp().sourcePins[wb]
-			a.rootApp().sourceMu.Unlock()
+			pins := a.rootApp().sourcePins.Count(wb)
 			if pins > baselinePins {
 				break
 			}
@@ -340,9 +336,7 @@ func TestRecordQueuedCancellationAndExpiredOwnerReleaseSourcePins(t *testing.T) 
 		if cancelRequest && w.Body.Len() != 0 || !cancelRequest && w.Code != 409 {
 			t.Fatal(cancelRequest, w.Code, w.Body.String())
 		}
-		a.rootApp().sourceMu.Lock()
-		pins := a.rootApp().sourcePins[wb]
-		a.rootApp().sourceMu.Unlock()
+		pins := a.rootApp().sourcePins.Count(wb)
 		expectedPins := baselinePins
 		if !cancelRequest {
 			expectedPins-- // The evicted view's own source pin is released too.

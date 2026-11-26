@@ -80,9 +80,7 @@ func TestRecipeCaptureUsesFullInputTypesAndCommitRetriesAreIdempotent(t *testing
 	if out := reconcilePost(t, a, "/api/recipes/capture/commit", request); out.Code == 200 {
 		t.Fatal("same capture token silently changed an already committed definition")
 	}
-	a.sourceMu.Lock()
-	pins := len(a.sourcePins)
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Len()
 	if pins != 0 {
 		t.Fatal("finished type capture retained source pins", pins)
 	}

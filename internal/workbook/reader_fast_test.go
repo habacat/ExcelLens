@@ -20,11 +20,13 @@ func TestFastViewportDecoderParity(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sheet.xml")
 	var text strings.Builder
 	idx := &SheetIndex{XMLPath: path, SharedAnchors: map[string]SharedFormulaAnchor{"1": {Ref: "A2", Formula: "A1*2"}}}
+	var offsets []RowOffset
 	for i, line := range cases {
 		begin := int64(text.Len())
 		text.WriteString(line)
-		idx.resident = append(idx.resident, RowOffset{Number: i + 1, Start: begin, End: int64(text.Len())})
+		offsets = append(offsets, RowOffset{Number: i + 1, Start: begin, End: int64(text.Len())})
 	}
+	idx.RowIndex = NewRowIndex(offsets)
 	if err := os.WriteFile(path, []byte(text.String()), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -126,18 +128,20 @@ func TestFastSparseColumnsParity(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "selected.xml")
 	var buf strings.Builder
 	idx := &SheetIndex{XMLPath: file, SharedAnchors: map[string]SharedFormulaAnchor{"6": {Ref: "N2", Formula: "A2+H2"}}}
+	var offsets []RowOffset
 	for _, line := range content {
 		start := int64(buf.Len())
 		buf.WriteString(line)
-		n := idx.RowCount() + 1
+		n := len(offsets) + 1
 		if n == 3 {
 			n = 20
 		}
 		if n == 2 {
 			n = 3
 		}
-		idx.resident = append(idx.resident, RowOffset{Number: n, Start: start, End: int64(buf.Len())})
+		offsets = append(offsets, RowOffset{Number: n, Start: start, End: int64(buf.Len())})
 	}
+	idx.RowIndex = NewRowIndex(offsets)
 	idx.XMLSize = int64(buf.Len())
 	if err := os.WriteFile(file, []byte(buf.String()), 0600); err != nil {
 		t.Fatal(err)

@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"excellens/internal/formats"
+	"excellens/internal/styles"
 )
 
 const xlsbSSTMagic = "ELNSST01"
@@ -399,7 +400,7 @@ func (w *Workbook) xlsbRichPresentation(text string, data []byte) (*RichText, er
 func (w *Workbook) xlsbRichFont(id int) RichFont {
 	f := w.source.xlsb.fonts[id]
 	size, _ := strconv.ParseFloat(f.Size.Val, 64)
-	bold, italic, strike := enabled(f.Bold), enabled(f.Italic), enabled(f.Strike)
+	bold, italic, strike := styles.FlagEnabled(f.Bold), styles.FlagEnabled(f.Italic), styles.FlagEnabled(f.Strike)
 	out := RichFont{
 		Name: f.Name.Val, Size: size, Color: w.resolveColor(f.Color, w.IndexedColors),
 		Bold: &bold, Italic: &italic, Strike: &strike, Vertical: f.Vertical.Val,

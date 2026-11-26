@@ -1,0 +1,73 @@
+{
+  "version": "1.19.0",
+  "result": "PASS",
+  "desktopManualAcceptance": false,
+  "officeWpsAcceptance": false,
+  "checks": [
+    "real main grid preserves exact large numeric source/type/style, applies false font flags above rich spans, displays conditional numeric text separately, and decorates sparse row 2 without extending source extent; Z1 reference is resolved outside the requested column",
+    "actual Ctrl+C includes conditional rich HTML and exact source text; original-format toggle, font override, frozen corner and frozen top share derived presentation",
+    "zoom, 125 percent emulated DPI, dark palette, cached sheet switch and scroll/return retain conditional models and source coordinates",
+    "asynchronous HTML retains sparse styles and incomplete causes; proven formatted XLSX downloads and reopens as seven deduplicated ordinary XFs with exact values, numeric types, leading zeros, conditional display, rich font overlays and sparse row styles; unsupported/missing-cache conditions fail without a download ticket, and plain fallback reopens",
+    "ordinary source XF superscript/subscript and double/accounting underlines render without fabricating source rich text; compact H1:J1 snapshot reopens at A1:C1 with the same ordinary fonts and the proven blue conditional font still overrides the old red numeric format"
+  ],
+  "screenshots": [
+    "validation/1.19.0/private/conditional/main.png",
+    "validation/1.19.0/private/conditional/frozen.png",
+    "validation/1.19.0/private/conditional/dpi-125.png",
+    "validation/1.19.0/private/conditional/dark.png",
+    "validation/1.19.0/private/conditional/frozen-xlsx-reopened.png"
+  ],
+  "errors": [],
+  "actual": {
+    "a": {
+      "raw": "9007199254740993.31",
+      "color": "#FF0033",
+      "weight": "400",
+      "style": 0
+    },
+    "b": {
+      "text": "中😀富文本",
+      "spans": [
+        {
+          "color": "rgb(255, 0, 51)",
+          "weight": "400",
+          "decoration": "none"
+        },
+        {
+          "color": "rgb(255, 0, 51)",
+          "weight": "400",
+          "decoration": "none"
+        }
+      ]
+    },
+    "d": {
+      "text": "1.24",
+      "raw": "1.236",
+      "sourceDisplay": "1.236"
+    },
+    "e": {
+      "raw": "",
+      "presentationOnly": true,
+      "fill": "#FFFF00"
+    },
+    "missing": true,
+    "missingNotice": "条件规则6：所引用公式没有保存计算结果；低优先级样式未应用",
+    "pending": "条件规则7：该条件格式需要范围统计或尚未支持的规则，不自动扫描整表；低优先级样式未应用"
+  },
+  "ordinarySourceFonts": [
+    {
+      "text": "普通上标",
+      "vertical": "super",
+      "decoration": "double",
+      "rich": false
+    },
+    {
+      "text": "普通下标",
+      "vertical": "sub",
+      "decoration": "double",
+      "rich": false
+    }
+  ],
+  "sourceSHA256": "024f37f9eea592b488b01ea258f1c9b1850e9cc374a61bd086e7ad0bb5c85f27",
+  "sourceUnchanged": true
+}

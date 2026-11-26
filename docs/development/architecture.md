@@ -11,8 +11,10 @@ cmd/excellens              启动、单实例、托盘与本机服务装配
 internal/formats           格式支持名单、源类型语义、容量和显示能力
 internal/valueconv         显式日期/时间解析；只处理调用方给出的短文本
 internal/sourceview        声明式来源范围、筛选/排序和显隐设置；不读工作簿
-internal/conditional       条件表达式编译、A1 引用解析及工作表统计磁盘索引
-internal/excelformula       两种 Excel 日期系统、精确舍入、文本通配符和二进制累加
+internal/conditional       条件表达式求值引擎、成本规划与滑动窗口、完整性校验统计磁盘索引及跨工作簿容量预算
+internal/excelformula       两种 Excel 日期系统、精确十进制、精确舍入、Unicode 折叠、文本通配符和二进制累加
+internal/rowindex          高性能行偏移索引、mmap、临时查询文件配额、RowOrder/RowSet、行列显隐、RowProjection 与外部归并排序
+internal/styles            OOXML 样式表与主题色解析、差异样式与富文本字体、数字/会计/定点十进制/Excel 日期格式化及系统字体度量
 internal/workbook          格式适配、源值/布局、索引、缓存与查询
 internal/onlinedb          数据库协议、只读目录、逐行类型转换
 internal/archives          容器目录、按需提取、完整性及缓存固定
@@ -38,6 +40,7 @@ internal/transferjobs       传输准入、取消与提交仲裁、历史与确�
 internal/savedconfig        带摘要的本地 JSON 设置、读写与替换
 internal/searchservice      跨表搜索调度、源行扫描次序与检查点续做
 internal/searchresults      磁盘命中记录、有界分页、筛选与流式 CSV
+internal/taskmanager       进程内并发槽位准入、原子引用计数快照租约、资源固定集、字节预算与已退出任务历史淘汰
 internal/server            HTTP、会话、任务及业务装配
 internal/ui                嵌入的 HTML/CSS/JS 与格式配置注入
 internal/tray, shellmenu    Windows 用户入口
@@ -60,7 +63,10 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
 | conditional | formats、excelformula |
 | excelformula | 无内部依赖 |
-| workbook | conditional、excelformula、fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
+| rowindex | formats、sourceview、excelformula |
+| styles | formats、excelformula |
+| taskmanager | Go 标准库（无内部依赖） |
+| workbook | conditional、excelformula、rowindex、styles、fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
 | onlinedb | formats |
 | savedconfig | Go 标准库 |
 | transferjobs | localstore、savedconfig |
@@ -78,7 +84,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | shellmenu | formats |
 | tray | branding、formats、workbook、buildinfo |
 | localstore | filelock、formats |
-| server | localstore、browserlease、transferjobs、savedconfig、searchservice、searchresults、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+| server | localstore、browserlease、transferjobs、savedconfig、searchservice、searchresults、taskmanager、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
 
 ### 备份、来源与任务
 
@@ -98,7 +104,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 原生文件打开入口先分配独立会话，该会话的首次 API 调用再读取文件。网页等待任务由当前文档的 `activity.js` 持有。一次任务可以连续跨过传输、解析、索引和显示阶段，轮询、取消和迟到响应均使用原任务句柄。已有进度区可接入同一指示器，空闲文档不订阅其他页的任务。`motion.css` 负责控件与弹层的时序，网格坐标和大小直接更新。
 
-工作表索引与窗口读取在 `server/sheet_http.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。快速跨表搜索由 searchservice 限制在两个在途工作表内，全量查询沿源表顺序流式生成结果。searchresults 通过 workbook 的临时文件配额分配磁盘，查询完成后支持只读分页与导出。关闭结果会等待已开始的读取。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
+工作表索引与窗口读取在 `server/sheet_http.go`，后台条件统计索引与跨工作簿容量预算在 `server/conditional_stats.go`，筛选和搜索各有自己的 HTTP 入口与任务生命周期。普通行索引完成即释放网格交互；需要整表磁盘统计的条件规则由独立的后台条件统计任务（`/api/conditional-stats/{start,status,cancel}`）在共享后台索引槽内构建或修复，前台视口读取保持只读非阻塞并将未完成规则如实标为计算中，后台完成后自动刷新当前视口，关闭原格式时推迟或取消统计。`internal/conditional` 按成本自动选择短范围视口缓存、中短滑动窗口增量求和、共享定界聚合或磁盘前缀/分组/匹配索引，磁盘索引存放于本地数据 `conditional-stats` 独立可重建缓存分组，不纳入备份，并在全局可配置上限内按 LRU 淘汰闲置文件、保护在用读取器及已打开工作簿。快速跨表搜索由 searchservice 限制在两个在途工作表内，全量查询沿源表顺序流式生成结果。searchresults 通过 workbook 的临时文件配额分配磁盘，查询完成后支持只读分页与导出。关闭结果会等待已开始的读取。分析工作区、源字段、查询任务、结果导出分别在 `analysis_workspace.go`、`analysis_source.go`、`analysis_query_job.go` 和 `analysis_results_http.go`。按区域扩展的分析列和普通分析列共用字段命名，稳定的字段 ID 绑定源列号。
 
 `workbook/xlsb*.go` 以 MS-XLSB 规范解码 OPC 工作簿内的 BIFF12。表内数据顺序写入 `ELNROW02`，富文本、共享公式状态、数组锚点及行样式使用 XLSB 独立缓存域。全量共享字符串以磁盘偏移读取，前缀预览单独限读所需字符串。工作表边扫边保存布局及规则记录，同一张表的构建受公共索引门控，异表可并行构建并复用已确认的共享字符串缓存。XLSB 缓存域为 `xlsb-biff12-v3`，早期开发缓存可随未使用缓存清理。
 
@@ -139,7 +145,7 @@ F21导出输入由`server/export_selection.go`共用原范围装配，`export_ch
 
 F18的`reconcile/relation.go`复用原有源类型/显式文本或精确数值键和`workbook.SortKeyStream`；公共`BuildRowOrder`向已有有界行序构建器流式提交位置，共用逆序、校验、映射引用和临时磁盘配额，源缓存编码不变。预检只归并键组起点及计数，输出数量用int64并以字符串编码。`relation_order.go`在每组内按原序保留七模式各前100个紧凑候选，不能进入全局前100条时跳过剩余组合；预览直接读取固定位置，不再次归并整表。完整提取先核对上限，再经共享有界排序恢复左表原序及同左记录的右表原序；仅右侧模式按右表原序。配对元数据固定45字节，不复制源值，双读取器复用连续相同位置，不缓存整组；状态/来源/匹配数量不一致的记录拒绝。完整CSV按字段列输出原值，附对齐的类型/存在/缺缓存/源列数组；来源固定、检查及原子发布归server。`server/relation_source.go`复用`buildTypedTableSource`，单独的64列容量不放宽旧对账限额；原生文件及分析表内容版本在每次操作前后核对。来源/内核/CSV与任务和界面的实施边界见[关联记录](table-relations.md)。
 
-F18的`server/source_lease.go`统一输入、完成来源及编码响应的独立引用，最后释放清空载荷，不能用关闭句柄继续保留未计费正文。`relation_snapshot.go`排队前固定双来源，准备另借输入；`Source.RetainedBytes`记录分析表选定投影费用，公共`RowOrder.RetainedHeapBytes`与`Relation.RetainedOrderHeapBytes`区分驻留数组和磁盘映射页，快照Go堆计费跨标签共享，不宣称是总RSS上限。`relation_tasks.go`按完成预检派生七模式任务，状态轮询不重复传正文；候选完整成功后发布，旧结果保留，清除/切档/关停只摘取自己拥有的引用并锁外回收。结果GET另借编码字节，写网络前归还查询槽和缓存锁。字段读取共用F17异步字段任务及源签名，`relation_export.go`复用公共导出中心和原子发布；`relation_navigation.go`验证两侧真实原格后接公共导航。当前后端与界面的验证边界分开记录，不增加源写回、缓存编码或运行依赖。
+F18通过`internal/taskmanager.Lease`统一输入、完成来源及编码响应的独立引用（原`server/source_lease.go`与`composition`/`analysis`/`row_view`四处重复CAS租约已合并），最后释放清空载荷，不能用关闭句柄继续保留未计费正文。`relation_snapshot.go`排队前固定双来源，准备另借输入；`Source.RetainedBytes`记录分析表选定投影费用，公共`RowOrder.RetainedHeapBytes`与`Relation.RetainedOrderHeapBytes`区分驻留数组和磁盘映射页，快照Go堆计费经`taskmanager.ByteBudget`跨标签共享，不宣称是总RSS上限。`relation_tasks.go`按完成预检派生七模式任务，状态轮询不重复传正文；候选完整成功后发布，旧结果保留，清除/切档/关停只摘取自己拥有的引用并锁外回收。结果GET另借编码字节，写网络前归还查询槽和缓存锁。字段读取共用F17异步字段任务及源签名，`relation_export.go`复用公共导出中心和原子发布；`relation_navigation.go`验证两侧真实原格后接公共导航。当前后端与界面的验证边界分开记录，不增加源写回、缓存编码或运行依赖。
 
 F17/F18的字段选择统一由`field-picker.js/css`负责单选、多选、搜索、有限分页和迟到按钮隔离；原始表头对应使用一次摘要索引，只建议完整唯一的表头。`composition-tasks.js`的`ExcelLensSourceTasks`复用来源身份、轻量轮询和独立令牌回收，可接入不同业务端点。`relations-model.js`在DOM外核对精确整数、完整查询/来源、七模式形状、原值状态、原序及响应容量，`relations.js`只在完整候选和视图均成功后替换旧结果。列数按实际容器宽度分页，尺寸和主题变化只重绘现有结果；全量CSV仍经公共导出中心，切档与迟到导航各自清理拥有的资源。
 
@@ -167,13 +173,13 @@ F17的`server/composition_store.go`复用该封套保存版本1联合定义，�
 
 `server/printing_tasks.go`复用泛型元数据任务、公共查询槽位和来源固定，保留有界打印计划/源属性/公共合并快照，预算包括计划绑定的源几何及设置。`printing_page.go`在同一来源引用与缓存读锁下按页消费整数几何，使用公共源行读取获得原CellData、富文本/条件呈现及引用样式。完整源矩形与实际页面切片分开，合并锚点及隐藏起点不搬移，巨量隐藏间隔用前缀跳过；单页格数/字节/轴项和工作量由formats维护。创建时以完整OOXML打印扫描的合并声明核对公共SourceLayout；数量、命名空间、容量或重叠未知时明确拒绝，源缓存编码不变。清除及历史淘汰取消已完成任务的上下文，取页同时绑定HTTP与任务取消，排队期间也能立即释放来源；发布前再次核对任务/来源/索引。只读预览界面已接入，按页读取、缩放和只读覆盖的契约与验证边界见[打印实施记录](printing.md)。
 
-第二阶段开发树的`workbook.RowOrder`持有不可变的源索引位置顺序，`RowSet`提供同一数据的源序成员视图。连续区间只存起点和数量，小结果保存uint32，大结果用`ELORD001`私有临时文件校验后映射；反向定位由有界uint64排序段、最多16路归并建立。进程重启不复用中断结果；行序不改写源行缓存。第三阶段的原生已用区域规则升级单独处理源索引版本，见下文。
+第二阶段开发树的`rowindex.RowOrder`（`workbook`以类型别名沿用）持有不可变的源索引位置顺序，`RowSet`提供同一数据的源序成员视图。连续区间只存起点和数量，小结果保存uint32，大结果用`ELORD001`私有临时文件校验后映射；反向定位由有界uint64排序段、最多16路归并建立。进程重启不复用中断结果；行序不改写源行缓存。第三阶段的原生已用区域规则升级单独处理源索引版本，见下文。
 
-`sort_order.go`和`sort_run.go`完成比较键分段排序。驻留数组、字符串分配余量及双缓冲归并头计入64MiB工作预算，短文本复制自身字节，避免保留大源字符串。小结果内存快路径与`ELSORT01`排序段共用精确比较器、五级键和源位置并列规则；自然顺序是显式文本模式。归并按比较键实际最大长度进一步收紧最多16路扇入，头/长度/CRC/源位置/段内顺序校验全部通过后才发布结果。排序阶段保留单独进度，取消或失败不会替换旧视图；详见[实现与验证](row-order-and-sort.md)。
+`rowindex/sort_order.go`和`sort_run.go`完成比较键分段排序。驻留数组、字符串分配余量及双缓冲归并头计入64MiB工作预算，短文本复制自身字节，避免保留大源字符串。小结果内存快路径与`ELSORT01`排序段共用精确比较器、五级键和源位置并列规则；自然顺序是显式文本模式。归并按比较键实际最大长度进一步收紧最多16路扇入，头/长度/CRC/源位置/段内顺序校验全部通过后才发布结果。排序阶段保留单独进度，取消或失败不会替换旧视图；详见[实现与验证](row-order-and-sort.md)。
 
 `server/filter_result.go`在结果表锁内取得独立行序引用。请求和导出结束时释放自己的引用；淘汰、清除及切档释放结果表引用，最后一个引用才解除映射、删除私有文件并退还空间。finalizer仅兜底，不依赖GC及时性控制磁盘预算。完整筛选导出直接持有该顺序，视口只复制有限页；明确包含空白冻结行的选区目前仍使用已有有界源行号数组。
 
-临时查询文件统一由`workbook/query_file.go`登记：共享8GiB和8192文件预算只由formats定义；登记/创建与中断文件清理使用同一锁，避免Unix上活跃文件被误删。文件名携带进程归属，其他活跃进程已经关闭句柄的排序段也受保护；无法确定进程状态时保留文件，PID复用时可能保守延迟回收。删除失败仍计费并重试，当前及历史缓存清理保护在用查询文件。`selectionRowView`共同处理冻结位置、可视页和源格定位，手工源范围通过成员秩取子集，避免扫描全部显示顺序；计算选区按实际可视位置访问。
+临时查询文件统一由`rowindex/query_file.go`登记：共享8GiB和8192文件预算只由formats定义；登记/创建与中断文件清理使用同一锁，避免Unix上活跃文件被误删。文件名携带进程归属，其他活跃进程已经关闭句柄的排序段也受保护；无法确定进程状态时保留文件，PID复用时可能保守延迟回收。删除失败仍计费并重试，当前及历史缓存清理保护在用查询文件。`selectionRowView`共同处理冻结位置、可视页和源格定位，手工源范围通过成员秩取子集，避免扫描全部显示顺序；计算选区按实际可视位置访问。
 
 `indexedStream`共享正向/反向预读：相邻递减源偏移向后取1MiB窗口，分散跳转采用16KiB对齐小窗，防止倒序导出为每条短记录重复读取1MiB。窗口仍按已校验的源偏移切片，XML严格回退和外部二进制解码语义不变。
 

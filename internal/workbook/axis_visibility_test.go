@@ -113,8 +113,8 @@ func TestAxisVisibilityBillionRowDefaultHiddenAndBoundaryRankSelectStayCompresse
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Len() != 3 || len(v.hidden) != 2 || len(v.groups) != 0 {
-		t.Fatal("expanded the billion-row domain", v.Len(), v.hidden)
+	if v.Len() != 3 || len(v.HiddenRanges()) != 2 || len(v.Groups()) != 0 {
+		t.Fatal("expanded the billion-row domain", v.Len(), v.HiddenRanges())
 	}
 	page, err := v.Page(0, 5)
 	if err != nil || !slices.Equal(page, []int{1, 500_000_000, formats.ExternalRows}) {
@@ -130,7 +130,7 @@ func TestAxisVisibilityBillionRowDefaultHiddenAndBoundaryRankSelectStayCompresse
 	}
 	zero := SourceLayout{DefaultRowZeroSize: true, RowStates: []SourceAxisRange{{Min: 1, Max: 1, HiddenSet: true, ZeroSize: true}}}
 	all, err := zero.BuildAxisVisibility(context.Background(), "row", formats.ExternalRows, AxisViewSettings{})
-	if err != nil || all.Len() != 0 || len(all.hidden) != 1 || all.Next(1) != 0 || all.Previous(formats.ExternalRows) != 0 {
+	if err != nil || all.Len() != 0 || len(all.HiddenRanges()) != 1 || all.Next(1) != 0 || all.Previous(formats.ExternalRows) != 0 {
 		t.Fatal("all-hidden domain fabricated a visible row", err)
 	}
 }

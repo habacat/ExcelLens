@@ -104,6 +104,48 @@ func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, r
 		options = prepareRichRead(options)
 	}
 	stream := indexedStream{f: f, idx: idx}
+	if presentation != nil && !byRow {
+		var batch []RowData
+		for ref := range refs {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			number, position := ref.Number, ref.Position
+			if number < 1 || number > MaxRowsForIndex(idx) {
+				return errors.New("源行号超出允许范围")
+			}
+			if position < -1 || position >= idx.RowCount() || position >= 0 && idx.RowAt(position).Number != number {
+				return errors.New("源行号与索引位置不匹配")
+			}
+			if position == -1 && !knownBlanks {
+				i := idx.FindRowOffset(number)
+				if i < idx.RowCount() && idx.RowAt(i).Number == number {
+					return errors.New("已有源记录不能伪装成空白行")
+				}
+			}
+			row := RowData{Number: number}
+			if position >= 0 {
+				row, err = stream.readWithOptions(w, position, first, last, selected, options)
+				if err != nil {
+					return err
+				}
+			}
+			batch = append(batch, row)
+		}
+		presentation.setBatchRows(batch, first, last, selected)
+		for i := range batch {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := presentation.apply(&batch[i], first, last, selected); err != nil {
+				return err
+			}
+			if err := visit(batch[i]); err != nil {
+				return err
+			}
+		}
+		return ctx.Err()
+	}
 	for ref := range refs {
 		if err := ctx.Err(); err != nil {
 			return err

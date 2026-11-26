@@ -13,11 +13,13 @@ func syntheticIndex(t *testing.T, rows ...string) *SheetIndex {
 	f := filepath.Join(t.TempDir(), "indexed.xml")
 	var b strings.Builder
 	idx := &SheetIndex{XMLPath: f, SharedAnchors: make(map[string]SharedFormulaAnchor)}
+	offsets := make([]RowOffset, 0, len(rows))
 	for i, row := range rows {
 		from := int64(b.Len())
 		b.WriteString(row)
-		idx.resident = append(idx.resident, RowOffset{Number: i + 1, Start: from, End: int64(b.Len())})
+		offsets = append(offsets, RowOffset{Number: i + 1, Start: from, End: int64(b.Len())})
 	}
+	idx.RowIndex = NewRowIndex(offsets)
 	idx.XMLSize = int64(b.Len())
 	if err := os.WriteFile(f, []byte(b.String()), 0600); err != nil {
 		t.Fatal(err)

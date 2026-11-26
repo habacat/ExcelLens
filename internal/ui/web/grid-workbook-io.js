@@ -128,6 +128,7 @@
         if (!data.opened) {
           if (data.archive) panels.archiveCenter.present(data.archive);
           S.opened = false;
+          this.d.cancelConditionalStats?.(false, false);
           panels.catalogueCenter?.resetBook();
           panels.dataRulesCenter?.resetBook();
           panels.printingCenter?.resetBook();
@@ -293,6 +294,8 @@
       S.sheet = null;
       S.indexReady = false;
       S.index = null;
+      this.d.cancelConditionalStats?.(false, false);
+      S.tilesSkippedConditional = false;
       // Only a confirmed workbook handoff discards the old cells. In
       // particular, don't lay out the previous grid again on leaving Home.
       invalidateViewport();

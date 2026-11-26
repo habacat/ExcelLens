@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"excellens/internal/fileidentity"
+	"excellens/internal/styles"
 )
 
 func readXLSGlobals(stream io.ReaderAt, size int64) (*xlsGlobals, error) {
@@ -180,7 +181,7 @@ func readXLSGlobals(stream io.ReaderAt, size int64) (*xlsGlobals, error) {
 	}
 	for i := range g.styles {
 		style := &g.styles[i]
-		style.SectionColors = sectionTextColors(style.NumFmtID, g.formats[style.NumFmtID])
+		style.SectionColors = styles.SectionTextColors(style.NumFmtID, g.formats[style.NumFmtID])
 	}
 	g.catalogue = catalogue.finish()
 	return g, nil

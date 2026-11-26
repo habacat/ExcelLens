@@ -38,7 +38,7 @@ func TestConditionalNamespaceAliasesAreBoundToTheWorksheetAndForeignFormulaIsNot
 			if out == nil || out.Notice != "" || out.Style.Font.Color != "#FF0033" {
 				t.Fatal("valid namespace aliases were lost", out, index.Summary())
 			}
-		} else if out == nil || out.Notice == "" || !out.Style.empty() {
+		} else if out == nil || out.Notice == "" || !out.Style.Empty() {
 			t.Fatal("foreign metadata was applied", out, index.Summary())
 		}
 	}
@@ -67,7 +67,7 @@ func TestConditionalDXFUnknownNamespacesAndInvalidColorsKeepAVisibleCause(t *tes
 			t.Fatal(err)
 		}
 		out := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil)
-		if out == nil || out.Notice == "" || !out.Style.empty() {
+		if out == nil || out.Notice == "" || !out.Style.Empty() {
 			t.Fatal("unsupported style became a success", out)
 		}
 	}
@@ -93,7 +93,7 @@ func TestConditionalEmptyBorderContainerInheritsAndExplicitEmptySideClears(t *te
 			t.Fatal(err)
 		}
 		out := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil)
-		if out == nil || out.Notice != "" || out.Style.empty() != tc.empty || !tc.empty && (out.Style.Border == nil || out.Style.Border.Right == nil || out.Style.Border.Right.Style == nil) {
+		if out == nil || out.Notice != "" || out.Style.Empty() != tc.empty || !tc.empty && (out.Style.Border == nil || out.Style.Border.Right == nil || out.Style.Border.Right.Style == nil) {
 			t.Fatal("empty container and explicit clearing were confused", tc.xml, out)
 		}
 	}
@@ -106,7 +106,7 @@ func TestConditionalBlocksWithNoReadableRulesDoNotSilentlyDisappear(t *testing.T
 	} {
 		_, _, index := conditionalFixture(t, block+`<conditionalFormatting sqref="A1:B1"><cfRule type="expression" priority="1" dxfId="0"><formula>TRUE()</formula></cfRule></conditionalFormatting>`)
 		out := evaluateConditional(t, index, 1, 1, CellData{Raw: "1"}, nil)
-		if out == nil || out.Notice == "" || !out.Style.empty() || index.Summary().Pending == 0 {
+		if out == nil || out.Notice == "" || !out.Style.Empty() || index.Summary().Pending == 0 {
 			t.Fatal("unreadable rule block was treated as absent", block, out, index.Summary())
 		}
 		outside := evaluateConditional(t, index, 1, 2, CellData{Raw: "1"}, nil)
@@ -160,10 +160,10 @@ func TestConditionalRangeIndexAgreesWithIndependentMembershipOracleAndDeduplicat
 	}
 	_, _, overlap := conditionalFixture(t, `<conditionalFormatting sqref="`+strings.TrimSpace(strings.Repeat("A1:XFD1048576 ", 1024))+`"><cfRule type="expression" priority="1"><formula>TRUE()</formula></cfRule></conditionalFormatting>`)
 	e = overlap.NewEvaluator(context.Background())
-	before := e.work
+	before := e.engine.Work
 	out, err := e.Evaluate(1, 1, CellData{Raw: "1"}, nil)
-	if err != nil || out == nil || out.Matched != 1 || before-e.work > 64 {
-		t.Fatal("overlapping areas caused duplicate or unbounded predicate work", out, err, before-e.work)
+	if err != nil || out == nil || out.Matched != 1 || before-e.engine.Work > 64 {
+		t.Fatal("overlapping areas caused duplicate or unbounded predicate work", out, err, before-e.engine.Work)
 	}
 }
 
@@ -183,7 +183,7 @@ func FuzzConditionalDecimalComparisonMatchesExactRational(f *testing.F) {
 		if !ok {
 			return
 		}
-		if x.exponent < -128 || x.exponent > 128 || y.exponent < -128 || y.exponent > 128 {
+		if x.Exponent < -128 || x.Exponent > 128 || y.Exponent < -128 || y.Exponent > 128 {
 			return
 		}
 		// A zero canonicalizes away its exponent. Bound the original oracle

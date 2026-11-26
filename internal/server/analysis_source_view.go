@@ -9,23 +9,24 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"excellens/internal/formats"
 	"excellens/internal/sourceview"
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
+
+var errAnalysisSourceReleased = errors.New("分析来源快照已失效，请重新捕获")
 
 // Each pool entry, job, request and export owns an independent lease. The row
 // plan borrows the immutable selection until the final lease is closed.
 type analysisSourceSnapshot struct {
-	data   *analysisSourceSnapshotData
-	closed atomic.Bool
+	data  *analysisSourceSnapshotData
+	lease *taskmanager.Lease[*analysisSourceSnapshotData]
 }
 
 type analysisSourceSnapshotData struct {
-	refs        atomic.Int64
 	id          string
 	source      string
 	wb          *workbook.Workbook
@@ -38,33 +39,44 @@ type analysisSourceSnapshotData struct {
 	composition *compositionSnapshot
 }
 
+func ownAnalysisSourceData(data *analysisSourceSnapshotData) *analysisSourceSnapshot {
+	lease := taskmanager.NewFinalizedLease(data, func() {
+		data.snapshot.close()
+		data.composition.close()
+		if data.unpin != nil {
+			data.unpin()
+		}
+	})
+	return &analysisSourceSnapshot{data: data, lease: lease}
+}
+
+func (s *analysisSourceSnapshot) refs() int64 {
+	if s == nil || s.lease == nil {
+		return 0
+	}
+	return s.lease.Refs()
+}
+
+func (s *analysisSourceSnapshot) isClosed() bool {
+	return s == nil || s.lease.Closed()
+}
+
 func (s *analysisSourceSnapshot) retain() (*analysisSourceSnapshot, error) {
-	if s == nil || s.closed.Load() {
-		return nil, errors.New("分析来源快照已失效，请重新捕获")
+	if s == nil || s.lease == nil {
+		return nil, errAnalysisSourceReleased
 	}
-	defer runtime.KeepAlive(s)
-	for {
-		count := s.data.refs.Load()
-		if count < 1 {
-			return nil, errors.New("分析来源快照已释放")
-		}
-		if s.data.refs.CompareAndSwap(count, count+1) {
-			next := &analysisSourceSnapshot{data: s.data}
-			runtime.SetFinalizer(next, (*analysisSourceSnapshot).close)
-			return next, nil
-		}
+	next, err := s.lease.Retain(errAnalysisSourceReleased)
+	if err != nil {
+		return nil, err
 	}
+	return &analysisSourceSnapshot{data: next.Value(), lease: next}, nil
 }
 
 func (s *analysisSourceSnapshot) close() {
-	if s == nil || !s.closed.CompareAndSwap(false, true) || s.data.refs.Add(-1) != 0 {
+	if s == nil || s.lease == nil {
 		return
 	}
-	s.data.snapshot.close()
-	s.data.composition.close()
-	if s.data.unpin != nil {
-		s.data.unpin()
-	}
+	s.lease.Close()
 }
 
 func ownAnalysisSource(wb *workbook.Workbook, idx *workbook.SheetIndex, source string, scope sourceview.Scope, snapshot selectionSnapshot, unpin func()) (*analysisSourceSnapshot, error) {
@@ -85,10 +97,7 @@ func ownAnalysisSource(wb *workbook.Workbook, idx *workbook.SheetIndex, source s
 		}
 	}
 	data := &analysisSourceSnapshotData{id: randomID(), source: source, wb: wb, index: idx, scope: scope, snapshot: snapshot, plan: plan, created: time.Now(), unpin: unpin}
-	data.refs.Store(1)
-	out := &analysisSourceSnapshot{data: data}
-	runtime.SetFinalizer(out, (*analysisSourceSnapshot).close)
-	return out, nil
+	return ownAnalysisSourceData(data), nil
 }
 
 type analysisSourceCaptureRequest struct {

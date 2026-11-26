@@ -36,9 +36,7 @@ func TestCompositionPreviewDoesNotDecodeTheRowAfterItsVisibleLimit(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := &compositionSnapshotData{plan: plan}
-	data.refs.Store(1)
-	source := &compositionSnapshot{data: data}
+	source := ownCompositionSnapshot(&compositionSnapshotData{plan: plan})
 	defer source.close()
 	preview, truncated, err := compositionPreview(context.Background(), source)
 	if err != nil || !truncated || len(preview) != formats.CompositionPreviewRows || reads != formats.CompositionPreviewRows {

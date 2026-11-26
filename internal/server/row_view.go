@@ -4,22 +4,23 @@ import (
 	"errors"
 	"log"
 	"runtime"
-	"sync/atomic"
 	"time"
 
+	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
+
+var errRowViewReleased = errors.New("可见行视图已释放，请重新打开")
 
 // A lease binds a projection to one immutable source/index/filter/visibility
 // snapshot. Matching row counts alone never prove source identity. The pin
 // outlives map eviction and workbook changes while another consumer has a lease.
 type sheetRowView struct {
-	data   *sheetRowViewData
-	closed atomic.Bool
+	data  *sheetRowViewData
+	lease *taskmanager.Lease[*sheetRowViewData]
 }
 
 type sheetRowViewData struct {
-	refs     atomic.Int64
 	id       string
 	wb       *workbook.Workbook
 	idx      *workbook.SheetIndex
@@ -39,41 +40,38 @@ type sheetRowViewData struct {
 }
 
 func ownSheetRowView(data *sheetRowViewData) *sheetRowView {
-	data.refs.Store(1)
-	v := &sheetRowView{data: data}
-	runtime.SetFinalizer(v, (*sheetRowView).close)
-	return v
+	lease := taskmanager.NewFinalizedLease(data, func() {
+		if err := data.projection.Close(); err != nil {
+			log.Printf("释放可见行投影失败：%v", err)
+		}
+		data.filter.close()
+		if data.unpin != nil {
+			data.unpin()
+		}
+	})
+	return &sheetRowView{data: data, lease: lease}
+}
+
+func (v *sheetRowView) isClosed() bool {
+	return v == nil || v.lease.Closed()
 }
 
 func (v *sheetRowView) retain() (*sheetRowView, error) {
-	if v == nil || v.closed.Load() {
-		return nil, errors.New("可见行视图已释放，请重新打开")
+	if v == nil || v.lease == nil {
+		return nil, errRowViewReleased
 	}
-	defer runtime.KeepAlive(v)
-	for {
-		count := v.data.refs.Load()
-		if count <= 0 {
-			return nil, errors.New("可见行视图已释放，请重新打开")
-		}
-		if v.data.refs.CompareAndSwap(count, count+1) {
-			next := &sheetRowView{data: v.data}
-			runtime.SetFinalizer(next, (*sheetRowView).close)
-			return next, nil
-		}
+	next, err := v.lease.Retain(errRowViewReleased)
+	if err != nil {
+		return nil, err
 	}
+	return &sheetRowView{data: next.Value(), lease: next}, nil
 }
 
 func (v *sheetRowView) close() {
-	if v == nil || !v.closed.CompareAndSwap(false, true) || v.data.refs.Add(-1) != 0 {
+	if v == nil || v.lease == nil {
 		return
 	}
-	if err := v.data.projection.Close(); err != nil {
-		log.Printf("释放可见行投影失败：%v", err)
-	}
-	v.data.filter.close()
-	if v.data.unpin != nil {
-		v.data.unpin()
-	}
+	v.lease.Close()
 }
 
 // Caller holds the shared cache read lock. Retain under the map lock so

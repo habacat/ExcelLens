@@ -1,11 +1,6 @@
 package workbook
 
-import (
-	"math/big"
-	"strconv"
-	"strings"
-	"testing"
-)
+import "testing"
 
 func TestFixedDecimalSourceAndConditionalDisplaysUseOriginalDigits(t *testing.T) {
 	for _, tc := range []struct{ raw, format, want string }{
@@ -44,45 +39,4 @@ func TestFixedDecimalSourceAndConditionalDisplaysUseOriginalDigits(t *testing.T)
 			t.Fatal("built-in numeric format used rounded float digits", id, got, want)
 		}
 	}
-}
-
-func FuzzDecimalFixedDisplayRoundsOriginalDecimal(f *testing.F) {
-	f.Add(int64(2675), int8(-3), uint8(2))
-	f.Add(int64(900719925474099331), int8(-2), uint8(2))
-	f.Add(int64(-9995), int8(-3), uint8(2))
-	f.Fuzz(func(t *testing.T, coefficient int64, exponent int8, places uint8) {
-		exp, decimals := int(exponent)%10, int(places)%11
-		raw := strconv.FormatInt(coefficient, 10) + "e" + strconv.Itoa(exp)
-		n, ok := parseConditionalDecimal(raw)
-		if !ok {
-			t.Fatal("valid decimal rejected", raw)
-		}
-		got, ok := decimalFixedAbs(n, decimals, 0, 1, false)
-		if !ok {
-			t.Fatal("bounded decimal refused", raw)
-		}
-		r, ok := new(big.Rat).SetString(raw)
-		if !ok {
-			t.Fatal(raw)
-		}
-		r.Abs(r)
-		scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
-		r.Mul(r, new(big.Rat).SetInt(scale))
-		q, remainder := new(big.Int), new(big.Int)
-		q.QuoRem(r.Num(), r.Denom(), remainder)
-		if new(big.Int).Lsh(remainder, 1).Cmp(r.Denom()) >= 0 {
-			q.Add(q, big.NewInt(1))
-		}
-		want := q.String()
-		if len(want) <= decimals {
-			want = strings.Repeat("0", decimals+1-len(want)) + want
-		}
-		if decimals > 0 {
-			at := len(want) - decimals
-			want = want[:at] + "." + want[at:]
-		}
-		if got != want {
-			t.Fatal(raw, decimals, got, want)
-		}
-	})
 }

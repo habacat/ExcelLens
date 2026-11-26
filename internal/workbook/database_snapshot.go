@@ -171,7 +171,7 @@ func (d *DatabaseSnapshot) WriteTable(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	defer writer.offsets.close()
+	defer writer.offsets.Close()
 	var cells []externalCell
 	begin := func(def DatabaseTableDefinition) error {
 		if cells != nil || len(def.Columns) == 0 || len(def.Columns) > formats.ExcelColumns {
@@ -225,7 +225,7 @@ func (d *DatabaseSnapshot) WriteTable(ctx context.Context,
 	}
 	index := externalSheetIndex(meta, rowsPath, idxPath, writer)
 	indexHash := sha256.New()
-	if err := writeIndexFile(index, writer.offsets.count, writer.offsets.file, indexHash); err != nil {
+	if err := writeIndexFile(index, writer.offsets.Count(), writer.offsets.SpillFile(), indexHash); err != nil {
 		return err
 	}
 	st, err := os.Stat(idxPath)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,10 +18,7 @@ import (
 func ownCompositionAnalysisSource(wb *workbook.Workbook, source *compositionSnapshot) *analysisSourceSnapshot {
 	definition := source.data.plan.Definition()
 	data := &analysisSourceSnapshotData{id: randomID(), source: "append:" + definition.Digest(), wb: wb, composition: source, created: time.Now()}
-	data.refs.Store(1)
-	owner := &analysisSourceSnapshot{data: data}
-	runtime.SetFinalizer(owner, (*analysisSourceSnapshot).close)
-	return owner
+	return ownAnalysisSourceData(data)
 }
 
 func (a *App) borrowCompositionAnalysisSource(wb *workbook.Workbook, source, id string) (*analysisSourceSnapshot, error) {
@@ -75,7 +71,7 @@ func (a *App) compositionAnalysisSource(ctx context.Context, wb *workbook.Workbo
 	if observer != nil {
 		return analysisSource{}, errors.New("联合来源的分析方案捕获尚未接入")
 	}
-	if borrowed == nil || borrowed.closed.Load() || borrowed.data.composition == nil || borrowed.data.wb != wb || borrowed.data.source != q.Source {
+	if borrowed == nil || borrowed.isClosed() || borrowed.data.composition == nil || borrowed.data.wb != wb || borrowed.data.source != q.Source {
 		return analysisSource{}, errors.New("联合来源快照已释放，请重新运行分析")
 	}
 	q, err := compositionAnalysisDefinition(q, borrowed)

@@ -43,9 +43,9 @@ func (a *App) handleRelationNavigate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 409, err.Error())
 		return
 	}
-	defer source.close()
-	data := source.data.value
-	input := data.inputs.data.value
+	defer source.Close()
+	data := source.Value()
+	input := data.inputs.Value()
 	book, ref := input.books[req.Side], input.refs[req.Side]
 	if req.Book != ref.Book {
 		writeError(w, 409, "关联定位来源不一致")

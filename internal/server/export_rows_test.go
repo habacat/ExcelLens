@@ -97,9 +97,7 @@ func TestVisibleAndFullFilteredExportsRetainDifferentImmutableSetsAcrossClear(t 
 	if string(fullCSV) != ",7.70\r\n,2.20\r\n001,1.10\r\n,5.50\r\n,9007199254740993.31\r\n,3.30\r\n" {
 		t.Fatal("complete match set was changed by visibility", string(fullCSV))
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("export's final release leaked source/view pins", pins)
 	}
@@ -157,9 +155,7 @@ func TestVisibleSelectionExportReopensSparseRowsAndCancelledQueueReleasesSnapsho
 	if status.DownloadURL != "" {
 		t.Fatal("cancelled export exposed partial download")
 	}
-	a.sourceMu.Lock()
-	pins := a.sourcePins[wb]
-	a.sourceMu.Unlock()
+	pins := a.sourcePins.Count(wb)
 	if pins != 0 {
 		t.Fatal("cancelled queued export retained source snapshot", pins)
 	}

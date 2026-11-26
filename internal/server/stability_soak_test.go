@@ -487,10 +487,9 @@ func stabilitySnapshot(root *App, sources []*stabilitySource, start time.Time, c
 		return stabilitySample{}, err
 	}
 	sample := stabilitySample{ElapsedSeconds: time.Since(start).Seconds(), Cycles: cycles, HeapBytes: mem.HeapAlloc, HeapInuseBytes: mem.HeapInuse, Goroutines: runtime.NumGoroutine(), Process: process}
-	root.sourceMu.Lock()
-	sample.Pins = len(root.sourcePins) + len(root.sourceUploads)
-	bytes := root.relationBytes + root.compositionBytes
-	root.sourceMu.Unlock()
+	sample.Pins = root.sourcePins.Len() + root.sourceUploads.Len()
+
+	bytes := root.relationBudget.Used() + root.compositionBudget.Used()
 	if sample.Pins != 0 || bytes != 0 {
 		return sample, fmt.Errorf("quiescent source ownership retained %d pins / %d bytes", sample.Pins, bytes)
 	}
@@ -720,9 +719,7 @@ func TestStabilityRealHTTPBaseline(t *testing.T) {
 	transport.CloseIdleConnections()
 	server.Close()
 	root.Close()
-	root.sourceMu.Lock()
-	remaining := len(root.sourcePins) + len(root.sourceUploads)
-	root.sourceMu.Unlock()
+	remaining := root.sourcePins.Len() + root.sourceUploads.Len()
 	if remaining != 0 || len(root.sessions) != 0 {
 		t.Fatal("application close retained source or browser owners", remaining, len(root.sessions))
 	}

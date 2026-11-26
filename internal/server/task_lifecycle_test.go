@@ -227,9 +227,7 @@ func TestUnsuccessfulReconcileReleasesRemovedSourceBeforeHistoryClear(t *testing
 			case <-time.After(5 * time.Second):
 				t.Fatal("unsuccessful reconciliation did not exit")
 			}
-			a.sourceMu.Lock()
-			pins := len(a.sourcePins)
-			a.sourceMu.Unlock()
+			pins := a.sourcePins.Len()
 			if job.Status != outcome || pins != 0 || job.Books[0] != nil || job.Books[1] != nil || job.release != nil {
 				t.Error("unsuccessful history retained removed sources", job.Status, job.Error, pins)
 			}

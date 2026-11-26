@@ -155,13 +155,7 @@ func TestCompositionSourcePinsSurviveOwnerCloseAndFailedCaptureReleasesEveryPin(
 	definition := compositionDefinition(t, a)
 	root := a.rootApp()
 	pinCount := func() int {
-		root.sourceMu.Lock()
-		defer root.sourceMu.Unlock()
-		n := 0
-		for _, count := range root.sourcePins {
-			n += count
-		}
-		return n
+		return root.sourcePins.Total()
 	}
 	baseline := pinCount()
 	snapshot := compositionCapture(t, a, definition)
