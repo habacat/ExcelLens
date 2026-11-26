@@ -50,11 +50,18 @@ async function measureConditional({ root, temp, go, exe, meter, smoke }) {
       reopenedViewportMedianMs: percentile(runs.map(r => r.reopenedViewportMs), .5),
       sharedIndexBytes: Math.max(...runs.map(r => r.sharedIndexBytes)), runs };
   });
-  const micro = execFileSync(test, ['-test.run=^$', '-test.bench=^BenchmarkConditionalCellEvaluation$', '-test.benchmem',
+  const micro = execFileSync(test, ['-test.run=^$', '-test.bench=^Benchmark(ConditionalCellEvaluation|InlinePresentationViewport)$', '-test.benchmem',
     '-test.benchtime=300ms', '-test.count=' + repetitions], { cwd, windowsHide: true, encoding: 'utf8' });
   const measurements = [...micro.matchAll(/BenchmarkConditionalCellEvaluation-\d+\s+\d+\s+([\d.]+) ns\/op\s+(\d+) B\/op\s+(\d+) allocs\/op/g)]
     .map(([, ns, bytes, allocs]) => ({ nsPerCell: Number(ns), bytesPerCell: Number(bytes), allocationsPerCell: Number(allocs) }));
   assert.equal(measurements.length, repetitions);
+  const inlinePresentation = {};
+  for (const [, kind, styled, latency, bytes, allocations] of micro.matchAll(/BenchmarkInlinePresentationViewport\/(simple|four_runs)\/styled_(true|false)-\d+\s+\d+\s+([\d.]+) ns\/op\s+(\d+) B\/op\s+(\d+) allocs\/op/g)) {
+    const samples = inlinePresentation[kind + '/styled_' + styled] ??= [];
+    samples.push({ nsPerViewport: Number(latency), bytesPerViewport: Number(bytes), allocationsPerViewport: Number(allocations) });
+  }
+  assert.equal(Object.keys(inlinePresentation).length, 4);
+  for (const samples of Object.values(inlinePresentation)) assert.equal(samples.length, repetitions);
   const browser = [];
   for (const profile of [
     { mode: 'complex', rows: 2400, file: path.join(temp, 'complex-conditional-fixture.xlsx') },
@@ -66,7 +73,7 @@ async function measureConditional({ root, temp, go, exe, meter, smoke }) {
     if (profile.mode === 'external') assert.equal(run.sourceSHA256, statistics[0].sourceSHA256);
     browser.push(run);
   }
-  return { statistics, perCell: { runs: measurements, medianNs: percentile(measurements.map(m => m.nsPerCell), .5),
+  return { statistics, inlinePresentation, perCell: { runs: measurements, medianNs: percentile(measurements.map(m => m.nsPerCell), .5),
     medianBytes: percentile(measurements.map(m => m.bytesPerCell), .5), medianAllocs: percentile(measurements.map(m => m.allocationsPerCell), .5) }, browser };
 }
 

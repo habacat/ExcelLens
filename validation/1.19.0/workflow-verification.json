@@ -34,5 +34,78 @@
     "fileCount": 4,
     "observations": 272,
     "source": "internal/workbook/testdata/conditional-native"
+  },
+  "packageStructure": {
+    "method": "direct package Go files, excluding _test.go",
+    "versions": {
+      "previous": {
+        "server": {
+          "productionLines": 31972,
+          "files": 147
+        },
+        "excelformula": {
+          "productionLines": 214,
+          "files": 4
+        },
+        "conditional": {
+          "productionLines": 1292,
+          "files": 3
+        },
+        "editfile": {
+          "productionLines": 26147,
+          "files": 114
+        },
+        "rowindex": {
+          "productionLines": 0,
+          "files": 0
+        },
+        "taskmanager": {
+          "productionLines": 0,
+          "files": 0
+        },
+        "styles": {
+          "productionLines": 0,
+          "files": 0
+        },
+        "workbook": {
+          "productionLines": 39397,
+          "files": 154
+        }
+      },
+      "candidate": {
+        "server": {
+          "productionLines": 32294,
+          "files": 147
+        },
+        "excelformula": {
+          "productionLines": 346,
+          "files": 6
+        },
+        "conditional": {
+          "productionLines": 4879,
+          "files": 10
+        },
+        "editfile": {
+          "productionLines": 26147,
+          "files": 114
+        },
+        "rowindex": {
+          "productionLines": 3611,
+          "files": 16
+        },
+        "taskmanager": {
+          "productionLines": 458,
+          "files": 5
+        },
+        "styles": {
+          "productionLines": 3105,
+          "files": 10
+        },
+        "workbook": {
+          "productionLines": 30812,
+          "files": 127
+        }
+      }
+    }
   }
 }

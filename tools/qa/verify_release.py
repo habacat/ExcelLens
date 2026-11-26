@@ -17,6 +17,30 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def verify_performance_coverage(version, report):
+    if tuple(map(int, version.split("."))) < (1, 19, 0):
+        return
+    require(report.get("schema") == 2, "This release requires the second-generation performance baseline")
+    query = report.get("rowQuery", {})
+    require(query.get("sourceRows") == 1000000 and query.get("matchedDataRows") == 10000
+            and query.get("everyCoordinateAndRawValueVerified") is True, "Missing source-verified filter/sort workload")
+    cf = report.get("conditional", {})
+    cases = cf.get("statistics", [])
+    require(sorted((case["rows"], case["distinctKeys"]) for case in cases) == [(1000000, 10000), (1000000, 500000)],
+            "Missing million-row conditional statistics workload")
+    for case in cases:
+        runs = case.get("runs", [])
+        require(len(runs) == case.get("repetitions") == 3 and all(
+            r.get("sharedIndexUnchangedOnWarmAndReopen") is True and r.get("result") == "PASS"
+            and r.get("sourceSHA256") == case.get("sourceSHA256") and len(r.get("warmViewportSamplesMs", [])) == 16
+            for r in runs), "Incomplete cold/warm statistics measurements")
+    views = cf.get("browser", [])
+    require(sorted(v["mode"] for v in views) == ["complex", "external"] and all(
+        v.get("sourceUnchanged") and v.get("result") == "PASS" and v.get("resources", {}).get("peakServiceRSSBytes", 0) > 0
+        and len(v.get("passes", [])) >= 3 for v in views), "Incomplete conditional browser measurements")
+    require(len(cf.get("perCell", {}).get("runs", [])) == 3 and len(cf.get("inlinePresentation", {})) == 4
+            and all(len(runs) == 3 for runs in cf["inlinePresentation"].values()), "Incomplete allocation measurements")
+
 def digest(path):
     h = hashlib.sha256()
     with path.open("rb") as stream:
@@ -146,6 +170,7 @@ def finalize(directory, version, ref, performance_report=None):
                     and report["modifiedBuildInputs"] is False and report["profile"] == "release"
                     and report["result"] == "PASS" and report["sourceDigestsVerified"] is True,
                     "Performance report must come from the tested release checkout")
+            verify_performance_coverage(version, report)
             report["cleanup"] = [{k: entry[k] for k in ("scenario", "code")} for entry in report["cleanup"]]
             public_report = staging / ("ExcelLens_" + version + "_Performance.json")
             write_json(public_report, report)
