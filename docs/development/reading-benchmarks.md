@@ -39,6 +39,8 @@ node tools/bench/release.cjs --out=validation/1.16.0/private/run.json --save-bas
 
 完整矩阵可用 `node tools/bench/release.cjs --out=validation/1.19.0/private/run.json --save-baseline=validation/1.19.0/performance-baseline.json` 重建。快速诊断使用 `node tools/bench/release.cjs --smoke --only=conditional`。诊断结果不会登记为发行基线。仅在主机、工具链、测量代码、样本摘要、数据规模和重复次数均一致时计算跨版本差值。
 
+正式候选的完整原始轮次、微基准、资源与像素数据可在[1.19.0 综合基线](../../validation/1.19.0/performance-baseline.json)中查看。
+
 ## 1.8.19 历史读取实验
 
 2026-11-17，ExcelLens 1.8.19。测试使用项目自带的`tools/largeprobe`，通过实际工作簿读取接口计时。
