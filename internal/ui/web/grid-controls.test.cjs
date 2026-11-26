@@ -102,3 +102,13 @@ test('column visibility follows the active source when switching between BIFF an
   controller.applyVisibility();
   assert.equal(state.hiddenColumns.size, 16384);
 });
+
+test('index progress distinguishes source extents, bytes and statistics rows', () => {
+  const ctx = { window: {} };
+  vm.runInNewContext(fs.readFileSync(__dirname + '/grid-workbook-io.js', 'utf8'), ctx);
+  const io = new ctx.window.ExcelLensWorkbookIO({fmtBytes:n=>n+' B'});
+  const calls = [], activity = {report:(...args)=>calls.push(args)};
+  io.reportIndexProgress(activity,{stage:'索引完成',status:'done',totalRows:75,doneBytes:42,totalBytes:42});
+  io.reportIndexProgress(activity,{stage:'条件统计',status:'running',statisticsProgress:{done:4,total:8}});
+  assert.deepEqual(calls,[[42,42,'索引完成','42 B / 42 B'],[4,8,'条件统计','4 / 8 行']]);
+});

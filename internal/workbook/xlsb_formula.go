@@ -425,23 +425,21 @@ func (w *Workbook) resolveXLSBNames() {
 		item := &b.names[i]
 		item.definition, _ = b.formulaText(item.formula, -1, -1, false)
 		item.formula = xlsbFormula{}
-		if !strings.HasPrefix(item.definition, "=") {
-			continue
+		name := item.name
+		definition := ""
+		if strings.HasPrefix(item.definition, "=") {
+			definition = strings.TrimPrefix(item.definition, "=")
 		}
-		name, definition := item.name, strings.TrimPrefix(item.definition, "=")
 		if item.flags&32 != 0 {
 			name = "_xlnm." + name
 		}
-		if item.scope == math.MaxUint32 {
-			w.NamedRanges[name] = definition
-			continue
-		}
-		if item.scope < uint32(len(b.sheetNames)) {
-			sheet := b.sheetNames[item.scope]
-			if w.LocalNamedRanges[sheet] == nil {
-				w.LocalNamedRanges[sheet] = make(map[string]string)
+		scope := ""
+		if item.scope != math.MaxUint32 {
+			if item.scope >= uint32(len(b.sheetNames)) {
+				continue
 			}
-			w.LocalNamedRanges[sheet][name] = definition
+			scope = b.sheetNames[item.scope]
 		}
+		registerWorkbookName(w.NamedRanges, w.LocalNamedRanges, scope, name, definition)
 	}
 }

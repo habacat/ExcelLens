@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"excellens/internal/excelformula"
 	"excellens/internal/valueconv"
 )
 
@@ -38,19 +39,7 @@ func (e *formulaEval) dateSerial(t time.Time) *big.Rat {
 
 // ExcelDateSerial maps a calendar date to an Excel day in the workbook's
 // compatibility date system. Serial 60 in the 1900 system has no time.Time.
-func ExcelDateSerial(t time.Time, date1904 bool) int64 {
-	y, m, d := t.Date()
-	t = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	base := time.Date(1899, 12, 31, 0, 0, 0, 0, time.UTC)
-	if date1904 {
-		base = time.Date(1904, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	days := (t.Unix() - base.Unix()) / 86400
-	if !date1904 && !t.Before(time.Date(1900, 3, 1, 0, 0, 0, 0, time.UTC)) {
-		days++
-	}
-	return days
-}
+func ExcelDateSerial(t time.Time, date1904 bool) int64 { return excelformula.Serial(t, date1904) }
 func (e *formulaEval) serialTime(v FormulaValue) (time.Time, int64, error) {
 	if v.Kind == "text" {
 		s := strings.TrimSpace(v.Text)
@@ -75,7 +64,7 @@ func (e *formulaEval) serialTime(v FormulaValue) (time.Time, int64, error) {
 		return time.Time{}, 0, errors.New("#VALUE! 无效日期或时间")
 	}
 	whole := floorInteger(n)
-	if !whole.IsInt64() || whole.Int64() < 0 || whole.Int64() > 2958465 {
+	if !whole.IsInt64() || whole.Int64() < 0 || whole.Int64() > excelformula.MaxSerial(e.date1904) {
 		return time.Time{}, 0, errors.New("#NUM! 日期序号越界")
 	}
 	days := whole.Int64()
@@ -137,20 +126,11 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 		if err != nil {
 			return FormulaValue{}, err
 		}
-		if y >= 0 && y < 1900 {
-			y += 1900
-		}
-		if y < 1900 || y > 9999 || m < -120000 || m > 120000 || d < -1000000 || d > 1000000 {
+		serial, ok := excelformula.Date(y, m, d, e.date1904)
+		if !ok {
 			return FormulaValue{}, errors.New("#NUM! 日期参数越界")
 		}
-		if !e.date1904 && y == 1900 && m == 2 && d == 29 {
-			return integerResult(60)
-		}
-		t := time.Date(int(y), time.Month(m), int(d), 0, 0, 0, 0, time.UTC)
-		if t.Year() < 1900 || t.Year() > 9999 {
-			return FormulaValue{}, errors.New("#NUM! 日期越界")
-		}
-		return numberResult(e.dateSerial(t))
+		return integerResult(serial)
 	case "TIME":
 		h, err := integer(0, 0)
 		if err != nil {
@@ -173,7 +153,6 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 	if err != nil {
 		return FormulaValue{}, err
 	}
-	fake := !e.date1904 && serial == 60
 	switch n.op {
 	case "DATEVALUE":
 		if vals[0].Kind != "text" || !strings.ContainsAny(vals[0].Text, "-/年月日.") {
@@ -182,24 +161,16 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 		return numberResult(e.dateSerial(t))
 	case "TIMEVALUE":
 		return numberResult(big.NewRat(int64(t.Hour()*3600+t.Minute()*60+t.Second())*1e9+int64(t.Nanosecond()), 86400*1e9))
-	case "YEAR":
-		if !e.date1904 && serial == 0 {
-			return integerResult(1900)
+	case "YEAR", "MONTH", "DAY":
+		y, m, d, _ := excelformula.DateParts(serial, e.date1904)
+		switch n.op {
+		case "YEAR":
+			return integerResult(int64(y))
+		case "MONTH":
+			return integerResult(int64(m))
+		default:
+			return integerResult(int64(d))
 		}
-		return integerResult(int64(t.Year()))
-	case "MONTH":
-		if !e.date1904 && serial == 0 {
-			return integerResult(1)
-		}
-		return integerResult(int64(t.Month()))
-	case "DAY":
-		if !e.date1904 && serial == 0 {
-			return integerResult(0)
-		}
-		if fake {
-			return integerResult(29)
-		}
-		return integerResult(int64(t.Day()))
 	case "HOUR":
 		return integerResult(int64(t.Hour()))
 	case "MINUTE":
@@ -214,22 +185,9 @@ func dateFunction(e *formulaEval, n *formulaNode) (FormulaValue, error) {
 		if err != nil {
 			return FormulaValue{}, err
 		}
-		weekday := int(t.Weekday())
-		if !e.date1904 && serial < 61 {
-			weekday = (weekday + 6) % 7
-		}
-		if kind == 1 {
-			return integerResult(int64(weekday + 1))
-		}
-		if kind == 2 {
-			return integerResult(int64((weekday+6)%7 + 1))
-		}
-		if kind == 3 {
-			return integerResult(int64((weekday + 6) % 7))
-		}
-		if kind >= 11 && kind <= 17 {
-			start := int(kind-10) % 7
-			return integerResult(int64((weekday-start+7)%7 + 1))
+		_, _, _, weekday := excelformula.DateParts(serial, e.date1904)
+		if day, ok := excelformula.Weekday(weekday, kind); ok {
+			return integerResult(int64(day))
 		}
 		return FormulaValue{}, errors.New("#NUM! WEEKDAY 类型无效")
 	case "WEEKNUM":

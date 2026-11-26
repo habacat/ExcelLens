@@ -81,12 +81,16 @@ func (p *xlsbSSTPage) readHeader(file *os.File, pos, end int64, readAhead int) (
 	return binary.LittleEndian.Uint64(data), nil
 }
 
-func xlsbPreviewStrings(part *zip.File) (func(uint32) (xlsbString, error), func() error, error) {
+func xlsbPreviewStrings(part *zip.File, wrap func(io.Reader) io.Reader) (func(uint32) (xlsbString, error), func() error, error) {
 	input, err := part.Open()
 	if err != nil {
 		return nil, nil, err
 	}
-	record := newXLSBRecords(io.LimitReader(input, 8<<20))
+	var source io.Reader = io.LimitReader(input, 8<<20)
+	if wrap != nil {
+		source = wrap(source)
+	}
+	record := newXLSBRecords(source)
 	var prefix []xlsbString
 	used := 0
 	get := func(id uint32) (xlsbString, error) {

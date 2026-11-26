@@ -11,6 +11,8 @@ cmd/excellens              启动、单实例、托盘与本机服务装配
 internal/formats           格式支持名单、源类型语义、容量和显示能力
 internal/valueconv         显式日期/时间解析；只处理调用方给出的短文本
 internal/sourceview        声明式来源范围、筛选/排序和显隐设置；不读工作簿
+internal/conditional       条件表达式编译、A1 引用解析及工作表统计磁盘索引
+internal/excelformula       两种 Excel 日期系统、精确舍入、文本通配符和二进制累加
 internal/workbook          格式适配、源值/布局、索引、缓存与查询
 internal/onlinedb          数据库协议、只读目录、逐行类型转换
 internal/archives          容器目录、按需提取、完整性及缓存固定
@@ -56,14 +58,16 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | opc | Go 标准库 |
 | separated | 不依赖其他项目包 |
 | analysis | valueconv、sourceview、formats（统一文本映射容量） |
-| workbook | fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
+| conditional | formats、excelformula |
+| excelformula | 无内部依赖 |
+| workbook | conditional、excelformula、fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
 | onlinedb | formats |
 | savedconfig | Go 标准库 |
 | transferjobs | localstore、savedconfig |
 | searchresults | formats、separated |
 | searchservice | workbook、checkpoint、formats、searchresults |
 | archives | formats、workbook |
-| calculator | analysis、valueconv、formats（统一地址容量） |
+| calculator | excelformula、analysis、valueconv、formats（统一地址容量） |
 | reconcile | analysis、workbook、formats |
 | recipe | analysis、sourceview |
 | export | workbook、formats（统一快照样式容量）、separated |

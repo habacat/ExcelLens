@@ -1,0 +1,828 @@
+[
+  {
+    "epoch": "1900",
+    "cases": [
+      {
+        "ref": "F2",
+        "group": "scoped-names",
+        "formula": "AND(Period=\"month\",Cutoff=42)",
+        "highlight": true
+      },
+      {
+        "ref": "F3",
+        "group": "scoped-names",
+        "formula": "AND(Period=\"half\",Cutoff=42)",
+        "highlight": false
+      },
+      {
+        "ref": "F4",
+        "group": "scoped-names",
+        "formula": "LocalCut=9",
+        "highlight": true
+      },
+      {
+        "ref": "F5",
+        "group": "scoped-names",
+        "formula": "LocalCut=42",
+        "highlight": false
+      },
+      {
+        "ref": "F6",
+        "group": "scoped-names",
+        "formula": "ABS(Cutoff-LocalCut)=33",
+        "highlight": true
+      },
+      {
+        "ref": "F7",
+        "group": "range-and-types",
+        "formula": "SUM($A$2:$A$6)=9",
+        "highlight": true
+      },
+      {
+        "ref": "F8",
+        "group": "range-and-types",
+        "formula": "COUNT($A$2:$A$6)=2",
+        "highlight": true
+      },
+      {
+        "ref": "F9",
+        "group": "range-and-types",
+        "formula": "COUNTA($A$2:$A$8)=6",
+        "highlight": true
+      },
+      {
+        "ref": "F10",
+        "group": "range-and-types",
+        "formula": "COUNTBLANK($A$2:$A$8)=2",
+        "highlight": true
+      },
+      {
+        "ref": "F11",
+        "group": "range-and-types",
+        "formula": "AVERAGE($A$2:$A$6)=4.5",
+        "highlight": true
+      },
+      {
+        "ref": "F12",
+        "group": "range-and-types",
+        "formula": "SUM($A$4,$A$5)=0",
+        "highlight": true
+      },
+      {
+        "ref": "F13",
+        "group": "range-and-types",
+        "formula": "SUM(\"4\",TRUE)=5",
+        "highlight": true
+      },
+      {
+        "ref": "F14",
+        "group": "range-and-types",
+        "formula": "ISTEXT($A$4)",
+        "highlight": true
+      },
+      {
+        "ref": "F15",
+        "group": "range-and-types",
+        "formula": "ISNUMBER($A$4)",
+        "highlight": false
+      },
+      {
+        "ref": "F16",
+        "group": "range-and-types",
+        "formula": "ISBLANK($A$6)",
+        "highlight": true
+      },
+      {
+        "ref": "F17",
+        "group": "range-and-types",
+        "formula": "ISBLANK($A$7)",
+        "highlight": false
+      },
+      {
+        "ref": "F18",
+        "group": "range-and-types",
+        "formula": "ISLOGICAL($A$5)",
+        "highlight": true
+      },
+      {
+        "ref": "F19",
+        "group": "range-and-types",
+        "formula": "ISNA($A$8)",
+        "highlight": true
+      },
+      {
+        "ref": "F20",
+        "group": "criteria",
+        "formula": "COUNTIF($B$2:$B$8,\"k\")=3",
+        "highlight": true
+      },
+      {
+        "ref": "F21",
+        "group": "criteria",
+        "formula": "COUNTIF($A$2:$A$8,\"4\")=1",
+        "highlight": true
+      },
+      {
+        "ref": "F22",
+        "group": "criteria",
+        "formula": "COUNTIF($A$2:$A$8,\"\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F23",
+        "group": "criteria",
+        "formula": "COUNTIF($B$2:$B$8,\"k*\")=3",
+        "highlight": true
+      },
+      {
+        "ref": "F24",
+        "group": "criteria",
+        "formula": "COUNTIFS($B$2:$B$8,\"k\",$C$2:$C$8,\">0\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F25",
+        "group": "criteria",
+        "formula": "SUMIF($B$2:$B$8,\"k\",$C$2:$C$8)=3",
+        "highlight": true
+      },
+      {
+        "ref": "F26",
+        "group": "criteria",
+        "formula": "SUMIFS($C$2:$C$8,$B$2:$B$8,\"k\",$C$2:$C$8,\">0\")=5.2",
+        "highlight": true
+      },
+      {
+        "ref": "F27",
+        "group": "criteria",
+        "formula": "MATCH(\"k\",$B$2:$B$8,0)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F28",
+        "group": "criteria",
+        "formula": "MATCH(\"x\",$B$2:$B$8,0)=3",
+        "highlight": true
+      },
+      {
+        "ref": "F29",
+        "group": "criteria",
+        "formula": "ISNA(MATCH(\"absent\",$B$2:$B$8,0))",
+        "highlight": true
+      },
+      {
+        "ref": "F30",
+        "group": "errors-and-logic",
+        "formula": "IFERROR($A$8,7)=7",
+        "highlight": true
+      },
+      {
+        "ref": "F31",
+        "group": "errors-and-logic",
+        "formula": "ISERROR(1/0)",
+        "highlight": true
+      },
+      {
+        "ref": "F32",
+        "group": "errors-and-logic",
+        "formula": "ISERR($A$8)",
+        "highlight": false
+      },
+      {
+        "ref": "F33",
+        "group": "errors-and-logic",
+        "formula": "ISNA($A$8)",
+        "highlight": true
+      },
+      {
+        "ref": "F34",
+        "group": "errors-and-logic",
+        "formula": "AND($A$6,TRUE)",
+        "highlight": true
+      },
+      {
+        "ref": "F35",
+        "group": "errors-and-logic",
+        "formula": "OR(FALSE,$A$5)",
+        "highlight": true
+      },
+      {
+        "ref": "F36",
+        "group": "errors-and-logic",
+        "formula": "IF(FALSE,1/0,5)=5",
+        "highlight": true
+      },
+      {
+        "ref": "F37",
+        "group": "errors-and-logic",
+        "formula": "_xlfn.IFNA($A$8,12)=12",
+        "highlight": true
+      },
+      {
+        "ref": "F38",
+        "group": "errors-and-logic",
+        "formula": "ISERROR(PRODUCT(1E300,1E300))",
+        "highlight": true
+      },
+      {
+        "ref": "F39",
+        "group": "date-and-number",
+        "formula": "ROUND(1.25,1)=1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F40",
+        "group": "date-and-number",
+        "formula": "ROUND(-1.25,1)=-1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F41",
+        "group": "date-and-number",
+        "formula": "ROUNDDOWN(-1.29,1)=-1.2",
+        "highlight": true
+      },
+      {
+        "ref": "F42",
+        "group": "date-and-number",
+        "formula": "ROUNDUP(-1.21,1)=-1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F43",
+        "group": "date-and-number",
+        "formula": "MOD(-3,2)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F44",
+        "group": "date-and-number",
+        "formula": "0.1+0.2=0.3",
+        "highlight": true
+      },
+      {
+        "ref": "F45",
+        "group": "date-and-number",
+        "formula": "1/3*3=1",
+        "highlight": true
+      },
+      {
+        "ref": "F46",
+        "group": "date-and-number",
+        "formula": "1+1E-16=1",
+        "highlight": true
+      },
+      {
+        "ref": "F47",
+        "group": "date-and-number",
+        "formula": "1+1E-14>1",
+        "highlight": true
+      },
+      {
+        "ref": "F48",
+        "group": "date-and-number",
+        "formula": "1+4E-15=1",
+        "highlight": true
+      },
+      {
+        "ref": "F49",
+        "group": "date-and-number",
+        "formula": "1+5E-15=1",
+        "highlight": false
+      },
+      {
+        "ref": "F50",
+        "group": "date-and-number",
+        "formula": "0.1+0.2-0.3=0",
+        "highlight": false
+      },
+      {
+        "ref": "F51",
+        "group": "date-and-number",
+        "formula": "SUM(1E16,1,-1E16)=0",
+        "highlight": true
+      },
+      {
+        "ref": "F52",
+        "group": "date-and-number",
+        "formula": "DATE(1900,3,0)=60",
+        "highlight": true
+      },
+      {
+        "ref": "F53",
+        "group": "date-and-number",
+        "formula": "WEEKDAY(1)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F54",
+        "group": "date-and-number",
+        "formula": "YEAR(0)=1904",
+        "highlight": false
+      },
+      {
+        "ref": "F55",
+        "group": "date-and-number",
+        "formula": "MONTH(0)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F56",
+        "group": "date-and-number",
+        "formula": "DATE(9999,12,31)>2900000",
+        "highlight": true
+      },
+      {
+        "ref": "F57",
+        "group": "date-and-number",
+        "formula": "DAY(60)=29",
+        "highlight": true
+      },
+      {
+        "ref": "F58",
+        "group": "date-and-number",
+        "formula": "WEEKDAY(60,2)=3",
+        "highlight": true
+      },
+      {
+        "ref": "F59",
+        "group": "text-and-wildcards",
+        "formula": "LEFT(\"编号001\",2)=\"编号\"",
+        "highlight": true
+      },
+      {
+        "ref": "F60",
+        "group": "text-and-wildcards",
+        "formula": "EXACT(\"A\",\"a\")",
+        "highlight": false
+      },
+      {
+        "ref": "F61",
+        "group": "text-and-wildcards",
+        "formula": "SEARCH(\"a~*\",\"xa*b\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F62",
+        "group": "text-and-wildcards",
+        "formula": "ISERROR(SEARCH(\"\",\"abc\",4))",
+        "highlight": true
+      },
+      {
+        "ref": "F63",
+        "group": "text-and-wildcards",
+        "formula": "FIND(\"\",\"abc\",4)=4",
+        "highlight": true
+      },
+      {
+        "ref": "F64",
+        "group": "text-and-wildcards",
+        "formula": "LEN(TRIM(\"  a b  \"))=3",
+        "highlight": true
+      },
+      {
+        "ref": "G2",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G3",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": true
+      },
+      {
+        "ref": "G4",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G5",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G6",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      }
+    ]
+  },
+  {
+    "epoch": "1904",
+    "cases": [
+      {
+        "ref": "F2",
+        "group": "scoped-names",
+        "formula": "AND(Period=\"month\",Cutoff=42)",
+        "highlight": true
+      },
+      {
+        "ref": "F3",
+        "group": "scoped-names",
+        "formula": "AND(Period=\"half\",Cutoff=42)",
+        "highlight": false
+      },
+      {
+        "ref": "F4",
+        "group": "scoped-names",
+        "formula": "LocalCut=9",
+        "highlight": true
+      },
+      {
+        "ref": "F5",
+        "group": "scoped-names",
+        "formula": "LocalCut=42",
+        "highlight": false
+      },
+      {
+        "ref": "F6",
+        "group": "scoped-names",
+        "formula": "ABS(Cutoff-LocalCut)=33",
+        "highlight": true
+      },
+      {
+        "ref": "F7",
+        "group": "range-and-types",
+        "formula": "SUM($A$2:$A$6)=9",
+        "highlight": true
+      },
+      {
+        "ref": "F8",
+        "group": "range-and-types",
+        "formula": "COUNT($A$2:$A$6)=2",
+        "highlight": true
+      },
+      {
+        "ref": "F9",
+        "group": "range-and-types",
+        "formula": "COUNTA($A$2:$A$8)=6",
+        "highlight": true
+      },
+      {
+        "ref": "F10",
+        "group": "range-and-types",
+        "formula": "COUNTBLANK($A$2:$A$8)=2",
+        "highlight": true
+      },
+      {
+        "ref": "F11",
+        "group": "range-and-types",
+        "formula": "AVERAGE($A$2:$A$6)=4.5",
+        "highlight": true
+      },
+      {
+        "ref": "F12",
+        "group": "range-and-types",
+        "formula": "SUM($A$4,$A$5)=0",
+        "highlight": true
+      },
+      {
+        "ref": "F13",
+        "group": "range-and-types",
+        "formula": "SUM(\"4\",TRUE)=5",
+        "highlight": true
+      },
+      {
+        "ref": "F14",
+        "group": "range-and-types",
+        "formula": "ISTEXT($A$4)",
+        "highlight": true
+      },
+      {
+        "ref": "F15",
+        "group": "range-and-types",
+        "formula": "ISNUMBER($A$4)",
+        "highlight": false
+      },
+      {
+        "ref": "F16",
+        "group": "range-and-types",
+        "formula": "ISBLANK($A$6)",
+        "highlight": true
+      },
+      {
+        "ref": "F17",
+        "group": "range-and-types",
+        "formula": "ISBLANK($A$7)",
+        "highlight": false
+      },
+      {
+        "ref": "F18",
+        "group": "range-and-types",
+        "formula": "ISLOGICAL($A$5)",
+        "highlight": true
+      },
+      {
+        "ref": "F19",
+        "group": "range-and-types",
+        "formula": "ISNA($A$8)",
+        "highlight": true
+      },
+      {
+        "ref": "F20",
+        "group": "criteria",
+        "formula": "COUNTIF($B$2:$B$8,\"k\")=3",
+        "highlight": true
+      },
+      {
+        "ref": "F21",
+        "group": "criteria",
+        "formula": "COUNTIF($A$2:$A$8,\"4\")=1",
+        "highlight": true
+      },
+      {
+        "ref": "F22",
+        "group": "criteria",
+        "formula": "COUNTIF($A$2:$A$8,\"\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F23",
+        "group": "criteria",
+        "formula": "COUNTIF($B$2:$B$8,\"k*\")=3",
+        "highlight": true
+      },
+      {
+        "ref": "F24",
+        "group": "criteria",
+        "formula": "COUNTIFS($B$2:$B$8,\"k\",$C$2:$C$8,\">0\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F25",
+        "group": "criteria",
+        "formula": "SUMIF($B$2:$B$8,\"k\",$C$2:$C$8)=3",
+        "highlight": true
+      },
+      {
+        "ref": "F26",
+        "group": "criteria",
+        "formula": "SUMIFS($C$2:$C$8,$B$2:$B$8,\"k\",$C$2:$C$8,\">0\")=5.2",
+        "highlight": true
+      },
+      {
+        "ref": "F27",
+        "group": "criteria",
+        "formula": "MATCH(\"k\",$B$2:$B$8,0)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F28",
+        "group": "criteria",
+        "formula": "MATCH(\"x\",$B$2:$B$8,0)=3",
+        "highlight": true
+      },
+      {
+        "ref": "F29",
+        "group": "criteria",
+        "formula": "ISNA(MATCH(\"absent\",$B$2:$B$8,0))",
+        "highlight": true
+      },
+      {
+        "ref": "F30",
+        "group": "errors-and-logic",
+        "formula": "IFERROR($A$8,7)=7",
+        "highlight": true
+      },
+      {
+        "ref": "F31",
+        "group": "errors-and-logic",
+        "formula": "ISERROR(1/0)",
+        "highlight": true
+      },
+      {
+        "ref": "F32",
+        "group": "errors-and-logic",
+        "formula": "ISERR($A$8)",
+        "highlight": false
+      },
+      {
+        "ref": "F33",
+        "group": "errors-and-logic",
+        "formula": "ISNA($A$8)",
+        "highlight": true
+      },
+      {
+        "ref": "F34",
+        "group": "errors-and-logic",
+        "formula": "AND($A$6,TRUE)",
+        "highlight": true
+      },
+      {
+        "ref": "F35",
+        "group": "errors-and-logic",
+        "formula": "OR(FALSE,$A$5)",
+        "highlight": true
+      },
+      {
+        "ref": "F36",
+        "group": "errors-and-logic",
+        "formula": "IF(FALSE,1/0,5)=5",
+        "highlight": true
+      },
+      {
+        "ref": "F37",
+        "group": "errors-and-logic",
+        "formula": "_xlfn.IFNA($A$8,12)=12",
+        "highlight": true
+      },
+      {
+        "ref": "F38",
+        "group": "errors-and-logic",
+        "formula": "ISERROR(PRODUCT(1E300,1E300))",
+        "highlight": true
+      },
+      {
+        "ref": "F39",
+        "group": "date-and-number",
+        "formula": "ROUND(1.25,1)=1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F40",
+        "group": "date-and-number",
+        "formula": "ROUND(-1.25,1)=-1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F41",
+        "group": "date-and-number",
+        "formula": "ROUNDDOWN(-1.29,1)=-1.2",
+        "highlight": true
+      },
+      {
+        "ref": "F42",
+        "group": "date-and-number",
+        "formula": "ROUNDUP(-1.21,1)=-1.3",
+        "highlight": true
+      },
+      {
+        "ref": "F43",
+        "group": "date-and-number",
+        "formula": "MOD(-3,2)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F44",
+        "group": "date-and-number",
+        "formula": "0.1+0.2=0.3",
+        "highlight": true
+      },
+      {
+        "ref": "F45",
+        "group": "date-and-number",
+        "formula": "1/3*3=1",
+        "highlight": true
+      },
+      {
+        "ref": "F46",
+        "group": "date-and-number",
+        "formula": "1+1E-16=1",
+        "highlight": true
+      },
+      {
+        "ref": "F47",
+        "group": "date-and-number",
+        "formula": "1+1E-14>1",
+        "highlight": true
+      },
+      {
+        "ref": "F48",
+        "group": "date-and-number",
+        "formula": "1+4E-15=1",
+        "highlight": true
+      },
+      {
+        "ref": "F49",
+        "group": "date-and-number",
+        "formula": "1+5E-15=1",
+        "highlight": false
+      },
+      {
+        "ref": "F50",
+        "group": "date-and-number",
+        "formula": "0.1+0.2-0.3=0",
+        "highlight": false
+      },
+      {
+        "ref": "F51",
+        "group": "date-and-number",
+        "formula": "SUM(1E16,1,-1E16)=0",
+        "highlight": true
+      },
+      {
+        "ref": "F52",
+        "group": "date-and-number",
+        "formula": "DATE(1900,3,0)=60",
+        "highlight": false
+      },
+      {
+        "ref": "F53",
+        "group": "date-and-number",
+        "formula": "WEEKDAY(1)=1",
+        "highlight": false
+      },
+      {
+        "ref": "F54",
+        "group": "date-and-number",
+        "formula": "YEAR(0)=1904",
+        "highlight": true
+      },
+      {
+        "ref": "F55",
+        "group": "date-and-number",
+        "formula": "MONTH(0)=1",
+        "highlight": true
+      },
+      {
+        "ref": "F56",
+        "group": "date-and-number",
+        "formula": "DATE(9999,12,31)>2900000",
+        "highlight": true
+      },
+      {
+        "ref": "F57",
+        "group": "date-and-number",
+        "formula": "DAY(60)=29",
+        "highlight": false
+      },
+      {
+        "ref": "F58",
+        "group": "date-and-number",
+        "formula": "WEEKDAY(60,2)=3",
+        "highlight": false
+      },
+      {
+        "ref": "F59",
+        "group": "text-and-wildcards",
+        "formula": "LEFT(\"编号001\",2)=\"编号\"",
+        "highlight": true
+      },
+      {
+        "ref": "F60",
+        "group": "text-and-wildcards",
+        "formula": "EXACT(\"A\",\"a\")",
+        "highlight": false
+      },
+      {
+        "ref": "F61",
+        "group": "text-and-wildcards",
+        "formula": "SEARCH(\"a~*\",\"xa*b\")=2",
+        "highlight": true
+      },
+      {
+        "ref": "F62",
+        "group": "text-and-wildcards",
+        "formula": "ISERROR(SEARCH(\"\",\"abc\",4))",
+        "highlight": true
+      },
+      {
+        "ref": "F63",
+        "group": "text-and-wildcards",
+        "formula": "FIND(\"\",\"abc\",4)=4",
+        "highlight": true
+      },
+      {
+        "ref": "F64",
+        "group": "text-and-wildcards",
+        "formula": "LEN(TRIM(\"  a b  \"))=3",
+        "highlight": true
+      },
+      {
+        "ref": "G2",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G3",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": true
+      },
+      {
+        "ref": "G4",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G5",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      },
+      {
+        "ref": "G6",
+        "group": "relative",
+        "formula": "AND(ISNUMBER($A2),$A2>3)",
+        "highlight": false
+      }
+    ]
+  }
+]

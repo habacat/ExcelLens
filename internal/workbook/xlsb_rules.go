@@ -249,7 +249,7 @@ func (w *Workbook) loadXLSBConditional(ctx context.Context, meta SheetMeta) (*So
 					}
 					extensionOwners[rule.guid] = len(result.rules)
 				}
-				result.rules = append(result.rules, compileSourceConditionalRule(rule.SourceConditionalRule, group, meta.Name))
+				result.rules = append(result.rules, w.compileSourceConditionalRule(rule.SourceConditionalRule, group, meta.Name))
 			}
 			rule = nil
 		case brtCFRuleExt:

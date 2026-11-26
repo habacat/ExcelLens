@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"excellens/internal/excelformula"
 	"excellens/internal/formats"
 )
 
@@ -39,8 +40,10 @@ func (e *ConditionalEvaluator) evalAggregate(op string, args []*conditionalExpr,
 	var count, nonEmpty int64
 	addNumber := func(r *big.Rat) bool {
 		count++
-		if op == "SUM" || op == "AVERAGE" {
-			sum.Add(sum, r)
+		if (op == "SUM" || op == "AVERAGE") && sum != nil {
+			if !excelformula.AddFloat(sum, r) {
+				sum = nil
+			}
 		}
 		if op == "PRODUCT" && prod != nil {
 			prod.Mul(prod, r)
@@ -59,7 +62,7 @@ func (e *ConditionalEvaluator) evalAggregate(op string, args []*conditionalExpr,
 		return true
 	}
 	for _, arg := range args {
-		if arg.kind == cfExprRange {
+		if arg.Kind == cfExprRange {
 			data, refErr, notice, err := e.loadRange(arg, group)
 			if notice != "" || err != nil {
 				return conditionalValue{}, notice, err
@@ -115,7 +118,7 @@ func (e *ConditionalEvaluator) evalAggregate(op string, args []*conditionalExpr,
 			}
 			return v, "", nil
 		}
-		if arg.kind == cfExprRef {
+		if arg.Kind == cfExprRef {
 			// Single cell references in SUM/MIN/MAX/COUNT ignore text, booleans and blanks.
 			if v.kind == "number" {
 				r, ok := valueToRat(v)
@@ -154,12 +157,18 @@ func (e *ConditionalEvaluator) evalAggregate(op string, args []*conditionalExpr,
 	case "COUNTA":
 		return conditionalIntVal(nonEmpty), "", nil
 	case "SUM":
-		return ratToConditionalValue(sum), "", nil
+		if sum == nil {
+			return conditionalErrorVal("#NUM!"), "", nil
+		}
+		return conditionalSumResult(sum), "", nil
 	case "AVERAGE":
 		if count == 0 {
 			return conditionalErrorVal("#DIV/0!"), "", nil
 		}
-		return ratToConditionalValue(sum.Quo(sum, big.NewRat(count, 1))), "", nil
+		if sum == nil {
+			return conditionalErrorVal("#NUM!"), "", nil
+		}
+		return conditionalSumResult(sum.Quo(sum, big.NewRat(count, 1))), "", nil
 	case "MIN":
 		if minVal == nil {
 			return conditionalIntVal(0), "", nil
@@ -193,11 +202,7 @@ func (e *ConditionalEvaluator) compileCFCriterion(v conditionalValue) cfCriterio
 	op := "="
 	rhs := v
 	if v.kind == "blank" {
-		// In Excel, a blank cell passed as COUNTIF/SUMIF criteria evaluates as numeric 0,
-		// NOT as matching empty cells (which requires explicit "" criteria).
-		return func(x conditionalValue) (bool, string) {
-			return x.kind == "number" && !conditionalValueIsNonZero(x), ""
-		}
+		rhs = conditionalIntVal(0)
 	}
 	if v.kind == "text" {
 		s := v.text
@@ -228,7 +233,7 @@ func (e *ConditionalEvaluator) compileCFCriterion(v conditionalValue) cfCriterio
 		} else if strings.EqualFold(s, "FALSE") {
 			rhs = conditionalBoolVal(false)
 		} else if strings.ContainsAny(s, "*?~") && (op == "=" || op == "<>") {
-			tokens := parseExcelWildcard(s, true)
+			tokens := excelformula.Wildcard(s, true)
 			return func(x conditionalValue) (bool, string) {
 				matched := false
 				if x.kind == "text" {
@@ -379,9 +384,9 @@ func (e *ConditionalEvaluator) evalSumIf(args []*conditionalExpr, group *conditi
 			return conditionalErrorVal("#REF!"), "", nil
 		}
 		sumExpr := &conditionalExpr{
-			kind:   cfExprRange,
-			ref:    conditionalReference{row: sr1, col: sc1, absoluteRow: true, absoluteCol: true},
-			endRef: conditionalReference{row: sr2, col: sc2, absoluteRow: true, absoluteCol: true},
+			Kind:   cfExprRange,
+			Ref:    conditionalReference{ForeignSheet: args[2].Ref.ForeignSheet, Row: sr1, Col: sc1, AbsoluteRow: true, AbsoluteCol: true},
+			EndRef: conditionalReference{Row: sr2, Col: sc2, AbsoluteRow: true, AbsoluteCol: true},
 		}
 		sumRange, refErr, notice, err = e.loadRange(sumExpr, group)
 		if notice != "" || err != nil {
@@ -534,14 +539,16 @@ func (e *ConditionalEvaluator) evalMultiCriteria(ranges []conditionalRangeData, 
 				if !ok {
 					return conditionalErrorVal("#NUM!"), "", nil
 				}
-				sum.Add(sum, r)
+				if !excelformula.AddFloat(sum, r) {
+					return conditionalErrorVal("#NUM!"), "", nil
+				}
 			}
 		}
 	}
 	if sumRange == nil {
 		return conditionalIntVal(count), "", nil
 	}
-	return ratToConditionalValue(sum), "", nil
+	return conditionalSumResult(sum), "", nil
 }
 
 func (e *ConditionalEvaluator) evalMatch(args []*conditionalExpr, group *conditionalGroup) (conditionalValue, string, error) {
@@ -551,6 +558,9 @@ func (e *ConditionalEvaluator) evalMatch(args []*conditionalExpr, group *conditi
 	}
 	if lookup.kind == "error" {
 		return lookup, "", nil
+	}
+	if lookup.kind == "blank" {
+		lookup = conditionalIntVal(0)
 	}
 	data, refErr, notice, err := e.loadRange(args[1], group)
 	if notice != "" || err != nil {
@@ -583,9 +593,9 @@ func (e *ConditionalEvaluator) evalMatch(args []*conditionalExpr, group *conditi
 		return item.col - data.c1 + 1
 	}
 	if matchType == 0 {
-		var wild []cfWildcardToken
+		var wild []excelformula.Token
 		if lookup.kind == "text" && strings.ContainsAny(lookup.text, "*?~") {
-			wild = parseExcelWildcard(lookup.text, false)
+			wild = excelformula.Wildcard(lookup.text, false)
 		}
 		for _, item := range data.cells {
 			if !e.spend(1) {

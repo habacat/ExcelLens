@@ -99,21 +99,22 @@ func (q *queryController) waitAndRelease() {
 }
 
 type IndexJob struct {
-	mu         sync.RWMutex
-	ID         string
-	Sheet      string
-	Path       string
-	Status     string
-	Stage      string
-	Progress   float64
-	DoneBytes  int64
-	TotalBytes int64
-	Error      string
-	Index      *workbook.SheetIndex
-	Started    time.Time
-	cancel     context.CancelFunc
-	ctx        context.Context
-	done       chan struct{}
+	mu                  sync.RWMutex
+	ID                  string
+	Sheet               string
+	Path                string
+	Status              string
+	Stage               string
+	Progress            float64
+	DoneBytes           int64
+	TotalBytes          int64
+	DoneRows, TotalRows int
+	Error               string
+	Index               *workbook.SheetIndex
+	Started             time.Time
+	cancel              context.CancelFunc
+	ctx                 context.Context
+	done                chan struct{}
 }
 
 type FilterJob struct {

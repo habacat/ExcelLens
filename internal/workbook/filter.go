@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode"
 
+	"excellens/internal/excelformula"
 	"excellens/internal/formats"
 	"excellens/internal/sourceview"
 )
@@ -296,22 +296,6 @@ func compareSortNumeric(a, b string, af, bf float64) int {
 	return 0
 }
 
-func foldRune(r rune) rune {
-	if r < 0x80 {
-		if r >= 'a' && r <= 'z' {
-			return r - ('a' - 'A')
-		}
-		return r
-	}
-	minimum := r
-	for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
-		if folded < minimum {
-			minimum = folded
-		}
-	}
-	return minimum
-}
-
 // filterFoldKey is canonically equivalent to strings.EqualFold, not merely
 // ToLower. Unicode simple-fold groups include U+017F (long s) and the Kelvin
 // sign; dropping that distinction would make optimized filters incorrect.
@@ -329,7 +313,7 @@ func filterFoldKey(s string) string {
 	var out strings.Builder
 	out.Grow(len(s))
 	for _, r := range s {
-		out.WriteRune(foldRune(r))
+		out.WriteRune(excelformula.FoldRune(r))
 	}
 	return out.String()
 }

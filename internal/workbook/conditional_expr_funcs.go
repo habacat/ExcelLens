@@ -5,19 +5,33 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 
+	"excellens/internal/excelformula"
 	"excellens/internal/formats"
 )
 
-const (
-	maxExcelSerial1900 = 2958465 // 9999-12-31 in 1900 date system
-	maxExcelSerial1904 = 2957003 // 9999-12-31 in 1904 date system
-)
-
 func (e *ConditionalEvaluator) evalCall(node *conditionalExpr, group *conditionalGroup) (conditionalValue, string, error) {
-	switch node.op {
+	var indexIssue string
+	if e.indexed != nil {
+		switch node.Op {
+		case "COUNTIF", "COUNTIFS", "SUMIF", "SUMIFS", "MATCH", "SUM":
+			v, notice, err, handled := e.indexed(node, group)
+			if handled || err != nil {
+				return v, notice, err
+			}
+			indexIssue = notice
+		}
+	}
+	v, notice, err := e.evalBuiltin(node, group)
+	if indexIssue != "" && notice != "" {
+		notice = indexIssue + "；" + notice
+	}
+	return v, notice, err
+}
+
+func (e *ConditionalEvaluator) evalBuiltin(node *conditionalExpr, group *conditionalGroup) (conditionalValue, string, error) {
+	switch node.Op {
 	case "TRUE":
 		return conditionalBoolVal(true), "", nil
 	case "FALSE":
@@ -25,15 +39,15 @@ func (e *ConditionalEvaluator) evalCall(node *conditionalExpr, group *conditiona
 	case "NA":
 		return conditionalErrorVal("#N/A"), "", nil
 	case "IF":
-		return e.evalIf(node.args, group)
+		return e.evalIf(node.Args, group)
 	case "IFS":
-		return e.evalIfs(node.args, group)
+		return e.evalIfs(node.Args, group)
 	case "IFERROR", "IFNA":
-		return e.evalIfError(node.op, node.args, group)
+		return e.evalIfError(node.Op, node.Args, group)
 	case "AND", "OR", "XOR":
-		return e.evalLogical(node.op, node.args, group)
+		return e.evalLogical(node.Op, node.Args, group)
 	case "NOT":
-		v, notice, err := e.evalExpr(node.args[0], group)
+		v, notice, err := e.evalExpr(node.Args[0], group)
 		if notice != "" || err != nil {
 			return conditionalValue{}, notice, err
 		}
@@ -43,27 +57,27 @@ func (e *ConditionalEvaluator) evalCall(node *conditionalExpr, group *conditiona
 		}
 		return conditionalBoolVal(!b), "", nil
 	case "ISBLANK", "ISNUMBER", "ISTEXT", "ISNONTEXT", "ISLOGICAL", "ISERROR", "ISERR", "ISNA", "ISEVEN", "ISODD", "N", "T":
-		return e.evalInfo(node.op, node.args[0], group)
+		return e.evalInfo(node.Op, node.Args[0], group)
 	case "ROW", "COLUMN", "ROWS", "COLUMNS":
-		return e.evalPosition(node.op, node.args, group)
+		return e.evalPosition(node.Op, node.Args, group)
 	case "ABS", "SIGN", "INT", "TRUNC", "ROUND", "ROUNDUP", "ROUNDDOWN", "MOD", "QUOTIENT", "POWER", "SQRT":
-		return e.evalMathScalar(node.op, node.args, group)
+		return e.evalMathScalar(node.Op, node.Args, group)
 	case "SUM", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA", "COUNTBLANK", "PRODUCT":
-		return e.evalAggregate(node.op, node.args, group)
+		return e.evalAggregate(node.Op, node.Args, group)
 	case "LEN", "TRIM", "CLEAN", "LEFT", "RIGHT", "MID", "UPPER", "LOWER", "EXACT", "FIND", "SEARCH", "SUBSTITUTE", "REPLACE", "REPT", "CONCAT", "CONCATENATE", "VALUE":
-		return e.evalTextFunc(node.op, node.args, group)
+		return e.evalTextFunc(node.Op, node.Args, group)
 	case "COUNTIF":
-		return e.evalCountIf(node.args, group)
+		return e.evalCountIf(node.Args, group)
 	case "COUNTIFS":
-		return e.evalCountIfs(node.args, group)
+		return e.evalCountIfs(node.Args, group)
 	case "SUMIF":
-		return e.evalSumIf(node.args, group)
+		return e.evalSumIf(node.Args, group)
 	case "SUMIFS":
-		return e.evalSumIfs(node.args, group)
+		return e.evalSumIfs(node.Args, group)
 	case "MATCH":
-		return e.evalMatch(node.args, group)
+		return e.evalMatch(node.Args, group)
 	case "DATE", "YEAR", "MONTH", "DAY", "WEEKDAY":
-		return e.evalDateFunc(node.op, node.args, group)
+		return e.evalDateFunc(node.Op, node.Args, group)
 	}
 	return conditionalValue{}, "条件格式公式尚未求值", nil
 }
@@ -132,7 +146,7 @@ func (e *ConditionalEvaluator) evalLogical(op string, args []*conditionalExpr, g
 		}
 	}
 	for _, arg := range args {
-		if arg.kind == cfExprRange {
+		if arg.Kind == cfExprRange {
 			data, refErr, notice, err := e.loadRange(arg, group)
 			if notice != "" || err != nil {
 				return conditionalValue{}, notice, err
@@ -171,11 +185,11 @@ func (e *ConditionalEvaluator) evalLogical(op string, args []*conditionalExpr, g
 		case "number":
 			apply(conditionalValueIsNonZero(v))
 		case "blank":
-			if arg.kind != cfExprRef {
+			if arg.Kind != cfExprRef {
 				apply(false)
 			}
 		case "text":
-			if arg.kind == cfExprRef {
+			if arg.Kind == cfExprRef {
 				// Direct cell reference holding text is ignored in AND/OR/XOR in Excel.
 				continue
 			}
@@ -397,42 +411,13 @@ func ratTruncInt64(r *big.Rat) (int64, bool) {
 }
 
 func ratRound(r *big.Rat, digits int64, mode string) conditionalValue {
-	scale := new(big.Rat)
-	if digits >= 0 {
-		scale.SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(digits), nil))
-	} else {
-		scale.SetFrac(big.NewInt(1), new(big.Int).Exp(big.NewInt(10), big.NewInt(-digits), nil))
-	}
-	scaled := new(big.Rat).Mul(r, scale)
-	neg := scaled.Sign() < 0
-	abs := new(big.Rat).Abs(scaled)
-	q, rem := new(big.Int).QuoRem(abs.Num(), abs.Denom(), new(big.Int))
-	switch mode {
-	case "half":
-		// Excel rounds ties away from zero.
-		twice := new(big.Int).Lsh(rem, 1)
-		if twice.Cmp(abs.Denom()) >= 0 {
-			q.Add(q, big.NewInt(1))
-		}
-	case "up":
-		if rem.Sign() > 0 {
-			q.Add(q, big.NewInt(1))
-		}
-	case "down":
-		// already truncated toward zero
-	}
-	if neg {
-		q.Neg(q)
-	}
-	out := new(big.Rat).Quo(new(big.Rat).SetInt(q), scale)
-	return ratToConditionalValue(out)
+	return ratToConditionalValue(excelformula.Round(r, digits, mode))
 }
-
 func (e *ConditionalEvaluator) evalTextFunc(op string, args []*conditionalExpr, group *conditionalGroup) (conditionalValue, string, error) {
 	if op == "CONCAT" || op == "CONCATENATE" {
 		var b strings.Builder
 		for _, arg := range args {
-			if op == "CONCAT" && arg.kind == cfExprRange {
+			if op == "CONCAT" && arg.Kind == cfExprRange {
 				data, refErr, notice, err := e.loadRange(arg, group)
 				if notice != "" || err != nil {
 					return conditionalValue{}, notice, err
@@ -618,7 +603,7 @@ func (e *ConditionalEvaluator) evalTextFunc(op string, args []*conditionalExpr, 
 			}
 			return conditionalIntVal(start + int64(utf8.RuneCountInString(sub[:idx]))), "", nil
 		}
-		pos, complete := e.wildcardPosition(parseExcelWildcard(needle, false), hayRunes[start-1:], true)
+		pos, complete := e.wildcardPosition(excelformula.Wildcard(needle, false), hayRunes[start-1:], true)
 		if !complete {
 			return conditionalValue{}, conditionalWorkNotice, nil
 		}
@@ -755,40 +740,9 @@ func substituteNth(s, oldStr, newStr string, n int64) string {
 	}
 }
 
-type cfWildcardToken struct {
-	kind byte // 'c' literal rune, '?' any single rune, '*' zero or more runes
-	r    rune
-}
-
-// Criteria use ~ to escape ?, * or ~. SEARCH and MATCH also consume
-// the escape before ordinary characters and ignore a trailing escape.
-func parseExcelWildcard(pattern string, criteria bool) []cfWildcardToken {
-	runes := []rune(pattern)
-	tokens := make([]cfWildcardToken, 0, len(runes))
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		switch r {
-		case '~':
-			if i+1 < len(runes) && (!criteria || strings.ContainsRune("*?~", runes[i+1])) {
-				i++
-				r = runes[i]
-			} else if !criteria {
-				continue
-			}
-		case '?', '*':
-			if r != '*' || len(tokens) == 0 || tokens[len(tokens)-1].kind != '*' {
-				tokens = append(tokens, cfWildcardToken{kind: byte(r)})
-			}
-			continue
-		}
-		tokens = append(tokens, cfWildcardToken{kind: 'c', r: foldRune(r)})
-	}
-	return tokens
-}
-
 // Charge comparisons and retries to the same request budget as formula nodes.
 // SEARCH takes the first matching start. Criteria and MATCH require a full match.
-func (e *ConditionalEvaluator) wildcardPosition(tokens []cfWildcardToken, text []rune, search bool) (int, bool) {
+func (e *ConditionalEvaluator) wildcardPosition(tokens []excelformula.Token, text []rune, search bool) (int, bool) {
 	for start := 0; start <= len(text); start++ {
 		ti, pi := start, 0
 		star, consumed := -1, start
@@ -799,11 +753,11 @@ func (e *ConditionalEvaluator) wildcardPosition(tokens []cfWildcardToken, text [
 			switch {
 			case pi == len(tokens) && (search || ti == len(text)):
 				return start, true
-			case pi < len(tokens) && tokens[pi].kind == '*':
+			case pi < len(tokens) && tokens[pi].Kind == '*':
 				star, consumed = pi, ti
 				pi++
 				continue
-			case pi < len(tokens) && ti < len(text) && (tokens[pi].kind == '?' || tokens[pi].r == foldRune(text[ti])):
+			case pi < len(tokens) && ti < len(text) && (tokens[pi].Kind == '?' || tokens[pi].Rune == excelformula.FoldRune(text[ti])):
 				pi++
 				ti++
 				continue
@@ -841,24 +795,10 @@ func (e *ConditionalEvaluator) evalDateFunc(op string, args []*conditionalExpr, 
 		nums[i] = q.Int64()
 	}
 	date1904 := e.index != nil && e.index.date1904
-	maxSerial := int64(maxExcelSerial1900)
-	if date1904 {
-		maxSerial = maxExcelSerial1904
-	}
+	maxSerial := excelformula.MaxSerial(date1904)
 	if op == "DATE" {
-		y, m, d := nums[0], nums[1], nums[2]
-		if y < 0 || y >= 10000 || m < -120000 || m > 120000 || d < -4000000 || d > 4000000 {
-			return conditionalErrorVal("#NUM!"), "", nil
-		}
-		if y < 1900 {
-			y += 1900
-		}
-		// Normalize the month first, then advance on the workbook's serial
-		// calendar. Day 60 is a real slot in the Excel 1900 system.
-		first := time.Date(int(y), time.Month(m), 1, 0, 0, 0, 0, time.UTC)
-		serial, ok := excelSerialFromTime(first, date1904)
-		serial += d - 1
-		if !ok || serial < 0 || serial > maxSerial {
+		serial, ok := excelformula.Date(nums[0], nums[1], nums[2], date1904)
+		if !ok {
 			return conditionalErrorVal("#NUM!"), "", nil
 		}
 		return conditionalIntVal(serial), "", nil
@@ -867,7 +807,7 @@ func (e *ConditionalEvaluator) evalDateFunc(op string, args []*conditionalExpr, 
 	if rats[0].Sign() < 0 || nums[0] < 0 || nums[0] > maxSerial {
 		return conditionalErrorVal("#NUM!"), "", nil
 	}
-	y, m, d, wd := excelDateFromSerial(nums[0], date1904)
+	y, m, d, wd := excelformula.DateParts(nums[0], date1904)
 	switch op {
 	case "YEAR":
 		return conditionalIntVal(int64(y)), "", nil
@@ -880,79 +820,11 @@ func (e *ConditionalEvaluator) evalDateFunc(op string, args []*conditionalExpr, 
 		if len(nums) == 2 {
 			returnType = nums[1]
 		}
-		res, ok := excelWeekday(wd, returnType)
+		res, ok := excelformula.Weekday(wd, returnType)
 		if !ok {
 			return conditionalErrorVal("#NUM!"), "", nil
 		}
 		return conditionalIntVal(int64(res)), "", nil
 	}
 	return conditionalValue{}, "条件格式公式尚未求值", nil
-}
-
-// Use Unix seconds rather than time.Duration (which overflows at ~292 years) so
-// Excel dates through 9999-12-31 compute exact day serials without clamping.
-func excelSerialFromTime(t time.Time, date1904 bool) (int64, bool) {
-	y, m, d := t.Date()
-	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	if date1904 {
-		base := time.Date(1904, 1, 1, 0, 0, 0, 0, time.UTC)
-		if day.Before(base) {
-			return 0, false
-		}
-		days := (day.Unix() - base.Unix()) / 86400
-		return days, days >= 0 && days <= maxExcelSerial1904
-	}
-	base := time.Date(1899, 12, 31, 0, 0, 0, 0, time.UTC)
-	if day.Before(base) {
-		return 0, false
-	}
-	days := (day.Unix() - base.Unix()) / 86400
-	// Excel 1900 leap year bug: serial 60 is 1900-02-29.
-	if days >= 60 {
-		days++
-	}
-	return days, days >= 0 && days <= maxExcelSerial1900
-}
-
-func excelDateFromSerial(serial int64, date1904 bool) (year, month, day int, weekday time.Weekday) {
-	if date1904 {
-		t := time.Date(1904, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(serial))
-		return t.Year(), int(t.Month()), t.Day(), t.Weekday()
-	}
-	if serial == 0 {
-		return 1900, 1, 0, time.Saturday
-	}
-	if serial == 60 {
-		return 1900, 2, 29, time.Wednesday
-	}
-	days := serial
-	if days > 60 {
-		days--
-	}
-	t := time.Date(1899, 12, 31, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(days))
-	return t.Year(), int(t.Month()), t.Day(), time.Weekday((serial + 6) % 7)
-}
-
-func excelWeekday(wd time.Weekday, returnType int64) (int, bool) {
-	// wd: Sunday=0, Monday=1, ..., Saturday=6
-	sun0 := int(wd)
-	switch returnType {
-	case 1, 17:
-		return sun0 + 1, true
-	case 2, 11:
-		return (sun0+6)%7 + 1, true
-	case 3:
-		return (sun0 + 6) % 7, true
-	case 12:
-		return (sun0+5)%7 + 1, true
-	case 13:
-		return (sun0+4)%7 + 1, true
-	case 14:
-		return (sun0+3)%7 + 1, true
-	case 15:
-		return (sun0+2)%7 + 1, true
-	case 16:
-		return (sun0+1)%7 + 1, true
-	}
-	return 0, false
 }

@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+
+	"excellens/internal/excelformula"
 )
 
 func registerConditionalFunctions(add functionRegistrar) {
@@ -19,26 +21,15 @@ func wildcardPattern(s string, whole bool) (*regexp.Regexp, error) {
 	if whole {
 		b.WriteByte('^')
 	}
-	escaped := false
-	for _, r := range s {
-		if escaped {
-			b.WriteString(regexp.QuoteMeta(string(r)))
-			escaped = false
-			continue
-		}
-		switch r {
-		case '~':
-			escaped = true
+	for _, t := range excelformula.Wildcard(s, true) {
+		switch t.Kind {
 		case '*':
 			b.WriteString(".*")
 		case '?':
 			b.WriteByte('.')
 		default:
-			b.WriteString(regexp.QuoteMeta(string(r)))
+			b.WriteString(regexp.QuoteMeta(string(t.Rune)))
 		}
-	}
-	if escaped {
-		b.WriteByte('~')
 	}
 	if whole {
 		b.WriteByte('$')

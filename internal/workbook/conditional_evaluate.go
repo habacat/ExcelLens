@@ -23,6 +23,7 @@ type ConditionalFormatResult struct {
 type ConditionalCellResolver func(row, col int) (cell CellData, available bool, err error)
 
 type ConditionalEvaluator struct {
+	indexed         func(*conditionalExpr, *conditionalGroup) (conditionalValue, string, error, bool)
 	index           *SourceConditionalFormats
 	ctx             context.Context
 	work, textBytes int
@@ -34,6 +35,7 @@ type ConditionalEvaluator struct {
 	currentReady    bool
 	currentNotice   string
 	resolver        ConditionalCellResolver
+	foreignCell     func(string, int, int) (CellData, string, error)
 	rangeResolver   ConditionalRangeResolver
 }
 

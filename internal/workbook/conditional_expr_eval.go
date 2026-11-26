@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"excellens/internal/excelformula"
 	"excellens/internal/formats"
 )
 
@@ -54,6 +55,25 @@ func valueToRat(v conditionalValue) (*big.Rat, bool) {
 	return decimalToRat(v.number)
 }
 
+// Calculated conditional values follow Excel binary arithmetic. Keep the full
+// intermediate for subsequent operators and the 15-digit comparison value.
+func conditionalFloatResult(f float64) conditionalValue {
+	if math.IsInf(f, 0) || math.IsNaN(f) {
+		return conditionalErrorVal("#NUM!")
+	}
+	d, ok := parseConditionalDecimal(strconv.FormatFloat(f, 'g', 15, 64))
+	if !ok {
+		return conditionalErrorVal("#NUM!")
+	}
+	return conditionalValue{kind: "number", number: d, rat: new(big.Rat).SetFloat64(f), calculatedFloat: true}
+}
+func conditionalSumResult(r *big.Rat) conditionalValue {
+	if r == nil {
+		return conditionalFloatResult(0)
+	}
+	f, _ := r.Float64()
+	return conditionalFloatResult(f)
+}
 func ratToConditionalValue(r *big.Rat) conditionalValue {
 	if r == nil || r.Sign() == 0 {
 		return conditionalValue{kind: "number", number: conditionalDecimal{digits: "0"}}
@@ -136,23 +156,23 @@ func (e *ConditionalEvaluator) evalExpr(node *conditionalExpr, group *conditiona
 	if !e.spend(1) {
 		return conditionalValue{}, "条件格式超过本次求值预算", nil
 	}
-	switch node.kind {
+	switch node.Kind {
 	case cfExprLiteral:
-		return node.value, "", nil
+		return node.Value, "", nil
 	case cfExprRef:
-		return e.evalRef(node.ref, group)
+		return e.evalRef(node.Ref, group)
 	case cfExprRange:
 		// A range in scalar context is invalid unless used inside a range-accepting function.
 		return conditionalErrorVal("#VALUE!"), "", nil
 	case cfExprUnary:
-		v, notice, err := e.evalExpr(node.args[0], group)
+		v, notice, err := e.evalExpr(node.Args[0], group)
 		if notice != "" || err != nil {
 			return conditionalValue{}, notice, err
 		}
 		if v.kind == "error" {
 			return v, "", nil
 		}
-		if node.op == "+" {
+		if node.Op == "+" {
 			// Excel unary + preserves text/value or returns number; for non-number text it's a no-op.
 			return v, "", nil
 		}
@@ -162,7 +182,7 @@ func (e *ConditionalEvaluator) evalExpr(node *conditionalExpr, group *conditiona
 		}
 		return ratToConditionalValue(r.Neg(r)), "", nil
 	case cfExprPercent:
-		v, notice, err := e.evalExpr(node.args[0], group)
+		v, notice, err := e.evalExpr(node.Args[0], group)
 		if notice != "" || err != nil {
 			return conditionalValue{}, notice, err
 		}
@@ -181,11 +201,11 @@ func (e *ConditionalEvaluator) evalExpr(node *conditionalExpr, group *conditiona
 }
 
 func (e *ConditionalEvaluator) resolveRefCoords(ref conditionalReference, group *conditionalGroup) (int, int, bool) {
-	row, col := ref.row, ref.col
-	if !ref.absoluteRow {
+	row, col := ref.Row, ref.Col
+	if !ref.AbsoluteRow {
 		row += e.row - group.anchorRow
 	}
-	if !ref.absoluteCol {
+	if !ref.AbsoluteCol {
 		col += e.col - group.anchorCol
 	}
 	if row < 1 || row > formats.ExcelRows || col < 1 || col > formats.ExcelColumns {
@@ -195,21 +215,21 @@ func (e *ConditionalEvaluator) resolveRefCoords(ref conditionalReference, group 
 }
 
 func (e *ConditionalEvaluator) resolveRangeBounds(node *conditionalExpr, group *conditionalGroup) (r1, c1, r2, c2 int, ok bool) {
-	if node.kind == cfExprRef {
-		r, c, valid := e.resolveRefCoords(node.ref, group)
+	if node.Kind == cfExprRef {
+		r, c, valid := e.resolveRefCoords(node.Ref, group)
 		return r, c, r, c, valid
 	}
-	if node.kind != cfExprRange {
+	if node.Kind != cfExprRange {
 		return 0, 0, 0, 0, false
 	}
-	a, b := node.ref, node.endRef
-	if a.row == 0 && b.row == 0 {
+	a, b := node.Ref, node.EndRef
+	if a.Row == 0 && b.Row == 0 {
 		// Whole-column range: A:C
-		c1, c2 = a.col, b.col
-		if !a.absoluteCol {
+		c1, c2 = a.Col, b.Col
+		if !a.AbsoluteCol {
 			c1 += e.col - group.anchorCol
 		}
-		if !b.absoluteCol {
+		if !b.AbsoluteCol {
 			c2 += e.col - group.anchorCol
 		}
 		if c1 < 1 || c1 > formats.ExcelColumns || c2 < 1 || c2 > formats.ExcelColumns {
@@ -220,13 +240,13 @@ func (e *ConditionalEvaluator) resolveRangeBounds(node *conditionalExpr, group *
 		}
 		return 1, c1, formats.ExcelRows, c2, true
 	}
-	if a.col == 0 && b.col == 0 {
+	if a.Col == 0 && b.Col == 0 {
 		// Whole-row range: 2:5
-		r1, r2 = a.row, b.row
-		if !a.absoluteRow {
+		r1, r2 = a.Row, b.Row
+		if !a.AbsoluteRow {
 			r1 += e.row - group.anchorRow
 		}
-		if !b.absoluteRow {
+		if !b.AbsoluteRow {
 			r2 += e.row - group.anchorRow
 		}
 		if r1 < 1 || r1 > formats.ExcelRows || r2 < 1 || r2 > formats.ExcelRows {
@@ -257,6 +277,14 @@ func (e *ConditionalEvaluator) evalRef(ref conditionalReference, group *conditio
 	if !ok {
 		return conditionalErrorVal("#REF!"), "", nil
 	}
+	if ref.ForeignSheet != "" {
+		cell, notice, err := e.readForeignCell(ref.ForeignSheet, row, col)
+		if notice != "" || err != nil {
+			return conditionalValue{}, notice, err
+		}
+		v, notice := e.value(cell)
+		return v, notice, nil
+	}
 	if row == e.row && col == e.col {
 		v, notice := e.currentValue()
 		return v, notice, nil
@@ -280,12 +308,28 @@ func (e *ConditionalEvaluator) evalRef(ref conditionalReference, group *conditio
 }
 
 func (e *ConditionalEvaluator) loadRange(node *conditionalExpr, group *conditionalGroup) (conditionalRangeData, conditionalValue, string, error) {
-	if node.kind != cfExprRef && node.kind != cfExprRange {
+	if node.Kind != cfExprRef && node.Kind != cfExprRange {
 		return conditionalRangeData{}, conditionalErrorVal("#VALUE!"), "", nil
 	}
 	r1, c1, r2, c2, ok := e.resolveRangeBounds(node, group)
 	if !ok {
 		return conditionalRangeData{}, conditionalErrorVal("#REF!"), "", nil
+	}
+	if node.Ref.ForeignSheet != "" {
+		if r1 != r2 || c1 != c2 {
+			return conditionalRangeData{}, conditionalValue{}, "跨表求和区域超出定义名称的单元格", nil
+		}
+		cell, notice, err := e.readForeignCell(node.Ref.ForeignSheet, r1, c1)
+		if notice != "" || err != nil {
+			return conditionalRangeData{}, conditionalValue{}, notice, err
+		}
+		data := conditionalRangeData{r1: r1, c1: c1, r2: r2, c2: c2}
+		if cell.Raw == "" && cell.Type == "" && !cell.CacheMissing {
+			data.blankCount = 1
+		} else {
+			data.cells = []conditionalRangeCell{{row: r1, col: c1, cell: cell}}
+		}
+		return data, conditionalValue{}, "", nil
 	}
 	if e.rangeResolver != nil {
 		data, notice, err := e.rangeResolver(r1, c1, r2, c2)
@@ -340,11 +384,11 @@ func (e *ConditionalEvaluator) loadRange(node *conditionalExpr, group *condition
 }
 
 func (e *ConditionalEvaluator) evalBinary(node *conditionalExpr, group *conditionalGroup) (conditionalValue, string, error) {
-	left, notice, err := e.evalExpr(node.args[0], group)
+	left, notice, err := e.evalExpr(node.Args[0], group)
 	if notice != "" || err != nil {
 		return conditionalValue{}, notice, err
 	}
-	right, notice, err := e.evalExpr(node.args[1], group)
+	right, notice, err := e.evalExpr(node.Args[1], group)
 	if notice != "" || err != nil {
 		return conditionalValue{}, notice, err
 	}
@@ -354,13 +398,13 @@ func (e *ConditionalEvaluator) evalBinary(node *conditionalExpr, group *conditio
 	if right.kind == "error" {
 		return right, "", nil
 	}
-	switch node.op {
+	switch node.Op {
 	case "=", "<>", "<", ">", "<=", ">=":
 		cmp, valid := compareConditionalValues(left, right)
 		if !valid {
 			return conditionalErrorVal("#VALUE!"), "", nil
 		}
-		return conditionalBoolVal(matchConditionalComparison(cmp, node.op)), "", nil
+		return conditionalBoolVal(matchConditionalComparison(cmp, node.Op)), "", nil
 	case "&":
 		a, okA := e.asText(left)
 		if !okA {
@@ -384,18 +428,20 @@ func (e *ConditionalEvaluator) evalBinary(node *conditionalExpr, group *conditio
 		if errB != nil {
 			return *errB, "", nil
 		}
-		switch node.op {
+		af, _ := ar.Float64()
+		bf, _ := br.Float64()
+		switch node.Op {
 		case "+":
-			return ratToConditionalValue(ar.Add(ar, br)), "", nil
+			return conditionalFloatResult(af + bf), "", nil
 		case "-":
-			return ratToConditionalValue(ar.Sub(ar, br)), "", nil
+			return conditionalFloatResult(af - bf), "", nil
 		case "*":
-			return ratToConditionalValue(ar.Mul(ar, br)), "", nil
+			return conditionalFloatResult(af * bf), "", nil
 		case "/":
-			if br.Sign() == 0 {
+			if bf == 0 {
 				return conditionalErrorVal("#DIV/0!"), "", nil
 			}
-			return ratToConditionalValue(ar.Quo(ar, br)), "", nil
+			return conditionalFloatResult(af / bf), "", nil
 		case "^":
 			return conditionalPower(ar, br), "", nil
 		}
@@ -455,8 +501,8 @@ func conditionalAsBool(v conditionalValue) (bool, *conditionalValue) {
 	case "blank":
 		return false, nil
 	case "text":
-		if strings.EqualFold(v.text, "TRUE") || strings.EqualFold(v.text, "FALSE") {
-			return strings.EqualFold(v.text, "TRUE"), nil
+		if b, ok := excelformula.BooleanText(v.text); ok {
+			return b, nil
 		}
 	case "number":
 		return conditionalValueIsNonZero(v), nil

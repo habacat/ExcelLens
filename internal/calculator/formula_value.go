@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math/big"
 	"strings"
+
+	"excellens/internal/excelformula"
 )
 
 type FormulaValue struct {
@@ -105,11 +107,8 @@ func formulaBool(v FormulaValue) (bool, error) {
 		return v.Number.Sign() != 0, nil
 	}
 	if v.Kind == "text" {
-		if strings.EqualFold(v.Text, "TRUE") {
-			return true, nil
-		}
-		if strings.EqualFold(v.Text, "FALSE") {
-			return false, nil
+		if b, ok := excelformula.BooleanText(v.Text); ok {
+			return b, nil
 		}
 	}
 	return false, errors.New("#VALUE! 需要逻辑值")

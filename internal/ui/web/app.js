@@ -865,8 +865,7 @@
       await delay(320);
       const progress = await api(`/api/index/status?id=${encodeURIComponent(jobID)}`);
       if (epoch !== S.sheetEpoch) return null;
-      activity?.report(progress.doneBytes, progress.totalBytes, progress.stage || '正在建立索引',
-        progress.totalBytes > 0 ? fmtBytes(progress.doneBytes) + ' / ' + fmtBytes(progress.totalBytes) : '');
+      workbookIO.reportIndexProgress(activity, progress);
       if (progress.status === "error") throw new Error(progress.error || "索引建立失败");
       if (progress.status === "cancelled") throw new Error("索引任务已取消");
       if (progress.status === "done") return progress;

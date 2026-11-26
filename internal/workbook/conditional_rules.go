@@ -10,9 +10,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"excellens/internal/conditional"
 	"excellens/internal/formats"
 )
 
@@ -47,15 +50,19 @@ type conditionalRangeEntry = sourceRangeEntry
 type conditionalRangeNode = sourceRangeNode
 
 type SourceConditionalFormats struct {
-	groups    []conditionalGroup
-	rules     []compiledConditionalRule
-	nodes     []conditionalRangeNode
-	root      int
-	notice    string
-	styles    []DifferentialStyle
-	sheetName string
-	date1904  bool
-	bytes     int64
+	statistics []conditionalStatPlan
+	statsMu    sync.Mutex
+	statsIssue string
+	statsRetry time.Time
+	groups     []conditionalGroup
+	rules      []compiledConditionalRule
+	nodes      []conditionalRangeNode
+	root       int
+	notice     string
+	styles     []DifferentialStyle
+	sheetName  string
+	date1904   bool
+	bytes      int64
 }
 
 type ConditionalFormatSummary struct {
@@ -98,41 +105,41 @@ func parseConditionalRanges(raw string) ([]CellMerge, error) {
 		if strings.Contains(finish, ":") {
 			return nil, errors.New("条件格式范围无效")
 		}
-		if a, ok := parseConditionalCellRef(start); ok {
+		if a, ok := conditional.ParseCellRef(start); ok {
 			b := a
 			if ranged {
-				b, ok = parseConditionalCellRef(finish)
+				b, ok = conditional.ParseCellRef(finish)
 				if !ok {
 					return nil, errors.New("条件格式终点无效")
 				}
 			}
-			if b.row < a.row || b.col < a.col {
+			if b.Row < a.Row || b.Col < a.Col {
 				return nil, errors.New("条件格式范围顺序无效")
 			}
-			out = append(out, CellMerge{Row: a.row, Col: a.col, EndRow: b.row, EndCol: b.col})
+			out = append(out, CellMerge{Row: a.Row, Col: a.Col, EndRow: b.Row, EndCol: b.Col})
 			continue
 		}
 		if ranged {
-			if a, ok1 := parseConditionalColRef(start); ok1 {
-				b, ok2 := parseConditionalColRef(finish)
+			if a, ok1 := conditional.ParseColumnRef(start); ok1 {
+				b, ok2 := conditional.ParseColumnRef(finish)
 				if !ok2 {
 					return nil, errors.New("条件格式终点无效")
 				}
-				if b.col < a.col {
+				if b.Col < a.Col {
 					return nil, errors.New("条件格式范围顺序无效")
 				}
-				out = append(out, CellMerge{Row: 1, Col: a.col, EndRow: formats.ExcelRows, EndCol: b.col})
+				out = append(out, CellMerge{Row: 1, Col: a.Col, EndRow: formats.ExcelRows, EndCol: b.Col})
 				continue
 			}
-			if a, ok1 := parseConditionalRowRef(start); ok1 {
-				b, ok2 := parseConditionalRowRef(finish)
+			if a, ok1 := conditional.ParseRowRef(start); ok1 {
+				b, ok2 := conditional.ParseRowRef(finish)
 				if !ok2 {
 					return nil, errors.New("条件格式终点无效")
 				}
-				if b.row < a.row {
+				if b.Row < a.Row {
 					return nil, errors.New("条件格式范围顺序无效")
 				}
-				out = append(out, CellMerge{Row: a.row, Col: 1, EndRow: b.row, EndCol: formats.ExcelColumns})
+				out = append(out, CellMerge{Row: a.Row, Col: 1, EndRow: b.Row, EndCol: formats.ExcelColumns})
 				continue
 			}
 		}
@@ -269,7 +276,7 @@ func readSourceConditionalRule(d *xml.Decoder, start xml.StartElement) (SourceCo
 	}
 }
 
-func compileSourceConditionalRule(source SourceConditionalRule, group int, sheetName string) compiledConditionalRule {
+func (w *Workbook) compileSourceConditionalRule(source SourceConditionalRule, group int, sheetName string) compiledConditionalRule {
 	out := compiledConditionalRule{source: source, group: group, predicateNotice: source.Notice}
 	if out.predicateNotice != "" {
 		return out
@@ -294,7 +301,7 @@ func compileSourceConditionalRule(source SourceConditionalRule, group int, sheet
 			return out
 		}
 		for _, formula := range source.Formulas {
-			expr, nodes, notice := compileConditionalExpr(formula, sheetName)
+			expr, nodes, notice := w.compileConditionalExpr(formula, sheetName)
 			if notice != "" {
 				if notice == "条件格式公式尚未求值" {
 					out.predicateNotice = "条件比较表达式需要尚未支持的计算"
@@ -312,7 +319,7 @@ func compileSourceConditionalRule(source SourceConditionalRule, group int, sheet
 			out.predicateNotice = "条件格式公式数量无效"
 			return out
 		}
-		expr, nodes, notice := compileConditionalExpr(source.Formulas[0], sheetName)
+		expr, nodes, notice := w.compileConditionalExpr(source.Formulas[0], sheetName)
 		if notice != "" {
 			out.predicateNotice = notice
 			return out
@@ -503,7 +510,7 @@ func (w *Workbook) loadConditionalFormats(ctx context.Context, meta SheetMeta, i
 				if err != nil {
 					return nil, err
 				}
-				index.rules = append(index.rules, compileSourceConditionalRule(rule, groupID, meta.Name))
+				index.rules = append(index.rules, w.compileSourceConditionalRule(rule, groupID, meta.Name))
 			}
 		}
 		if end, err := d.Token(); err != nil {
@@ -550,6 +557,7 @@ func finishConditionalFormats(index *SourceConditionalFormats, entries []conditi
 		group.ruleIndices = append(group.ruleIndices, i)
 	}
 	index.nodes, index.root = buildSourceRangeTree(entries)
+	index.statistics = index.statisticPlans()
 	index.bytes = conditionalIndexBytes(index)
 	return index
 }

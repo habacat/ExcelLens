@@ -81,6 +81,10 @@ func xlsbTruncated(err error) error {
 }
 
 func readXLSBPart(file *zip.File, limit uint64, handle func(uint16, []byte) error) error {
+	return readXLSBPartWithReader(file, limit, nil, handle)
+}
+
+func readXLSBPartWithReader(file *zip.File, limit uint64, wrap func(io.Reader) io.Reader, handle func(uint16, []byte) error) error {
 	if file == nil {
 		return errors.New("缺少 BIFF12 部件")
 	}
@@ -92,7 +96,11 @@ func readXLSBPart(file *zip.File, limit uint64, handle func(uint16, []byte) erro
 		return err
 	}
 	defer input.Close()
-	records := newXLSBRecords(input)
+	var source io.Reader = input
+	if wrap != nil {
+		source = wrap(source)
+	}
+	records := newXLSBRecords(source)
 	for {
 		kind, data, err := records.next()
 		if err == io.EOF {

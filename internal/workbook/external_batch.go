@@ -20,6 +20,7 @@ func (w *Workbook) readIndexedBatchWithOptions(ctx context.Context, f *os.File, 
 	if err != nil {
 		return nil, err
 	}
+	defer presentation.closeStatistics()
 	rows := make([]RowData, 0, len(indices))
 	var block []byte
 	const batchLimit = 4 << 20

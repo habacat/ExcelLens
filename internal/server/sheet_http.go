@@ -56,8 +56,9 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cacheMu.RLock()
 	cachedIndex := wb.GetCachedIndex(meta.Path)
+	ready := cachedIndex != nil && !wb.ConditionalStatisticsPending(r.Context(), meta, cachedIndex)
 	a.cacheMu.RUnlock()
-	if cachedIndex != nil {
+	if ready {
 		writeJSON(w, indexPayload(true, "", meta.Name, cachedIndex))
 		return
 	}
@@ -120,7 +121,7 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 	job.Status = "running"
 	job.Stage = "正在解压并建立行索引"
 	job.mu.Unlock()
-	idx, err := wb.BuildIndex(meta, func(done, total int64, stage string) {
+	update := func(done, total int64, stage string) {
 		job.mu.Lock()
 		job.DoneBytes = done
 		job.TotalBytes = total
@@ -129,7 +130,19 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 			job.Progress = float64(done) / float64(total) * 100
 		}
 		job.mu.Unlock()
-	}, job.ctx.Done())
+	}
+	idx, err := wb.BuildIndex(meta, update, job.ctx.Done())
+	if err == nil {
+		err = wb.PrepareConditionalStatistics(job.ctx, meta, idx, func(done, total int) {
+			job.mu.Lock()
+			defer job.mu.Unlock()
+			job.Stage = "正在建立条件统计索引"
+			job.DoneRows, job.TotalRows = done, total
+			if total > 0 {
+				job.Progress = float64(done) * 100 / float64(total)
+			}
+		})
+	}
 	job.mu.Lock()
 	defer job.mu.Unlock()
 	if err != nil {
@@ -168,6 +181,9 @@ func (a *App) handleIndexStatus(w http.ResponseWriter, r *http.Request) {
 		"id": job.ID, "sheet": job.Sheet, "status": job.Status, "stage": job.Stage,
 		"progress": job.Progress, "doneBytes": job.DoneBytes, "totalBytes": job.TotalBytes,
 		"error": job.Error,
+	}
+	if job.TotalRows > 0 && job.Status == "running" {
+		out["statisticsProgress"] = map[string]int{"done": job.DoneRows, "total": job.TotalRows}
 	}
 	if job.Index != nil {
 		out["dimension"] = job.Index.Dimension

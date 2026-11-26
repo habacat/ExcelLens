@@ -160,7 +160,7 @@ type xlsbRowCell struct {
 }
 
 func (w *Workbook) streamXLSBRows(meta SheetMeta, writer *externalRowWriter, cancel <-chan struct{}, progress func(int64, int64, string)) (*xlsbSheetData, error) {
-	data, err := w.walkXLSBRows(meta, 0, 0, cancel, progress, func(row, style int, cells []externalCell) error {
+	data, err := w.walkXLSBRows(meta, 0, 0, cancel, progress, nil, func(row, style int, cells []externalCell) error {
 		if row <= writer.rows {
 			return errors.New("XLSB 行坐标顺序无效")
 		}
@@ -179,7 +179,7 @@ func (w *Workbook) streamXLSBRows(meta SheetMeta, writer *externalRowWriter, can
 	return data, nil
 }
 
-func (w *Workbook) walkXLSBRows(meta SheetMeta, previewRows, previewCols int, cancel <-chan struct{}, progress func(int64, int64, string), emit func(int, int, []externalCell) error) (*xlsbSheetData, error) {
+func (w *Workbook) walkXLSBRows(meta SheetMeta, previewRows, previewCols int, cancel <-chan struct{}, progress func(int64, int64, string), wrap func(io.Reader) io.Reader, emit func(int, int, []externalCell) error) (*xlsbSheetData, error) {
 	pkg, parts, err := openXLSBParts(w.Path)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func (w *Workbook) walkXLSBRows(meta SheetMeta, previewRows, previewCols int, ca
 	b := w.source.xlsb
 	var stringsLookup func(uint32) (xlsbString, error)
 	if previewRows != 0 && parts[b.sharedStrings] != nil {
-		get, close, err := xlsbPreviewStrings(parts[b.sharedStrings])
+		get, close, err := xlsbPreviewStrings(parts[b.sharedStrings], wrap)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +251,7 @@ func (w *Workbook) walkXLSBRows(meta SheetMeta, previewRows, previewCols int, ca
 		return emit(row+1, style, cells)
 	}
 	var begin, inData, dataDone, end bool
-	err = readXLSBPart(src, 0, func(kind uint16, data []byte) error {
+	err = readXLSBPartWithReader(src, 0, wrap, func(kind uint16, data []byte) error {
 		select {
 		case <-cancel:
 			return context.Canceled

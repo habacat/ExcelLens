@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"excellens/internal/analysis"
+	"excellens/internal/excelformula"
 )
 
 const MaxExpression = 4096
@@ -416,24 +417,14 @@ func (p *parser) function() (*big.Rat, error) {
 		if places < -20 || places > 20 {
 			return nil, p.fail("舍入位数应在-20至20之间")
 		}
-		factor := new(big.Rat).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(abs(places)), nil))
-		scaled := new(big.Rat).Set(v)
-		if places >= 0 {
-			scaled.Mul(scaled, factor)
-		} else {
-			scaled.Quo(scaled, factor)
+		mode := "half"
+		switch name {
+		case "ROUNDUP":
+			mode = "up"
+		case "ROUNDDOWN":
+			mode = "down"
 		}
-		q, rem := new(big.Int), new(big.Int)
-		q.QuoRem(scaled.Num(), scaled.Denom(), rem)
-		if rem.Sign() != 0 && (name == "ROUNDUP" || name == "ROUND" && new(big.Int).Lsh(new(big.Int).Abs(rem), 1).Cmp(scaled.Denom()) >= 0) {
-			q.Add(q, big.NewInt(int64(scaled.Sign())))
-		}
-		v.SetInt(q)
-		if places >= 0 {
-			v.Quo(v, factor)
-		} else {
-			v.Mul(v, factor)
-		}
+		v.Set(excelformula.Round(v, places, mode))
 	default:
 		return nil, p.fail("支持 SUM、AVG、MIN、MAX、ABS、ROUND、ROUNDUP、ROUNDDOWN")
 	}

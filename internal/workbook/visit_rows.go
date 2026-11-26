@@ -35,6 +35,7 @@ func (w *Workbook) VisitRowsWithOptionsContext(ctx context.Context, idx *SheetIn
 	if err != nil {
 		return err
 	}
+	defer presentation.closeStatistics()
 	var selected map[int]struct{}
 	if len(options.Columns) > 0 {
 		selected = make(map[int]struct{}, len(options.Columns))

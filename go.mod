@@ -19,6 +19,7 @@ require (
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/ulikunitz/xz v0.5.17
+	go.etcd.io/bbolt v1.4.3
 	golang.org/x/crypto v0.59.0
 	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.50.0

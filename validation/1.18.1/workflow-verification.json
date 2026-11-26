@@ -1,0 +1,266 @@
+{
+  "version": "1.18.1",
+  "result": "PASS",
+  "scope": "Targeted compatibility and large-sheet conditional indexing",
+  "realWorkbook": {
+    "method": "Read-only Excel DisplayFormat versus isolated current workbook grid and single-cell service",
+    "oldVersion": "1.18.0",
+    "oldNoticeReproduced": true,
+    "newNoticeAbsent": true,
+    "sourceValueAndBaseFillPreserved": true,
+    "sourceDigestUnchanged": true,
+    "nativeTextAndFillMatch": true
+  },
+  "native": {
+    "method": "Excel DisplayFormat on synthetic XLSX and XLSB in 1900 and 1904 date systems",
+    "observations": 272,
+    "expectedCellsPerFile": 68,
+    "fixtures": "internal/workbook/testdata/conditional-native",
+    "groups": [
+      "criteria",
+      "date-and-number",
+      "errors-and-logic",
+      "range-and-types",
+      "relative",
+      "scoped-names",
+      "text-and-wildcards"
+    ]
+  },
+  "statisticIndex": {
+    "formatVersion": 1,
+    "provider": "go.etcd.io/bbolt v1.4.3",
+    "concurrentReadersSingleBuild": true,
+    "cancellationDoesNotPublish": true,
+    "corruptEmptyCacheRebuilt": true,
+    "sourceOrderedFloatingWindowAndErrors": true,
+    "exactMatchFoldedZeroPercent": true,
+    "unavailableFileFallsBackWithinReadBudget": true
+  },
+  "scale": [
+    {
+      "cellsPerViewport": 120,
+      "distinctKeys": 10000,
+      "firstViewportMs": 3.6223,
+      "reopenedViewportMs": 5.6847,
+      "result": "PASS",
+      "rows": 1000000,
+      "rules": [
+        "COUNTIF($A:$A,$A2)=100",
+        "SUMIF($A:$A,$A2,$C:$C)=200",
+        "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+        "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+        "MATCH($A2,$A:$A,0)=MOD(ROW()-2,10000)+2",
+        "SUM($C2:$C4)=6"
+      ],
+      "sharedIndexBytes": 67108864,
+      "sharedIndexUnchangedOnWarmAndReopen": true,
+      "sourceIndexMs": 2829,
+      "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+      "statisticsPreparationMs": 17852.5462,
+      "warmViewportMaxMs": 10.1475,
+      "warmViewportMedianMs": 3.3825,
+      "warmViewports": 16
+    },
+    {
+      "cellsPerViewport": 120,
+      "distinctKeys": 500000,
+      "firstViewportMs": 6.2277,
+      "reopenedViewportMs": 5.0198,
+      "result": "PASS",
+      "rows": 1000000,
+      "rules": [
+        "COUNTIF($A:$A,$A2)=2",
+        "SUMIF($A:$A,$A2,$C:$C)=4",
+        "COUNTIFS($A:$A,$A2,$B:$B,$B2)=1",
+        "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=2",
+        "MATCH($A2,$A:$A,0)=MOD(ROW()-2,500000)+2",
+        "SUM($C2:$C4)=6"
+      ],
+      "sharedIndexBytes": 268435456,
+      "sharedIndexUnchangedOnWarmAndReopen": true,
+      "sourceIndexMs": 3234,
+      "sourceSHA256": "59394ee4b6c2ffb53d5e8f02a539efa4f2b2c0938f2e2e8566535660a5e7e41d",
+      "statisticsPreparationMs": 20412.9546,
+      "warmViewportMaxMs": 14.5728,
+      "warmViewportMedianMs": 3.5041,
+      "warmViewports": 16
+    }
+  ],
+  "desktopManualAcceptance": false,
+  "wpsAcceptance": false,
+  "benchmarkEnvironment": {
+    "platform": "windows/amd64",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "go": "go version go1.27.4 windows/amd64",
+    "node": "v24.18.0",
+    "browser": "158.0.8127.88"
+  },
+  "sameSourceComparison": {
+    "measurement": "Sequential candidate comparison, identical source and 17 viewports",
+    "sourceSHA256": "61d2d107081067c127f307e2e8bd885a638cf96f85d0f0f2b4f0a2e5b3f709c0",
+    "versions": [
+      {
+        "coldMs": 116.9054,
+        "conditionCells": 2040,
+        "matched": 2040,
+        "notices": 0,
+        "rows": 1000,
+        "source": "compare-ledger.xlsx",
+        "version": "1.18.0",
+        "viewports": 17,
+        "warmMaxMs": 135.8714,
+        "warmMedianMs": 108.39945
+      },
+      {
+        "coldMs": 19.5186,
+        "conditionCells": 2040,
+        "matched": 2040,
+        "notices": 0,
+        "rows": 1000,
+        "source": "compare-ledger.xlsx",
+        "version": "1.18.1",
+        "viewports": 17,
+        "warmMaxMs": 2.983,
+        "warmMedianMs": 1.9945
+      }
+    ]
+  },
+  "scroll": {
+    "source": "synthetic ledger",
+    "scroll": [
+      {
+        "originalFormat": true,
+        "durationMs": 10008.399999999994,
+        "frames": 422,
+        "fps": 42.16458175132891,
+        "p95FrameMs": 33.5,
+        "emptyFrames": 0,
+        "incompleteCoverageFrames": 0
+      },
+      {
+        "originalFormat": false,
+        "durationMs": 10008.5,
+        "frames": 473,
+        "fps": 47.259829145226554,
+        "p95FrameMs": 33.400000000001455,
+        "emptyFrames": 0,
+        "incompleteCoverageFrames": 0
+      },
+      {
+        "originalFormat": false,
+        "durationMs": 10008.400000000001,
+        "frames": 574,
+        "fps": 57.35182446744734,
+        "p95FrameMs": 17.099999999998545,
+        "emptyFrames": 0,
+        "incompleteCoverageFrames": 0
+      },
+      {
+        "originalFormat": true,
+        "durationMs": 10008.400000000009,
+        "frames": 563,
+        "fps": 56.25274769193872,
+        "p95FrameMs": 33.30000000000291,
+        "emptyFrames": 0,
+        "incompleteCoverageFrames": 0
+      }
+    ],
+    "desktopManualAcceptance": false,
+    "openToStyledGridMs": 32687,
+    "profileCleanup": "EPERM",
+    "result": "PASS"
+  },
+  "earlierScroll": [
+    {
+      "originalFormat": true,
+      "durationMs": 10061.899999999994,
+      "frames": 267,
+      "fps": 26.53574374621097,
+      "p95FrameMs": 76.40000000000146,
+      "emptyFrames": 0,
+      "incompleteCoverageFrames": 5
+    },
+    {
+      "originalFormat": false,
+      "durationMs": 10055.5,
+      "frames": 272,
+      "fps": 27.049873203719358,
+      "p95FrameMs": 55.80000000000291,
+      "emptyFrames": 0,
+      "incompleteCoverageFrames": 0
+    },
+    {
+      "originalFormat": false,
+      "durationMs": 10021.099999999991,
+      "frames": 255,
+      "fps": 25.446308289509158,
+      "p95FrameMs": 76.09999999999854,
+      "emptyFrames": 0,
+      "incompleteCoverageFrames": 3
+    },
+    {
+      "originalFormat": true,
+      "durationMs": 10020.400000000009,
+      "frames": 305,
+      "fps": 30.437906670392373,
+      "p95FrameMs": 61.89999999999418,
+      "emptyFrames": 0,
+      "incompleteCoverageFrames": 1
+    }
+  ],
+  "packageLines": {
+    "method": "Go source lines directly in each package; production excludes _test.go",
+    "packages": {
+      "workbook": {
+        "v1.18.0": {
+          "production": 39293,
+          "includingTests": 57471
+        },
+        "v1.18.1": {
+          "production": 39397,
+          "includingTests": 57972
+        }
+      },
+      "server": {
+        "v1.18.0": {
+          "production": 31955,
+          "includingTests": 62988
+        },
+        "v1.18.1": {
+          "production": 31972,
+          "includingTests": 63005
+        }
+      },
+      "editfile": {
+        "v1.18.0": {
+          "production": 26147,
+          "includingTests": 29174
+        },
+        "v1.18.1": {
+          "production": 26147,
+          "includingTests": 29174
+        }
+      },
+      "conditional": {
+        "v1.18.0": {
+          "production": 0,
+          "includingTests": 0
+        },
+        "v1.18.1": {
+          "production": 1292,
+          "includingTests": 1407
+        }
+      },
+      "excelformula": {
+        "v1.18.0": {
+          "production": 0,
+          "includingTests": 0
+        },
+        "v1.18.1": {
+          "production": 214,
+          "includingTests": 214
+        }
+      }
+    }
+  }
+}

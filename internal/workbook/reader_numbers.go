@@ -99,6 +99,7 @@ func (w *Workbook) visitSourceReferences(ctx context.Context, idx *SheetIndex, r
 	if err != nil {
 		return err
 	}
+	defer presentation.closeStatistics()
 	if !byRow {
 		options = prepareRichRead(options)
 	}

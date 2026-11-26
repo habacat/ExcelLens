@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"excellens/internal/excelformula"
 )
 
 type formulaEval struct {
@@ -207,22 +209,7 @@ func (e *formulaEval) binaryValue(op string, a, b FormulaValue) (FormulaValue, e
 		if err != nil {
 			return FormulaValue{}, err
 		}
-		yes := false
-		switch op {
-		case "=":
-			yes = comparison == 0
-		case "<>":
-			yes = comparison != 0
-		case "<":
-			yes = comparison < 0
-		case ">":
-			yes = comparison > 0
-		case "<=":
-			yes = comparison <= 0
-		case ">=":
-			yes = comparison >= 0
-		}
-		return BoolValue(yes), nil
+		return BoolValue(excelformula.MatchesComparison(comparison, op)), nil
 	}
 	x, err := formulaNumber(a)
 	if err != nil {

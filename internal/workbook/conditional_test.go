@@ -468,7 +468,7 @@ func TestConditionalOOXMLCompatibilityDXFPatternFillSqrefAndCanonicalFormulas(t 
 func TestConditionalEdgeCasesDateOverflowInvalidUTF8GroupNoticeAndDeterminism(t *testing.T) {
 	isolateTestStorage(t)
 	// 1. Invalid UTF-8 bytes in formula must never panic in decodeUTF8At.
-	if expr, _, notice := compileConditionalExpr("\xff=1", "Sheet1"); expr != nil || notice == "" {
+	if expr, _, notice := (*Workbook)(nil).compileConditionalExpr("\xff=1", "Sheet1"); expr != nil || notice == "" {
 		t.Fatalf("invalid UTF-8 formula should fail cleanly without panic: expr=%v notice=%q", expr, notice)
 	}
 
@@ -558,7 +558,7 @@ func TestConditionalFormulasExcelBoundaryResults(t *testing.T) {
 			index := SourceConditionalFormats{date1904: tc.date1904}
 			e := index.NewEvaluator(context.Background())
 			e.row, e.col = 1, 1
-			expr, _, notice := compileConditionalExpr(tc.formula, "Sheet1")
+			expr, _, notice := (*Workbook)(nil).compileConditionalExpr(tc.formula, "Sheet1")
 			if notice != "" {
 				t.Fatal(notice)
 			}
@@ -580,7 +580,7 @@ func TestConditionalLimitsPreserveUnknownResults(t *testing.T) {
 		e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
 		e.row, e.col, e.work = 1, 1, 18
 		e.cell = CellData{Raw: "ordinary worksheet text", Type: "s"}
-		node, _, notice := compileConditionalExpr(formula, "Sheet1")
+		node, _, notice := (*Workbook)(nil).compileConditionalExpr(formula, "Sheet1")
 		if notice != "" {
 			t.Fatal(notice)
 		}
@@ -593,11 +593,11 @@ func TestConditionalLimitsPreserveUnknownResults(t *testing.T) {
 	e := (&SourceConditionalFormats{}).NewEvaluator(context.Background())
 	e.row, e.col = 1, 2
 	e.resolver = func(row, col int) (CellData, bool, error) { return CellData{Raw: "0.9"}, true, nil }
-	node, _, _ := compileConditionalExpr("IFERROR(PRODUCT(A1:A750),0)", "Sheet1")
+	node, _, _ := (*Workbook)(nil).compileConditionalExpr("IFERROR(PRODUCT(A1:A750),0)", "Sheet1")
 	if _, notice, err := e.evalExpr(node, group); err != nil || !strings.Contains(notice, "容量") {
 		t.Errorf("bounded exact product lost its limit: %q, %v", notice, err)
 	}
-	node, _, _ = compileConditionalExpr("ISERROR(PRODUCT(1E300,1E300,0))", "Sheet1")
+	node, _, _ = (*Workbook)(nil).compileConditionalExpr("ISERROR(PRODUCT(1E300,1E300,0))", "Sheet1")
 	if result, notice, err := e.evalExpr(node, group); err != nil || notice != "" || !result.boolean {
 		t.Errorf("Excel numeric overflow lost: %+v, %q, %v", result, notice, err)
 	}

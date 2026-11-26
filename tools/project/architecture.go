@@ -19,7 +19,9 @@ var allowedInternalImports = map[string][]string{
 	"branding":      {},
 	"browserlease":  {},
 	"buildinfo":     {},
-	"calculator":    {"analysis", "valueconv", "formats"},
+	"calculator":    {"analysis", "valueconv", "formats", "excelformula"},
+	"conditional":   {"formats", "excelformula"},
+	"excelformula":  {},
 	"checkpoint":    {"formats", "filelock"},
 	"clustering":    {"workbook", "formats"},
 	"composition":   {"workbook", "sourceview", "formats"},
@@ -49,7 +51,7 @@ var allowedInternalImports = map[string][]string{
 	"tray":          {"branding", "formats", "workbook", "buildinfo"},
 	"ui":            {"formats", "buildinfo"},
 	"valueconv":     {},
-	"workbook":      {"searchresults", "fileidentity", "formats", "localstore", "searchdsl", "sourceview"},
+	"workbook":      {"conditional", "excelformula", "searchresults", "fileidentity", "formats", "localstore", "searchdsl", "sourceview"},
 }
 
 var allowedCommandImports = map[string][]string{

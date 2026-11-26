@@ -6,6 +6,18 @@
       this.d = deps;
     }
 
+    reportIndexProgress(activity, progress) {
+      const { fmtBytes } = this.d;
+      const stats = progress.statisticsProgress;
+      if (stats && stats.total > 0) {
+        activity?.report(stats.done, stats.total, progress.stage,
+          stats.done.toLocaleString() + ' / ' + stats.total.toLocaleString() + ' 行');
+      } else {
+        activity?.report(progress.doneBytes, progress.totalBytes, progress.stage || '正在建立索引',
+          progress.totalBytes > 0 ? fmtBytes(progress.doneBytes) + ' / ' + fmtBytes(progress.totalBytes) : '');
+      }
+    }
+
     renderSheetTabs() {
       const { $, S, selectSheetTab } = this.d;
       const tabs = $('sheetTabs');

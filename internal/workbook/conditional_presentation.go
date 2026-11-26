@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"excellens/internal/conditional"
 	"excellens/internal/formats"
 )
 
@@ -29,6 +30,10 @@ type conditionalDependencyUnavailable struct{ reason string }
 func (e *conditionalDependencyUnavailable) Error() string { return e.reason }
 
 type conditionalRead struct {
+	statBindings                     map[boundStatKey]boundStatQuery
+	statistics                       *conditional.Index
+	statNotice                       string
+	statProgress                     func(int, int)
 	w                                *Workbook
 	idx                              *SheetIndex
 	ctx                              context.Context
@@ -41,6 +46,8 @@ type conditionalRead struct {
 	columns                          []int
 	cells                            map[int]CellData
 	cache                            map[conditionalAddress]CellData
+	foreignValues                    map[conditionalForeignAddress]CellData
+	foreignOpens                     int
 	rangeCache                       map[conditionalRangeKey]conditionalRangeData
 	cacheBytes                       int
 	remainingBytes, remainingCells   int
@@ -77,6 +84,10 @@ func (w *Workbook) newConditionalRead(ctx context.Context, idx *SheetIndex, file
 	}
 	r := &conditionalRead{w: w, idx: idx, ctx: ctx, index: index, evaluator: index.NewEvaluator(ctx), stream: indexedStream{f: file, idx: idx}, cache: make(map[conditionalAddress]CellData), rangeCache: make(map[conditionalRangeKey]conditionalRangeData)}
 	r.evaluator.SetRangeResolver(r.resolveRange)
+	r.evaluator.foreignCell = r.resolveForeignCell
+	if len(index.statistics) > 0 && idx.RowCount() >= formats.ConditionalStatsMinRows {
+		r.evaluator.indexed = r.indexedStatistic
+	}
 	r.columns = append([]int(nil), options.Columns...)
 	r.resetBudget()
 	return r, nil
@@ -90,6 +101,7 @@ func conditionalNotice(s string) string {
 }
 
 func (r *conditionalRead) resetBudget() {
+	r.foreignOpens = formats.ConditionalForeignOpens
 	r.remainingBytes, r.remainingCells = formats.ConditionalReadBytes, formats.ConditionalReadCells
 	r.dependencyReads, r.dependencyBytes = formats.ConditionalDependencyReads, formats.ConditionalDependencyXMLBytes
 	r.evaluator.work, r.evaluator.textBytes = formats.ConditionalEvalWork, formats.ConditionalEvalTextBytes

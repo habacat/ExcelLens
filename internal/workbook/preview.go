@@ -47,7 +47,7 @@ func (w *Workbook) PreviewRows(ctx context.Context, meta SheetMeta, limit, colum
 			return nil, err
 		}
 		if w.Format == "xlsb" {
-			_, err := w.walkXLSBRows(meta, limit, columns, ctx.Done(), nil, func(number, style int, cells []externalCell) error {
+			_, err := w.walkXLSBRows(meta, limit, columns, ctx.Done(), nil, nil, func(number, style int, cells []externalCell) error {
 				r := RowData{Number: number, Style: style, Cells: make([]CellData, 0, len(cells))}
 				suffix := strconv.Itoa(number)
 				for _, cell := range cells {

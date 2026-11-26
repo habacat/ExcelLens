@@ -227,7 +227,7 @@ func (w *Workbook) resolveHyperlinkLocation(location, sourceSheet string, depth 
 		if !ok {
 			key := strings.ToLower(strings.TrimSpace(address))
 			if scope := w.LocalNamedRanges[strings.ToLower(sourceSheet)]; scope != nil {
-				if expr := scope[key]; expr != "" {
+				if expr, exists := scope[key]; exists {
 					return w.resolveHyperlinkLocation(expr, sourceSheet, depth+1)
 				}
 			}
@@ -581,29 +581,12 @@ func readNamedRanges(data []byte, original []workbookSheetXML) (map[string]strin
 	if err != nil || !catalogue.Complete {
 		return global, local
 	}
-	groups := make(map[string][]CatalogueItem)
 	for _, item := range catalogue.Items {
-		key := catalogueScopeKey(item.Scope, item.Name)
-		groups[key] = append(groups[key], item)
-	}
-	for _, group := range groups {
-		if len(group) != 1 {
-			continue
+		value := strings.TrimSpace(item.Definition)
+		if item.Status == "invalid" || item.Status == "unavailable" || len(value) > 2048 {
+			value = ""
 		}
-		item := group[0]
-		if item.Status == "invalid" || item.Status == "unavailable" || len(item.Definition) > 2048 {
-			continue
-		}
-		key, value := strings.ToLower(item.Name), strings.TrimSpace(item.Definition)
-		if item.Scope == "" {
-			global[key] = value
-			continue
-		}
-		sheet := strings.ToLower(item.Scope)
-		if local[sheet] == nil {
-			local[sheet] = make(map[string]string)
-		}
-		local[sheet][key] = value
+		registerWorkbookName(global, local, item.Scope, item.Name, value)
 	}
 	return global, local
 }
