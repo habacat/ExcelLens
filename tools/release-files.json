@@ -8,6 +8,7 @@
   "validation/1.16.0/performance-baseline.json",
   "validation/1.19.0/performance-baseline.json",
   "validation/1.19.1/viewport-performance.json",
+  "validation/1.19.1/performance-baseline.json",
   "go.mod",
   "NOTICE.md",
   "LICENSE",
