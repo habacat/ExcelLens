@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -18,7 +19,8 @@ def require(condition, message):
 
 
 def verify_performance_coverage(version, report):
-    if tuple(map(int, version.split("."))) < (1, 19, 0):
+    release = tuple(map(int, version.split(".")))
+    if release < (1, 19, 0):
         return
     require(report.get("schema") == 2, "This release requires the second-generation performance baseline")
     query = report.get("rowQuery", {})
@@ -40,6 +42,19 @@ def verify_performance_coverage(version, report):
         and len(v.get("passes", [])) >= 3 for v in views), "Incomplete conditional browser measurements")
     require(len(cf.get("perCell", {}).get("runs", [])) == 3 and len(cf.get("inlinePresentation", {})) == 4
             and all(len(runs) == 3 for runs in cf["inlinePresentation"].values()), "Incomplete allocation measurements")
+    if release >= (1, 19, 1):
+        for section, names in (("conditionalViewports", {"column_step_1", "column_step_7"}),
+                               ("sourceNumberReads", {"single", "forward", "reverse", "scattered"})):
+            series = cf.get(section, {})
+            require(set(series) == names, f"Missing {section} workloads")
+            for name, runs in series.items():
+                require(len(runs) == 3, f"Incomplete {section}/{name} measurements")
+                for run in runs:
+                    ns = run.get("nsPerViewport")
+                    require(type(ns) in (int, float) and math.isfinite(ns) and ns > 0
+                            and all(type(run.get(k)) is int and run[k] >= 0
+                                    for k in ("bytesPerViewport", "allocationsPerViewport")),
+                            f"Invalid {section}/{name} measurement")
 
 def digest(path):
     h = hashlib.sha256()
