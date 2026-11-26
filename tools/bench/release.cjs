@@ -163,15 +163,15 @@ async function readingCases(){
       if(kind==='csv'&&rows===list[0]){
         await h.page.call('Page.bringToFront');
         await h.page.run(seconds=>{
-          const grid=document.getElementById('grid'),start=performance.now();
+          const grid=document.getElementById('grid'),start=performance.now(),scale=window.ExcelLensPerformance().virtualScrollScale;
           let last=start;const intervals=[];let noCoverage=0,blank=0;
           function frame(t){
             if(t>last)intervals.push(t-last);last=t;
-            grid.scrollTop=(t-start)*.9%(Math.max(1,grid.scrollHeight-grid.clientHeight));
+            grid.scrollTop=((t-start)*.9%Math.max(1,(grid.scrollHeight-grid.clientHeight)*scale))/scale;
             if(!window.ExcelLensPerformance().hasVisibleCoverage)noCoverage++;
             if(!document.querySelector('#rowsLayer .grid-cell')&&document.querySelector('#viewportFallback').hidden)blank++;
             if(t-start<seconds*1000)requestAnimationFrame(frame);
-            else{intervals.sort((a,b)=>a-b);window.benchScroll={durationMs:t-start,frames:intervals.length,fps:intervals.length*1000/(t-start),p95FrameMs:intervals[Math.ceil(intervals.length*.95)-1],noCoverageFrames:noCoverage,emptyFrames:blank};}
+            else{intervals.sort((a,b)=>a-b);window.benchScroll={durationMs:t-start,logicalVelocityPxPerSec:900,virtualScrollScale:scale,frames:intervals.length,fps:intervals.length*1000/(t-start),p95FrameMs:intervals[Math.ceil(intervals.length*.95)-1],noCoverageFrames:noCoverage,emptyFrames:blank};}
           }
           requestAnimationFrame(frame);
         },scrollSeconds);
@@ -267,7 +267,8 @@ async function editCase(){
          report.rowQuery=await require('./row-query.cjs').measureRowQuery(h.page,status,rows,m,waitFor);
        });
      },
-     conditional:async()=>{report.conditional=await require('./conditional.cjs').measureConditional({root,temp,go,exe,meter,smoke});}};
+     conditional:async()=>{report.conditional=await require('./conditional.cjs').measureConditional({root,temp,go,exe,meter,smoke,
+       onProgress:partial=>{report.conditional=partial;save();}});}};
    if(only&&!scenarios[only])throw Error('Unknown performance scenario: '+only);
    save();
    for(const [name,work] of Object.entries(scenarios)){if(!only||name===only){await work();console.log(name+' complete');}}

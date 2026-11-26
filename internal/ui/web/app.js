@@ -3887,6 +3887,7 @@
   // Contains counters only, never spreadsheet content. Used by automated QA.
   window.ExcelLensPerformance = () => ({
     ...S.renderMetrics,
+    virtualScrollScale: virtualScroll.scale,
     currentRows:S.renderedRows.size,
     visibleNodes:$("rowsLayer").querySelectorAll(".grid-cell").length,
     bufferedTiles:tiles.size,

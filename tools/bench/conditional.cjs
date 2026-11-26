@@ -13,7 +13,7 @@ function percentile(samples, p) {
   return sorted[Math.ceil(sorted.length * p) - 1];
 }
 
-async function measureConditional({ root, temp, go, exe, meter, smoke }) {
+async function measureConditional({ root, temp, go, exe, meter, smoke, onProgress }) {
   const cases = smoke ? [100, 5000] : [10000, 500000];
   const rows = smoke ? 10000 : 1000000;
   const repetitions = smoke ? 1 : 3;
@@ -36,6 +36,7 @@ async function measureConditional({ root, temp, go, exe, meter, smoke }) {
       assert.equal(sample.sharedIndexUnchangedOnWarmAndReopen, true);
       assert.equal(sample.warmViewportSamplesMs.length, 16);
       byKeys.get(keys).push(sample);
+      onProgress({ stage: 'statistics', completedRuns: [...byKeys.values()].flat() });
     }
   }
   const statistics = [...byKeys].map(([distinctKeys, runs]) => {
@@ -63,6 +64,10 @@ async function measureConditional({ root, temp, go, exe, meter, smoke }) {
   assert.equal(Object.keys(inlinePresentation).length, 4);
   for (const samples of Object.values(inlinePresentation)) assert.equal(samples.length, repetitions);
   const browser = [];
+  const report = { statistics, inlinePresentation, perCell: { runs: measurements,
+    medianNs: percentile(measurements.map(m => m.nsPerCell), .5), medianBytes: percentile(measurements.map(m => m.bytesPerCell), .5),
+    medianAllocs: percentile(measurements.map(m => m.allocationsPerCell), .5) }, browser };
+  onProgress({ stage: 'browser', ...report });
   for (const profile of [
     { mode: 'complex', rows: 2400, file: path.join(temp, 'complex-conditional-fixture.xlsx') },
     { mode: 'external', rows: rows + 1, keys: cases[0], file: fixture },
@@ -72,9 +77,9 @@ async function measureConditional({ root, temp, go, exe, meter, smoke }) {
     assert.ok(run.resources.peakServiceRSSBytes > 0 && run.resources.peakDataBytes > 0);
     if (profile.mode === 'external') assert.equal(run.sourceSHA256, statistics[0].sourceSHA256);
     browser.push(run);
+    onProgress({ stage: 'browser', ...report });
   }
-  return { statistics, inlinePresentation, perCell: { runs: measurements, medianNs: percentile(measurements.map(m => m.nsPerCell), .5),
-    medianBytes: percentile(measurements.map(m => m.bytesPerCell), .5), medianAllocs: percentile(measurements.map(m => m.allocationsPerCell), .5) }, browser };
+  return report;
 }
 
 module.exports = { measureConditional };

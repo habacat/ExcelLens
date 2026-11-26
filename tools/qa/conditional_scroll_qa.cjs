@@ -117,7 +117,9 @@ function installInstruments(mode, rows, keys, colors) {
     if (node.textContent !== '') populatedCols.add(Number(node.dataset.col));
   }
 
-  const q = { mode, box, dx, dy, stamp, events: [], calls: 0, cancels: 0 };
+  const scale = window.ExcelLensPerformance().virtualScrollScale;
+  if (!Number.isFinite(scale) || scale < 1) throw Error('Invalid logical scroll scale');
+  const q = { mode, box, dx, dy, scale, stamp, events: [], calls: 0, cancels: 0 };
 
   if (!window.__cfScrollFetchHooked) {
     window.__cfScrollFetchHooked = true;
@@ -165,7 +167,7 @@ function installInstruments(mode, rows, keys, colors) {
         const x = box.x + (box.right - box.x) * u;
         const y = box.y + (box.bottom - box.y) * v;
         const logicalX = x - a.left + g.scrollLeft;
-        const logicalY = y - a.top + g.scrollTop;
+        const logicalY = y - a.top + g.scrollTop * scale;
         const fracX = logicalX % dx, fracY = logicalY % dy;
         if (Math.min(fracX, dx - fracX, fracY, dy - fracY) < 1.5) continue;
         const c = Math.floor(logicalX / dx) + 1;
@@ -209,7 +211,7 @@ function installInstruments(mode, rows, keys, colors) {
   };
 
   window.cfScrollQA = q;
-  return { box, dx, dy, maxScrollLeft: Math.max(0, g.scrollWidth - g.clientWidth), maxScrollTop: Math.max(0, g.scrollHeight - g.clientHeight) };
+  return { box, dx, dy, scale, maxScrollLeft: Math.max(0, g.scrollWidth - g.clientWidth), maxScrollTop: Math.max(0, g.scrollHeight - g.clientHeight) * scale };
 }
 
 async function driveFixedVelocity(phases, styled) {
@@ -260,7 +262,7 @@ async function driveFixedVelocity(phases, styled) {
       const t = Math.min(1, (time - start) / duration);
       g.scrollTo(
         Math.max(0, fromX + Math.round(deltaX * t)),
-        Math.max(0, fromY + Math.round(deltaY * t))
+        Math.max(0, fromY + deltaY * t / q.scale)
       );
       lastInput = performance.now();
       q.mark(phase);
@@ -306,6 +308,8 @@ async function driveFixedVelocity(phases, styled) {
       durationMs: totalMs,
       logicalDeltaX: deltaX,
       logicalDeltaY: deltaY,
+      actualLogicalDeltaY: (g.scrollTop - fromY) * q.scale,
+      virtualScrollScale: q.scale,
       logicalVelocityPxPerSec: duration > 1 ? Math.round((distancePx * 1000) / duration) : 0,
       frames,
       checkedFrames: frames - 1,
