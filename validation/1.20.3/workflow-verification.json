@@ -1,0 +1,134 @@
+{
+  "version": "1.20.3",
+  "result": "PASS",
+  "scope": "Large-sample read-only data engine regression before tagging",
+  "comparisonVersion": "1.20.2",
+  "baselinePublicCommit": "9d7706fc9a8691e1153508a6003eaee487810c05",
+  "environment": {
+    "go": "go1.27.4",
+    "goos": "windows",
+    "goarch": "amd64",
+    "GOAMD64": "v1",
+    "CGO_ENABLED": 0,
+    "GOMAXPROCS": 4,
+    "cpu": "Intel Core i7-9750H"
+  },
+  "millionRowHTTP": {
+    "rows": 1000000,
+    "pairs": 4,
+    "sourceSHA256": "f868b956d7440059d355aa98765ab505e15e34aaab80f4e38c94e59193d439dc",
+    "includes": "upload, index, value search, cold filter and warm filter with different rules, first/last coordinates and exact financial strings, six cross-tab measures against independent decimal expectations",
+    "summary": {
+      "totalMs": {
+        "medianBefore": 6359.340900000003,
+        "medianAfter": 3192.3457000000008,
+        "medianPairedChangePct": -51.58,
+        "lowerPairs": 4
+      },
+      "openIndexMs": {
+        "medianBefore": 1541.3599000000004,
+        "medianAfter": 1578.9272500000031,
+        "medianPairedChangePct": 2.96,
+        "lowerPairs": 1
+      },
+      "searchMs": {
+        "medianBefore": 2885.8873500000045,
+        "medianAfter": 417.4306000000012,
+        "medianPairedChangePct": -85.29,
+        "lowerPairs": 4
+      },
+      "coldFilterReadMs": {
+        "medianBefore": 1340.7944499999935,
+        "medianAfter": 1074.3636499999986,
+        "medianPairedChangePct": -22.9,
+        "lowerPairs": 4
+      },
+      "warmFilterReadMs": {
+        "medianBefore": 540.2306000000045,
+        "medianAfter": 62.60364999999979,
+        "medianPairedChangePct": -88.15,
+        "lowerPairs": 4
+      },
+      "processPeakRSSBytes": {
+        "medianBefore": 222457856.0,
+        "medianAfter": 236447744.0,
+        "medianPairedChangePct": 6.29,
+        "lowerPairs": 0
+      },
+      "aggregateMs": {
+        "medianBefore": 7764.73225,
+        "medianAfter": 5300.039150000001,
+        "medianPairedChangePct": -33.53,
+        "lowerPairs": 4
+      },
+      "includingAggregateMs": {
+        "medianBefore": 14153.769750000003,
+        "medianAfter": 8663.123000000003,
+        "medianPairedChangePct": -41.93,
+        "lowerPairs": 4
+      }
+    }
+  },
+  "memoryDiagnostic": {
+    "pairs": 4,
+    "peakDifferenceFirstObservedAfter": "value search",
+    "settledHeapAllocMedianBytes": {
+      "prior": 12582080.0,
+      "candidate": 12559372.0
+    },
+    "processPeakIncreasedInAllMainPairs": true
+  },
+  "fiveMillionDataRows": {
+    "records": 5000001,
+    "rowsIncludingHeader": 5000002,
+    "phasesPassed": [
+      "cold-open-index",
+      "cached-reopen-index",
+      "random-viewport-100x80",
+      "full-search-tail",
+      "condition-filter",
+      "column-distinct",
+      "large-stable-external-sort",
+      "complete-filter-without-materializing-rows",
+      "streaming-group-count",
+      "complete-streaming-csv-export"
+    ],
+    "sourceUnchanged": true,
+    "residentOffsets": 0
+  },
+  "privateSourceValidation": {
+    "XLSM": {
+      "result": "PASS",
+      "versions": [
+        "1.20.2",
+        "1.20.3"
+      ],
+      "sourceUnchanged": true,
+      "rowOffsetsAndSharedFormulaAnchorsMatch": true,
+      "sampledRowsCompared": 64,
+      "allSampleColumnsCompared": true,
+      "sourceCellDataDigestMatches": true,
+      "searchPrefixRowsCompared": 4000
+    },
+    "TXT": {
+      "result": "PASS",
+      "versions": [
+        "1.20.2",
+        "1.20.3"
+      ],
+      "sourceUnchanged": true,
+      "rowOffsetsAndSharedFormulaAnchorsMatch": true,
+      "sampledRowsCompared": 64,
+      "allSampleColumnsCompared": true,
+      "sourceCellDataDigestMatches": true,
+      "searchPrefixRowsCompared": 4000
+    }
+  },
+  "desktopManualAcceptance": false,
+  "receipts": {
+    "million-ledger-pairs.json": "9cb70dbdd215606aad73ab032faf8bc316c7dce932689638d332363bbffdfc89",
+    "million-ledger-memory.json": "351c62714e7aeb426ce5828417e3b74ea0ab0b0180596d49b1710cf953368116",
+    "five-million-regression.json": "d63617365a88fe6890fd497fc8b8a56f4a0f899b63a4ff6512c7476a51d34a3c",
+    "private-sample-summary.json": "573e3ade23c58cf80c41ab303b2a87abb8ff1fe366d2d1697bb5bcf422cbdba1"
+  }
+}

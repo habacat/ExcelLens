@@ -1,0 +1,298 @@
+{
+  "benchmark": "^BenchmarkEngineLedger$/^(csv|txt)$/^workflow$",
+  "benchtime": "550ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "workbook-final.exe",
+      "sha256": "79cf9b1bbe5f50d1af497df6450858345d8ff6f1d973310f1def021c2dcbbaa7"
+    },
+    "after": {
+      "name": "workbook-final-pgo.exe",
+      "sha256": "23c365cd4b955509267a5d4acb566d8c66e5b572b87f64944e824f7dd5275306"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          58131410.0,
+          12638293,
+          168313
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          65378722.0,
+          12702154,
+          168364
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          73925188.0,
+          13509457,
+          233854
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          61974856.0,
+          13547099,
+          233903
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          58514120.0,
+          13481813,
+          233851
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          59803110.0,
+          13534312,
+          233902
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          56639860.0,
+          12638552,
+          168314
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          56580080.0,
+          12690533,
+          168365
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          58990520.0,
+          12638332,
+          168313
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          63559567.0,
+          12702672,
+          168366
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          63537489.0,
+          13494671,
+          233853
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          68956400.0,
+          13546359,
+          233903
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          62735978.0,
+          13494799,
+          233853
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          61679644.0,
+          13546808,
+          233904
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          59789230.0,
+          12637824,
+          168312
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          59695720.0,
+          12691198,
+          168367
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          63497522.0,
+          12650010,
+          168313
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          69375488.0,
+          12718298,
+          168367
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          75020025.0,
+          13510052,
+          233854
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          75489300.0,
+          13561673,
+          233904
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          64286389.0,
+          13494608,
+          233852
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          69885775.0,
+          13561438,
+          233904
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          62285111.0,
+          12649968,
+          168313
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          61681756.0,
+          12703198,
+          168366
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          62529533.0,
+          12649997,
+          168313
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          62004350.0,
+          12690920,
+          168365
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          66411044.0,
+          13494799,
+          233853
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          69154062.0,
+          13561689,
+          233905
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          120977100.0,
+          13591395,
+          233857
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          112430800.0,
+          13644046,
+          233908
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          92163743.0,
+          12685545,
+          168317
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          129645140.0,
+          12799099,
+          168368
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkEngineLedger/csv/workflow-4": {
+      "medianBefore": [
+        61037170.5,
+        12644260.0,
+        168313.0
+      ],
+      "medianAfter": [
+        65348716.5,
+        13494799.0,
+        233853.0
+      ],
+      "medianPairedTimeChangePct": 6.96,
+      "fasterPairs": 0
+    },
+    "BenchmarkEngineLedger/txt/workflow-4": {
+      "medianBefore": [
+        62781958.5,
+        12702413.0,
+        168366.0
+      ],
+      "medianAfter": [
+        69055231.0,
+        13554268.5,
+        233904.0
+      ],
+      "medianPairedTimeChangePct": 7.09,
+      "fasterPairs": 2
+    }
+  }
+}

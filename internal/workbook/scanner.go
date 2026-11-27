@@ -148,7 +148,7 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 				info := inspectXMLTag(tag)
 				if layout != nil && info.valid {
 					n := 0
-					if !info.closing && bytes.Equal(info.name, []byte("row")) {
+					if !info.closing && string(info.name) == "row" {
 						n = parsePositiveIntBytes(xmlAttribute(tag, "r"))
 						if n <= 0 {
 							n = len(rows) + 1
@@ -157,7 +157,7 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 					layout.captureMetadataToken(tag, info, tagStart, counted.n-int64(reader.Buffered()), n)
 				}
 				if info.valid && !info.closing && hyperlinkStart != nil &&
-					bytes.Equal(info.name, []byte("hyperlinks")) && *hyperlinkStart == -1 {
+					string(info.name) == "hyperlinks" && *hyperlinkStart == -1 {
 					*hyperlinkStart = tagStart
 				}
 				if info.valid {
@@ -176,17 +176,17 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 						}
 					}
 					if info.closing {
-						if bytes.Equal(info.name, []byte("r")) && depth == runDepth {
+						if string(info.name) == "r" && depth == runDepth {
 							runDepth = 0
 						}
-						if bytes.Equal(info.name, []byte("is")) && depth == inlineDepth {
+						if string(info.name) == "is" && depth == inlineDepth {
 							inlineDepth, runDepth = 0, 0
 						}
-						if (bytes.Equal(info.name, []byte("rPh")) || bytes.Equal(info.name, []byte("extLst"))) && ignoredTextDepth > 0 {
+						if (string(info.name) == "rPh" || string(info.name) == "extLst") && ignoredTextDepth > 0 {
 							ignoredTextDepth--
 						}
 						switch {
-						case bytes.Equal(info.name, []byte("f")) && depth == formulaDepth:
+						case string(info.name) == "f" && depth == formulaDepth:
 							inCellFormula = false
 							if inAnchorFormula && anchorID != "" {
 								formula := strings.TrimSpace(html.UnescapeString(string(formulaText)))
@@ -201,8 +201,8 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 							formulaDepth = 0
 							anchorID, anchorRef = "", ""
 							formulaText = formulaText[:0]
-						case (bytes.Equal(info.name, []byte("v")) || bytes.Equal(info.name, []byte("t"))) && depth == valueDepth:
-							if cellOpen && cellIsShared && bytes.Equal(info.name, []byte("v")) && len(sharedValue) > 0 {
+						case (string(info.name) == "v" || string(info.name) == "t") && depth == valueDepth:
+							if cellOpen && cellIsShared && string(info.name) == "v" && len(sharedValue) > 0 {
 								index, err := strconv.Atoi(string(bytes.TrimSpace(sharedValue)))
 								if err != nil || index < 0 || len(shared) == 0 || index >= len(shared) || strings.TrimSpace(shared[index]) != "" {
 									cellPayload = true
@@ -212,7 +212,7 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 							// a styled blank into a used cell.
 							inCellValue = false
 							valueDepth = 0
-						case bytes.Equal(info.name, []byte("c")) && depth == 1:
+						case string(info.name) == "c" && depth == 1:
 							if cellOpen && cellPayload {
 								if rowNumber > maxRow {
 									maxRow = rowNumber
@@ -227,7 +227,7 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 							inCellFormula = false
 							cellIsShared = false
 							currentCellRef = nil
-						case bytes.Equal(info.name, []byte("row")):
+						case string(info.name) == "row":
 							if !inRow {
 								return nil, nil, "", 0, 0, errors.New("发现未匹配的工作表行结束标签")
 							}
@@ -245,11 +245,11 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 						}
 					} else {
 						switch {
-						case bytes.Equal(info.name, []byte("dimension")):
+						case string(info.name) == "dimension":
 							if ref := xmlAttribute(tag, "ref"); len(ref) > 0 {
 								dimension = html.UnescapeString(string(ref))
 							}
-						case bytes.Equal(info.name, []byte("row")):
+						case string(info.name) == "row":
 							if inRow {
 								return nil, nil, "", 0, 0, errors.New("工作表行标签嵌套，XML 结构异常")
 							}
@@ -264,11 +264,11 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 								rows = append(rows, RowOffset{Number: rowNumber, Start: rowStart, End: counted.n - int64(reader.Buffered())})
 
 							}
-						case bytes.Equal(info.name, []byte("rPh")) || bytes.Equal(info.name, []byte("extLst")):
+						case string(info.name) == "rPh" || string(info.name) == "extLst":
 							if !info.selfClosing {
 								ignoredTextDepth++
 							}
-						case bytes.Equal(info.name, []byte("c")) && inRow && !cellOpen && ignoredTextDepth == 0:
+						case string(info.name) == "c" && inRow && !cellOpen && ignoredTextDepth == 0:
 							refAttr, typeAttr, _ := xmlCellAttributes(tag)
 							currentCellRef = append(cellRefSmall[:0], refAttr...)
 							parsedCol := parseColumnBytes(currentCellRef)
@@ -284,16 +284,16 @@ func scanWorksheetWithSharedHint(source io.Reader, total int64, cancel <-chan st
 							inCellFormula = false
 							cellIsShared = bytes.Equal(typeAttr, []byte("s"))
 							sharedValue = sharedValue[:0]
-						case bytes.Equal(info.name, []byte("is")) && cellOpen && depth == 2 && !info.selfClosing:
+						case string(info.name) == "is" && cellOpen && depth == 2 && !info.selfClosing:
 							inlineDepth = depth
-						case bytes.Equal(info.name, []byte("r")) && inlineDepth > 0 && depth == inlineDepth+1 && !info.selfClosing:
+						case string(info.name) == "r" && inlineDepth > 0 && depth == inlineDepth+1 && !info.selfClosing:
 							runDepth = depth
-						case cellOpen && ((bytes.Equal(info.name, []byte("v")) && depth == 2) || (bytes.Equal(info.name, []byte("t")) && inlineDepth > 0 && (depth == inlineDepth+1 || runDepth > 0 && depth == runDepth+1))):
+						case cellOpen && ((string(info.name) == "v" && depth == 2) || (string(info.name) == "t" && inlineDepth > 0 && (depth == inlineDepth+1 || runDepth > 0 && depth == runDepth+1))):
 							inCellValue = !info.selfClosing && ignoredTextDepth == 0
 							if inCellValue {
 								valueDepth = depth
 							}
-						case bytes.Equal(info.name, []byte("f")) && cellOpen && depth == 2:
+						case string(info.name) == "f" && cellOpen && depth == 2:
 							// A shared-formula follower often has no formula text,
 							// but it still represents a real, nonempty formula.
 							fType := string(xmlAttribute(tag, "t"))

@@ -25,6 +25,9 @@ type RowReadOptions struct {
 	// Only a synchronous internal scan that consumes every cell before the
 	// next read supplies storage. Returned public rows always own their cells.
 	cellScratch *[]CellData
+	// Restrict native row decoding to value hits. Plain text can be checked
+	// on borrowed record bytes; typed cells need their normal presentation.
+	nativeValueQuery *searchTextQuery
 }
 
 func (o RowReadOptions) cells(capacity int) []CellData {

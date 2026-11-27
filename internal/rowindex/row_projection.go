@@ -192,9 +192,9 @@ func (p *RowProjection) block(i int) rowProjectionBlock {
 	start := rowProjectionHeaderBytes + p.data.payloadBytes + i*rowProjectionRecordBytes
 	return decodeRowProjectionBlock(p.data.storage[start : start+rowProjectionRecordBytes])
 }
-func (p *RowProjection) word(block rowProjectionBlock, i int) uint64 {
-	start := rowProjectionHeaderBytes + int(block.offset) + i*8
-	return binary.LittleEndian.Uint64(p.data.storage[start : start+8])
+func (p *RowProjection) bitmap(block rowProjectionBlock) []byte {
+	start := rowProjectionHeaderBytes + int(block.offset)
+	return p.data.storage[start : start+int((block.count+63)/64)*8]
 }
 func (p *RowProjection) At(position int) int {
 	if p == nil || p.closed.Load() || position < 0 || position >= p.Len() {
@@ -210,18 +210,20 @@ func (p *RowProjection) At(position int) int {
 	if b.kind == rowProjectionAll {
 		return p.data.base.At(int(b.start) + rank)
 	}
-	for word := 0; word < int(b.count+63)/64; word++ {
-		value := p.word(b, word)
+	start := int(b.start)
+	for raw := p.bitmap(b); len(raw) >= 8; raw = raw[8:] {
+		value := binary.LittleEndian.Uint64(raw)
 		count := bits.OnesCount64(value)
 		if rank >= count {
 			rank -= count
+			start += 64
 			continue
 		}
 		for rank > 0 {
 			value &= value - 1
 			rank--
 		}
-		return p.data.base.At(int(b.start) + word*64 + bits.TrailingZeros64(value))
+		return p.data.base.At(start + bits.TrailingZeros64(value))
 	}
 	panic("invalid visible row bitmap")
 }
@@ -253,10 +255,13 @@ func (p *RowProjection) Position(sourcePosition int) (int, bool) {
 	if b.kind == rowProjectionAll {
 		return at + local, true
 	}
-	for word := 0; word < local/64; word++ {
-		at += bits.OnesCount64(p.word(b, word))
+	raw := p.bitmap(b)
+	prefix := raw[:local/64*8]
+	for len(prefix) >= 8 {
+		at += bits.OnesCount64(binary.LittleEndian.Uint64(prefix))
+		prefix = prefix[8:]
 	}
-	value := p.word(b, local/64)
+	value := binary.LittleEndian.Uint64(raw[local/64*8:])
 	bit := uint(local % 64)
 	at += bits.OnesCount64(value & ((uint64(1) << bit) - 1))
 	return at, value&(uint64(1)<<bit) != 0
@@ -317,8 +322,10 @@ func (p *RowProjection) IterRange(offset, count int) iter.Seq[int] {
 			}
 			skip := max(offset-int(b.visibleStart), 0)
 			left := min(end-int(b.visibleStart), int(b.visible)) - skip
-			for word := 0; word < int(b.count+63)/64; word++ {
-				value := p.word(b, word)
+			raw := p.bitmap(b)
+			for word := 0; len(raw) >= 8; word++ {
+				value := binary.LittleEndian.Uint64(raw)
+				raw = raw[8:]
 				bitsInWord := bits.OnesCount64(value)
 				if skip >= bitsInWord {
 					skip -= bitsInWord

@@ -1,0 +1,789 @@
+{
+  "result": "PASS",
+  "rows": 1000000,
+  "versions": [
+    "1.20.2",
+    "1.20.3"
+  ],
+  "pairs": [
+    {
+      "order": [
+        "prior",
+        "candidate"
+      ],
+      "prior": {
+        "started": {
+          "HeapAlloc": 4168680,
+          "HeapInuse": 5537792,
+          "HeapReleased": 4063232,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 23166976,
+          "CurrentRSS": 23162880
+        },
+        "uploaded": {
+          "HeapAlloc": 104133736,
+          "HeapInuse": 105431040,
+          "HeapReleased": 3022848,
+          "HeapSys": 142409728,
+          "NumGC": 8,
+          "PeakRSS": 156606464,
+          "CurrentRSS": 156602368
+        },
+        "indexed": {
+          "HeapAlloc": 7507736,
+          "HeapInuse": 9117696,
+          "HeapReleased": 2252800,
+          "HeapSys": 205225984,
+          "NumGC": 9,
+          "PeakRSS": 223113216,
+          "CurrentRSS": 223109120
+        },
+        "searched": {
+          "HeapAlloc": 3551432,
+          "HeapInuse": 4988928,
+          "HeapReleased": 197525504,
+          "HeapSys": 205062144,
+          "NumGC": 547,
+          "PeakRSS": 223600640,
+          "CurrentRSS": 48566272
+        },
+        "coldFilter": {
+          "HeapAlloc": 17112816,
+          "HeapInuse": 18808832,
+          "HeapReleased": 175341568,
+          "HeapSys": 205029376,
+          "NumGC": 597,
+          "PeakRSS": 223600640,
+          "CurrentRSS": 71077888
+        },
+        "warmFilter": {
+          "HeapAlloc": 12553032,
+          "HeapInuse": 14204928,
+          "HeapReleased": 175751168,
+          "HeapSys": 204963840,
+          "NumGC": 603,
+          "PeakRSS": 223600640,
+          "CurrentRSS": 70672384
+        },
+        "aggregated": {
+          "HeapAlloc": 25387464,
+          "HeapInuse": 27271168,
+          "HeapReleased": 173809664,
+          "HeapSys": 204898304,
+          "NumGC": 869,
+          "PeakRSS": 223600640,
+          "CurrentRSS": 73064448
+        },
+        "settled": {
+          "HeapAlloc": 12587512,
+          "HeapInuse": 14385152,
+          "HeapReleased": 173809664,
+          "HeapSys": 204898304,
+          "NumGC": 870,
+          "PeakRSS": 223600640,
+          "CurrentRSS": 73064448
+        }
+      },
+      "candidate": {
+        "started": {
+          "HeapAlloc": 2779608,
+          "HeapInuse": 4038656,
+          "HeapReleased": 4956160,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 22851584,
+          "CurrentRSS": 22429696
+        },
+        "uploaded": {
+          "HeapAlloc": 104130080,
+          "HeapInuse": 105324544,
+          "HeapReleased": 3407872,
+          "HeapSys": 142409728,
+          "NumGC": 8,
+          "PeakRSS": 156319744,
+          "CurrentRSS": 156315648
+        },
+        "indexed": {
+          "HeapAlloc": 7522696,
+          "HeapInuse": 9019392,
+          "HeapReleased": 2613248,
+          "HeapSys": 205225984,
+          "NumGC": 9,
+          "PeakRSS": 222744576,
+          "CurrentRSS": 222740480
+        },
+        "searched": {
+          "HeapAlloc": 3915976,
+          "HeapInuse": 5349376,
+          "HeapReleased": 11608064,
+          "HeapSys": 205160448,
+          "NumGC": 12,
+          "PeakRSS": 234491904,
+          "CurrentRSS": 234029056
+        },
+        "coldFilter": {
+          "HeapAlloc": 18883472,
+          "HeapInuse": 20398080,
+          "HeapReleased": 30023680,
+          "HeapSys": 205127680,
+          "NumGC": 18,
+          "PeakRSS": 234491904,
+          "CurrentRSS": 216231936
+        },
+        "warmFilter": {
+          "HeapAlloc": 21936008,
+          "HeapInuse": 23519232,
+          "HeapReleased": 31399936,
+          "HeapSys": 205127680,
+          "NumGC": 18,
+          "PeakRSS": 234491904,
+          "CurrentRSS": 214863872
+        },
+        "aggregated": {
+          "HeapAlloc": 23532056,
+          "HeapInuse": 25337856,
+          "HeapReleased": 161816576,
+          "HeapSys": 204931072,
+          "NumGC": 167,
+          "PeakRSS": 234491904,
+          "CurrentRSS": 85135360
+        },
+        "settled": {
+          "HeapAlloc": 12565480,
+          "HeapInuse": 14311424,
+          "HeapReleased": 162275328,
+          "HeapSys": 204931072,
+          "NumGC": 168,
+          "PeakRSS": 234491904,
+          "CurrentRSS": 84676608
+        }
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "prior"
+      ],
+      "candidate": {
+        "started": {
+          "HeapAlloc": 2777144,
+          "HeapInuse": 3997696,
+          "HeapReleased": 4128768,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 23023616,
+          "CurrentRSS": 22577152
+        },
+        "uploaded": {
+          "HeapAlloc": 104129456,
+          "HeapInuse": 105267200,
+          "HeapReleased": 2686976,
+          "HeapSys": 142376960,
+          "NumGC": 8,
+          "PeakRSS": 157052928,
+          "CurrentRSS": 157048832
+        },
+        "indexed": {
+          "HeapAlloc": 7495840,
+          "HeapInuse": 8896512,
+          "HeapReleased": 3235840,
+          "HeapSys": 205225984,
+          "NumGC": 9,
+          "PeakRSS": 222056448,
+          "CurrentRSS": 222052352
+        },
+        "searched": {
+          "HeapAlloc": 3785992,
+          "HeapInuse": 5152768,
+          "HeapReleased": 6979584,
+          "HeapSys": 205193216,
+          "NumGC": 12,
+          "PeakRSS": 238600192,
+          "CurrentRSS": 238596096
+        },
+        "coldFilter": {
+          "HeapAlloc": 18552360,
+          "HeapInuse": 20103168,
+          "HeapReleased": 20283392,
+          "HeapSys": 205160448,
+          "NumGC": 18,
+          "PeakRSS": 238735360,
+          "CurrentRSS": 225927168
+        },
+        "warmFilter": {
+          "HeapAlloc": 21604896,
+          "HeapInuse": 23183360,
+          "HeapReleased": 20283392,
+          "HeapSys": 205160448,
+          "NumGC": 18,
+          "PeakRSS": 238735360,
+          "CurrentRSS": 225931264
+        },
+        "aggregated": {
+          "HeapAlloc": 24409976,
+          "HeapInuse": 26165248,
+          "HeapReleased": 152338432,
+          "HeapSys": 205029376,
+          "NumGC": 166,
+          "PeakRSS": 238735360,
+          "CurrentRSS": 94527488
+        },
+        "settled": {
+          "HeapAlloc": 12553264,
+          "HeapInuse": 14188544,
+          "HeapReleased": 152797184,
+          "HeapSys": 205029376,
+          "NumGC": 167,
+          "PeakRSS": 238735360,
+          "CurrentRSS": 94072832
+        }
+      },
+      "prior": {
+        "started": {
+          "HeapAlloc": 2779784,
+          "HeapInuse": 4079616,
+          "HeapReleased": 4808704,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 22827008,
+          "CurrentRSS": 22552576
+        },
+        "uploaded": {
+          "HeapAlloc": 104129552,
+          "HeapInuse": 105381888,
+          "HeapReleased": 2744320,
+          "HeapSys": 142409728,
+          "NumGC": 8,
+          "PeakRSS": 157057024,
+          "CurrentRSS": 157052928
+        },
+        "indexed": {
+          "HeapAlloc": 7378672,
+          "HeapInuse": 8904704,
+          "HeapReleased": 2629632,
+          "HeapSys": 205258752,
+          "NumGC": 9,
+          "PeakRSS": 222720000,
+          "CurrentRSS": 222715904
+        },
+        "searched": {
+          "HeapAlloc": 2675608,
+          "HeapInuse": 4046848,
+          "HeapReleased": 197877760,
+          "HeapSys": 204963840,
+          "NumGC": 532,
+          "PeakRSS": 223039488,
+          "CurrentRSS": 48168960
+        },
+        "coldFilter": {
+          "HeapAlloc": 20823440,
+          "HeapInuse": 22732800,
+          "HeapReleased": 174817280,
+          "HeapSys": 204931072,
+          "NumGC": 581,
+          "PeakRSS": 223039488,
+          "CurrentRSS": 71512064
+        },
+        "warmFilter": {
+          "HeapAlloc": 21191816,
+          "HeapInuse": 22994944,
+          "HeapReleased": 177037312,
+          "HeapSys": 204898304,
+          "NumGC": 587,
+          "PeakRSS": 223039488,
+          "CurrentRSS": 69296128
+        },
+        "aggregated": {
+          "HeapAlloc": 13857888,
+          "HeapInuse": 15753216,
+          "HeapReleased": 173948928,
+          "HeapSys": 204832768,
+          "NumGC": 855,
+          "PeakRSS": 223039488,
+          "CurrentRSS": 72888320
+        },
+        "settled": {
+          "HeapAlloc": 12568320,
+          "HeapInuse": 14311424,
+          "HeapReleased": 173948928,
+          "HeapSys": 204832768,
+          "NumGC": 856,
+          "PeakRSS": 223039488,
+          "CurrentRSS": 72888320
+        }
+      }
+    },
+    {
+      "order": [
+        "prior",
+        "candidate"
+      ],
+      "prior": {
+        "started": {
+          "HeapAlloc": 4169720,
+          "HeapInuse": 5455872,
+          "HeapReleased": 4128768,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 23134208,
+          "CurrentRSS": 23130112
+        },
+        "uploaded": {
+          "HeapAlloc": 104129584,
+          "HeapInuse": 105332736,
+          "HeapReleased": 3096576,
+          "HeapSys": 142409728,
+          "NumGC": 8,
+          "PeakRSS": 156598272,
+          "CurrentRSS": 156594176
+        },
+        "indexed": {
+          "HeapAlloc": 7440824,
+          "HeapInuse": 8937472,
+          "HeapReleased": 2424832,
+          "HeapSys": 205193216,
+          "NumGC": 9,
+          "PeakRSS": 222949376,
+          "CurrentRSS": 222945280
+        },
+        "searched": {
+          "HeapAlloc": 4241208,
+          "HeapInuse": 5652480,
+          "HeapReleased": 197165056,
+          "HeapSys": 205062144,
+          "NumGC": 532,
+          "PeakRSS": 223240192,
+          "CurrentRSS": 48861184
+        },
+        "coldFilter": {
+          "HeapAlloc": 16623376,
+          "HeapInuse": 18186240,
+          "HeapReleased": 175521792,
+          "HeapSys": 205029376,
+          "NumGC": 582,
+          "PeakRSS": 223240192,
+          "CurrentRSS": 70852608
+        },
+        "warmFilter": {
+          "HeapAlloc": 12548656,
+          "HeapInuse": 14041088,
+          "HeapReleased": 176062464,
+          "HeapSys": 205029376,
+          "NumGC": 588,
+          "PeakRSS": 223240192,
+          "CurrentRSS": 70316032
+        },
+        "aggregated": {
+          "HeapAlloc": 22156904,
+          "HeapInuse": 23691264,
+          "HeapReleased": 173867008,
+          "HeapSys": 204701696,
+          "NumGC": 854,
+          "PeakRSS": 223240192,
+          "CurrentRSS": 72962048
+        },
+        "settled": {
+          "HeapAlloc": 12588816,
+          "HeapInuse": 14352384,
+          "HeapReleased": 173867008,
+          "HeapSys": 204701696,
+          "NumGC": 855,
+          "PeakRSS": 223240192,
+          "CurrentRSS": 72962048
+        }
+      },
+      "candidate": {
+        "started": {
+          "HeapAlloc": 2612832,
+          "HeapInuse": 3817472,
+          "HeapReleased": 7766016,
+          "HeapSys": 15532032,
+          "NumGC": 2,
+          "PeakRSS": 23248896,
+          "CurrentRSS": 22933504
+        },
+        "uploaded": {
+          "HeapAlloc": 104129024,
+          "HeapInuse": 105316352,
+          "HeapReleased": 7118848,
+          "HeapSys": 146571264,
+          "NumGC": 8,
+          "PeakRSS": 157003776,
+          "CurrentRSS": 156999680
+        },
+        "indexed": {
+          "HeapAlloc": 7704752,
+          "HeapInuse": 9207808,
+          "HeapReleased": 6815744,
+          "HeapSys": 209354752,
+          "NumGC": 9,
+          "PeakRSS": 222650368,
+          "CurrentRSS": 222646272
+        },
+        "searched": {
+          "HeapAlloc": 4334200,
+          "HeapInuse": 5693440,
+          "HeapReleased": 17113088,
+          "HeapSys": 209354752,
+          "NumGC": 12,
+          "PeakRSS": 232988672,
+          "CurrentRSS": 232656896
+        },
+        "coldFilter": {
+          "HeapAlloc": 18969888,
+          "HeapInuse": 20537344,
+          "HeapReleased": 36249600,
+          "HeapSys": 209354752,
+          "NumGC": 18,
+          "PeakRSS": 232988672,
+          "CurrentRSS": 214167552
+        },
+        "warmFilter": {
+          "HeapAlloc": 22024872,
+          "HeapInuse": 23642112,
+          "HeapReleased": 38543360,
+          "HeapSys": 209321984,
+          "NumGC": 18,
+          "PeakRSS": 232988672,
+          "CurrentRSS": 211881984
+        },
+        "aggregated": {
+          "HeapAlloc": 19835400,
+          "HeapInuse": 21389312,
+          "HeapReleased": 170532864,
+          "HeapSys": 209158144,
+          "NumGC": 167,
+          "PeakRSS": 232988672,
+          "CurrentRSS": 80568320
+        },
+        "settled": {
+          "HeapAlloc": 12566600,
+          "HeapInuse": 14237696,
+          "HeapReleased": 171057152,
+          "HeapSys": 209158144,
+          "NumGC": 168,
+          "PeakRSS": 232988672,
+          "CurrentRSS": 80044032
+        }
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "prior"
+      ],
+      "candidate": {
+        "started": {
+          "HeapAlloc": 2776312,
+          "HeapInuse": 3997696,
+          "HeapReleased": 7110656,
+          "HeapSys": 15532032,
+          "NumGC": 2,
+          "PeakRSS": 23384064,
+          "CurrentRSS": 23379968
+        },
+        "uploaded": {
+          "HeapAlloc": 104127584,
+          "HeapInuse": 105357312,
+          "HeapReleased": 6758400,
+          "HeapSys": 146604032,
+          "NumGC": 8,
+          "PeakRSS": 157347840,
+          "CurrentRSS": 157343744
+        },
+        "indexed": {
+          "HeapAlloc": 7518152,
+          "HeapInuse": 9035776,
+          "HeapReleased": 7208960,
+          "HeapSys": 209354752,
+          "NumGC": 9,
+          "PeakRSS": 222371840,
+          "CurrentRSS": 222367744
+        },
+        "searched": {
+          "HeapAlloc": 4130088,
+          "HeapInuse": 5611520,
+          "HeapReleased": 12386304,
+          "HeapSys": 209289216,
+          "NumGC": 12,
+          "PeakRSS": 237780992,
+          "CurrentRSS": 237481984
+        },
+        "coldFilter": {
+          "HeapAlloc": 18547464,
+          "HeapInuse": 20144128,
+          "HeapReleased": 30736384,
+          "HeapSys": 209256448,
+          "NumGC": 18,
+          "PeakRSS": 237780992,
+          "CurrentRSS": 219881472
+        },
+        "warmFilter": {
+          "HeapAlloc": 21596032,
+          "HeapInuse": 23216128,
+          "HeapReleased": 31653888,
+          "HeapSys": 209256448,
+          "NumGC": 18,
+          "PeakRSS": 237780992,
+          "CurrentRSS": 218968064
+        },
+        "aggregated": {
+          "HeapAlloc": 14614240,
+          "HeapInuse": 16056320,
+          "HeapReleased": 168624128,
+          "HeapSys": 209158144,
+          "NumGC": 169,
+          "PeakRSS": 237780992,
+          "CurrentRSS": 82644992
+        },
+        "settled": {
+          "HeapAlloc": 12547696,
+          "HeapInuse": 14114816,
+          "HeapReleased": 169082880,
+          "HeapSys": 209158144,
+          "NumGC": 170,
+          "PeakRSS": 237780992,
+          "CurrentRSS": 82186240
+        }
+      },
+      "prior": {
+        "started": {
+          "HeapAlloc": 2778712,
+          "HeapInuse": 4128768,
+          "HeapReleased": 4710400,
+          "HeapSys": 11862016,
+          "NumGC": 2,
+          "PeakRSS": 22982656,
+          "CurrentRSS": 22978560
+        },
+        "uploaded": {
+          "HeapAlloc": 104129136,
+          "HeapInuse": 105463808,
+          "HeapReleased": 6676480,
+          "HeapSys": 146604032,
+          "NumGC": 8,
+          "PeakRSS": 157483008,
+          "CurrentRSS": 157478912
+        },
+        "indexed": {
+          "HeapAlloc": 7628912,
+          "HeapInuse": 9289728,
+          "HeapReleased": 6856704,
+          "HeapSys": 209420288,
+          "NumGC": 9,
+          "PeakRSS": 222736384,
+          "CurrentRSS": 222732288
+        },
+        "searched": {
+          "HeapAlloc": 4537216,
+          "HeapInuse": 6045696,
+          "HeapReleased": 201728000,
+          "HeapSys": 209289216,
+          "NumGC": 539,
+          "PeakRSS": 223006720,
+          "CurrentRSS": 48599040
+        },
+        "coldFilter": {
+          "HeapAlloc": 16679264,
+          "HeapInuse": 18300928,
+          "HeapReleased": 179273728,
+          "HeapSys": 209190912,
+          "NumGC": 589,
+          "PeakRSS": 223006720,
+          "CurrentRSS": 71356416
+        },
+        "warmFilter": {
+          "HeapAlloc": 12545112,
+          "HeapInuse": 14262272,
+          "HeapReleased": 180584448,
+          "HeapSys": 209190912,
+          "NumGC": 595,
+          "PeakRSS": 223006720,
+          "CurrentRSS": 70053888
+        },
+        "aggregated": {
+          "HeapAlloc": 22072368,
+          "HeapInuse": 23781376,
+          "HeapReleased": 178241536,
+          "HeapSys": 209059840,
+          "NumGC": 863,
+          "PeakRSS": 223006720,
+          "CurrentRSS": 72871936
+        },
+        "settled": {
+          "HeapAlloc": 12576648,
+          "HeapInuse": 14352384,
+          "HeapReleased": 178241536,
+          "HeapSys": 209059840,
+          "NumGC": 864,
+          "PeakRSS": 223006720,
+          "CurrentRSS": 72871936
+        }
+      }
+    }
+  ],
+  "medians": {
+    "started": {
+      "prior": {
+        "HeapAlloc": 3474232.0,
+        "HeapInuse": 4792320.0,
+        "HeapReleased": 4419584.0,
+        "HeapSys": 11862016.0,
+        "NumGC": 2.0,
+        "PeakRSS": 23058432.0,
+        "CurrentRSS": 23054336.0
+      },
+      "candidate": {
+        "HeapAlloc": 2776728.0,
+        "HeapInuse": 3997696.0,
+        "HeapReleased": 6033408.0,
+        "HeapSys": 13697024.0,
+        "NumGC": 2.0,
+        "PeakRSS": 23136256.0,
+        "CurrentRSS": 22755328.0
+      }
+    },
+    "uploaded": {
+      "prior": {
+        "HeapAlloc": 104129568.0,
+        "HeapInuse": 105406464.0,
+        "HeapReleased": 3059712.0,
+        "HeapSys": 142409728.0,
+        "NumGC": 8.0,
+        "PeakRSS": 156831744.0,
+        "CurrentRSS": 156827648.0
+      },
+      "candidate": {
+        "HeapAlloc": 104129240.0,
+        "HeapInuse": 105320448.0,
+        "HeapReleased": 5083136.0,
+        "HeapSys": 144490496.0,
+        "NumGC": 8.0,
+        "PeakRSS": 157028352.0,
+        "CurrentRSS": 157024256.0
+      }
+    },
+    "indexed": {
+      "prior": {
+        "HeapAlloc": 7474280.0,
+        "HeapInuse": 9027584.0,
+        "HeapReleased": 2527232.0,
+        "HeapSys": 205242368.0,
+        "NumGC": 9.0,
+        "PeakRSS": 222842880.0,
+        "CurrentRSS": 222838784.0
+      },
+      "candidate": {
+        "HeapAlloc": 7520424.0,
+        "HeapInuse": 9027584.0,
+        "HeapReleased": 5025792.0,
+        "HeapSys": 207290368.0,
+        "NumGC": 9.0,
+        "PeakRSS": 222511104.0,
+        "CurrentRSS": 222507008.0
+      }
+    },
+    "searched": {
+      "prior": {
+        "HeapAlloc": 3896320.0,
+        "HeapInuse": 5320704.0,
+        "HeapReleased": 197701632.0,
+        "HeapSys": 205062144.0,
+        "NumGC": 535.5,
+        "PeakRSS": 223139840.0,
+        "CurrentRSS": 48582656.0
+      },
+      "candidate": {
+        "HeapAlloc": 4023032.0,
+        "HeapInuse": 5480448.0,
+        "HeapReleased": 11997184.0,
+        "HeapSys": 207241216.0,
+        "NumGC": 12.0,
+        "PeakRSS": 236136448.0,
+        "CurrentRSS": 235755520.0
+      }
+    },
+    "coldFilter": {
+      "prior": {
+        "HeapAlloc": 16896040.0,
+        "HeapInuse": 18554880.0,
+        "HeapReleased": 175431680.0,
+        "HeapSys": 205029376.0,
+        "NumGC": 585.5,
+        "PeakRSS": 223139840.0,
+        "CurrentRSS": 71217152.0
+      },
+      "candidate": {
+        "HeapAlloc": 18717916.0,
+        "HeapInuse": 20271104.0,
+        "HeapReleased": 30380032.0,
+        "HeapSys": 207208448.0,
+        "NumGC": 18.0,
+        "PeakRSS": 236136448.0,
+        "CurrentRSS": 218056704.0
+      }
+    },
+    "warmFilter": {
+      "prior": {
+        "HeapAlloc": 12550844.0,
+        "HeapInuse": 14233600.0,
+        "HeapReleased": 176549888.0,
+        "HeapSys": 204996608.0,
+        "NumGC": 591.5,
+        "PeakRSS": 223139840.0,
+        "CurrentRSS": 70184960.0
+      },
+      "candidate": {
+        "HeapAlloc": 21770452.0,
+        "HeapInuse": 23367680.0,
+        "HeapReleased": 31526912.0,
+        "HeapSys": 207208448.0,
+        "NumGC": 18.0,
+        "PeakRSS": 236136448.0,
+        "CurrentRSS": 216915968.0
+      }
+    },
+    "aggregated": {
+      "prior": {
+        "HeapAlloc": 22114636.0,
+        "HeapInuse": 23736320.0,
+        "HeapReleased": 173907968.0,
+        "HeapSys": 204865536.0,
+        "NumGC": 859.0,
+        "PeakRSS": 223139840.0,
+        "CurrentRSS": 72925184.0
+      },
+      "candidate": {
+        "HeapAlloc": 21683728.0,
+        "HeapInuse": 23363584.0,
+        "HeapReleased": 165220352.0,
+        "HeapSys": 207093760.0,
+        "NumGC": 167.0,
+        "PeakRSS": 236136448.0,
+        "CurrentRSS": 83890176.0
+      }
+    },
+    "settled": {
+      "prior": {
+        "HeapAlloc": 12582080.0,
+        "HeapInuse": 14352384.0,
+        "HeapReleased": 173907968.0,
+        "HeapSys": 204865536.0,
+        "NumGC": 860.0,
+        "PeakRSS": 223139840.0,
+        "CurrentRSS": 72925184.0
+      },
+      "candidate": {
+        "HeapAlloc": 12559372.0,
+        "HeapInuse": 14213120.0,
+        "HeapReleased": 165679104.0,
+        "HeapSys": 207093760.0,
+        "NumGC": 168.0,
+        "PeakRSS": 236136448.0,
+        "CurrentRSS": 83431424.0
+      }
+    }
+  },
+  "method": "Independent alternating runs on new loopback services. Runtime heap and Windows process working set after each stage. Only the final settled sample requested an explicit Go GC. Process peak is lifetime high-water; heap allocations before final GC include unreclaimed objects."
+}

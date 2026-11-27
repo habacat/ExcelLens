@@ -237,11 +237,10 @@ func (w *Workbook) streamTextRecords(source io.Reader, track func([]string) erro
 			return fmt.Errorf("CSV/TXT 第 %d 条记录解析失败：%w", reader.InputOffset(), err)
 		}
 		if w.Format == "txt" && w.source.delimiter == '|' {
-			copyFields := make([]string, len(fields))
+			// ReuseRecord lends this slice to track until the next Read.
 			for i, v := range fields {
-				copyFields[i] = strings.TrimSpace(v)
+				fields[i] = strings.TrimSpace(v)
 			}
-			fields = copyFields
 		}
 		if err := track(fields); err != nil {
 			return err

@@ -22,8 +22,9 @@ func stats(label string, before time.Time) {
 	fmt.Printf("%s: time=%s live_heap=%.1fMiB total_alloc=%.1fMiB gc=%d\n", label, time.Since(before), float64(m.HeapAlloc)/(1<<20), float64(m.TotalAlloc)/(1<<20), m.NumGC)
 }
 func main() {
-	f := flag.String("file", "", "input xlsx/xlsm")
-	index := flag.Bool("index", true, "build largest sheet index")
+	f := flag.String("file", "", "input workbook or text ledger")
+	sheetName := flag.String("sheet", "", "sheet to verify (default: largest worksheet in the ZIP)")
+	index := flag.Bool("index", true, "build the selected sheet index")
 	search := flag.Bool("search", false, "search first 4000 indexed rows")
 	sortFlag := flag.Bool("sort", false, "sort 3 sparse columns")
 	digestFlag := flag.Bool("digest", false, "hash exact metadata/rows/cell data without exposing cell values")
@@ -52,18 +53,26 @@ func main() {
 	if !*index {
 		return
 	}
-	zr, err := zip.OpenReader(*f)
-	if err != nil {
-		panic(err)
+	var meta workbook.SheetMeta
+	if *sheetName != "" {
+		var ok bool
+		if meta, ok = wb.FindSheet(*sheetName); !ok {
+			panic("requested sheet was not found")
+		}
+	} else {
+		zr, err := zip.OpenReader(*f)
+		if err != nil {
+			panic(err)
+		}
+		defer zr.Close()
+		sizes := make(map[string]uint64, len(zr.File))
+		for _, v := range zr.File {
+			sizes[v.Name] = v.UncompressedSize64
+		}
+		sort.Slice(wb.Sheets, func(i, j int) bool { return sizes[wb.Sheets[i].Path] > sizes[wb.Sheets[j].Path] })
+		meta = wb.Sheets[0]
+		fmt.Printf("largest_sheet=%q inflatedMiB=%.1f sheetCount=%d\n", meta.Name, float64(sizes[meta.Path])/(1<<20), len(wb.Sheets))
 	}
-	defer zr.Close()
-	sizes := make(map[string]uint64, len(zr.File))
-	for _, v := range zr.File {
-		sizes[v.Name] = v.UncompressedSize64
-	}
-	sort.Slice(wb.Sheets, func(i, j int) bool { return sizes[wb.Sheets[i].Path] > sizes[wb.Sheets[j].Path] })
-	meta := wb.Sheets[0]
-	fmt.Printf("largest_sheet=%q inflatedMiB=%.1f sheetCount=%d\n", meta.Name, float64(sizes[meta.Path])/(1<<20), len(wb.Sheets))
 	start = time.Now()
 	idx, err := wb.BuildIndex(meta, nil, nil)
 	if err != nil {

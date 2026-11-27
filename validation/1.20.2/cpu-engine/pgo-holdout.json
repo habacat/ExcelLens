@@ -1,0 +1,204 @@
+{
+  "benchmark": "^BenchmarkEngineLedger$/^txt$/^workflow$",
+  "benchtime": "1x",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "scale-control.exe",
+      "sha256": "826c3f5525c5861bdd6fc18e60dbd25633252423546e64cf03c5608b80ca10c1"
+    },
+    "after": {
+      "name": "scale-pgo.exe",
+      "sha256": "5d2560b8a5cc03d8b3b82bf95c24e9043632a9ef5a7ce8564dd4d57d08ae4d63"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          466838900.0,
+          58504288,
+          1343970
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          452665900.0,
+          65076320,
+          1868256
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          413502200.0,
+          65081320,
+          1868263
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          427144800.0,
+          58504256,
+          1343969
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          426751800.0,
+          58503840,
+          1343963
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          427838700.0,
+          65076432,
+          1868258
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          434987900.0,
+          65076736,
+          1868262
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          446737700.0,
+          58508904,
+          1343969
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          438559900.0,
+          58503840,
+          1343964
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          447089600.0,
+          65076336,
+          1868256
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          449288000.0,
+          65076544,
+          1868259
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          424196500.0,
+          58503808,
+          1343964
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          438883700.0,
+          58510328,
+          1343978
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          424342300.0,
+          65077016,
+          1868261
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          458912300.0,
+          65076304,
+          1868258
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          485658300.0,
+          58504000,
+          1343967
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkEngineLedger/txt/workflow-4": {
+      "medianBefore": [
+        438721800.0,
+        58504128.0,
+        1343968.0
+      ],
+      "medianAfter": [
+        441038750.0,
+        65076488.0,
+        1868258.5
+      ],
+      "medianPairedTimeChangePct": -2.83,
+      "fasterPairs": 5
+    }
+  }
+}

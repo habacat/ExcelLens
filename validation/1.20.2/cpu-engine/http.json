@@ -1,0 +1,227 @@
+{
+  "rows": 100000,
+  "sourceBytes": 7700005,
+  "sourceSHA256": "926c7b55d2b077893c33365e116ed855f8c858fc3cfbff3f7cb3b4ee2ae0e4b9",
+  "probeSHA256": {
+    "before": "fdc5550a9fe31eb187ee63d5c09e0aeaf0d57f88e79b008db3257739c8d85dcd",
+    "after": "52f1fb7bc445c1bdaf368ee0f4612ccf05ede0ca6c1dc27749b2158d4177ed4f"
+  },
+  "GOMAXPROCS": 4,
+  "pollMs": 5,
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 917.3473999999999,
+        "openIndexMs": 294.5738,
+        "searchMs": 287.58039999999994,
+        "coldFilterReadMs": 228.71780000000007,
+        "warmFilterReadMs": 106.4753999999999,
+        "processPeakRSSBytes": 47448064
+      },
+      "after": {
+        "totalMs": 600.292,
+        "openIndexMs": 332.54850000000016,
+        "searchMs": 78.4695000000002,
+        "coldFilterReadMs": 150.6160999999997,
+        "warmFilterReadMs": 38.657900000000026,
+        "processPeakRSSBytes": 47185920
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 598.6423000000008,
+        "openIndexMs": 349.32820000000044,
+        "searchMs": 76.1700000000003,
+        "coldFilterReadMs": 138.78019999999935,
+        "warmFilterReadMs": 34.36390000000067,
+        "processPeakRSSBytes": 47226880
+      },
+      "before": {
+        "totalMs": 956.5201999999999,
+        "openIndexMs": 311.32709999999975,
+        "searchMs": 343.63460000000055,
+        "coldFilterReadMs": 208.90809999999948,
+        "warmFilterReadMs": 92.65040000000013,
+        "processPeakRSSBytes": 47120384
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 938.1636000000002,
+        "openIndexMs": 320.74970000000036,
+        "searchMs": 288.1324999999997,
+        "coldFilterReadMs": 212.06810000000064,
+        "warmFilterReadMs": 117.21329999999952,
+        "processPeakRSSBytes": 47321088
+      },
+      "after": {
+        "totalMs": 558.8905999999989,
+        "openIndexMs": 305.2652,
+        "searchMs": 54.483199999999954,
+        "coldFilterReadMs": 176.0079999999995,
+        "warmFilterReadMs": 23.13419999999944,
+        "processPeakRSSBytes": 45608960
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 565.6745999999995,
+        "openIndexMs": 318.143899999999,
+        "searchMs": 62.59570000000103,
+        "coldFilterReadMs": 147.3469999999999,
+        "warmFilterReadMs": 37.58799999999951,
+        "processPeakRSSBytes": 47431680
+      },
+      "before": {
+        "totalMs": 917.3638999999998,
+        "openIndexMs": 282.08080000000103,
+        "searchMs": 299.62929999999943,
+        "coldFilterReadMs": 226.0895999999999,
+        "warmFilterReadMs": 109.56419999999945,
+        "processPeakRSSBytes": 47099904
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 976.6232000000006,
+        "openIndexMs": 333.1967999999996,
+        "searchMs": 351.5807000000013,
+        "coldFilterReadMs": 206.0455999999995,
+        "warmFilterReadMs": 85.80010000000016,
+        "processPeakRSSBytes": 47108096
+      },
+      "after": {
+        "totalMs": 531.1775999999995,
+        "openIndexMs": 303.5153000000008,
+        "searchMs": 53.3387999999988,
+        "coldFilterReadMs": 150.93810000000119,
+        "warmFilterReadMs": 23.38539999999867,
+        "processPeakRSSBytes": 47046656
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 590.1429,
+        "openIndexMs": 343.30560000000077,
+        "searchMs": 70.56709999999988,
+        "coldFilterReadMs": 143.80539999999974,
+        "warmFilterReadMs": 32.46479999999963,
+        "processPeakRSSBytes": 46977024
+      },
+      "before": {
+        "totalMs": 989.275000000001,
+        "openIndexMs": 334.4316000000003,
+        "searchMs": 312.4385000000007,
+        "coldFilterReadMs": 229.75179999999895,
+        "warmFilterReadMs": 112.65310000000106,
+        "processPeakRSSBytes": 47308800
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 1055.4874000000004,
+        "openIndexMs": 414.98470000000157,
+        "searchMs": 301.47230000000036,
+        "coldFilterReadMs": 233.86009999999757,
+        "warmFilterReadMs": 105.17030000000105,
+        "processPeakRSSBytes": 47579136
+      },
+      "after": {
+        "totalMs": 673.3095999999996,
+        "openIndexMs": 394.1777000000002,
+        "searchMs": 78.46539999999891,
+        "coldFilterReadMs": 172.00599999999966,
+        "warmFilterReadMs": 28.660500000000866,
+        "processPeakRSSBytes": 47759360
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 614.8404000000021,
+        "openIndexMs": 362.5351999999999,
+        "searchMs": 60.94590000000011,
+        "coldFilterReadMs": 165.1455999999989,
+        "warmFilterReadMs": 26.213700000003115,
+        "processPeakRSSBytes": 47329280
+      },
+      "before": {
+        "totalMs": 1415.2486000000017,
+        "openIndexMs": 444.5206000000006,
+        "searchMs": 547.0994999999981,
+        "coldFilterReadMs": 274.60710000000074,
+        "warmFilterReadMs": 149.0214000000023,
+        "processPeakRSSBytes": 47198208
+      }
+    }
+  ],
+  "summary": {
+    "totalMs": {
+      "medianBefore": 966.5717000000002,
+      "medianAfter": 594.3926000000004,
+      "medianPairedChangePct": -39.34,
+      "lowerPairs": 8
+    },
+    "openIndexMs": {
+      "medianBefore": 326.97325,
+      "medianAfter": 337.92705000000046,
+      "medianPairedChangePct": -1.09,
+      "lowerPairs": 4
+    },
+    "searchMs": {
+      "medianBefore": 306.9554000000005,
+      "medianAfter": 66.58140000000046,
+      "medianPairedChangePct": -78.47,
+      "lowerPairs": 8
+    },
+    "coldFilterReadMs": {
+      "medianBefore": 227.4037,
+      "medianAfter": 150.77710000000044,
+      "medianPairedChangePct": -33.86,
+      "lowerPairs": 8
+    },
+    "warmFilterReadMs": {
+      "medianBefore": 108.01979999999966,
+      "medianAfter": 30.562650000000247,
+      "medianPairedChangePct": -71.96,
+      "lowerPairs": 8
+    },
+    "processPeakRSSBytes": {
+      "medianBefore": 47253504.0,
+      "medianAfter": 47206400.0,
+      "medianPairedChangePct": 0.05,
+      "lowerPairs": 4
+    }
+  }
+}

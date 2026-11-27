@@ -1,0 +1,843 @@
+{
+  "baseline": "6616a1a",
+  "toolchain": "go1.27.4",
+  "GOMAXPROCS": 4,
+  "GOAMD64": "v1",
+  "profiles": [
+    {
+      "benchmark": "BenchmarkWorksheetIndexScanner",
+      "name": "xml.cpu",
+      "sha256": "fc9f299ca4401bfb35b8535c0bfc8a7752e109ec92a1fbaa5168a91f42690fd3",
+      "sample": "Duration: 6.20s, Total samples = 6.01s (96.94%)",
+      "topFlat": [
+        {
+          "function": "excellens/internal/workbook.scanWorksheetWithSharedHint",
+          "flat": "1.92s",
+          "flatPct": 31.95,
+          "cum": "5.47s",
+          "cumPct": 91.01
+        },
+        {
+          "function": "excellens/internal/workbook.readXMLTag",
+          "flat": "0.65s",
+          "flatPct": 10.82,
+          "cum": "1.20s",
+          "cumPct": 19.97
+        },
+        {
+          "function": "bufio.(*Reader).ReadSlice",
+          "flat": "0.48s",
+          "flatPct": 7.99,
+          "cum": "1.04s",
+          "cumPct": 17.3
+        },
+        {
+          "function": "indexbytebody",
+          "flat": "0.41s",
+          "flatPct": 6.82,
+          "cum": "0.41s",
+          "cumPct": 6.82
+        },
+        {
+          "function": "memeqbody",
+          "flat": "0.39s",
+          "flatPct": 6.49,
+          "cum": "0.39s",
+          "cumPct": 6.49
+        },
+        {
+          "function": "excellens/internal/workbook.xmlCellAttributes",
+          "flat": "0.31s",
+          "flatPct": 5.16,
+          "cum": "0.38s",
+          "cumPct": 6.32
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.scanWorksheetWithSharedHint",
+          "flat": "1.92s",
+          "flatPct": 31.95,
+          "cum": "5.47s",
+          "cumPct": 91.01
+        },
+        {
+          "function": "excellens/internal/workbook.readXMLTag",
+          "flat": "0.65s",
+          "flatPct": 10.82,
+          "cum": "1.20s",
+          "cumPct": 19.97
+        },
+        {
+          "function": "excellens/internal/workbook.inspectXMLTag",
+          "flat": "0.23s",
+          "flatPct": 3.83,
+          "cum": "0.53s",
+          "cumPct": 8.82
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/csv/parse",
+      "name": "csv-parse.cpu",
+      "sha256": "234bffa2a5a27d52c389ef932b66fb03cab83110415ac659d96ba9f0c0617c5a",
+      "sample": "Duration: 1.56s, Total samples = 1.78s (114.15%)",
+      "topFlat": [
+        {
+          "function": "unicode/utf8.ValidString",
+          "flat": "0.34s",
+          "flatPct": 19.1,
+          "cum": "0.35s",
+          "cumPct": 19.66
+        },
+        {
+          "function": "encoding/csv.(*Reader).readRecord",
+          "flat": "0.33s",
+          "flatPct": 18.54,
+          "cum": "0.80s",
+          "cumPct": 44.94
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.21s",
+          "flatPct": 11.8,
+          "cum": "0.21s",
+          "cumPct": 11.8
+        },
+        {
+          "function": "indexbytebody",
+          "flat": "0.10s",
+          "flatPct": 5.62,
+          "cum": "0.10s",
+          "cumPct": 5.62
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRows.func1",
+          "flat": "0.08s",
+          "flatPct": 4.49,
+          "cum": "0.47s",
+          "cumPct": 26.4
+        },
+        {
+          "function": "runtime.preemptM",
+          "flat": "0.08s",
+          "flatPct": 4.49,
+          "cum": "0.08s",
+          "cumPct": 4.49
+        }
+      ],
+      "focus": [
+        {
+          "function": "unicode/utf8.ValidString",
+          "flat": "0.34s",
+          "flatPct": 19.1,
+          "cum": "0.35s",
+          "cumPct": 19.66
+        },
+        {
+          "function": "encoding/csv.(*Reader).readRecord",
+          "flat": "0.33s",
+          "flatPct": 18.54,
+          "cum": "0.80s",
+          "cumPct": 44.94
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRecords",
+          "flat": "0.01s",
+          "flatPct": 0.56,
+          "cum": "1.28s",
+          "cumPct": 71.91
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRows",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "1.33s",
+          "cumPct": 74.72
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/txt/parse",
+      "name": "txt-parse.cpu",
+      "sha256": "fc139104537063575c16848be3f7964c4e21554b0164114c69adf0116cdc9d18",
+      "sample": "Duration: 1.42s, Total samples = 1.59s (112.00%)",
+      "topFlat": [
+        {
+          "function": "unicode/utf8.ValidString",
+          "flat": "0.24s",
+          "flatPct": 15.09,
+          "cum": "0.25s",
+          "cumPct": 15.72
+        },
+        {
+          "function": "encoding/csv.(*Reader).readRecord",
+          "flat": "0.17s",
+          "flatPct": 10.69,
+          "cum": "0.59s",
+          "cumPct": 37.11
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.17s",
+          "flatPct": 10.69,
+          "cum": "0.17s",
+          "cumPct": 10.69
+        },
+        {
+          "function": "indexbytebody",
+          "flat": "0.11s",
+          "flatPct": 6.92,
+          "cum": "0.11s",
+          "cumPct": 6.92
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRows.func1",
+          "flat": "0.09s",
+          "flatPct": 5.66,
+          "cum": "0.34s",
+          "cumPct": 21.38
+        },
+        {
+          "function": "runtime.mallocgcSmallScanNoHeaderSC7",
+          "flat": "0.08s",
+          "flatPct": 5.03,
+          "cum": "0.11s",
+          "cumPct": 6.92
+        }
+      ],
+      "focus": [
+        {
+          "function": "unicode/utf8.ValidString",
+          "flat": "0.24s",
+          "flatPct": 15.09,
+          "cum": "0.25s",
+          "cumPct": 15.72
+        },
+        {
+          "function": "encoding/csv.(*Reader).readRecord",
+          "flat": "0.17s",
+          "flatPct": 10.69,
+          "cum": "0.59s",
+          "cumPct": 37.11
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRecords",
+          "flat": "0.03s",
+          "flatPct": 1.89,
+          "cum": "1.19s",
+          "cumPct": 74.84
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).streamTextRows",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "1.22s",
+          "cumPct": 76.73
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/csv/workflow",
+      "name": "workflow-retry.cpu",
+      "sha256": "d909be26295e0c9a34664dc8d6982104f9ec8f90f8d94fd619976d5cb34411fd",
+      "sample": "Duration: 2.16s, Total samples = 2.52s (116.82%)",
+      "topFlat": [
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.42s",
+          "flatPct": 16.67,
+          "cum": "0.42s",
+          "cumPct": 16.67
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.13s",
+          "flatPct": 5.16,
+          "cum": "0.65s",
+          "cumPct": 25.79
+        },
+        {
+          "function": "runtime.scanblock",
+          "flat": "0.12s",
+          "flatPct": 4.76,
+          "cum": "0.17s",
+          "cumPct": 6.75
+        },
+        {
+          "function": "runtime.memclrNoHeapPointers",
+          "flat": "0.08s",
+          "flatPct": 3.17,
+          "cum": "0.08s",
+          "cumPct": 3.17
+        },
+        {
+          "function": "runtime.concatstrings",
+          "flat": "0.06s",
+          "flatPct": 2.38,
+          "cum": "0.09s",
+          "cumPct": 3.57
+        },
+        {
+          "function": "runtime.tryDeferToSpanScan",
+          "flat": "0.06s",
+          "flatPct": 2.38,
+          "cum": "0.07s",
+          "cumPct": 2.78
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.13s",
+          "flatPct": 5.16,
+          "cum": "0.65s",
+          "cumPct": 25.79
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).searchExternalResumable",
+          "flat": "0.04s",
+          "flatPct": 1.59,
+          "cum": "0.74s",
+          "cumPct": 29.37
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).buildExternalIndex",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.37s",
+          "cumPct": 14.68
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).filterRowOrder",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.63s",
+          "cumPct": 25.0
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/txt/workflow",
+      "name": "txt-workflow.cpu",
+      "sha256": "74edaec5cd169417b4d6f5a0f9abad41744d7b014e199494e38ba348797cbc08",
+      "sample": "Duration: 1.51s, Total samples = 1.81s (119.64%)",
+      "topFlat": [
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.34s",
+          "flatPct": 18.78,
+          "cum": "0.34s",
+          "cumPct": 18.78
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.10s",
+          "flatPct": 5.52,
+          "cum": "0.39s",
+          "cumPct": 21.55
+        },
+        {
+          "function": "runtime.preemptM",
+          "flat": "0.10s",
+          "flatPct": 5.52,
+          "cum": "0.10s",
+          "cumPct": 5.52
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).externalCellValue",
+          "flat": "0.07s",
+          "flatPct": 3.87,
+          "cum": "0.09s",
+          "cumPct": 4.97
+        },
+        {
+          "function": "runtime.memmove",
+          "flat": "0.07s",
+          "flatPct": 3.87,
+          "cum": "0.07s",
+          "cumPct": 3.87
+        },
+        {
+          "function": "runtime.semasleep",
+          "flat": "0.07s",
+          "flatPct": 3.87,
+          "cum": "0.07s",
+          "cumPct": 3.87
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.10s",
+          "flatPct": 5.52,
+          "cum": "0.39s",
+          "cumPct": 21.55
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).searchExternalResumable",
+          "flat": "0.02s",
+          "flatPct": 1.1,
+          "cum": "0.52s",
+          "cumPct": 28.73
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).buildExternalIndex",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.33s",
+          "cumPct": 18.23
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).filterRowOrder",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.43s",
+          "cumPct": 23.76
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/csv/search",
+      "name": "csv-search.cpu",
+      "sha256": "85c84e86f60dc016e765c10fa0cdc522fa30f79da5b4741b195a5236c89e87c4",
+      "sample": "Duration: 1.95s, Total samples = 2.46s (126.37%)",
+      "topFlat": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.18s",
+          "flatPct": 7.32,
+          "cum": "0.86s",
+          "cumPct": 34.96
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.17s",
+          "flatPct": 6.91,
+          "cum": "0.17s",
+          "cumPct": 6.91
+        },
+        {
+          "function": "strings.Map",
+          "flat": "0.16s",
+          "flatPct": 6.5,
+          "cum": "0.46s",
+          "cumPct": 18.7
+        },
+        {
+          "function": "runtime.scanblock",
+          "flat": "0.15s",
+          "flatPct": 6.1,
+          "cum": "0.22s",
+          "cumPct": 8.94
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).externalCellValue",
+          "flat": "0.11s",
+          "flatPct": 4.47,
+          "cum": "0.27s",
+          "cumPct": 10.98
+        },
+        {
+          "function": "excellens/internal/workbook.containsFold",
+          "flat": "0.10s",
+          "flatPct": 4.07,
+          "cum": "0.59s",
+          "cumPct": 23.98
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.18s",
+          "flatPct": 7.32,
+          "cum": "0.86s",
+          "cumPct": 34.96
+        },
+        {
+          "function": "excellens/internal/workbook.containsFold",
+          "flat": "0.10s",
+          "flatPct": 4.07,
+          "cum": "0.59s",
+          "cumPct": 23.98
+        },
+        {
+          "function": "unicode.ToLower",
+          "flat": "0.05s",
+          "flatPct": 2.03,
+          "cum": "0.10s",
+          "cumPct": 4.07
+        },
+        {
+          "function": "strings.ToLower",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.46s",
+          "cumPct": 18.7
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/csv/filter-cold",
+      "name": "csv-filter-cold.cpu",
+      "sha256": "673532a10fe5a55f6c3d285d5bb16f487ff83fcac06b273b1f3fedcd6c4b3643",
+      "sample": "Duration: 1.67s, Total samples = 1.98s (118.37%)",
+      "topFlat": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.18s",
+          "flatPct": 9.09,
+          "cum": "0.63s",
+          "cumPct": 31.82
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.17s",
+          "flatPct": 8.59,
+          "cum": "0.17s",
+          "cumPct": 8.59
+        },
+        {
+          "function": "runtime.preemptM",
+          "flat": "0.09s",
+          "flatPct": 4.55,
+          "cum": "0.09s",
+          "cumPct": 4.55
+        },
+        {
+          "function": "excellens/internal/workbook.(*filterScanner).read",
+          "flat": "0.08s",
+          "flatPct": 4.04,
+          "cum": "1.01s",
+          "cumPct": 51.01
+        },
+        {
+          "function": "runtime.memclrNoHeapPointers",
+          "flat": "0.08s",
+          "flatPct": 4.04,
+          "cum": "0.08s",
+          "cumPct": 4.04
+        },
+        {
+          "function": "internal/stringslite.Index",
+          "flat": "0.05s",
+          "flatPct": 2.53,
+          "cum": "0.06s",
+          "cumPct": 3.03
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.(*Workbook).decodeExternalRow",
+          "flat": "0.18s",
+          "flatPct": 9.09,
+          "cum": "0.63s",
+          "cumPct": 31.82
+        },
+        {
+          "function": "excellens/internal/workbook.matchCompiledFilter",
+          "flat": "0.02s",
+          "flatPct": 1.01,
+          "cum": "0.38s",
+          "cumPct": 19.19
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).filterRowOrder",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "1.46s",
+          "cumPct": 73.74
+        },
+        {
+          "function": "excellens/internal/workbook.parseFilterNumber",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.23s",
+          "cumPct": 11.62
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkEngineLedger/csv/filter-warm",
+      "name": "csv-filter-warm.cpu",
+      "sha256": "d3006b81370eed7a642de04232f7930219ce93b0f03042414d4af66c5be00eb1",
+      "sample": "Duration: 1.64s, Total samples = 1.73s (105.63%)",
+      "topFlat": [
+        {
+          "function": "excellens/internal/workbook.(*filterScanner).read",
+          "flat": "0.22s",
+          "flatPct": 12.72,
+          "cum": "0.44s",
+          "cumPct": 25.43
+        },
+        {
+          "function": "excellens/internal/workbook.cacheCell",
+          "flat": "0.19s",
+          "flatPct": 10.98,
+          "cum": "0.20s",
+          "cumPct": 11.56
+        },
+        {
+          "function": "internal/stringslite.Index",
+          "flat": "0.11s",
+          "flatPct": 6.36,
+          "cum": "0.18s",
+          "cumPct": 10.4
+        },
+        {
+          "function": "excellens/internal/workbook.(*filterScanner).matches",
+          "flat": "0.09s",
+          "flatPct": 5.2,
+          "cum": "0.95s",
+          "cumPct": 54.91
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "0.08s",
+          "flatPct": 4.62,
+          "cum": "0.08s",
+          "cumPct": 4.62
+        },
+        {
+          "function": "runtime.mallocgcSmallScanNoHeaderSC5",
+          "flat": "0.07s",
+          "flatPct": 4.05,
+          "cum": "0.08s",
+          "cumPct": 4.62
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/workbook.cacheCell",
+          "flat": "0.19s",
+          "flatPct": 10.98,
+          "cum": "0.20s",
+          "cumPct": 11.56
+        },
+        {
+          "function": "excellens/internal/workbook.matchCompiledFilter",
+          "flat": "0.04s",
+          "flatPct": 2.31,
+          "cum": "0.86s",
+          "cumPct": 49.71
+        },
+        {
+          "function": "excellens/internal/workbook.(*Workbook).filterRowOrder",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "1.43s",
+          "cumPct": 82.66
+        },
+        {
+          "function": "excellens/internal/workbook.parseFilterNumber",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.60s",
+          "cumPct": 34.68
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkProjectionBitmap",
+      "name": "bitmap.cpu",
+      "sha256": "fa7638b75aeb3f4715d9c9e80ac604b53ff4605104f3ec3b69ceedb48dc4dd96",
+      "sample": "Duration: 910.45ms, Total samples = 940ms (103.25%)",
+      "topFlat": [
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).At",
+          "flat": "230ms",
+          "flatPct": 24.47,
+          "cum": "390ms",
+          "cumPct": 41.49
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).word",
+          "flat": "220ms",
+          "flatPct": 23.4,
+          "cum": "270ms",
+          "cumPct": 28.72
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).Position",
+          "flat": "120ms",
+          "flatPct": 12.77,
+          "cum": "410ms",
+          "cumPct": 43.62
+        },
+        {
+          "function": "runtime.cgocall",
+          "flat": "100ms",
+          "flatPct": 10.64,
+          "cum": "100ms",
+          "cumPct": 10.64
+        },
+        {
+          "function": "encoding/binary.littleEndian.Uint64",
+          "flat": "50ms",
+          "flatPct": 5.32,
+          "cum": "50ms",
+          "cumPct": 5.32
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).block",
+          "flat": "40ms",
+          "flatPct": 4.26,
+          "cum": "80ms",
+          "cumPct": 8.51
+        }
+      ],
+      "focus": [
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).At",
+          "flat": "230ms",
+          "flatPct": 24.47,
+          "cum": "390ms",
+          "cumPct": 41.49
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).word",
+          "flat": "220ms",
+          "flatPct": 23.4,
+          "cum": "270ms",
+          "cumPct": 28.72
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowProjection).Position",
+          "flat": "120ms",
+          "flatPct": 12.77,
+          "cum": "410ms",
+          "cumPct": 43.62
+        },
+        {
+          "function": "excellens/internal/rowindex.(*RowOrder).Position",
+          "flat": "30ms",
+          "flatPct": 3.19,
+          "cum": "50ms",
+          "cumPct": 5.32
+        },
+        {
+          "function": "excellens/internal/rowindex.RowSet.At",
+          "flat": "10ms",
+          "flatPct": 1.06,
+          "cum": "10ms",
+          "cumPct": 1.06
+        }
+      ]
+    },
+    {
+      "benchmark": "BenchmarkAnalysisPreparedMetrics",
+      "name": "aggregate.cpu",
+      "sha256": "764db66690d920e0be947468907ca774927bbbc061062c996d2e1999e8aee317",
+      "sample": "Duration: 2.34s, Total samples = 2.86s (122.22%)",
+      "topFlat": [
+        {
+          "function": "runtime.scanObjectsSmall",
+          "flat": "0.24s",
+          "flatPct": 8.39,
+          "cum": "0.37s",
+          "cumPct": 12.94
+        },
+        {
+          "function": "math/big.(*Int).lehmerGCD",
+          "flat": "0.20s",
+          "flatPct": 6.99,
+          "cum": "0.69s",
+          "cumPct": 24.13
+        },
+        {
+          "function": "runtime.mallocgcTinySC2",
+          "flat": "0.10s",
+          "flatPct": 3.5,
+          "cum": "0.12s",
+          "cumPct": 4.2
+        },
+        {
+          "function": "runtime.semasleep",
+          "flat": "0.10s",
+          "flatPct": 3.5,
+          "cum": "0.10s",
+          "cumPct": 3.5
+        },
+        {
+          "function": "math/big.reciprocalWord",
+          "flat": "0.09s",
+          "flatPct": 3.15,
+          "cum": "0.09s",
+          "cumPct": 3.15
+        },
+        {
+          "function": "runtime.mallocgcSmallNoScanSC5",
+          "flat": "0.09s",
+          "flatPct": 3.15,
+          "cum": "0.16s",
+          "cumPct": 5.59
+        }
+      ],
+      "focus": [
+        {
+          "function": "math/big.nat.norm",
+          "flat": "0.05s",
+          "flatPct": 1.75,
+          "cum": "0.05s",
+          "cumPct": 1.75
+        },
+        {
+          "function": "math/big.(*Rat).norm",
+          "flat": "0.04s",
+          "flatPct": 1.4,
+          "cum": "0.85s",
+          "cumPct": 29.72
+        },
+        {
+          "function": "excellens/internal/analysis.(*accumulator).add",
+          "flat": "0.02s",
+          "flatPct": 0.7,
+          "cum": "1.14s",
+          "cumPct": 39.86
+        },
+        {
+          "function": "excellens/internal/analysis.Decimal",
+          "flat": "0.02s",
+          "flatPct": 0.7,
+          "cum": "0.46s",
+          "cumPct": 16.08
+        },
+        {
+          "function": "internal/runtime/atomic.(*Uint64).Add",
+          "flat": "0.02s",
+          "flatPct": 0.7,
+          "cum": "0.02s",
+          "cumPct": 0.7
+        },
+        {
+          "function": "math/big.nat.add",
+          "flat": "0.02s",
+          "flatPct": 0.7,
+          "cum": "0.03s",
+          "cumPct": 1.05
+        },
+        {
+          "function": "excellens/internal/analysis.metricPlan.prepare",
+          "flat": "0.01s",
+          "flatPct": 0.35,
+          "cum": "0.50s",
+          "cumPct": 17.48
+        },
+        {
+          "function": "math/big.(*Rat).Add",
+          "flat": "0.01s",
+          "flatPct": 0.35,
+          "cum": "0.90s",
+          "cumPct": 31.47
+        },
+        {
+          "function": "math/big.(*Int).Add",
+          "flat": "0",
+          "flatPct": 0.0,
+          "cum": "0.04s",
+          "cumPct": 1.4
+        }
+      ]
+    }
+  ]
+}

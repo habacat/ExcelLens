@@ -1,0 +1,95 @@
+{
+  "go": "go1.27.4",
+  "os": "windows",
+  "arch": "amd64",
+  "GOAMD64": "v1",
+  "CGO_ENABLED": 0,
+  "ordinaryWindowsGODEBUG": "cpu.all=off alone left AVX2=true",
+  "method": "Test-only go -overlay of runtime/proc.go passes cpu.all=off to its original cpuinit and exposes the resulting three feature bits to tests. Installed Go files and product sources are untouched.",
+  "runtimeSourceSHA256": "40d15ce858cf058cff92606001a29ee1689db88c121a2f0c283163a0d64a7375",
+  "overlaySHA256": "858b48a46d70daaa66acf78130fef957b055531ef1cef942b289cd429c615ad8",
+  "runs": {
+    "workbook": {
+      "result": "PASS",
+      "runtimeAVX2": false,
+      "runtimeSSE42": false,
+      "runtimePOPCNT": false,
+      "log": "workbook-forced.log",
+      "sha256": "9f4c16877d631fdcf8f53ba1f0d5d2851dda08d5776f9f944d9ce803b02adf31",
+      "tests": [
+        "TestCPUFallbackObserved",
+        "TestDictionaryFilterScanMatchesScalarAtEveryPosition",
+        "TestFilterExactLongNumericAndStringIDs",
+        "TestFilterCancellationDoesNotPublishPartialCache",
+        "TestFilterResumeSourceRecordsHeadersAliasesAndMissingPrefixCache",
+        "TestFilterResumeTextAdaptersKeepLogicalRecordsAndExactSourceOrder",
+        "TestFilterSortStageUsesExistingExactTypedNaturalAndHeaderRules",
+        "TestFilterResumeInvalidCursorCancellationAndSaveFailureDoNotPublishColumns",
+        "TestScanReusableTagPreservesSharedAnchorsAndExtents",
+        "TestBufferedTagReaderPreservesQuotedGreaterThan",
+        "TestBufferedTagReaderCrossBufferAndXMLCDATA",
+        "TestLiteralSearchAgreesWithUnicodeLower",
+        "TestExternalValueSearchMatchesDecodedRows",
+        "TestFastSearchMatchesStandardDecoder",
+        "TestPipeTextRecordsMatchIndependentCSVRead",
+        "TestIndexTagNamesMatchStandardXMLRowSpans"
+      ]
+    },
+    "rowindex": {
+      "result": "PASS",
+      "runtimeAVX2": false,
+      "runtimeSSE42": false,
+      "runtimePOPCNT": false,
+      "log": "rowindex-forced.log",
+      "sha256": "eaca282c922f2a6327544064cd9cf8ab5ddc5e7b6196a2a24e162c92b1bd5c3e",
+      "tests": [
+        "TestCPUFallbackObserved",
+        "TestRowProjectionCodecRejectsCorruptionTruncationAndSemanticallyInvalidRechecksummedMasks",
+        "TestRowProjectionBillionPositionMaskWithTwoVisibleRecordsStaysCompressed",
+        "TestRowProjectionPreservesSortedSourceCoordinatesWithoutDuplicatingReverseIndex",
+        "TestRowProjectionIdentityEmptyAndActiveCancellationDoNotLeakFiles",
+        "TestRowProjectionParallelRetainedConsumersSurviveOwnerRemoval",
+        "FuzzRowProjectionMatchesLiteralPermutation",
+        "FuzzRowProjectionStorageValidationAndRankSelect"
+      ]
+    },
+    "analysis": {
+      "result": "PASS",
+      "runtimeAVX2": false,
+      "runtimeSSE42": false,
+      "runtimePOPCNT": false,
+      "log": "analysis-forced.log",
+      "sha256": "c2f913efa5ebd77a7c81d27e9ad78ec84481778efb3c36b5a5f251fa78e12f75",
+      "tests": [
+        "TestAccountingDecimalKeepsExactPrecisionAndRejectsMalformedNumbers",
+        "TestSharedFieldMeasuresKeepDifferentCountsAndExactValues",
+        "TestComparisonExportRetainsRatiosStatesAndExactCumulativeResults",
+        "TestComparisonExportRefusesExcelNumericUnderflowAndOverflowWithoutRounding",
+        "TestComparisonReportsPersistAsVersionFourAndRejectLegacyVersionClaims",
+        "TestComparisonRatiosUseIndependentWholeScopeTotalsInOneScan",
+        "TestComparisonsRetainTypedBlanksErrorsZeroDenominatorsAndMissingCrossGroups",
+        "TestComparisonTreeScopeAndExactSortRemainDeterministic",
+        "TestComparisonRejectsInvalidSettingsBudgetAndCancellationWithoutPartialResult",
+        "TestComparisonExactFractionsAndLargeAmountsNeverUseDisplayRounding",
+        "TestCPUFallbackObserved",
+        "TestRollupDistinctBudgetIncludesAllTotals",
+        "TestDecimalCoefficientAndScaleAgainstBigRat",
+        "TestPivotRollupMatchesRecordAtATime"
+      ]
+    }
+  },
+  "experiments": {
+    "avx2checked": {
+      "result": "PASS",
+      "runtimeAVX2": false,
+      "log": "avx2checked-forced-experiment.log",
+      "sha256": "2b613c0e5ae351350310613cfb6597b77dfdf38e7b3d04a6a0ad53a5296a7588"
+    },
+    "portable": {
+      "result": "PASS",
+      "runtimeAVX2": false,
+      "log": "portable-forced-experiment.log",
+      "sha256": "90e5acc1e7a83ccc79802f336d234b6900739c6432a5be22bb5c98aa2d6f6939"
+    }
+  }
+}

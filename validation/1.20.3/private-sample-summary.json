@@ -1,0 +1,28 @@
+{
+  "XLSM": {
+    "result": "PASS",
+    "versions": [
+      "1.20.2",
+      "1.20.3"
+    ],
+    "sourceUnchanged": true,
+    "rowOffsetsAndSharedFormulaAnchorsMatch": true,
+    "sampledRowsCompared": 64,
+    "allSampleColumnsCompared": true,
+    "sourceCellDataDigestMatches": true,
+    "searchPrefixRowsCompared": 4000
+  },
+  "TXT": {
+    "result": "PASS",
+    "versions": [
+      "1.20.2",
+      "1.20.3"
+    ],
+    "sourceUnchanged": true,
+    "rowOffsetsAndSharedFormulaAnchorsMatch": true,
+    "sampledRowsCompared": 64,
+    "allSampleColumnsCompared": true,
+    "sourceCellDataDigestMatches": true,
+    "searchPrefixRowsCompared": 4000
+  }
+}

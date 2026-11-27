@@ -23,19 +23,19 @@ func sourceMetadataWorkbook(t testing.TB, worksheet, styles string) string {
 		t.Fatal(err)
 	}
 	z := zip.NewWriter(f)
-	for name, value := range map[string]string{
-		"xl/workbook.xml":            `<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="s1"/></sheets></workbook>`,
-		"xl/_rels/workbook.xml.rels": `<Relationships><Relationship Id="s1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
-		"xl/worksheets/sheet1.xml":   worksheet, "xl/styles.xml": styles,
+	for _, part := range []struct{ name, value string }{
+		{"xl/workbook.xml", `<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="s1"/></sheets></workbook>`},
+		{"xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="s1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`},
+		{"xl/worksheets/sheet1.xml", worksheet}, {"xl/styles.xml", styles},
 	} {
-		if value == "" {
+		if part.value == "" {
 			continue
 		}
-		entry, err := z.Create(name)
+		entry, err := z.Create(part.name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := entry.Write([]byte(value)); err != nil {
+		if _, err := entry.Write([]byte(part.value)); err != nil {
 			t.Fatal(err)
 		}
 	}

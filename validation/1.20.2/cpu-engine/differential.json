@@ -1,0 +1,60 @@
+{
+  "host": "windows/amd64",
+  "go": "go1.27.4",
+  "tests": {
+    "analysis-diff-final": {
+      "log": "analysis-diff-final.log",
+      "sha256": "44844d0c1989a2c96eb8c17e72515e3d52fe8490f5ed4a6ec4335c90a8b478d4",
+      "passedTests": [
+        "TestAccountingDecimalKeepsExactPrecisionAndRejectsMalformedNumbers",
+        "TestSharedFieldMeasuresKeepDifferentCountsAndExactValues",
+        "TestComparisonExportRetainsRatiosStatesAndExactCumulativeResults",
+        "TestComparisonExportRefusesExcelNumericUnderflowAndOverflowWithoutRounding",
+        "TestComparisonReportsPersistAsVersionFourAndRejectLegacyVersionClaims",
+        "TestComparisonRatiosUseIndependentWholeScopeTotalsInOneScan",
+        "TestComparisonsRetainTypedBlanksErrorsZeroDenominatorsAndMissingCrossGroups",
+        "TestComparisonTreeScopeAndExactSortRemainDeterministic",
+        "TestComparisonRejectsInvalidSettingsBudgetAndCancellationWithoutPartialResult",
+        "TestComparisonExactFractionsAndLargeAmountsNeverUseDisplayRounding",
+        "TestRollupDistinctBudgetIncludesAllTotals",
+        "TestDecimalCoefficientAndScaleAgainstBigRat",
+        "TestPivotRollupMatchesRecordAtATime"
+      ]
+    },
+    "workbook-diff": {
+      "log": "workbook-diff.log",
+      "sha256": "ceedb742c919efe1a3d77a0f50396a978a37a25a724b18dd0b6a42d743092ec2",
+      "passedTests": [
+        "TestDictionaryFilterScanMatchesScalarAtEveryPosition",
+        "TestFilterExactLongNumericAndStringIDs",
+        "TestFilterCancellationDoesNotPublishPartialCache",
+        "TestFilterResumeSourceRecordsHeadersAliasesAndMissingPrefixCache",
+        "TestFilterResumeTextAdaptersKeepLogicalRecordsAndExactSourceOrder",
+        "TestFilterSortStageUsesExistingExactTypedNaturalAndHeaderRules",
+        "TestFilterResumeInvalidCursorCancellationAndSaveFailureDoNotPublishColumns",
+        "TestScanReusableTagPreservesSharedAnchorsAndExtents",
+        "TestBufferedTagReaderPreservesQuotedGreaterThan",
+        "TestBufferedTagReaderCrossBufferAndXMLCDATA",
+        "TestLiteralSearchAgreesWithUnicodeLower",
+        "TestExternalValueSearchMatchesDecodedRows",
+        "TestFastSearchMatchesStandardDecoder",
+        "TestPipeTextRecordsMatchIndependentCSVRead",
+        "TestIndexTagNamesMatchStandardXMLRowSpans"
+      ]
+    }
+  },
+  "rowProjectionFuzz": [
+    {
+      "target": "FuzzRowProjectionMatchesLiteralPermutation",
+      "executions": 49444,
+      "time": "4s",
+      "sha256": "1f4950df4d0f276bf614adf717933692dcf24256ec8273111adeeba9ed45a559"
+    },
+    {
+      "target": "FuzzRowProjectionStorageValidationAndRankSelect",
+      "executions": 136810,
+      "time": "4s",
+      "sha256": "24b96e266e0f9dfeb74b658b4b307a63fa02f08c72a3ae9f10ee139c914549a1"
+    }
+  ]
+}

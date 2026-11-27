@@ -62,11 +62,28 @@ func Decimal(input string) (*big.Rat, bool) {
 	if len(digits) == 0 {
 		return nil, false
 	}
+	shift := dec - exponent
+	// Common signed 64-bit coefficients and scales fit without constructing
+	// two big integers and exponentiating ten. Overflow keeps the full parser.
+	if len(digits) <= 19 && shift >= 0 && shift <= 18 {
+		if n, err := strconv.ParseInt(string(digits), 10, 64); err == nil {
+			if sign == "-" {
+				n = -n
+			}
+			if shift == 0 {
+				return new(big.Rat).SetInt64(n), true
+			}
+			scale := int64(1)
+			for range shift {
+				scale *= 10
+			}
+			return new(big.Rat).SetFrac64(n, scale), true
+		}
+	}
 	numerator, ok := new(big.Int).SetString(sign+string(digits), 10)
 	if !ok {
 		return nil, false
 	}
-	shift := dec - exponent
 	if shift < 0 {
 		numerator.Mul(numerator, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-shift)), nil))
 		return new(big.Rat).SetInt(numerator), true

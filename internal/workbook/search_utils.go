@@ -36,6 +36,41 @@ func minInt(a, b int) int {
 	return b
 }
 
+type searchTextQuery struct {
+	needle  string
+	literal bool
+}
+
+// Lowercasing cannot introduce or remove ASCII nonletters or basic Han
+// characters. For these common amount, ID and Chinese queries, strings.Contains
+// can use the standard library's architecture-dispatched substring search.
+func newSearchTextQuery(lower string) searchTextQuery {
+	for _, r := range lower {
+		if !literalSearchRune(r) {
+			return searchTextQuery{needle: lower}
+		}
+	}
+	return searchTextQuery{needle: lower, literal: true}
+}
+
+func literalSearchRune(r rune) bool {
+	if r < 128 {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
+	}
+	return r >= 0x4e00 && r <= 0x9fff
+}
+
+func (q searchTextQuery) contains(value string) bool {
+	if q.literal {
+		return strings.Contains(value, q.needle)
+	}
+	return containsFold(value, q.needle)
+}
+
+func (q searchTextQuery) matchesCell(c CellData) bool {
+	return q.contains(c.Raw) || (c.Display != c.Raw && q.contains(c.Display))
+}
+
 func containsFold(value, lowerNeedle string) bool {
 	if lowerNeedle == "" {
 		return true

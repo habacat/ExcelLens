@@ -1,0 +1,179 @@
+{
+  "rows": 1000000,
+  "sourceBytes": 77000005,
+  "sourceSHA256": "f868b956d7440059d355aa98765ab505e15e34aaab80f4e38c94e59193d439dc",
+  "probeSHA256": {
+    "before": "576093fe515061272cb9c21280cddf14f88c2585beb097c682c62c8b69552d95",
+    "after": "b0e8d1fd66b961ab3fe45dd117846d6e9d47d51974dbefdaa3c733a32534e284"
+  },
+  "GOMAXPROCS": 4,
+  "pollMs": 5,
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 5776.6792,
+        "openIndexMs": 1443.4464,
+        "searchMs": 2512.9067000000005,
+        "coldFilterReadMs": 1313.4329000000005,
+        "warmFilterReadMs": 506.8931999999986,
+        "processPeakRSSBytes": 222769152,
+        "aggregateMs": 7628.930700000002,
+        "includingAggregateMs": 13405.609900000001
+      },
+      "after": {
+        "totalMs": 3032.020899999999,
+        "openIndexMs": 1599.2706999999982,
+        "searchMs": 388.6004000000014,
+        "coldFilterReadMs": 979.7177999999996,
+        "warmFilterReadMs": 64.43200000000004,
+        "processPeakRSSBytes": 236290048,
+        "aggregateMs": 5925.9704999999985,
+        "includingAggregateMs": 8957.991399999997
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 3373.4971999999993,
+        "openIndexMs": 1697.4516000000008,
+        "searchMs": 446.26080000000104,
+        "coldFilterReadMs": 1169.0094999999978,
+        "warmFilterReadMs": 60.77529999999953,
+        "processPeakRSSBytes": 236568576,
+        "aggregateMs": 5512.974600000003,
+        "includingAggregateMs": 8886.471800000003
+      },
+      "before": {
+        "totalMs": 6858.768099999999,
+        "openIndexMs": 1639.2734000000005,
+        "searchMs": 3197.6482000000033,
+        "coldFilterReadMs": 1468.3992999999944,
+        "warmFilterReadMs": 553.4472000000007,
+        "processPeakRSSBytes": 222228480,
+        "aggregateMs": 8043.161500000004,
+        "includingAggregateMs": 14901.929600000003
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "totalMs": 7035.651999999999,
+        "openIndexMs": 1726.4424999999974,
+        "searchMs": 3273.794200000005,
+        "coldFilterReadMs": 1365.019199999999,
+        "warmFilterReadMs": 670.3960999999979,
+        "processPeakRSSBytes": 222367744,
+        "aggregateMs": 7900.533799999998,
+        "includingAggregateMs": 14936.185799999997
+      },
+      "after": {
+        "totalMs": 3352.670500000002,
+        "openIndexMs": 1558.583800000008,
+        "searchMs": 527.269099999998,
+        "coldFilterReadMs": 1179.6590999999949,
+        "warmFilterReadMs": 87.15850000000103,
+        "processPeakRSSBytes": 236396544,
+        "aggregateMs": 5087.1037,
+        "includingAggregateMs": 8439.774200000002
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "totalMs": 2742.0753000000104,
+        "openIndexMs": 1476.2744000000084,
+        "searchMs": 352.3067999999938,
+        "coldFilterReadMs": 876.6422000000063,
+        "warmFilterReadMs": 36.85190000000205,
+        "processPeakRSSBytes": 236498944,
+        "aggregateMs": 3918.317399999992,
+        "includingAggregateMs": 6660.392700000003
+      },
+      "before": {
+        "totalMs": 5859.913700000007,
+        "openIndexMs": 1442.203500000005,
+        "searchMs": 2574.1265000000058,
+        "coldFilterReadMs": 1316.5696999999882,
+        "warmFilterReadMs": 527.0140000000083,
+        "processPeakRSSBytes": 222547968,
+        "aggregateMs": 7431.5996999999925,
+        "includingAggregateMs": 13291.5134
+      }
+    }
+  ],
+  "aggregate": {
+    "groups": 4,
+    "columns": 2,
+    "metrics": [
+      "sum",
+      "average",
+      "min",
+      "max",
+      "count",
+      "distinct"
+    ]
+  },
+  "summary": {
+    "totalMs": {
+      "medianBefore": 6359.340900000003,
+      "medianAfter": 3192.3457000000008,
+      "medianPairedChangePct": -51.58,
+      "lowerPairs": 4
+    },
+    "openIndexMs": {
+      "medianBefore": 1541.3599000000004,
+      "medianAfter": 1578.9272500000031,
+      "medianPairedChangePct": 2.96,
+      "lowerPairs": 1
+    },
+    "searchMs": {
+      "medianBefore": 2885.8873500000045,
+      "medianAfter": 417.4306000000012,
+      "medianPairedChangePct": -85.29,
+      "lowerPairs": 4
+    },
+    "coldFilterReadMs": {
+      "medianBefore": 1340.7944499999935,
+      "medianAfter": 1074.3636499999986,
+      "medianPairedChangePct": -22.9,
+      "lowerPairs": 4
+    },
+    "warmFilterReadMs": {
+      "medianBefore": 540.2306000000045,
+      "medianAfter": 62.60364999999979,
+      "medianPairedChangePct": -88.15,
+      "lowerPairs": 4
+    },
+    "processPeakRSSBytes": {
+      "medianBefore": 222457856.0,
+      "medianAfter": 236447744.0,
+      "medianPairedChangePct": 6.29,
+      "lowerPairs": 0
+    },
+    "aggregateMs": {
+      "medianBefore": 7764.73225,
+      "medianAfter": 5300.039150000001,
+      "medianPairedChangePct": -33.53,
+      "lowerPairs": 4
+    },
+    "includingAggregateMs": {
+      "medianBefore": 14153.769750000003,
+      "medianAfter": 8663.123000000003,
+      "medianPairedChangePct": -41.93,
+      "lowerPairs": 4
+    }
+  }
+}

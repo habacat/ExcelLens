@@ -108,3 +108,45 @@ node tools/qa/compare_scroll.cjs artifacts/qa/scroll/before.json artifacts/qa/sc
 ## 1.19.1 发行基准结果
 
 干净候选 `660fbb2` 已完成全部综合测量。百万行、1 万／50 万个键的统计准备中位数分别为 4.38 秒、13.35 秒，每组 48 个暖视口的中位数分别为 2.99 毫秒、2.20 毫秒。百万行样本在 5.24 秒可操作，10.76 秒完成条件着色。报告包含新增六组读取的各轮时间与分配。 [本版综合基线](../../validation/1.19.1/performance-baseline.json)
+
+## CPU 与数据引擎配对基准
+
+2026-11-28 在 Windows 10 19045、Intel Core i7-9750H、Go 1.27.4 上，将 `6616a1a` 的引擎与本次工作树配对。两端使用同一版测量代码，`GOAMD64=v1`、`CGO_ENABLED=0`、`GOMAXPROCS=4`。每项 8 对，交替先跑基线和候选，无并行计时。表中两列耗时各取中位数，变化取每对耗时比的中位数。操作系统文件缓存按当时状态使用。
+
+| 测量 | 基线 | 优化后 | 配对耗时变化 | 变快对数 |
+| --- | ---: | ---: | ---: | ---: |
+| 10 万行 CSV，真实 HTTP 上传至最后一次筛选读回 | 762.7 ms | 478.0 ms | −37.4% | 8/8 |
+| 其中全文搜索 | 225.4 ms | 52.5 ms | −78.1% | 8/8 |
+| 其中冷筛选及两次读回 | 180.7 ms | 134.2 ms | −23.0% | 8/8 |
+| 其中热列缓存换条件筛选及两次读回 | 95.8 ms | 39.4 ms | −54.0% | 8/8 |
+| 16384 行 TXT，仅解析管道分隔及带引号的字段 | 13.40 ms | 10.94 ms | −22.7% | 8/8 |
+| 1800 × 80 工作表 XML 建行索引 | 88.06 ms | 67.56 ms | −15.6% | 6/8 |
+| 65536 行混合位图，反复核对正向和反向定位 | 302.7 µs | 241.2 µs | −20.9% | 7/8 |
+| 8 个财务文本的精确解析，含编号与非数值 | 5.34 µs | 3.44 µs | −35.6% | 8/8 |
+| 5000 行交叉汇总，单项求和／同字段六指标 | 28.09／35.40 ms | 16.32／18.85 ms | −41.8%／−47.4% | 各 8/8 |
+
+每次 HTTP 测量启动独立的真实服务，使用空数据目录和字节相同的 7,700,005 字节 CSV。检验末行搜索命中、两次筛选结果数、首末匹配的源行号、前导零编号及超过二进制浮点精度的金额原文。操作系统报告的进程峰值工作集中位数为 47.07 → 46.96 MB，8 对中各有 4 对上升和下降。Go 基准中的 B/op 衡量一次操作累计分配量。独立 CSV 解析长轮仅 4/8 变快，4096 行 XLSX 的打开、索引、搜索和读回也仅 4/8。1000 个唯一分组的聚合为 4/8。三种场景均未观察到稳定提速。[HTTP 原始收据](../../validation/1.20.2/cpu-engine/final-http.json) · [工作簿逐对记录](../../validation/1.20.2/cpu-engine/final-engine.json) · [纯解析长轮](../../validation/1.20.2/cpu-engine/text-parse.json) · [位图](../../validation/1.20.2/cpu-engine/bitmap.json) · [计算](../../validation/1.20.2/cpu-engine/final-calculations.json)
+
+### 热点与取舍
+
+- 原始 CSV 工作流采样中，搜索占累计 CPU 的 29.4%，两次筛选占 25.0%。热筛选仍花费 34.7% 做数字解析。现在按源类型选择数字比较。对适合的不可变列字典只判定一次每个取值，再沿连续编码每 64 行构造掩码。排序、数值语义或高基数使该路径不适用时，复用逐格筛选。查询掩码表每个字典值占 1 字节，最多 32 个已有字典、每个 4096 项。列缓存继续执行每列 64 MiB、合计 96 MiB 的上限。[各阶段 pprof 与摘要](../../validation/1.20.2/cpu-engine/profiles.json)
+- 外部行缓存搜索在结构检查时匹配普通文本。有类型的格仍核对原值和显示值。编号、标点及基本汉字的字面查询复用 Go 标准库子串搜索，由工具链按架构和 CPU 特性选择实现。大小写有关的查询仍按原规则匹配。单独开关字面搜索后，编号和汉字查询的配对耗时分别下降 63.8% 和 68.4%，均为 8/8。位图采用连续小端字读取，`math/bits` 在本机 v1 构建按运行时 POPCNT 能力分派。[字面查询独立对照](../../validation/1.20.2/cpu-engine/literal.json)
+- XML 标签名直接与字符串常量比较。管道 TXT 在 `encoding/csv` 借出的记录上做已有的去空格处理，配对长轮每次分配 4.20 → 2.89 MB。精确数值路径在系数和小数尺度可表示时直接构造 `big.Rat`，其余继续按任意精度解析。透视先计算各分组交叉格，再合并精确总和、计数和极值。平均数保持权重。去重集合在扫描每条来源记录时计入原预算，超限当行立即终止。[精确计算对照](../../validation/1.20.2/cpu-engine/final-calculations.json)
+- Go 1.27 的 `simd` 和 `simd/archsimd` 均为编译时实验。本机实编 `GOEXPERIMENT=simd`，用 `archsimd.X86.AVX2()` 检测指令集、八通道比较字典编码，并用通用循环处理尾段。与相同实验工具链下的通用版本配对，热筛选仅 5/8 变快，完整 CSV 流程仅 3/8。便携 `simd.Uint32s` 原型用同一组连续编码和掩码测试，热筛选配对增加 6.6%（仅 1/8 变快），CSV 全流程增加 2.2%（2/8）。另用基线 CSV 完整工作流的 CPU profile 训练 PGO，对最终代码的 CSV、TXT 流程分别增加 7.0% 和 7.1% 配对耗时。再用相同 CSV 训练结果验证 131072 行 TXT（训练样本的八倍），5/8 对变快，累计分配 58.50 → 65.08 MB。本轮交付沿用默认 Go 构建。原始 CPU 采样、实验覆盖文件与探针在 `validation/1.20.2/private/cpu-engine/`。[AVX2 对照](../../validation/1.20.2/cpu-engine/avx2.json) · [便携 SIMD 对照](../../validation/1.20.2/cpu-engine/portable-simd.json) · [最终 PGO 对照](../../validation/1.20.2/cpu-engine/final-pgo.json) · [PGO 独立规模复测](../../validation/1.20.2/cpu-engine/pgo-holdout.json) · [Go 1.27 发布说明](https://go.dev/doc/go1.27) · [Go PGO 指南](https://go.dev/doc/pgo)
+
+### 指令集与兼容性验证
+
+本机 `GOAMD64=v1` 二进制的反汇编中，子串查找读取 Go 运行时 CPU 能力位，位图定位在 `POPCNTQ` 前检查 `runtime.x86HasPOPCNT`。Windows 的 Go 1.27.4 不在 CPU 初始化前读取环境变量，单独设置 `GODEBUG=cpu.all=off` 时探针仍报告 AVX2 可用。为实际执行回退，在测试专用 `go -overlay` 中把 `cpu.all=off` 交给工具链原有的 `cpuinit`。工作簿、位图与聚合测试进程均先读取并断言 AVX2、SSE4.2 和 POPCNT 为 false。AVX2 和便携 SIMD 原型的差分也在相同能力位下通过。生产构建使用原工具链。[能力位与每组测试](../../validation/1.20.2/cpu-engine/fallback.json)
+
+逐格差分覆盖 Unicode 全表小写映射、编号、金额、空格与缺失格、65 行边界附近的恢复及损坏缓存。金额另与 `math/big` 的参考值逐一比较，2500 条交叉汇总与逐条累加参考核对每个指标的原始精确值和计数。位图读写的两组 fuzz 共执行 186254 次。Windows 和 Linux 的 amd64/arm64 及 macOS arm64 五项无 CGO 单文件构建均完成，Windows amd64 实跑版本入口。其余四项为交叉编译核验。全仓标准检查与 Windows 竞态检查均通过。[差分与 fuzz 收据](../../validation/1.20.2/cpu-engine/differential.json) · [构建收据](../../validation/1.20.2/cpu-engine/platforms.json) · [标准门禁](../../validation/1.20.2/cpu-engine/check.json) · [竞态门禁](../../validation/1.20.2/cpu-engine/check-race.json)
+
+### 复测
+
+两端分别编译 `go test -c -pgo=off -o <输出> ./internal/workbook`，按同样方式编译 `./internal/analysis`、`./internal/rowindex`。HTTP 探针使用 `go build -pgo=off -o <输出> ./tools/uiprobe`。基线工作树也要使用候选的 `engine_bench_test.go`、确定 ZIP 条目顺序的 `source_metadata_test.go`、`decimal_bench_test.go`、`aggregation_bench_test.go` 和 `row_projection_bench_test.go`。原始 JSON 包含二进制 SHA-256、逐对顺序、时间和分配量。
+
+```powershell
+python tools/bench/engine_pairs.py before.exe after.exe --bench '^BenchmarkEngineLedger$' --benchtime 450ms --pairs 8 --out ledger.json
+python tools/bench/engine_http.py probe-before.exe probe-after.exe --rows 100000 --pairs 8 --out http.json
+go test ./internal/workbook -run '^$' -bench '^BenchmarkEngineLedger$/^csv$/^workflow$' -benchtime 2s -cpuprofile workflow.cpu
+go tool pprof -top workflow.cpu
+```

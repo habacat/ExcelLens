@@ -1,0 +1,298 @@
+{
+  "benchmark": "^BenchmarkEngineLiteralSearch$",
+  "benchtime": "550ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "workbook-fold.exe",
+      "sha256": "bc3bad35c320f2b4f144dd1a3dfda1f5a6658a86ee5345c48e278c7024f7a3c2"
+    },
+    "after": {
+      "name": "workbook-final.exe",
+      "sha256": "79cf9b1bbe5f50d1af497df6450858345d8ff6f1d973310f1def021c2dcbbaa7"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          21304710.0,
+          3749859,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          27615350.0,
+          4069243,
+          81835
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          9529844.0,
+          2438766,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7258960.0,
+          2438707,
+          32681
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7348792.0,
+          2438777,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7765511.0,
+          2438724,
+          32681
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          20638508.0,
+          3749818,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          24371512.0,
+          4069229,
+          81835
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          18691378.0,
+          3749830,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          21971964.0,
+          4069246,
+          81835
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7010163.0,
+          2438769,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7293286.0,
+          2438722,
+          32681
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          6836031.0,
+          2438823,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7380102.0,
+          2438724,
+          32681
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          21886061.0,
+          3749868,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          26487689.0,
+          4069222,
+          81835
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          31720432.0,
+          3749952,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          30868164.0,
+          4069205,
+          81834
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7081513.0,
+          2438758,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7419787.0,
+          2438704,
+          32681
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7369004.0,
+          2438754,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7955400.0,
+          2438710,
+          32681
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          20527945.0,
+          3749702,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          25320993.0,
+          4069442,
+          81835
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          20693371.0,
+          3749707,
+          49066
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          24839021.0,
+          4069214,
+          81834
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7778458.0,
+          2438758,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          8306393.0,
+          2438716,
+          32681
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7235221.0,
+          2438784,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          8181881.0,
+          2438728,
+          32681
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          19814768.0,
+          3749840,
+          49067
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          23760440.0,
+          4069217,
+          81835
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkEngineLiteralSearch/ID-4": {
+      "medianBefore": [
+        20665939.5,
+        3749835.0,
+        49067.0
+      ],
+      "medianAfter": [
+        7292006.5,
+        2438767.5,
+        32681.0
+      ],
+      "medianPairedTimeChangePct": -63.79,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLiteralSearch/Han-4": {
+      "medianBefore": [
+        25080007.0,
+        4069225.5,
+        81835.0
+      ],
+      "medianAfter": [
+        7592649.0,
+        2438719.0,
+        32681.0
+      ],
+      "medianPairedTimeChangePct": -68.36,
+      "fasterPairs": 8
+    }
+  }
+}

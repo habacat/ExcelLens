@@ -1,0 +1,75 @@
+{
+  "billionRecordBenchmark": false,
+  "columns": 3,
+  "desktopManualAcceptance": false,
+  "indexBytes": 100000103,
+  "phases": [
+    {
+      "phase": "cold-open-index",
+      "milliseconds": 2591,
+      "liveHeapBytes": 429328,
+      "allocatedBytes": 178536944
+    },
+    {
+      "phase": "cached-reopen-index",
+      "milliseconds": 221,
+      "liveHeapBytes": 431992,
+      "allocatedBytes": 1742976
+    },
+    {
+      "phase": "random-viewport-100x80",
+      "milliseconds": 31,
+      "liveHeapBytes": 431256,
+      "allocatedBytes": 7222896
+    },
+    {
+      "phase": "full-search-tail",
+      "milliseconds": 1438,
+      "liveHeapBytes": 431560,
+      "allocatedBytes": 40782248
+    },
+    {
+      "phase": "condition-filter",
+      "milliseconds": 2029,
+      "liveHeapBytes": 25442456,
+      "allocatedBytes": 146232224
+    },
+    {
+      "phase": "column-distinct",
+      "milliseconds": 119,
+      "liveHeapBytes": 25441888,
+      "allocatedBytes": 5392
+    },
+    {
+      "phase": "large-stable-external-sort",
+      "milliseconds": 5517,
+      "liveHeapBytes": 50454032,
+      "allocatedBytes": 284270072
+    },
+    {
+      "phase": "complete-filter-without-materializing-rows",
+      "milliseconds": 2146,
+      "liveHeapBytes": 75464456,
+      "allocatedBytes": 226203040
+    },
+    {
+      "phase": "streaming-group-count",
+      "milliseconds": 3678,
+      "liveHeapBytes": 75463744,
+      "allocatedBytes": 4081235568
+    },
+    {
+      "phase": "complete-streaming-csv-export",
+      "milliseconds": 4908,
+      "liveHeapBytes": 432016,
+      "allocatedBytes": 3881492120
+    }
+  ],
+  "residentOffsets": 0,
+  "result": "PASS",
+  "rowCacheBytes": 239990095,
+  "rows": 5000002,
+  "sourceSHA256": "06ee11776a264ac01fe19912933d7777cac9bd55d30f0b8663d7a7bcc3cfd455",
+  "sourceUnchanged": true,
+  "version": "1.20.3"
+}

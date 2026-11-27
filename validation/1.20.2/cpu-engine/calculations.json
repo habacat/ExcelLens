@@ -1,0 +1,392 @@
+{
+  "benchmark": "^(BenchmarkDecimalLedger|BenchmarkAnalysisPreparedMetrics)$",
+  "benchtime": "450ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "analysis-base.exe",
+      "sha256": "ae327c7ec93aa6988e5985431fbaf738525a9f1d75fd47d3a24afe5c3ff90f9f"
+    },
+    "after": {
+      "name": "analysis-opt.exe",
+      "sha256": "6170ca34dcec1b0ef6d6f1f0c1af7376effac53dda157bea645e60ee80648c5e"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          44462758.0,
+          9991742,
+          237350
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          45644067.0,
+          14896342,
+          324282
+        ],
+        "BenchmarkDecimalLedger-4": [
+          5809.0,
+          1480,
+          73
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          17040948.0,
+          6356863,
+          132698
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          21372524.0,
+          7724465,
+          159192
+        ],
+        "BenchmarkDecimalLedger-4": [
+          3675.0,
+          800,
+          45
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          19444477.0,
+          6359380,
+          132753
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          20710029.0,
+          7723869,
+          159178
+        ],
+        "BenchmarkDecimalLedger-4": [
+          4419.0,
+          800,
+          45
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          38088380.0,
+          9990931,
+          237340
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          42141815.0,
+          14897854,
+          324320
+        ],
+        "BenchmarkDecimalLedger-4": [
+          6481.0,
+          1480,
+          73
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          33095053.0,
+          9991566,
+          237354
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          43566593.0,
+          14898832,
+          324343
+        ],
+        "BenchmarkDecimalLedger-4": [
+          9067.0,
+          1480,
+          73
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          21073454.0,
+          6359908,
+          132774
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          21843138.0,
+          7723690,
+          159177
+        ],
+        "BenchmarkDecimalLedger-4": [
+          3803.0,
+          800,
+          45
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          18430796.0,
+          6358495,
+          132732
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          19713633.0,
+          7723811,
+          159180
+        ],
+        "BenchmarkDecimalLedger-4": [
+          4009.0,
+          800,
+          45
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          41559243.0,
+          9989316,
+          237300
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          50012789.0,
+          14897655,
+          324316
+        ],
+        "BenchmarkDecimalLedger-4": [
+          6246.0,
+          1480,
+          73
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          35243375.0,
+          9989920,
+          237315
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          45577969.0,
+          14899150,
+          324352
+        ],
+        "BenchmarkDecimalLedger-4": [
+          5920.0,
+          1480,
+          73
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          19436360.0,
+          6359589,
+          132766
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          21106750.0,
+          7723160,
+          159158
+        ],
+        "BenchmarkDecimalLedger-4": [
+          4503.0,
+          800,
+          45
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          18937700.0,
+          6358075,
+          132730
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          21475275.0,
+          7723824,
+          159175
+        ],
+        "BenchmarkDecimalLedger-4": [
+          3913.0,
+          800,
+          45
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          29808067.0,
+          9992296,
+          237370
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          38189285.0,
+          14894832,
+          324246
+        ],
+        "BenchmarkDecimalLedger-4": [
+          6258.0,
+          1480,
+          73
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          28563169.0,
+          9990461,
+          237329
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          37858254.0,
+          14898861,
+          324344
+        ],
+        "BenchmarkDecimalLedger-4": [
+          5702.0,
+          1480,
+          73
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          18390400.0,
+          6359192,
+          132753
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          20691041.0,
+          7723268,
+          159163
+        ],
+        "BenchmarkDecimalLedger-4": [
+          3684.0,
+          800,
+          45
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          17530543.0,
+          6358443,
+          132735
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          21452527.0,
+          7723306,
+          159165
+        ],
+        "BenchmarkDecimalLedger-4": [
+          3983.0,
+          800,
+          45
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisPreparedMetrics/single-sum-4": [
+          30468619.0,
+          9988953,
+          237283
+        ],
+        "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": [
+          56629914.0,
+          14897038,
+          324301
+        ],
+        "BenchmarkDecimalLedger-4": [
+          7263.0,
+          1480,
+          73
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkAnalysisPreparedMetrics/single-sum-4": {
+      "medianBefore": [
+        34169214.0,
+        9990696.0,
+        237334.5
+      ],
+      "medianAfter": [
+        18684248.0,
+        6358843.5,
+        132744.0
+      ],
+      "medianPairedTimeChangePct": -43.66,
+      "fasterPairs": 8
+    },
+    "BenchmarkAnalysisPreparedMetrics/six-metrics-one-field-4": {
+      "medianBefore": [
+        44572281.0,
+        14897754.5,
+        324318.0
+      ],
+      "medianAfter": [
+        21239637.0,
+        7723750.5,
+        159176.0
+      ],
+      "medianPairedTimeChangePct": -52.02,
+      "fasterPairs": 8
+    },
+    "BenchmarkDecimalLedger-4": {
+      "medianBefore": [
+        6252.0,
+        1480.0,
+        73.0
+      ],
+      "medianAfter": [
+        3948.0,
+        800.0,
+        45.0
+      ],
+      "medianPairedTimeChangePct": -36.28,
+      "fasterPairs": 8
+    }
+  }
+}

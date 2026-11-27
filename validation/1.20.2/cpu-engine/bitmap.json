@@ -1,0 +1,204 @@
+{
+  "benchmark": "^BenchmarkProjectionBitmap$",
+  "benchtime": "500ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "rowindex-base.exe",
+      "sha256": "d9f8a494b16867437817e27fdcddb0c493ad6b7d8a202042c0a1fe1481e974c4"
+    },
+    "after": {
+      "name": "rowindex-opt.exe",
+      "sha256": "1a0c6844ae3e1aebc0e9b51482097708980cc6395c793ea33c34ed446f439d38"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          293099.0,
+          0,
+          0
+        ]
+      },
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          296559.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          234400.0,
+          0,
+          0
+        ]
+      },
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          332011.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          312352.0,
+          0,
+          0
+        ]
+      },
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          239454.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          226282.0,
+          0,
+          0
+        ]
+      },
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          265472.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          291447.0,
+          0,
+          0
+        ]
+      },
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          262410.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          262002.0,
+          0,
+          0
+        ]
+      },
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          356766.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          321379.0,
+          0,
+          0
+        ]
+      },
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          242974.0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkProjectionBitmap-4": [
+          232920.0,
+          0,
+          0
+        ]
+      },
+      "before": {
+        "BenchmarkProjectionBitmap-4": [
+          285875.0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkProjectionBitmap-4": {
+      "medianBefore": [
+        302725.5,
+        0.0,
+        0.0
+      ],
+      "medianAfter": [
+        241214.0,
+        0.0,
+        0.0
+      ],
+      "medianPairedTimeChangePct": -20.93,
+      "fasterPairs": 7
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "toolchain": "go1.27.4",
+  "host": "windows/amd64",
+  "builds": [
+    {
+      "os": "windows",
+      "arch": "amd64",
+      "cgo": false,
+      "size": 60171264,
+      "sha256": "db181ef8ffb7cfa7684fc393b307e92a2c831d752b12e72a31b9bb38766b816f",
+      "versionRun": "ExcelLens 1.20.2"
+    },
+    {
+      "os": "linux",
+      "arch": "amd64",
+      "cgo": false,
+      "size": 59161415,
+      "sha256": "cdc9b0b39713ebf5dbf129d2a3518c3e98f1ba602dca442c568b2e19c1cc94de"
+    },
+    {
+      "os": "linux",
+      "arch": "arm64",
+      "cgo": false,
+      "size": 55715288,
+      "sha256": "941d0fad2acc05a86fe7a24857684ff95d43d65124159edba37223f7e6c7aa70"
+    },
+    {
+      "os": "windows",
+      "arch": "arm64",
+      "cgo": false,
+      "size": 56167424,
+      "sha256": "17ac0dbeaa8f5c00e24c0e8e1bba258798f12905fe4b2a556bf4fb4c187f400b"
+    },
+    {
+      "os": "darwin",
+      "arch": "arm64",
+      "cgo": false,
+      "size": 57144770,
+      "sha256": "3952931d1aadc87577ff4649766394107550a223584d45d5ce8a35a1df7a09e8"
+    }
+  ]
+}

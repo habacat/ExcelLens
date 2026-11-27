@@ -177,7 +177,6 @@ func runLevel(ctx context.Context, q Query, fields []Field, rowFields, path []st
 		return result, err
 	}
 	groups := make(map[string]*metricGroup)
-	columnNames := make(map[string]struct{})
 	grand := make([]accumulator, stateCount)
 	colTotals := make(map[string][]accumulator)
 	var distinctUsed int
@@ -187,14 +186,6 @@ func runLevel(ctx context.Context, q Query, fields []Field, rowFields, path []st
 	readQuery := q
 	readQuery.Rows = rowFields
 	need := required(readQuery)
-	addMetrics := func(target []accumulator) error {
-		for i, field := range plan.fields {
-			if err := target[i].add(inputs[i], field.needs, &distinctUsed, memory); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
 	err = scan(ctx, need, func(rec Record) error {
 		scanned++
 		if scanned%256 == 0 {
@@ -237,14 +228,16 @@ func runLevel(ctx context.Context, q Query, fields []Field, rowFields, path []st
 		if len(q.Columns) > 0 {
 			column = values[q.Columns[0]].Text
 		}
-		if _, ok := columnNames[column]; !ok {
+		colTotal := colTotals[column]
+		if colTotal == nil {
 			if err := memory.reserve(int64(len(column)) + 128); err != nil {
 				return err
 			}
-			if len(columnNames) >= MaxColumns {
+			if len(colTotals) >= MaxColumns {
 				return fmt.Errorf("列维度的分类超过 %d 个，请增加筛选条件", MaxColumns)
 			}
-			columnNames[column] = struct{}{}
+			colTotal = make([]accumulator, stateCount)
+			colTotals[column] = colTotal
 		}
 		key := groupKey(rowKeys)
 		g := groups[key]
@@ -263,26 +256,26 @@ func runLevel(ctx context.Context, q Query, fields []Field, rowFields, path []st
 			if err := memory.reserve(int64(stateCount)*128 + 64); err != nil {
 				return err
 			}
-			if len(groups)*len(columnNames)*count > MaxCells {
+			if len(groups)*len(colTotals)*count > MaxCells {
 				return errors.New("透视表维度组合过大，请先筛选数据")
 			}
 			bucket = make([]accumulator, stateCount)
 			g.buckets[column] = bucket
 		}
-		if err := addMetrics(bucket); err != nil {
-			return err
-		}
-		if err := addMetrics(g.total); err != nil {
-			return err
-		}
-		if err := addMetrics(grand); err != nil {
-			return err
-		}
-		if colTotals[column] == nil {
-			colTotals[column] = make([]accumulator, stateCount)
-		}
-		if err := addMetrics(colTotals[column]); err != nil {
-			return err
+		for i, field := range plan.fields {
+			input := inputs[i]
+			if err := bucket[i].add(input, field.needs, &distinctUsed, memory); err != nil {
+				return err
+			}
+			// Enforce the global set and byte limits on the source row that
+			// incurs them, including memberships in all three totals.
+			if field.needs.distinct && input.value.Text != "" && !input.value.MissingCache {
+				for _, total := range []*accumulator{&g.total[i], &grand[i], &colTotal[i]} {
+					if err := total.addDistinct(input.value.Text, &distinctUsed, memory); err != nil {
+						return err
+					}
+				}
+			}
 		}
 		g.count++
 		return nil
@@ -294,8 +287,28 @@ func runLevel(ctx context.Context, q Query, fields []Field, rowFields, path []st
 		return result, err
 	}
 	result.Scanned = scanned
-	result.ColumnKeys = make([]string, 0, len(columnNames))
-	for key := range columnNames {
+	// Combine counts and exact numeric states before rendering or applying Top.
+	// Distinct sets have already been admitted during the source scan.
+	needs := make([]metricNeeds, stateCount)
+	for i, field := range plan.fields {
+		needs[i] = field.needs
+		needs[i].distinct = false
+	}
+	for _, g := range groups {
+		for column, bucket := range g.buckets {
+			if err := mergeMetrics(ctx, g.total, bucket, needs, &distinctUsed, memory); err != nil {
+				return result, err
+			}
+			if err := mergeMetrics(ctx, colTotals[column], bucket, needs, &distinctUsed, memory); err != nil {
+				return result, err
+			}
+		}
+		if err := mergeMetrics(ctx, grand, g.total, needs, &distinctUsed, memory); err != nil {
+			return result, err
+		}
+	}
+	result.ColumnKeys = make([]string, 0, len(colTotals))
+	for key := range colTotals {
 		result.ColumnKeys = append(result.ColumnKeys, key)
 	}
 	sort.Strings(result.ColumnKeys)

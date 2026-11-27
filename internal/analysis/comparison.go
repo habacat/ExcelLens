@@ -145,20 +145,9 @@ func mergeMetrics(ctx context.Context, target, source []accumulator, needs []met
 					}
 				}
 				at++
-				if _, exists := a.distinct[key]; exists {
-					continue
-				}
-				if err := memory.reserve(int64(len(key)) + 64); err != nil {
+				if err := a.addDistinct(key, used, memory); err != nil {
 					return err
 				}
-				*used++
-				if *used > MaxDistinct {
-					return errDistinctLimit
-				}
-				if a.distinct == nil {
-					a.distinct = make(map[string]struct{})
-				}
-				a.distinct[key] = struct{}{}
 			}
 		}
 	}

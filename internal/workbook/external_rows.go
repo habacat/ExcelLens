@@ -405,10 +405,17 @@ func (w *Workbook) decodeExternalRow(data []byte, number, first, last int, selec
 				continue
 			}
 		}
-		raw := string(data[rawStart : rawStart+int(size)])
+		rawBytes := data[rawStart : rawStart+int(size)]
+		if kind == 's' && options.nativeValueQuery != nil && !options.nativeValueQuery.contains(string(rawBytes)) {
+			continue
+		}
+		raw := string(rawBytes)
 		c := w.externalCellValue(rowSuffix, externalCell{Col: int(col), Raw: raw, Style: int(style), Type: kind,
 			HasFormula: flags&1 != 0, Formula: formula, CacheMissing: flags&2 != 0, SharedFormula: flags&8 != 0,
 			ArrayFormula: array, ArrayFormulaMember: flags&16 != 0}, options.FormatValue)
+		if kind != 's' && options.nativeValueQuery != nil && !options.nativeValueQuery.matchesCell(c) {
+			continue
+		}
 		if options.RichText && len(richData) != 0 {
 			if options.richBudget.admit(len(richData)) {
 				c.RichText, err = w.xlsbRichPresentation(raw, richData)

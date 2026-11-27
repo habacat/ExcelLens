@@ -74,6 +74,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.20.3.md](releases/1.20.3.md) | 数据引擎性能与大型台账验证 |
 | [releases/1.20.2.md](releases/1.20.2.md) | 界面控件统一样式、超链接已访问变色与提示文案清理 |
 | [releases/1.19.1.md](releases/1.19.1.md) | 工作表视口、分组聚合与缓存兼容性 |
 | [releases/1.19.0.md](releases/1.19.0.md) | 后台条件统计、内核拆分与综合性能基线 |

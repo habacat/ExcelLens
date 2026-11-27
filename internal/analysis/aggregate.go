@@ -71,24 +71,32 @@ type accumulator struct {
 	distinct            map[string]struct{}
 }
 
+func (a *accumulator) addDistinct(value string, used *int, memory *queryMemory) error {
+	if _, exists := a.distinct[value]; exists {
+		return nil
+	}
+	if err := memory.reserve(int64(len(value)) + 64); err != nil {
+		return err
+	}
+	*used++
+	if *used > MaxDistinct {
+		return errDistinctLimit
+	}
+	if a.distinct == nil {
+		a.distinct = make(map[string]struct{})
+	}
+	a.distinct[value] = struct{}{}
+	return nil
+}
+
 func (a *accumulator) add(input metricInput, needs metricNeeds, distinctUsed *int, memory *queryMemory) error {
 	v := input.value
 	if v.Text == "" || v.MissingCache {
 		return nil
 	}
 	if needs.distinct {
-		if _, exists := a.distinct[v.Text]; !exists {
-			if err := memory.reserve(int64(len(v.Text)) + 64); err != nil {
-				return err
-			}
-			*distinctUsed++
-			if *distinctUsed > MaxDistinct {
-				return errDistinctLimit
-			}
-			if a.distinct == nil {
-				a.distinct = make(map[string]struct{})
-			}
-			a.distinct[v.Text] = struct{}{}
+		if err := a.addDistinct(v.Text, distinctUsed, memory); err != nil {
+			return err
 		}
 	}
 	if needs.count {

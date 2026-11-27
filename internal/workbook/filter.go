@@ -284,25 +284,27 @@ func matchCompiledFilter(cell CellData, exists bool, rule compiledFilterRule) bo
 	case "notBlank":
 		return exists && strings.TrimSpace(value) != ""
 	}
-	folded := strings.ToLower(value)
 	switch rule.Operator {
 	case "contains":
-		return strings.Contains(folded, rule.needle)
+		return strings.Contains(strings.ToLower(value), rule.needle)
 	case "notContains":
-		return !strings.Contains(folded, rule.needle)
+		return !strings.Contains(strings.ToLower(value), rule.needle)
 	case "startsWith":
-		return strings.HasPrefix(folded, rule.needle)
+		return strings.HasPrefix(strings.ToLower(value), rule.needle)
 	case "endsWith":
-		return strings.HasSuffix(folded, rule.needle)
+		return strings.HasSuffix(strings.ToLower(value), rule.needle)
 	case "equals", "notEquals", "gt", "gte", "lt", "lte":
-		left, leftOK := parseFilterNumber(value)
-		// Text cells such as an account number with leading zeroes must not
-		// silently become a float64 (and lose distinct digits).
-		numeric := leftOK && rule.hasNumeric && !isTextCell(cell)
+		var left float64
+		var numeric bool
+		if rule.hasNumeric && !isTextCell(cell) {
+			left, numeric = parseFilterNumber(value)
+		}
 		if rule.Operator == "equals" || rule.Operator == "notEquals" {
-			equal := folded == rule.needle
+			var equal bool
 			if numeric {
 				equal = compareFilterNumeric(value, rule.Value, left, rule.numericValue) == 0
+			} else {
+				equal = strings.ToLower(value) == rule.needle
 			}
 			if rule.Operator == "equals" {
 				return equal

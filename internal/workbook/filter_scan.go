@@ -31,6 +31,7 @@ type filterScanner struct {
 	last      int
 	cached    bool
 	cells     []CellData
+	decoded   []CellData
 	exists    []bool
 	whole     bool
 }
@@ -82,6 +83,7 @@ func newFilterScanner(w *Workbook, idx *SheetIndex, rules []FilterRule, keys []S
 		s.first, s.last = min(s.first, column), max(s.last, column)
 	}
 	if !s.cached {
+		s.decoded = make([]CellData, 0, len(s.missing))
 		var err error
 		s.file, err = os.Open(idx.XMLPath)
 		if err != nil {
@@ -116,7 +118,7 @@ func (s *filterScanner) read(position int) error {
 		}
 	}
 	if !s.cached {
-		row, err := s.stream.read(s.w, position, s.first, s.last, s.missing, true, false)
+		row, err := s.stream.readWithOptions(s.w, position, s.first, s.last, s.missing, RowReadOptions{FormatValue: true, cellScratch: &s.decoded})
 		if err != nil {
 			return err
 		}
@@ -125,6 +127,7 @@ func (s *filterScanner) read(position int) error {
 				s.cells[slot], s.exists[slot] = cell, true
 			}
 		}
+		clear(s.decoded[:min(len(row.Cells), cap(s.decoded))])
 		for slot, builder := range s.builders {
 			if builder != nil {
 				s.builders[slot] = writeColumnCache(builder, position, s.cells[slot], s.exists[slot])
@@ -155,17 +158,33 @@ func (s *filterScanner) scan(ctx context.Context, start, headerRow int, visit fu
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	for position := start; position < s.idx.RowCount(); position++ {
+	end := s.idx.RowCount()
+	filters, err := s.dictionaryFilters(ctx, end-start)
+	if err != nil {
+		return err
+	}
+	var mask uint64
+	for position := start; position < end; position++ {
 		if position&31 == 0 {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 		}
-		if err := s.read(position); err != nil {
-			return err
+		header := headerRow > 0 && s.idx.RowAt(position).Number <= headerRow
+		var matched bool
+		if len(filters) > 0 {
+			if (position-start)%64 == 0 {
+				mask = dictionaryBlockMask(filters, position, min(position+64, end))
+			}
+			matched = mask&1 != 0
+			mask >>= 1
+		} else {
+			if err := s.read(position); err != nil {
+				return err
+			}
+			matched = !header && s.matches()
 		}
-		header := s.idx.RowAt(position).Number <= headerRow
-		if header || s.matches() {
+		if header || matched {
 			if err := visit(position, header); err != nil {
 				return err
 			}

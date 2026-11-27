@@ -1,0 +1,1238 @@
+{
+  "benchmark": "^(BenchmarkEngineLedger|BenchmarkEngineXMLWorkflow|BenchmarkEngineDenseSearch|BenchmarkEngineLiteralSearch|BenchmarkWorksheetIndexScanner)$",
+  "benchtime": "450ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "workbook-before.exe",
+      "sha256": "bb274201e3ebf6b724b3106444b47102d0190422e16a44bf989c16b8a2262f6e"
+    },
+    "after": {
+      "name": "workbook-final.exe",
+      "sha256": "79cf9b1bbe5f50d1af497df6450858345d8ff6f1d973310f1def021c2dcbbaa7"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7869790.0,
+          2885332,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          104296340.0,
+          44729678,
+          434551
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          47658820.0,
+          26124682,
+          212909
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          26822979.0,
+          10930210,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          9382560.0,
+          1108181,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          11761976.0,
+          4196374,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          106716540.0,
+          46093737,
+          451004
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          33876520.0,
+          3405409,
+          8783
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          51121300.0,
+          26124564,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          48974370.0,
+          26124590,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          49211160.0,
+          26401228,
+          245677
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          86457417.0,
+          1147128,
+          6
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          8356569.0,
+          2885338,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          62942862.0,
+          12529599,
+          168309
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          21387562.0,
+          3749702,
+          49067
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          16551724.0,
+          2187396,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          202674.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          10027646.0,
+          2885260,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          64598829.0,
+          12582235,
+          168363
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          36163186.0,
+          3404786,
+          8784
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          26103400.0,
+          5241196,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          9345020.0,
+          2438725,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          8392075.0,
+          2438727,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          73950857.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          8564397.0,
+          2885261,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          66575286.0,
+          12529738,
+          168309
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          21284560.0,
+          3749690,
+          49066
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          15199815.0,
+          2187376,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          229686.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          28770904.0,
+          2885466,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          92277617.0,
+          12582712,
+          168367
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          46273320.0,
+          3414813,
+          8798
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          36065086.0,
+          5241200,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          14141025.0,
+          2438727,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          10607738.0,
+          2438736,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          107212940.0,
+          1147128,
+          6
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          10180629.0,
+          2885345,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          124356200.0,
+          44729724,
+          434551
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          55601030.0,
+          26124680,
+          212910
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          32615394.0,
+          10930233,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          11146517.0,
+          1108178,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          14346684.0,
+          4196344,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          156912133.0,
+          46093634,
+          451005
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          39268592.0,
+          3414549,
+          8789
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          49893430.0,
+          26124537,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          50206180.0,
+          26124666,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          52904700.0,
+          26401332,
+          245678
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          77665833.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7815781.0,
+          2885363,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          113093725.0,
+          44729824,
+          434552
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          48987158.0,
+          26124661,
+          212909
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          26674728.0,
+          10930307,
+          151511
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          9128591.0,
+          1108181,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          11768675.0,
+          4196369,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          112558675.0,
+          46093524,
+          451003
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          38173662.0,
+          3414747,
+          8791
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          47701940.0,
+          26124621,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          47655610.0,
+          26124668,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          58799125.0,
+          26401227,
+          245677
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          95151250.0,
+          1147128,
+          6
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          9652293.0,
+          2885354,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          85498283.0,
+          12530004,
+          168310
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          26400233.0,
+          3749695,
+          49067
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          22124164.0,
+          2187394,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          364211.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          12613581.0,
+          2885263,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          82133483.0,
+          12582518,
+          168365
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          46047170.0,
+          3419552,
+          8802
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          34461386.0,
+          5241200,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          12227619.0,
+          2438738,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          20004760.0,
+          2438754,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          65460129.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7612937.0,
+          2885246,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          86172229.0,
+          12530422,
+          168311
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          25277524.0,
+          3749749,
+          49067
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          20825448.0,
+          2187399,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          240435.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          11894879.0,
+          2885247,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          103497012.0,
+          12582140,
+          168364
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          61862312.0,
+          3420659,
+          8809
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          30708294.0,
+          5241201,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          8300394.0,
+          2438749,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          8525294.0,
+          2438755,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          69156550.0,
+          1147128,
+          6
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7557708.0,
+          2885322,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          102598320.0,
+          44729569,
+          434551
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          42930533.0,
+          26124676,
+          212909
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          23049773.0,
+          10930206,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          7812747.0,
+          1108180,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          11905238.0,
+          4196364,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          152363825.0,
+          46093900,
+          451004
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          80454617.0,
+          3423396,
+          8829
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          50923400.0,
+          26124545,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          77372354.0,
+          26124611,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          69258214.0,
+          26401256,
+          245678
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          89666817.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          8338808.0,
+          2885263,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          108133180.0,
+          44730619,
+          434552
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          67681329.0,
+          26124723,
+          212910
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          36003564.0,
+          10930175,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          11096661.0,
+          1108183,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          15744864.0,
+          4196380,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          158197400.0,
+          46093893,
+          451004
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          50999344.0,
+          3414910,
+          8802
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          56694112.0,
+          26124540,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          61673950.0,
+          26124596,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          58695100.0,
+          26401219,
+          245677
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          118127840.0,
+          1147128,
+          6
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          11807693.0,
+          2885259,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          95221433.0,
+          12530022,
+          168310
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          28402730.0,
+          3749708,
+          49067
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          17819367.0,
+          2187421,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          223170.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          12134582.0,
+          2885266,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          86907767.0,
+          12582346,
+          168365
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          45138680.0,
+          3410041,
+          8795
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          30136680.0,
+          5241245,
+          81835
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          16298764.0,
+          2438727,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          14271817.0,
+          2438740,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          128985475.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          13093419.0,
+          2885261,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          87842433.0,
+          12530144,
+          168311
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          28302958.0,
+          3749716,
+          49067
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          16768594.0,
+          2187365,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          180611.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          8396761.0,
+          2885261,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          63251667.0,
+          12582184,
+          168363
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          37641392.0,
+          3411229,
+          8790
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          26655753.0,
+          5241214,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7066967.0,
+          2438733,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7620418.0,
+          2438747,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          65332943.0,
+          1147128,
+          6
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7165965.0,
+          2885252,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          95355300.0,
+          44730972,
+          434555
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          39733200.0,
+          26124714,
+          212909
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          25818065.0,
+          10930250,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          8248526.0,
+          1108181,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          10887316.0,
+          4196374,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          101066880.0,
+          46093500,
+          451002
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          34993707.0,
+          3408264,
+          8787
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          45760358.0,
+          26124628,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          50566144.0,
+          26124656,
+          212909
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          52995578.0,
+          26401240,
+          245677
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          78540633.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7608960.0,
+          2885335,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          113138120.0,
+          44729387,
+          434550
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          50549300.0,
+          26124768,
+          212910
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          28264594.0,
+          10930233,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          8014240.0,
+          1108182,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          11631954.0,
+          4196391,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          100704080.0,
+          46093563,
+          451002
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          32096150.0,
+          3408504,
+          8781
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          43702400.0,
+          26124620,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          54528175.0,
+          26124820,
+          212910
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          64348700.0,
+          26401265,
+          245677
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          76086483.0,
+          1147128,
+          6
+        ]
+      },
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7357756.0,
+          2885261,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          56670488.0,
+          12530272,
+          168310
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          18641683.0,
+          3749689,
+          49066
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          14514242.0,
+          2187400,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          183073.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          9565942.0,
+          2885270,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          61841738.0,
+          12582431,
+          168365
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          31135656.0,
+          3406042,
+          8783
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          22445176.0,
+          5241203,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7156785.0,
+          2438740,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7336238.0,
+          2438740,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          65670000.0,
+          1147128,
+          6
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          8080401.0,
+          2885332,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          61574275.0,
+          12529566,
+          168309
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          21984607.0,
+          3749686,
+          49066
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          15015703.0,
+          2187361,
+          102354
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          185833.0,
+          27024,
+          32
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          9025739.0,
+          2885271,
+          16406
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          57504862.0,
+          12582246,
+          168363
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          31155200.0,
+          3397254,
+          8778
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          22522892.0,
+          5241204,
+          81834
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          7457976.0,
+          2438736,
+          32681
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          7836159.0,
+          2438736,
+          32681
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          65960486.0,
+          1147128,
+          6
+        ]
+      },
+      "before": {
+        "BenchmarkEngineLedger/csv/parse-4": [
+          7351613.0,
+          2885336,
+          16406
+        ],
+        "BenchmarkEngineLedger/csv/workflow-4": [
+          102338740.0,
+          44729620,
+          434552
+        ],
+        "BenchmarkEngineLedger/csv/search-4": [
+          50221722.0,
+          26124508,
+          212909
+        ],
+        "BenchmarkEngineLedger/csv/filter-cold-4": [
+          25933355.0,
+          10930206,
+          151510
+        ],
+        "BenchmarkEngineLedger/csv/filter-warm-4": [
+          7694916.0,
+          1108178,
+          53271
+        ],
+        "BenchmarkEngineLedger/txt/parse-4": [
+          15285978.0,
+          4196384,
+          32792
+        ],
+        "BenchmarkEngineLedger/txt/workflow-4": [
+          109634980.0,
+          46093635,
+          451002
+        ],
+        "BenchmarkEngineXMLWorkflow-4": [
+          34711436.0,
+          3408015,
+          8786
+        ],
+        "BenchmarkEngineDenseSearch-4": [
+          47522500.0,
+          26124568,
+          212912
+        ],
+        "BenchmarkEngineLiteralSearch/ID-4": [
+          58532990.0,
+          26124694,
+          212910
+        ],
+        "BenchmarkEngineLiteralSearch/Han-4": [
+          110862633.0,
+          26401242,
+          245678
+        ],
+        "BenchmarkWorksheetIndexScanner-4": [
+          92096380.0,
+          1147128,
+          6
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkEngineLedger/csv/parse-4": {
+      "medianBefore": [
+        7712370.5,
+        2885333.5,
+        16406.0
+      ],
+      "medianAfter": [
+        8460483.0,
+        2885261.0,
+        16406.0
+      ],
+      "medianPairedTimeChangePct": 8.05,
+      "fasterPairs": 2
+    },
+    "BenchmarkEngineLedger/csv/workflow-4": {
+      "medianBefore": [
+        106214760.0,
+        44729701.0,
+        434551.5
+      ],
+      "medianAfter": [
+        76036784.5,
+        12530013.0,
+        168310.0
+      ],
+      "medianPairedTimeChangePct": -32.03,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLedger/csv/search-4": {
+      "medianBefore": [
+        49604440.0,
+        26124681.0,
+        212909.0
+      ],
+      "medianAfter": [
+        23631065.5,
+        3749698.5,
+        49067.0
+      ],
+      "medianPairedTimeChangePct": -55.67,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLedger/csv/filter-cold-4": {
+      "medianBefore": [
+        26748853.5,
+        10930221.5,
+        151510.0
+      ],
+      "medianAfter": [
+        16660159.0,
+        2187395.0,
+        102354.0
+      ],
+      "medianPairedTimeChangePct": -40.2,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLedger/csv/filter-warm-4": {
+      "medianBefore": [
+        8688558.5,
+        1108181.0,
+        53271.0
+      ],
+      "medianAfter": [
+        212922.0,
+        27024.0,
+        32.0
+      ],
+      "medianPairedTimeChangePct": -97.76,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLedger/txt/parse-4": {
+      "medianBefore": [
+        11836956.5,
+        4196374.0,
+        32792.0
+      ],
+      "medianAfter": [
+        10961262.5,
+        2885264.5,
+        16406.0
+      ],
+      "medianPairedTimeChangePct": -16.25,
+      "fasterPairs": 6
+    },
+    "BenchmarkEngineLedger/txt/workflow-4": {
+      "medianBefore": [
+        111096827.5,
+        46093634.5,
+        451003.5
+      ],
+      "medianAfter": [
+        73366156.0,
+        12582296.0,
+        168364.5
+      ],
+      "medianPairedTimeChangePct": -39.03,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineXMLWorkflow-4": {
+      "medianBefore": [
+        36583684.5,
+        3411526.5,
+        8788.0
+      ],
+      "medianAfter": [
+        41390036.0,
+        3410635.0,
+        8792.5
+      ],
+      "medianPairedTimeChangePct": 1.88,
+      "fasterPairs": 4
+    },
+    "BenchmarkEngineDenseSearch-4": {
+      "medianBefore": [
+        48797685.0,
+        26124566.0,
+        212912.0
+      ],
+      "medianAfter": [
+        28396216.5,
+        5241202.0,
+        81834.0
+      ],
+      "medianPairedTimeChangePct": -44.3,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLiteralSearch/ID-4": {
+      "medianBefore": [
+        52547159.5,
+        26124661.0,
+        212909.0
+      ],
+      "medianAfter": [
+        8822707.0,
+        2438734.5,
+        32681.0
+      ],
+      "medianPairedTimeChangePct": -83.47,
+      "fasterPairs": 8
+    },
+    "BenchmarkEngineLiteralSearch/Han-4": {
+      "medianBefore": [
+        58747112.5,
+        26401241.0,
+        245677.0
+      ],
+      "medianAfter": [
+        8458684.5,
+        2438740.0,
+        32681.0
+      ],
+      "medianPairedTimeChangePct": -84.28,
+      "fasterPairs": 8
+    },
+    "BenchmarkWorksheetIndexScanner-4": {
+      "medianBefore": [
+        88062117.0,
+        1147128.0,
+        6.0
+      ],
+      "medianAfter": [
+        67558518.0,
+        1147128.0,
+        6.0
+      ],
+      "medianPairedTimeChangePct": -15.64,
+      "fasterPairs": 6
+    }
+  }
+}

@@ -41,6 +41,13 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 	br := bufio.NewReaderSize(f, 1<<20)
 	offset := idx.RowAt(state.Next).Start
 	buf := make([]byte, 0, 4096)
+	// Keep a small scan-local cell buffer. An exceptionally wide source row
+	// can grow independently without retaining its storage for the whole scan.
+	scratch := make([]CellData, 0, min(32, idx.MaxCol))
+	options := RowReadOptions{FormatValue: true, IncludeFormula: true, cellScratch: &scratch}
+	if mode == "value" && (w.source == nil || w.source.ods == nil) {
+		options.nativeValueQuery = &matcher.query
+	}
 	lastReport := time.Now()
 	for i := state.Next; i < total; i++ {
 		off := idx.RowAt(i)
@@ -73,7 +80,7 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 			}
 			offset += size
 		}
-		row, err := w.decodeExternalRow(rowBytes, off.Number, 1, formats.ExcelColumns, nil, RowReadOptions{FormatValue: true, IncludeFormula: true})
+		row, err := w.decodeExternalRow(rowBytes, off.Number, 1, formats.ExcelColumns, nil, options)
 		if err != nil {
 			return state, fmt.Errorf("第 %d 行：%w", off.Number, err)
 		}
@@ -81,7 +88,7 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 		for _, cell := range row.Cells {
 			matched := false
 			if mode == "value" {
-				matched = containsFold(cell.Raw, query) || (cell.Display != cell.Raw && containsFold(cell.Display, query))
+				matched = options.nativeValueQuery != nil || matcher.query.matchesCell(cell)
 			}
 			if (mode == "formula" || mode == "reference") && cell.HasFormula && cell.Formula != "" {
 				matched = matcher.matchFormula(strings.TrimPrefix(cell.Formula, "="))
@@ -107,6 +114,7 @@ func (w *Workbook) searchExternalResumable(ctx context.Context, idx *SheetIndex,
 				return state, nil
 			}
 		}
+		clear(scratch[:min(len(row.Cells), cap(scratch))])
 		if idx.ODSRuns() != nil && budget.hits == hitsBefore {
 			// Simple search compares the stored values and formula text. Only
 			// the result coordinate changes inside a repeated ODS template.

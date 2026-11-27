@@ -1,0 +1,204 @@
+{
+  "benchmark": "^BenchmarkAnalysisUniqueGroups$",
+  "benchtime": "500ms",
+  "GOMAXPROCS": 4,
+  "GODEBUG": "",
+  "units": [
+    "ns/op",
+    "B/op",
+    "allocs/op"
+  ],
+  "binaries": {
+    "before": {
+      "name": "analysis-before.exe",
+      "sha256": "1985545261bb6cffbf0f93c21dff7dbd4eac64168054be7bd31b22057aca8547"
+    },
+    "after": {
+      "name": "analysis-final.exe",
+      "sha256": "6a3a2e5652717b70e9bb31eea21f18fad5267783ad44a0df603beeba1dfd2fe9"
+    }
+  },
+  "pairs": [
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          13791029.0,
+          4408376,
+          140125
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          16020011.0,
+          4408272,
+          140137
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          15280162.0,
+          4409031,
+          140164
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          18273360.0,
+          4404259,
+          139975
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          16663984.0,
+          4408887,
+          140140
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          14985395.0,
+          4408294,
+          140137
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          15509874.0,
+          4408653,
+          140150
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          17041197.0,
+          4409903,
+          140178
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          18048762.0,
+          4409185,
+          140151
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          16665568.0,
+          4406142,
+          140060
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          15703577.0,
+          4410142,
+          140203
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          13676379.0,
+          4410785,
+          140211
+        ]
+      }
+    },
+    {
+      "order": [
+        "before",
+        "after"
+      ],
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          14271916.0,
+          4407119,
+          140079
+        ]
+      },
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          14202903.0,
+          4408347,
+          140139
+        ]
+      }
+    },
+    {
+      "order": [
+        "after",
+        "before"
+      ],
+      "after": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          14432213.0,
+          4409050,
+          140164
+        ]
+      },
+      "before": {
+        "BenchmarkAnalysisUniqueGroups-4": [
+          13844572.0,
+          4412911,
+          140287
+        ]
+      }
+    }
+  ],
+  "host": [
+    "goos: windows",
+    "goarch: amd64",
+    "cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+  ],
+  "summary": {
+    "BenchmarkAnalysisUniqueGroups-4": {
+      "medianBefore": [
+        15467950.0,
+        4409036.0,
+        140145.5
+      ],
+      "medianAfter": [
+        15395018.0,
+        4408500.0,
+        140144.5
+      ],
+      "medianPairedTimeChangePct": -4.07,
+      "fasterPairs": 5
+    }
+  }
+}

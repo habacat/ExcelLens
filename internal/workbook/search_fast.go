@@ -71,7 +71,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 	if mode == "formula" && !matcher.relativeDependent {
 		anchorMatches = make(map[string]bool, len(idx.SharedAnchors))
 		for key, anchor := range idx.SharedAnchors {
-			anchorMatches[key] = containsFold(anchor.Formula, query)
+			anchorMatches[key] = matcher.query.contains(anchor.Formula)
 		}
 	}
 	lastProgress := time.Now()
@@ -120,7 +120,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 			for _, cell := range parsed.Cells {
 				matched := false
 				if mode == "value" {
-					matched = containsFold(cell.Raw, query) || containsFold(cell.Display, query)
+					matched = matcher.query.matchesCell(cell)
 				} else if cell.HasFormula && cell.Formula != "" {
 					matched = matcher.matchFormula(strings.TrimPrefix(cell.Formula, "="))
 				}
@@ -167,13 +167,13 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 					if !hasValue {
 						return true
 					}
-					valueMatched := containsFold(cellValue, query)
+					valueMatched := matcher.query.contains(cellValue)
 					style := 0
 					if !valueMatched && (len(typ) == 0 || bytes.Equal(typ, []byte("n"))) {
 						// Numeric presentation (dates, percent and grouping) only needs
 						// to be computed when raw text did not already match.
 						style = parsePositiveNonNegativeBytes(styleRaw)
-						valueMatched = containsFold(w.formatNumeric(cellValue, style), query)
+						valueMatched = matcher.query.contains(w.formatNumeric(cellValue, style))
 					}
 					if valueMatched {
 						ref := string(refRaw)
@@ -273,7 +273,7 @@ func (w *Workbook) searchSimpleResumable(ctx context.Context, idx *SheetIndex, s
 
 type searchMatcher struct {
 	mode              string
-	query             string
+	query             searchTextQuery
 	refSheet          string
 	relativeDependent bool
 	qualified         *regexp.Regexp
@@ -284,7 +284,7 @@ type searchMatcher struct {
 }
 
 func newSearchMatcher(sheetName, query, mode string) (searchMatcher, error) {
-	m := searchMatcher{mode: mode, query: query, refSheet: sheetName, currentSheet: sheetName}
+	m := searchMatcher{mode: mode, query: newSearchTextQuery(query), refSheet: sheetName, currentSheet: sheetName}
 	// A translated address can change even a one-letter or a whole-column
 	// substring. Only a function token ending in '(' is invariant under fill.
 	function, call := strings.CutSuffix(query, "(")
@@ -315,7 +315,7 @@ func newSearchMatcher(sheetName, query, mode string) (searchMatcher, error) {
 }
 func (m searchMatcher) matchFormula(formula string) bool {
 	if m.mode != "reference" {
-		return containsFold(formula, m.query)
+		return m.query.contains(formula)
 	}
 	formula = stripFormulaStringLiterals(formula)
 	if m.qualified.MatchString(formula) {

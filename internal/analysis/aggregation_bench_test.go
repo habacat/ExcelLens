@@ -32,3 +32,22 @@ func BenchmarkAnalysisPreparedMetrics(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkAnalysisUniqueGroups(b *testing.B) {
+	const n = 1000
+	rows := make([]Record, n)
+	for i := range rows {
+		rows[i] = Record{Number: i + 2, Values: map[string]Value{
+			"C1": {Text: strconv.Itoa(i)}, "C3": {Numeric: true, Text: "1/7"},
+		}}
+	}
+	q := Query{Source: "wb:benchmark", Rows: []string{"C1"}, Aggregate: "sum", Value: "C3", Precision: 4}
+	scan := testScan(rows)
+	b.ReportAllocs()
+	for b.Loop() {
+		r, err := Run(b.Context(), q, sampleFields(), scan, nil)
+		if err != nil || len(r.Rows) != n || r.Grand.Exact != "1000/7" {
+			b.Fatal(r.Grand, err)
+		}
+	}
+}
