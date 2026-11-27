@@ -15,7 +15,7 @@
 
 同一模板的两个版本适合从原坐标比较入手，不同批次的业务台账更适合先按字段身份和业务主键对齐。两项可共用输入摘要、分页差异明细和双侧来源导航。工作树已沿这两条路径实现版本比较和异常逐项跟踪。
 
-本地已能双向追踪公式的直接引用与从属关系，也有可撤销的编辑历史、复核标记和分析快照。本轮将这些能力计入现状。表中六项均已进入本地实现。版本比较与逐项跟踪复用来源、索引和导出服务，分页底稿复用纸张预览，批注和试算绑定编辑修订，ODS 使用公共只读适配器接口。[实施与验收记录](improvement-progress.md#接续入口)[公式追踪实现](../../internal/ui/web/tracing.js) · [复核标记](../../internal/server/bookmarks.go) · [分页预览](../user/printing.md) · [分析快照](../user/comparison-snapshots.md) · [双表核查](../user/reconciliation.md) · [格式注册表](../../internal/formats/formats.go)
+本地已能双向追踪公式的直接引用与从属关系，也有可撤销的编辑历史、复核标记和分析快照。本轮将这些能力计入现状。表中六项均已进入本地实现。版本比较与逐项跟踪复用来源、索引和导出服务，分页底稿复用纸张预览，批注和试算绑定编辑修订，ODS 使用公共只读适配器接口。[实施与验收记录](improvement-progress.md#接续入口)[公式追踪实现](../../internal/ui/src/features/tracing.ts) · [复核标记](../../internal/server/bookmarks.go) · [分页预览](../user/printing.md) · [分析快照](../user/comparison-snapshots.md) · [双表核查](../user/reconciliation.md) · [格式注册表](../../internal/formats/formats.go)
 
 ### 六项实现后的差距
 
@@ -42,7 +42,7 @@
 | 筛选与排序 | [筛选器](../../internal/workbook/filter.go)编译条件、复用列缓存、预计算排序键和稳定位置 | 结果仍为`[]int`；超过500万条时关闭排序，超大数据筛选结果限200万条；缺少外部排序及可分页落盘的结果顺序 |
 | 分析计算 | [分析引擎](../../internal/analysis/engine.go)单次扫描多个指标、精确有理数、显式内存保护 | 同一字段在不同指标和汇总层级反复解析；普通数值聚合同时更新sum/min/max；分组和精确去重达到限额后拒绝，尚无落盘聚合 |
 | 公式 | [公式求值](../../internal/calculator/formula.go)保留类型、范围访问及单次求值内的引用缓存 | 跨次计算的解析复用、范围聚合复用和编辑后的增量失效尚可深化；当前并不递归重算源公式 |
-| 网格 | [主网格](../../internal/ui/src/grid/viewport-pipeline.ts)已有有界视口、节点复用、单格内容比较；[几何模型](../../internal/ui/web/geometry.js)采用稀疏尺寸与前缀差值 | 极宽、富文本、复杂边框场景的绘制成本需要针对性测量；已有虚拟化不应重新计作新增能力 |
+| 网格 | [主网格](../../internal/ui/src/grid/viewport-pipeline.ts)已有有界视口、节点复用、单格内容比较；[几何模型](../../internal/ui/src/grid/geometry.ts)采用稀疏尺寸与前缀差值 | 极宽、富文本、复杂边框场景的绘制成本需要针对性测量；已有虚拟化不应重新计作新增能力 |
 | 视觉还原 | 常见字体、颜色、边框、对齐、合并、行高列宽、图片与超链接已有实现 | [富文本读取](../../internal/workbook/xmltypes.go)输出拼接文本；`CellData`没有文字片段样式模型；条件格式和大纲需要独立模型 |
 | 编辑与保存 | [分析工作区](../../internal/analysis/store.go)独立保存、版本检查、备份；[编辑界面](../../internal/ui/src/analysis/workspace.ts)已有草稿和撤销；[导出](../../internal/server/export.go)已有临时文件、Sync及发布步骤 | 分析表是字符串模型，撤销和未确认草稿仍驻留页面内存；源工作簿尚无变更层及完整往返保存 |
 | XLSX输出 | [现有写出器](../../internal/export/xlsx.go)流式生成快照，复制源styles/theme并保留适用合并范围 | 输出重建工作簿及关系，不是原包完整修改器；不能直接据此承诺保留所有绘图、表对象、验证、名称和未知扩展 |
