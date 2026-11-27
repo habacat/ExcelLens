@@ -6,6 +6,7 @@ import type { ImageDTO, ImageMarker } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireAnchor, requireButton, requireEl } from '../core/dom.ts';
 import type { WorkbookState } from './state.ts';
+import { decodeImagesApiResponse } from '../core/http-decoders.generated.ts';
 
 const clamp = (x: number, min: number, max: number): number => Math.max(min, Math.min(max, x));
 const fmtPx = (x: number): string => `${Math.round(x * 100) / 100}px`;
@@ -49,7 +50,8 @@ export interface PicturesOptions {
   readonly frozen: () => { readonly rows: number; readonly cols: number };
 }
 
-interface ImagesApiResponse {
+/** @httpResponse ImagesApiResponse */
+export interface ImagesApiResponse {
   readonly images?: readonly ImageDTO[];
 }
 
@@ -115,8 +117,10 @@ export class Pictures {
   async load(sheet: string, epoch: number): Promise<void> {
     this.reset();
     const serial = this.serial;
-    const data = await this.o.api<ImagesApiResponse>(
+    const data = await this.o.api(
       `/api/images?sheet=${encodeURIComponent(sheet)}`,
+      undefined,
+      decodeImagesApiResponse,
     );
     if (serial !== this.serial || this.o.state.sheetEpoch !== epoch || this.o.state.sheet !== sheet) {
       return;

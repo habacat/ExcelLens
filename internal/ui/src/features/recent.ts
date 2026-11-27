@@ -7,8 +7,10 @@ import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { RecentEntry } from '../contracts/features.ts';
 import { errorMessage, formatBytes, icon } from '../core/display-format.ts';
 import { requireEl, requireInput } from '../core/dom.ts';
+import { decodeRecentListResponse } from '../core/http-decoders.generated.ts';
 
-interface RecentListResponse {
+/** @httpResponse RecentListResponse */
+export interface RecentListResponse {
   readonly items?: readonly RecentEntry[] | null;
 }
 
@@ -109,7 +111,7 @@ export class RecentWorkbooks {
   async load(): Promise<void> {
     const ticket = ++this.ticket;
     try {
-      const data = await this.api<RecentListResponse>('/api/recent');
+      const data = await this.api('/api/recent', undefined, decodeRecentListResponse);
       if (ticket !== this.ticket) return;
       this.items = data.items ? [...data.items] : [];
       this.render();

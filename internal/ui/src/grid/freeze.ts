@@ -8,6 +8,7 @@ import { errorMessage } from '../core/display-format.ts';
 import type { ColumnLayoutItem } from './cell-view.ts';
 import type { GridCellElement, ViewportBounds, ViewportRequest, WorkbookState } from './state.ts';
 import { viewportCoversVisible } from './viewport-cache.ts';
+import { decodeSheetViewport } from '../core/viewport-response.ts';
 
 export interface BorderEdgeContext {
   readonly nextCol?: number;
@@ -241,10 +242,10 @@ export class FrozenPanes {
     const rows = Number(params.get('limit'));
     const cols = Number(params.get('cols'));
     if (rows <= 150 && cols <= 80) {
-      return this.o.api<SheetViewportResponse>(`/api/sheet?${params.toString()}`, {
+      return this.o.api(`/api/sheet?${params.toString()}`, {
         signal,
         activity: false,
-      });
+      }, decodeSheetViewport);
     }
     const selected = params.get('columns')?.split(',').map(Number);
     const firstCol = Number(params.get('col'));
@@ -266,10 +267,10 @@ export class FrozenPanes {
           const baseRow = Number(params.get('row'));
           page.set('row', String(request.rowOrder?.advance(baseRow, ro) ?? baseRow + ro));
         }
-        const data = await this.o.api<SheetViewportResponse>(`/api/sheet?${page.toString()}`, {
+        const data = await this.o.api(`/api/sheet?${page.toString()}`, {
           signal,
           activity: false,
-        });
+        }, decodeSheetViewport);
         meta ??= data;
         for (const row of data.rows) {
           const previous = byRow.get(row.number);

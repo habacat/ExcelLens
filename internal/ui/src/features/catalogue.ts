@@ -1,3 +1,5 @@
+import { decodeCatalogueJobStatus } from '../core/http-decoders.generated.ts';
+import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
  * Workbook Defined Names & Table Objects Catalogue dialog with bounded paging,
  * table-object confirmation, and guarded area navigation.
@@ -10,7 +12,7 @@ import type {
   CatalogueListItem,
 } from '../contracts/features.ts';
 import type { CatalogueLimits } from '../contracts/formats.ts';
-import { AsyncJobs, type AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
+import { AsyncJobs } from '../core/async-jobs.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import {
   byId,
@@ -20,6 +22,11 @@ import {
   requireSelect,
 } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeCatalogueDetailResponse,
+  decodeCatalogueItemsResponse,
+  decodeCatalogueResolveResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface CatalogueOptions {
   readonly state: WorkbookState;
@@ -35,18 +42,21 @@ export interface CatalogueOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-interface CatalogueJobStatus extends AsyncJobStatusEnvelope<CatalogueJobStatus> {
+/** @httpResponse CatalogueJobStatus */
+export interface CatalogueJobStatus extends AsyncJobProgress {
   readonly workbookKey?: string;
   readonly book?: string;
 }
 
-interface CatalogueDetailResponse {
+/** @httpResponse CatalogueDetailResponse */
+export interface CatalogueDetailResponse {
   readonly workbookKey?: string;
   readonly book?: string;
   readonly item?: CatalogueItem;
 }
 
-interface CatalogueResolveResponse {
+/** @httpResponse CatalogueResolveResponse */
+export interface CatalogueResolveResponse {
   readonly workbookKey?: string;
   readonly book?: string;
   readonly area: CatalogueArea;
@@ -128,6 +138,7 @@ export class Catalogue {
     const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.dialog = this.createDialog();
     this.jobs = new AsyncJobs<CatalogueJobStatus, CatalogueJobStatus>({
+      decodeStatus: decodeCatalogueJobStatus,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => this.s.workbookKey,
@@ -209,8 +220,8 @@ export class Catalogue {
     return JSON.stringify([this.s.workbookKey, this.s.book, this.epoch]);
   }
 
-  private post<T = unknown>(path: string, data: unknown): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(data) });
+  private post(path: string, data: unknown): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(data) });
   }
 
   private release(id: string): void {
@@ -449,9 +460,9 @@ export class Catalogue {
     if (new TextEncoder().encode(searchVal).length > this.limits.searchBytes) {
       throw new Error('搜索文字超过容量，请缩短后重试');
     }
-    const page = await this.api<CatalogueItemsResponse>(`/api/catalogue/items?${q.toString()}`, {
+    const page = await this.api(`/api/catalogue/items?${q.toString()}`, {
       signal,
-    });
+    }, decodeCatalogueItemsResponse);
     this.validSource(page);
     if (
       page.items.length > this.limits.pageRows ||
@@ -545,9 +556,10 @@ export class Catalogue {
     }
     requireEl('catalogueDetail').textContent = '正在读取定义…';
     try {
-      const data = await this.api<CatalogueDetailResponse>(
+      const data = await this.api(
         `/api/catalogue/detail?${new URLSearchParams({ id: job, item: id }).toString()}`,
         { signal: controller.signal },
+        decodeCatalogueDetailResponse,
       );
       if (
         serial !== this.detailRequest ||
@@ -751,8 +763,10 @@ export class Catalogue {
     try {
       let area = initialArea;
       if (resolve) {
-        const result = await this.api<CatalogueResolveResponse>(
+        const result = await this.api(
           `/api/catalogue/resolve?${new URLSearchParams(resolve).toString()}`,
+          undefined,
+          decodeCatalogueResolveResponse,
         );
         if (
           !current() ||

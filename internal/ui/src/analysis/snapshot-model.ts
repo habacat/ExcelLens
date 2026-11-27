@@ -292,7 +292,7 @@ export function snapshotDescription(s: ComparisonSnapshot): string {
   ];
   if (q.sourceScope) lines.push(`范围：${sourceScopeCaption(q.sourceScope)}`);
   if (q.headerRow) lines.push(`表头：第 ${q.headerRow} 行`);
-  if (q.rows.length) lines.push(`分类：${q.rows.map(field).join(' / ')}`);
+  if (q.rows?.length) lines.push(`分类：${q.rows.map(field).join(' / ')}`);
   if (q.columns?.length) lines.push(`系列：${q.columns.map(field).join(' / ')}`);
   for (const f of q.filters ?? []) {
     lines.push(

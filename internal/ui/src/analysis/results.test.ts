@@ -70,16 +70,17 @@ function setup() {
     api: async <T = unknown>(
       url: string,
       options?: ApiRequestOptions,
-      mode?: 'json' | 'text' | 'blob' | 'response',
+      mode?: 'json' | 'text' | 'blob' | 'response' | ((value: unknown) => unknown),
     ): Promise<T> => {
       if (url.startsWith('/api/recovery')) {
         const snap: unknown = { revision: 0, records: {} };
         return snap as T;
       }
-      return (await apiImpl(url, options, mode)) as T;
+      const value = await apiImpl(url, options, typeof mode === 'function' ? undefined : mode);
+      return (typeof mode === 'function' ? mode(value) : value) as T;
     },
-    post: async <T = unknown>(path: string, body: unknown): Promise<T> =>
-      (await postImpl(path, body)) as T,
+    post: async (path: string, body: unknown): Promise<unknown> =>
+      postImpl(path, body),
     formats: createFileFormats(makeTestFileFormatsConfig()),
     getSourceContext: () => ({
       workbookKey: 'book',
@@ -334,7 +335,7 @@ test('plan adoption preserves the visible result when schema identity changed af
     const previous = makeResult('previous');
     h.ws.state.activeResult = previous;
     h.ws.state.source = 'wb:old';
-    h.setApi(async () => ({ sourceStamp: 'edited', fields: [] }));
+    h.setApi(async () => ({ sourceStamp: 'edited', fields: [], preview: [], totalRows: 0, headerRow: 1, truncatedFields: false }));
     const completed = {
       job: 'plan',
       result: {
@@ -388,7 +389,7 @@ test('a delayed plan schema response cannot change a newer result intent', async
     );
     await Promise.resolve();
     h.ws.state.reportOpenSerial++;
-    release({ sourceStamp: 'stamp' });
+    release({ sourceStamp: 'stamp', fields: [], preview: [], totalRows: 0, headerRow: 1, truncatedFields: false });
     assert.equal(await pending, false);
     assert.equal(h.ws.state.activeResult, previous);
     assert.equal(h.ws.state.jobID, 'previous-job');

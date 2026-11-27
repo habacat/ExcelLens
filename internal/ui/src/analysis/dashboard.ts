@@ -286,7 +286,7 @@ export class AnalysisDashboardController {
       const loadCard = async (): Promise<void> => {
         if (!isCardConnected() || !isDashboardTab()) return;
         const load = ++chartLoad;
-        const viewQuery: WorkspaceAnalysisQuery = cloneJson(report.query);
+        const viewQuery: WorkspaceAnalysisQuery = cloneJson({ ...report.query, rows: report.query.rows ?? [] });
         chartImageToken = null;
         if (imageButton) imageButton.disabled = true;
         revalidateChartExport();

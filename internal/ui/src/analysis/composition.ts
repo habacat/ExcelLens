@@ -33,6 +33,13 @@ import {
 import { FieldPicker } from '../core/field-picker.ts';
 import { currentFileFormats, type FileFormatsRegistry } from '../core/formats.ts';
 import { SourceTasks } from '../core/source-tasks.ts';
+import {
+  decodeCompositionDefinitionStore,
+  decodeCompositionSaveResponse,
+  decodeCompositionTaskResult,
+  decodeOpenAttachedSourceResponse,
+  decodeReconcileSourcesResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface CompositionContext {
   readonly bookKey: string;
@@ -57,21 +64,24 @@ export interface CompositionBookMeta {
   readonly id: string;
   readonly name: string;
   readonly attached?: boolean;
-  readonly sheets?: readonly CompositionBookSheetMeta[];
-  readonly scratch?: readonly CompositionBookScratchMeta[];
+  readonly sheets?: readonly CompositionBookSheetMeta[] | null;
+  readonly scratch?: readonly CompositionBookScratchMeta[] | null;
   readonly scratchLoaded?: boolean;
 }
 
-interface ReconcileSourcesResponse {
+/** @httpResponse ReconcileSourcesResponse */
+export interface ReconcileSourcesResponse {
   readonly books: readonly CompositionBookMeta[];
 }
 
-interface CompositionSaveResponse {
+/** @httpResponse CompositionSaveResponse */
+export interface CompositionSaveResponse {
   readonly id: string;
   readonly revision: number;
 }
 
-interface OpenAttachedSourceResponse {
+/** @httpResponse OpenAttachedSourceResponse */
+export interface OpenAttachedSourceResponse {
   readonly book: string;
 }
 
@@ -258,8 +268,8 @@ export class CompositionPanel {
     return JSON.stringify([c.bookKey, c.book]);
   }
 
-  private post<T>(path: string, value: unknown): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(value) });
+  private post(path: string, value: unknown): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(value) });
   }
 
   message(text: string, error = false): void {
@@ -347,10 +357,10 @@ export class CompositionPanel {
 
   async refresh(current: () => boolean, focus = ''): Promise<void> {
     const [catalog, sources] = await Promise.all([
-      this.api<CompositionDefinitionStore>('/api/composition/definitions'),
-      this.api<ReconcileSourcesResponse>(
+      this.api('/api/composition/definitions', undefined, decodeCompositionDefinitionStore),
+      this.api(
         `/api/reconcile/sources${focus ? `?book=${encodeURIComponent(focus)}` : ''}`,
-      ),
+       undefined, decodeReconcileSourcesResponse),
     ]);
     if (!current()) return;
     const previous = new Map(this.books.map((book) => [book.id, book]));
@@ -591,7 +601,7 @@ export class CompositionPanel {
     let result: (CompositionTaskResult & { readonly id: string }) | undefined;
     try {
       const keepId = this.context().keepId;
-      result = await this.tasks.run<CompositionTaskResult>(
+      result = await this.tasks.run(decodeCompositionTaskResult,
         {
           mode: 'fields',
           choice: {
@@ -800,7 +810,7 @@ export class CompositionPanel {
     this.dropPreview();
     this.message('正在准备联合来源…');
     const keepId = this.context().keepId;
-    const data = await this.tasks.run<CompositionTaskResult>(
+    const data = await this.tasks.run(decodeCompositionTaskResult,
       {
         mode: 'append',
         definition: buildCompositionDefinition(this.name, this.rows, this.inputs),
@@ -853,14 +863,14 @@ export class CompositionPanel {
   async save(current: () => boolean): Promise<void> {
     if (!this.preview) return;
     const c = this.context();
-    const response = await this.post<CompositionSaveResponse>('/api/composition/definitions', {
+    const response = await this.post('/api/composition/definitions', {
       action: 'save',
       id: this.savedID,
       jobId: this.preview.id,
       book: c.book,
       workbookKey: c.bookKey,
       expectedRevision: this.catalog.revision,
-    });
+    }).then(decodeCompositionSaveResponse);
     if (!current()) return;
     this.savedID = response.id;
     this.catalog = { ...this.catalog, revision: response.revision };
@@ -946,10 +956,10 @@ export class CompositionPanel {
     form.append('reconcileSource', '1');
     form.append('workbookKey', c.bookKey);
     form.append('primaryBook', c.book);
-    const data = await this.api<OpenAttachedSourceResponse>('/api/open', {
+    const data = await this.api('/api/open', {
       method: 'POST',
       body: form,
-    });
+    }, decodeOpenAttachedSourceResponse);
     if (!current()) return;
     await this.refresh(current, data.book);
     if (!current()) return;

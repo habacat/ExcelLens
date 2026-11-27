@@ -1,3 +1,5 @@
+import { decodeNamedViewFilterJobStatus } from '../core/http-decoders.generated.ts';
+import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
  * Named Views manager: save, update, delete, resolve, and replay workbook
  * filter/sort/freeze/layout/row-visibility views.
@@ -17,7 +19,7 @@ import type {
   FilterStatusResponse,
   SourceFilterSpec,
 } from '../contracts/workbook.ts';
-import { AsyncJobs, type AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
+import { AsyncJobs } from '../core/async-jobs.ts';
 import { errorMessage } from '../core/display-format.ts';
 import {
   requireButton,
@@ -27,6 +29,10 @@ import {
   requireSelect,
 } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeNamedViewCatalogResponse,
+  decodeNamedViewResolveResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface NamedViewCapturePayload {
   readonly sheet: string;
@@ -36,21 +42,24 @@ export interface NamedViewCapturePayload {
   readonly config: NamedViewConfig;
 }
 
+/** @httpResponse NamedViewCatalogResponse */
 export interface NamedViewCatalogResponse {
   readonly book: string;
   readonly store: NamedViewStore;
   readonly id?: string;
 }
 
+/** @httpResponse NamedViewResolveResponse */
 export interface NamedViewResolveResponse {
   readonly view: NamedView;
   readonly book?: string;
   readonly workbookKey?: string;
 }
 
+/** @httpResponse NamedViewFilterJobStatus */
 export interface NamedViewFilterJobStatus
   extends Omit<FilterStatusResponse, 'status' | 'id'>,
-    AsyncJobStatusEnvelope<NamedViewFilterJobStatus> {
+    AsyncJobProgress {
   readonly id?: string;
   readonly status?: AsyncJobStatusKind;
 }
@@ -131,6 +140,7 @@ export class NamedViews {
 
     this.dialog = requireDialog('namedViewDialog');
     this.jobs = new AsyncJobs<NamedViewFilterJobStatus, NamedViewFilterJobStatus>({
+      decodeStatus: decodeNamedViewFilterJobStatus,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => this.s.workbookKey,
@@ -171,12 +181,12 @@ export class NamedViews {
     return JSON.stringify([this.s.workbookKey, this.s.sheet, this.s.sheetEpoch]);
   }
 
-  private post<T = unknown>(
+  private post(
     url: string,
     data: unknown,
     options: ApiRequestOptions = {},
-  ): Promise<T> {
-    return this.api<T>(url, { method: 'POST', body: JSON.stringify(data), ...options });
+  ): Promise<unknown> {
+    return this.api(url, { method: 'POST', body: JSON.stringify(data), ...options });
   }
 
   private selected(): NamedView | undefined {
@@ -263,9 +273,9 @@ export class NamedViews {
     const controller = new AbortController();
     this.catalogController = controller;
     try {
-      const data = await this.api<NamedViewCatalogResponse>('/api/named-views', {
+      const data = await this.api('/api/named-views', {
         signal: controller.signal,
-      });
+      }, decodeNamedViewCatalogResponse);
       if (serial !== this.catalogSerial || epoch !== this.epoch || book !== this.s.workbookKey) {
         return;
       }
@@ -331,7 +341,7 @@ export class NamedViews {
       if (new TextEncoder().encode(JSON.stringify(request)).length > 256 * 1024 + 8192) {
         throw new Error('视图配置过大，请减少尺寸覆盖或筛选值');
       }
-      const data = await this.post<NamedViewCatalogResponse>('/api/named-views', request);
+      const data = await this.post('/api/named-views', request).then(decodeNamedViewCatalogResponse);
       if (!this.current(serial, epoch, book)) return;
       this.setCatalog(data, data.id ?? '');
       this.status('已保存到本机');
@@ -357,13 +367,13 @@ export class NamedViews {
     this.mode = 'delete';
     this.controls();
     try {
-      const data = await this.post<NamedViewCatalogResponse>('/api/named-views', {
+      const data = await this.post('/api/named-views', {
         action: 'delete',
         id: selected.id,
         book: this.book,
         workbookKey: book,
         expectedRevision: this.store.revision,
-      });
+      }).then(decodeNamedViewCatalogResponse);
       if (!this.current(serial, epoch, book)) return;
       this.setCatalog(data);
       this.status('已删除所选视图');
@@ -408,11 +418,11 @@ export class NamedViews {
     let owned = '';
     let adopted = false;
     try {
-      const prepared = await this.post<NamedViewResolveResponse>(
+      const prepared = await this.post(
         '/api/named-views/resolve',
         { id: selected.id, book: this.book, workbookKey: book },
         { signal: controller.signal },
-      );
+      ).then(decodeNamedViewResolveResponse);
       if (!unchanged()) return;
       const version = prepared.view.ruleVersion || 1;
       if (version !== 1 && !(version === 2 && this.supportsRowVisibility())) {

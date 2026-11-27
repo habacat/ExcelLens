@@ -1,0 +1,355 @@
+{
+  "version": "1.20.1",
+  "result": "PASS",
+  "method": "Isolated Go service and headless Chromium with synthetic workbooks. Each receipt identifies its own run and assets.",
+  "cases": [
+    {
+      "scenario": "adaptive-layout-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "92398f7ad2ee21e2807370777db5066b0e2afb4889925226ecdfaad23862c934",
+      "sourceUnchanged": true
+    },
+    {
+      "scenario": "analysis-numbers-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "1031f68580dd34da2d2709113c1b5e8b279db8c6339770d2e1874ba39abe299a",
+      "sourceUnchanged": true,
+      "checks": [
+        "default thousands/scientific formatting covers exact large sum, rational average, negatives, real zero and cached child cells; independent switches and 10^9/10^12/10^15 thresholds update completed results and tooltips without starting another query",
+        "source drill preserves raw amount and leading-zero text; CSV is byte-identical across display settings; actual downloaded first-level XLSX reopens through the real adapter with three columns and exact large/rational totals stored as text to preserve precision",
+        "saving while the workspace catalogue response is deliberately held, then entering dashboard before release, still installs the saved report; flat pivot cells and already-loaded dashboard chart tooltips adopt settings immediately, without re-running saved reports",
+        "failed saves keep displayed and persisted settings; stale cross-page revisions are rejected until explicit reload; restore-default and narrow 420px native dialog controls work",
+        "actual service process restart on a different random port retains both independent preferences and the selected threshold in user config; rerun exact result and rendered card agree"
+      ]
+    },
+    {
+      "scenario": "analysis-source-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "6cfba4aaff65af7cb48fca4f5221048a067eeb1751b80f89b7ee3b92b48d0977",
+      "sourceUnchanged": true,
+      "checks": [
+        "UI visible-source fields, native text, missing formula cache, opt-in profile, aggregation, task-bound drill and materialized detail retain exact rows after the captured owner is cleared",
+        "saved full and visible reports keep distinct result queries through dashboard/open; workspace v2 backup/restore retains durable ranges without temporary IDs",
+        "real drag captures only column B and visible rows; saved plan origin is descriptive, target defaults to full source, explicit current-range preview/replay and adopted builder all preserve the same selected scope",
+        "sorted/frozen screen selection retains paired source/display endpoints; visible source includes only its visible frozen prefix/body while full filtered source retains manually hidden matches",
+        "cancel after real capture response and retry cannot publish a late owner; its exact ID is cleared; delayed profile response stays hidden after a newer range intent",
+        "420px range controls fit the viewport; reloaded application rebuilds a saved visible range and drills only its original rows without changing main-grid preferences"
+      ]
+    },
+    {
+      "scenario": "analysis-tree-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "c9a3b36407e7cb37c6081968bb9298cfea9fb18ce2a6de6f40be9106499ea5ac",
+      "sourceUnchanged": true,
+      "checks": [
+        "real hierarchy selector and expansion preserve native text, formula-cache warnings, huge exact amounts, leading-zero keys, empty/literal labels and safe text rendering; cache hits avoid scans; parent subtotal and blank-column drill/materialization are distinct; scoped/full reports and v3 backup replay retain actual completed layouts",
+        "actual first-level XLSX download reopens in an independent real application session; every cell of six result rows and thirteen columns matches the precise materialized root table",
+        "completed-layout CSV/result-table output is explicitly first-level and has no invented descendant columns; real late-start cancel plus immediate retry clears only its own ID; interrupted branch retries without losing its parent result",
+        "150-row pages bound the rendered tree; right-arrow keyboard navigation expands and focuses the next level; child columns align by category key, including an absent column; more than 24 branch visits evict bounded cached subtrees while retaining root totals",
+        "saved version-2 hierarchy plan replays into the same builder and expandable result; a real edited analysis source refuses old-root children and succeeds only after rerunning the root",
+        "420px controls fit and saved scoped hierarchy rebuilds its layout and exact branch after an application reload"
+      ]
+    },
+    {
+      "scenario": "cell-explanation-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "245bb08b44ee0a64f08085ca9112a349cc36e1234172f87704f719d5f1b3a698",
+      "sourceUnchanged": true,
+      "checks": [
+        "no explanation reads while loading/selecting; explicit toolbar and F2 preserve exact source numbers, native text/identifiers, formula cached/missing/unavailable/error/empty-string states and sparse outside-used blank",
+        "actual successful filter and sort appear in details; 420px light/dark layouts fit without horizontal overflow and resizing performs no source/explanation requests",
+        "actual failed request retries successfully; native Escape cancels a held read, immediate reopen rejects its late numeric reply; equal-content different-path upload closes old details and rejects stale responses",
+        "real CSV imported accounting amount and leading-zero identifier, and real CFB/BIFF8 numeric source use the same detail controller and exact qualification"
+      ]
+    },
+    {
+      "scenario": "chart-export-standard-roundtrip",
+      "result": "PASS",
+      "receiptSHA256": "a8e32a280a04f3e48adb6caf0638a2f6ec593e3e3d354478b99e152f5e0cb564"
+    },
+    {
+      "scenario": "chart-export-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "fea5ea023f0940abadfa308392fe1923279a4ce48ceb63d27ff43c3e3f1256d9",
+      "sourceUnchanged": true,
+      "checks": [
+        "all 9 actual analysis chart modes export real PNG and vector SVG through the UI; native image decode, strict native SVG DOM, bounded plot pixel comparison and full exact JSON with 80 accepted categories/14 series pass without an extra source query; real PNG/SVG/ZIP downloads land on disk with the declared filename and exactly match the accepted image/package bytes",
+        "real native PNG callback held after cancel retains the sole bitmap slot; immediate retry queues then succeeds, late work cannot replace the new ZIP; failure preserves the old link, 420px controls fit, captured dark SVG and explicit white 2x PNG retain their own display/output metadata",
+        "saved chart type and completed metric persist to the actual dashboard; a loaded card exports without querying; after real server task eviction by 13 completed jobs, the accepted client result still exports the original exact JSON without a replacement scan",
+        "same-content different-path switch during a real held PNG callback closes/revokes all resources and discards late work; a real million-row CSV selected at its last 1000 rows exports the 60 complete F13 segments and exact difference 10 without another scan"
+      ]
+    },
+    {
+      "scenario": "clustering-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "d8878e4295ef8add967a38423cd19624c6f79e9995db21705c3316a0936f4815",
+      "sourceUnchanged": true,
+      "checks": [
+        "actual field profile entry performs no implicit candidate scan; visible-source candidates preserve Chinese raw values, saved formula text types and hidden-row exclusion; explicit representative adds an exact map only once; 25-group paging and 420px light/dark controls remain reachable",
+        "failed first-page refresh retains the previous accepted result; a cancelled held start cannot replace an immediate retry; real candidate CSV download reopens through the actual adapter with leading-zero and Chinese raw text intact and no source script execution",
+        "confirmed text mapping is used by the real analysis engine, combines the visible source into exact 67, saves and reopens a version-5 workspace, and captures/previews/replays a version-4 plan through actual controls with all mapping entries retained"
+      ]
+    },
+    {
+      "scenario": "comparisons-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "bb2bed71b9ebcb00f31db34041f295e4d85390dbace0a08e68a7b27a077f52a8",
+      "sourceUnchanged": true,
+      "checks": [
+        "actual per-metric controls produce six independent exact comparisons on the captured visible source; native text/cache warnings and leading-zero labels persist; changing the builder does not relabel the completed table or saved query; workspace v4 backup/restore preserves all modes and axes",
+        "Top-N leaves whole-scope denominators unchanged; saved report reopens all metric choices; actual CSV and 19-column XLSX use exact ratios/states, and the real XLSX adapter reopens 0.12 as a numeric cell displayed as 12.00%",
+        "real tree expansion recomputes parent-range ratios, aligns column keys and keeps the exact child fractions; source drill still selects the current group; cancelled held starts cannot overwrite an immediate retry",
+        "version-3 analysis plan captures, previews and replays cumulative ratios through actual controls; 420px comparison controls fit their panel; cancelling numeric totals yield explicit zero-denominator states rather than 0%"
+      ]
+    },
+    {
+      "scenario": "composition-scale-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "5d530fa88d8c21bfe68a83d08b9b2a6a10d4c445011da8e7faf5c6a205af004f",
+      "sourceUnchanged": true,
+      "checks": [
+        "actual XFD source exposes 16384 searchable fields while rendering 20 mapping rows and at most 40 picker choices; explicit last-column binding preserves XFD2/raw/type through preview and exact mixed-format analysis",
+        "actual million-record CSV uses a 100-row preparation preview, retains leading-zero text, streams all 1000002 records through the real UI query and returns the independently computed exact 9997.85 sum"
+      ]
+    },
+    {
+      "scenario": "composition-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "c0bba53865ac0a026dba9ab65d039a0b745a16904ec12733c705e08f8db4adbf",
+      "sourceUnchanged": true,
+      "servedAssetsSHA256": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "composition.css": "25c5555d51b1e73bc9b590a987bafd67fe15c6ba670b6716f99c992c843a5778",
+        "analytics.css": "fbf9f1cd18d5e1fd0b1ea682fdb746247b61a3f7646b329872cdd80c5423563a"
+      },
+      "checks": [
+        "real file upload, unique-header-only alignment, explicit duplicate-header binding and sample type-conflict indication without coercion, empty columns, exact preview/definition persistence, header-zero analysis, original sparse rows and actual foreign B2 popup navigation",
+        "saved composition report survives dashboard open with header zero; workspace backup carries version six; cancelling a delayed successful preparation clears only its token and keeps the active source/result",
+        "field-fetch failure after preparation keeps the previous active source/result and reports the failure in the modal; real catalogue revision conflict preserves the confirmed file; explicit refresh/save and saved-definition reopen recover without copying data",
+        "420px and graphite theme render without outer overflow; resizing uses retained data and makes no additional source/query requests",
+        "explicit current-analysis range binding rebuilds the declarative visible scope independently, retains genuine blank source row 3, preserves established column mappings and aggregates the same precise values over five union records",
+        "real decoded PNG and independently unpacked chart ZIP retain the completed composition definition, header zero, two-source scope and exact aggregate without any new source/query request",
+        "real upload followed by a delayed source-list response cannot change a closed/reopened configuration; an actual queued native dialog close cannot cancel an immediately reopened preparation"
+      ]
+    },
+    {
+      "scenario": "context-menu-layering-after",
+      "result": "PASS",
+      "receiptSHA256": "f00dcac36bc09c2cdd78aaf205ff68b42f4532574d5403f1ccd44dc82ac28bfb",
+      "sourceUnchanged": true,
+      "assets": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "style.css": "b72b861d451fb27c466d4d4b20ce615f31c930edc00df2ee88f6bddc2f8fe698",
+        "index.html": "d5b8f830b71a403a085b63caa4748cf338107e323042fd746b517e6ae8560073"
+      },
+      "checks": [
+        "1200px DPR1: both context menus paint above colored tabs and receive clicks",
+        "900px DPR1.25: both context menus paint above colored tabs and receive clicks",
+        "420px DPR2: both context menus paint above colored tabs and receive clicks",
+        "Frozen rows and changing the active colored tab preserve menu hit testing; tabs remain clickable after dismissal"
+      ]
+    },
+    {
+      "scenario": "distribution-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "ac6ff54e29d7eae9c2fb4ed0c88d5ced35c1b465c7fa76256a3c852cb3bf260a",
+      "sourceUnchanged": true,
+      "checks": [
+        "no scan on open/select; explicit distribution returns all 10 numeric records including a source-hidden row, exact total/median/ten bins; number preferences redraw from accepted data; desktop/420px light/dark fit without new source calls",
+        "native numeric-looking text stays excluded, genuine errors and missing formula results remain separate; manual full-filter range includes every matching source row, while a real descending mouse drag carries visual endpoints and returns exactly its two numbers",
+        "failure retains the last complete result and retries; cancel plus immediate retry rejects a late response; equal-content different-path replacement closes old results and its delayed reply cannot overwrite the new text-only profile",
+        "actual CSV accounting text uses exact numeric rules and protects leading-zero IDs; actual CFB/BIFF8 returns the same exact constant-series distribution through the existing dialog"
+      ]
+    },
+    {
+      "scenario": "long-txt-scroll-fixed-browser",
+      "result": "PASS",
+      "receiptSHA256": "6b2557295b7bff5540e908742c19e63cb1ed6c3819e0ed3766867b57e05a2442",
+      "sourceUnchanged": true
+    },
+    {
+      "scenario": "presentation-matrix-browser",
+      "result": "PASS",
+      "receiptSHA256": "104abb16686423c98e4c6e8f34f269cf5836b7afcdd719002dc371871f1d02b3",
+      "sourceUnchanged": true,
+      "checks": [
+        "48 independent OOXML DPI/zoom/font combinations preserve exact source models, inherited row style, conditional display, Unicode rich runs, hidden rows, merged geometry and main/frozen numeric width decisions measured independently from computed fonts",
+        "DPR2 preview retains original source fonts and physical paper despite Consolas screen override and 125 percent grid zoom; 50/150/fit screen zoom changes no paper dimensions or print reads",
+        "12 native BIFF8 default-font boundary combinations use the shared main/frozen presenter without changing number/text types, source coordinates, formula caches or leading-zero identifiers"
+      ]
+    },
+    {
+      "scenario": "printing-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "7aaafe24a3d9b1ffe898190b3406118faf33589b36294738150537b222973b86",
+      "sourceUnchanged": true,
+      "checks": [
+        "real main and frozen grids share numeric width markers; double-click auto-fit reads the complete source display and restores the exact amount without changing raw source/type",
+        "seven served asset hashes match current source; opening/indexing perform no print IO; narrow numeric cells use width markers with exact raw/formatted value retained, leading-zero text/rich spans/missing formula cache/hidden exclusion/covered-corner merge perimeter survive; source header definitions remain safe text; screen zoom causes no data/index query",
+        "actual page navigation reaches a later 3000pt-row slice with full source dimensions and negative physical offset, preserving repeated title and real source page numbers",
+        "desktop, 420px and dark layouts keep footer/page controls accessible and paper inside fit viewport; paper and source fills retain original colors",
+        "explicit custom paper/margins/range/fit apply together; failed first-page refresh preserves the accepted paper; cancellation followed by immediate retry cleans a deliberately delayed start without replacing the newer preview",
+        "same-content uploads retain distinct path identity; empty source has no invented A1 page, a hidden merged anchor does not move its text, native BIFF8 uses the same preview and CSV respects the shared capability registry"
+      ]
+    },
+    {
+      "scenario": "record-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "d3a4791278188cdba73ce66d3c607875315058cff90dc15a03fa6bd74ddaa708",
+      "sourceUnchanged": true,
+      "checks": [
+        "actual sparse XFD-wide OOXML keeps only 32 fields in DOM, exact source values/types/cache state match shared cell reads; duplicate/blank headers, literal formula text and missing/unrecoverable formulas remain distinct; real clipboard copies exact amount, long Unicode value and full header without further source reads",
+        "last field at XFD is one real field, explicit header-row zero; cancel/retry discards delayed pages, failed/foreign candidates preserve the complete prior record, and immediate close/reopen survives the native queued close event",
+        "real sorted and hidden rows with a two-row frozen prefix use source sequence 1,2,6,5,3 without duplicate pinned rows; source-hidden row 4 and a later local hide of row 6 are excluded; locating a record uses shared grid navigation to exact B3",
+        "420px dark card and segmented full-value dialog have no horizontal overflow, stacked fields and visible fixed paging; same-content/different-path source change closes the old card and rejects its delayed response",
+        "native CFB/BIFF8 opens through the actual context menu and preserves identifiers/numbers; CSV opens through the command palette with exact large amount; an empty sheet keeps the card entry unavailable"
+      ]
+    },
+    {
+      "scenario": "relation-export-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "cb360d5347cf5c9c751409409438b54d28d02ec53f1a810510a24dbb744394fd",
+      "assets": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "relations.css": "cbeda50798e7309cafe3d48f7729db761fd07f3ee7c1aa246f7e621145e11f5a"
+      },
+      "checks": [
+        "small native results default CSV; actual CSV/ZIP downloads have identical complete bytes, verified ZIP CRC and exact large values; explicit raw/protected formula-like text retains existing semantics; shared export center displays ZIP",
+        "actual 100005-record CSV self relation recommends ZIP from injected registry/threshold; complete ZIP and CSV downloads are byte-identical; deliberate CSV choice remains on reopening; readable format control fits 420px/dark layout"
+      ]
+    },
+    {
+      "scenario": "relation-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "41bff23feace7b8e39d63bde54a91e299ec2d6e068fb5910d7d6a39287e4c847",
+      "sourceUnchanged": true,
+      "servedAssetsSHA256": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "relations.css": "cbeda50798e7309cafe3d48f7729db761fd07f3ee7c1aa246f7e621145e11f5a",
+        "field-picker.css": "3efaf50ac1e5aa1c5ce132350029e2e786d8155bb7223e80f9f946674a57608a"
+      },
+      "checks": [
+        "OOXML + actual CSV upload keeps the primary workbook; unique header binds A to B; 48-column picker preserves real AV coordinate and cancels without changing selection; preview retains sparse source rows, exact native amount, missing formula cache and literal markup; two-by-three duplicates expand to six in original source order",
+        "all seven UI modes share one preflight and show only their own side; lightweight polling has no rows; exact output limit refuses before export; actual downloaded complete CSV is independently parsed and preserves duplicate order, 9007199254740993.31, formula-text protection, source type/cache and absent-side states",
+        "explicit unprotected CSV option produces a second real downloaded file with original formula-shaped text",
+        "420px viewport, graphite theme and width-only 720px container reflow sources/keys/column pagination without outer overflow or additional source/query requests",
+        "real delayed successful start cancels and clears only its own token; contradictory candidate counts are rejected and cleared while the old result remains usable; explicit retry replaces it only after validation",
+        "actual upload followed by a held source-list response cannot replace a reopened configuration; a queued native dialog close does not cancel immediate reopening",
+        "actual same-file cell navigation and a separate foreign-file browser tab both resolve original B2 rather than preview position",
+        "real native BIFF8 XLS and HTML-in-XLS uploads traverse the same field/task/model/result UI with content-detected formats, preserved leading-zero keys and native numeric type",
+        "saved analysis tables use header zero; real 105-row result exposes only 100-row preview and 20-row pages; source navigation focuses actual saved row 21 rather than page row one; explicit clear removes the accepted owner",
+        "switching primary files resets relation state and cannot display the previous file result"
+      ]
+    },
+    {
+      "scenario": "selection-quick-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "848becb6b30e6c63b35709781708da0cc136e787e2a7ea7e16dcc72f8b82b438",
+      "sourceUnchanged": true,
+      "checks": [
+        "Ctrl+Q and explicit run use the actual hidden-row view, include declared hidden source columns, preserve native text/errors/missing formula caches, and compute all 116 paired rows exactly as 1.39; 60 full-data segments, 420px controls, dark contrast, safe text, number/theme/resize without requery",
+        "failed refresh preserves the accepted complete result; cancel/retry ignores a deliberately held late response; command entry and source-reference navigation work; same-content different-path switch closes and rejects a late old-source result",
+        "a real mouse drag across descending sorted source rows 2 to 7 with a frozen prefix carries paired source/visual endpoints and returns exact same-row difference 3.01 without scanning the intervening physical rows",
+        "actual CSV right-click entry preserves leading-zero IDs and exact imported text amounts; statistics-window entry reuses the current selected region without implicit reads; generated source hashes unchanged"
+      ]
+    },
+    {
+      "scenario": "snapshots-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "e60d29a8cead0d9295bba72dc122912684ed5af17bf6e28ddfac5adec6f5e6a5",
+      "sourceUnchanged": true,
+      "assets": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "snapshots.css": "edafddc3b03f6c53b2f084c20503e629b6c6c0eab2c1c22c5712bf81e67cb72e"
+      },
+      "checks": [
+        "actual native completed tasks save exact aggregates, retain native text eligibility, align original categories/series, preserve large .02 differences and mark one-sided categories; save/open do not rescan",
+        "40-row pages, series and theme/container resize redraw only accepted data; 420px fits with stacked sides and readable text",
+        "ignored-abort late reads cannot replace newer pair; actual HTTP read failures preserve accepted comparison and explicit status",
+        "selected second metric is captured from the server; incompatible measure definitions show both snapshots without fabricated deltas; deletion requires a second action",
+        "real process restart with no open workbook restores independent snapshots and exact comparison"
+      ]
+    },
+    {
+      "scenario": "task-recovery-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "6e8574a9f226f292e4771c8dbb78c424613e5cc47ddb1599b2d6f17e47914667",
+      "sourceUnchanged": true,
+      "checks": [
+        "empty home has no task or edit action and does not open a source or start a job",
+        "default search leaves no persistent task; explicit opt-in bypasses same-query browser cache and keeps original uploaded name",
+        "explicit advanced filtering and exact numeric multi-sort persist their original predicates and header; 10286 matching source records",
+        "all six original export formats opt in through the existing export center and download real files with source leading-zero IDs and exact amount text",
+        "actual server restart retains nine tasks, opens no source automatically, and compact list fits desktop / 420px / dark theme with one scroll container",
+        "explicit Open original file validates then installs the original uploaded copy without starting any query/export",
+        "after real restart all six tasks download again; complete text bytes or every decompressed container part independently match the original download",
+        "resumed search uses the existing search panel; restored filtering/sorting commits the same exact source order and restores visible sort settings",
+        "a deliberately delayed accepted resume after closing the task window cancels only that returned job and cannot reopen results",
+        "same bytes at another path require Open original; changed original is rejected while current grid survives; removing one task leaves both source files and other tasks intact",
+        "resume from home reveals the workspace; recovered multi-value predicates remain exact and use progress/cancel controls; a newly opened advanced query restores its normal editor",
+        "discarding the last usable checkpoint hides the home action immediately"
+      ]
+    },
+    {
+      "scenario": "transpose-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "9286337ce768208d15aeecf0d417fcec3fa9e6a927b07457733b41c7b036d5fa",
+      "sourceUnchanged": true,
+      "assets": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "transpose.css": "396923996ed3fdb88d162d40ff7520b5e83177a8414b3060a35d187b8c1ac509"
+      },
+      "checks": [
+        "explicit command reads one bounded shared selection; original hidden rows are excluded and original column/row labels exchange axes",
+        "exact amounts/leading-zero identifiers/native text, rich text, complete long Unicode, formula missing-cache and unavailable expressions retain source semantics; source markup stays text",
+        "more than 200 transposed columns remain paged; actual-container resizing and mode/page changes make no new query, preserve readable fonts and fit 420px / dark layout",
+        "read failure preserves complete accepted content; cancel followed by retry cannot adopt an older response even when transport ignores abort",
+        "source navigation uses original refs; merged covered cells stay blank; sparse millionth-row/XFD coordinates are read without expanding the source domain",
+        "a same-content upload at a new path closes and releases the old transposed snapshot; a late response cannot reopen it",
+        "actual sorted/frozen reverse selection retains source order 210/209/208/207 and paired source endpoints; arrow navigation follows transposed axes without changing source refs",
+        "actual XLSM/native BIFF8/HTML XLS/CSV/TSV/TXT adapters use the same source identities, axis map and typed content"
+      ]
+    },
+    {
+      "scenario": "toolbar/after",
+      "result": "PASS",
+      "receiptSHA256": "83ba52d20dadbae5ea9f6e561cd5b38b7341242c9ea84e971da0a019ae8a7a7e",
+      "sourceUnchanged": true,
+      "assets": {
+        "app.js": "2869ab5440829f24031543445cd3226211baa106b5929073f27a887e05fd07ef",
+        "style.css": "b72b861d451fb27c466d4d4b20ce615f31c930edc00df2ee88f6bddc2f8fe698",
+        "index.html": "d5b8f830b71a403a085b63caa4748cf338107e323042fd746b517e6ae8560073"
+      },
+      "checks": [
+        "Eight widths and four pixel ratios: core commands, tabs, command search, workbook name and formula controls fit and receive pointer input without new source tasks",
+        "At 760 px 3 commands fold into the overflow menu and still run",
+        "The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon keeps its overflow state stable over 12 frames",
+        "Resizing the bar itself, independent of the window, recomputes overflow",
+        "Each of the five tabs shows exactly its own panel",
+        "Every tab command is registered in command search; eight open their dialogs; a command on another tab brings its tab forward and anchors its menu to the button",
+        "A column menu opened from command search while folded is anchored to its visible button; Escape closes it and restores focus",
+        "Ctrl+F1 folds the bar, a tab opens it over the sheet for one command, and the choice is remembered",
+        "Compact worksheet tabs page through 80 sheets, with a theme-aware divider between adjacent names",
+        "Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet"
+      ]
+    },
+    {
+      "scenario": "toolbar-layouts",
+      "result": "PASS",
+      "receiptSHA256": "f829ca87807bcd2cac2d6858498bb185f91c9639a4dbd2e65878d5bf3b94a6fc",
+      "checks": [
+        "Classic is the default; desktop, narrow and breakpoint widths preserve one top row, working font and search controls, hit targets and formula space",
+        "Icon hit targets, hover names, native font selection and separate formula/value clipboard commands work",
+        "Header context menu and tray callbacks both switch the same persisted preference; control identity, command search and workbook binding survive the switch without new source jobs",
+        "A tray layout change keeps an in-progress edit and the active formula field",
+        "Clear all caches returns both tabs to home, empties disk cache, preserves source bytes, and reopens the workbook with its leading-zero ID"
+      ]
+    }
+  ],
+  "desktopManualAcceptance": false,
+  "officeWpsAcceptance": false,
+  "previousVersionManualAcceptance": {
+    "version": "1.20.0",
+    "confirmedByUser": true
+  }
+}

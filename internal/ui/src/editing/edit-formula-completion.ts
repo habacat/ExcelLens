@@ -13,6 +13,13 @@ import {
   type FormulaColumnContext,
   type FormulaContext,
 } from './formula-entry-model.ts';
+import {
+  decodeFormulaSymbols,
+  decodeFunctionCatalogResponse,
+} from '../core/http-decoders.generated.ts';
+
+/** @httpResponse FormulaSymbols */
+export type FormulaSymbols = readonly FormulaSymbol[];
 
 export interface WorksheetFunctionSpec {
   readonly name: string;
@@ -45,11 +52,12 @@ export interface FormulaCompletionHost {
         readonly revision: string;
       };
     } | null;
-    post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+    post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   };
 }
 
-interface FunctionCatalogResponse {
+/** @httpResponse FunctionCatalogResponse */
+export interface FunctionCatalogResponse {
   readonly items: readonly WorksheetFunctionSpec[];
 }
 
@@ -111,10 +119,10 @@ export class WorksheetCompletion {
     if (key !== this.symbolKey) {
       this.symbolKey = key;
       this.symbolsReady = this.editor.owner
-        .post<readonly FormulaSymbol[]>('formula-symbols', {
+        .post('formula-symbols', {
           document: { id: d.id, binding: d.binding },
           revision: d.revision,
-        })
+        }).then(decodeFormulaSymbols)
         .catch(() => {
           if (this.symbolKey === key) this.symbolKey = null;
           return [];
@@ -177,9 +185,9 @@ export class WorksheetCompletion {
       return;
     }
     if (!this.catalog) {
-      this.loading ??= this.api<FunctionCatalogResponse>(
+      this.loading ??= this.api(
         '/api/calculator/functions?scope=worksheet',
-      )
+       undefined, decodeFunctionCatalogResponse)
         .then((data) => {
           this.catalog = data.items;
         })

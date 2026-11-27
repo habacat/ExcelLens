@@ -9,14 +9,15 @@ import type {
   ApiRequestOptions,
   ApiResponseType,
   HttpError,
+  JsonDecoder,
   PostClient,
   SessionService,
 } from '../contracts/common.ts';
+import { decodeOpenResult } from './workbook-response.ts';
+import type { WorkbookStatusResponse } from '../contracts/workbook.ts';
+import { readAppToken } from './dom.ts';
 
 export type { ApiClient, PostClient };
-import type { WireRow, WorkbookStatusResponse } from '../contracts/workbook.ts';
-import { readAppToken } from './dom.ts';
-import { unpackWireRows } from './wire.ts';
 
 export interface TransportService {
   readonly api: ApiClient;
@@ -38,21 +39,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isWorkbookStatusResponse(value: unknown): value is WorkbookStatusResponse {
-  return isRecord(value) && (typeof value.opened === 'boolean' || typeof value.archiveOnly === 'boolean');
-}
-
 export function createTransport(deps: TransportDependencies = {}): TransportService {
   const token = deps.token ?? readAppToken();
 
-  async function apiImpl(
+  function api<T>(url: string, options: ApiRequestOptions | undefined, decode: JsonDecoder<T>): Promise<T>;
+  function api(url: string, options?: ApiRequestOptions, responseType?: 'json'): Promise<unknown>;
+  function api(url: string, options: ApiRequestOptions | undefined, responseType: 'text'): Promise<string>;
+  function api(url: string, options: ApiRequestOptions | undefined, responseType: 'blob'): Promise<Blob>;
+  function api(url: string, options: ApiRequestOptions | undefined, responseType: 'response'): Promise<Response>;
+  async function api(
     url: string,
     options: ApiRequestOptions = {},
-    responseType: ApiResponseType = 'json',
+    responseType: ApiResponseType | JsonDecoder<unknown> = 'json',
   ): Promise<unknown> {
     const activity = deps.activity?.request(url, options);
     try {
       await deps.session?.ready;
+      options.signal?.throwIfAborted();
       const headers = new Headers(options.headers ?? {});
       headers.set('X-ExcelLens-Token', token);
       deps.session?.apply(headers);
@@ -88,23 +91,19 @@ export function createTransport(deps: TransportDependencies = {}): TransportServ
         }
         throw error;
       });
-      if (isRecord(raw) && raw.compact === 1 && Array.isArray(raw.rows)) {
-        raw.rows = unpackWireRows(raw.rows as WireRow[]);
-      }
-      return raw;
+      options.signal?.throwIfAborted();
+      return typeof responseType === 'function' ? responseType(raw) : raw;
     } finally {
       activity?.end();
     }
   }
 
-  const api = apiImpl as ApiClient;
-
-  const post: PostClient = <T = unknown>(
+  const post: PostClient = (
     url: string,
     payload: unknown,
     options: ApiRequestOptions = {},
-  ): Promise<T> =>
-    api<T>(url, { ...options, method: 'POST', body: JSON.stringify(payload) });
+  ): Promise<unknown> =>
+    api(url, { ...options, method: 'POST', body: JSON.stringify(payload) });
 
   function upload(
     file: File,
@@ -139,8 +138,12 @@ export function createTransport(deps: TransportDependencies = {}): TransportServ
         } catch {
           // Surface malformed output as an open failure.
         }
-        if (xhr.status >= 200 && xhr.status < 300 && isWorkbookStatusResponse(data)) {
-          resolve(data);
+        if (xhr.status >= 200 && xhr.status < 300 && data !== undefined) {
+          try {
+            resolve(decodeOpenResult(data));
+          } catch (error: unknown) {
+            reject(error instanceof Error ? error : new Error('打开响应无效'));
+          }
         } else {
           const msg =
             isRecord(data) && typeof data.error === 'string' && data.error

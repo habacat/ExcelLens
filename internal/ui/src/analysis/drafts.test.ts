@@ -56,13 +56,13 @@ function setup(override?: (path: string, body: Record<string, unknown>) => unkno
       const empty: unknown = {};
       return empty as T;
     },
-    post: async <T = unknown>(path: string, body: unknown): Promise<T> => {
+    post: async (path: string, body: unknown): Promise<unknown> => {
       const payload = (typeof body === 'object' && body !== null
         ? body
         : {}) as Record<string, unknown>;
       calls.push({ path, body: payload });
       const res = override ? await override(path, payload) : { revision: 1, previous: [] };
-      return res as T;
+      return res;
     },
     toast: (message) => {
       messages.push(message);

@@ -50,7 +50,7 @@ test('all preceding cells draw a merged header edge at the same trailing pixel a
   const { dom, pipeline, makeNode, row, black } = setupBorders();
   try {
     const anchor = makeNode(8, 6);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       anchor,
       row.cells[0],
       row,
@@ -63,7 +63,7 @@ test('all preceding cells draw a merged header edge at the same trailing pixel a
     assert.equal(anchor.style.borderLeft, '');
     for (const col of [6, 7]) {
       const above = makeNode(7, col);
-      pipeline.updateSharedBorders(
+      pipeline.appearance.updateSharedBorders(
         above,
         null,
         { number: 7, cells: [] },
@@ -87,13 +87,13 @@ test('adjacent merged headers choose their real outer seam and frozen anchors re
   const { dom, S, pipeline, makeNode, row, black } = setupBorders();
   try {
     const left = makeNode(8, 6);
-    pipeline.updateSharedBorders(left, row.cells[0], row, null, row, null, { number: 9, cells: [] });
+    pipeline.appearance.updateSharedBorders(left, row.cells[0], row, null, row, null, { number: 9, cells: [] });
     assert.equal(left.style.borderRight, black);
     const j8 = row.cells[2];
     assert.ok(j8);
     S.frozenCellMap.set('J8', j8);
     const below = makeNode(9, 9);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       below,
       null,
       { number: 9, cells: [] },
@@ -104,7 +104,7 @@ test('adjacent merged headers choose their real outer seam and frozen anchors re
     );
     assert.equal(below.style.borderRight, black);
     const frozen = makeNode(8, 10);
-    pipeline.updateSharedBorders(frozen, j8, row, null, row, null, { number: 9, cells: [] });
+    pipeline.appearance.updateSharedBorders(frozen, j8, row, null, row, null, { number: 9, cells: [] });
     assert.equal(frozen.style.borderLeft, '');
     assert.equal(frozen.style.borderTop, '');
   } finally {
@@ -125,10 +125,10 @@ test('two-row currency and direction headers retain the entire right border next
       assert.ok(tall && short);
       S.cellMap.set(`${String.fromCharCode(64 + col)}8`, tall);
       const a = makeNode(8, col);
-      pipeline.updateSharedBorders(a, tall, row, short, row, null, { number: 9, cells: [] });
+      pipeline.appearance.updateSharedBorders(a, tall, row, short, row, null, { number: 9, cells: [] });
       assert.equal(a.style.borderRight, black);
       const b = makeNode(8, neighbor);
-      pipeline.updateSharedBorders(b, short, row, null, row, null, { number: 9, cells: [] });
+      pipeline.appearance.updateSharedBorders(b, short, row, null, row, null, { number: 9, cells: [] });
       assert.equal(b.style.borderLeft, '');
     }
   } finally {
@@ -143,7 +143,7 @@ test('merged XLS/XLSX perimeter reads borders from styled covered corners', () =
     S.styles.push({ borderBottom: black, borderRight: black });
     S.cellMap.set('E9', makeCellData(5, '', { ref: 'E9', style: 3 }));
     const anchor = makeNode(8, 5);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       anchor,
       makeCellData(5, '', { ref: 'E8', style: 2 }),
       row,
@@ -157,7 +157,7 @@ test('merged XLS/XLSX perimeter reads borders from styled covered corners', () =
     S.cellMap.clear();
     S.frozenCellMap.set('G8', makeCellData(7, '', { ref: 'G8', style: 3 }));
     const wide = makeNode(8, 6);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       wide,
       makeCellData(6, '', { ref: 'F8', style: 2 }),
       row,
@@ -185,11 +185,11 @@ test('conditional borders use the same seam and merged-perimeter model and clear
     });
     const edge = makeNode(2, 2);
     const before = JSON.stringify(cell);
-    pipeline.updateSharedBorders(edge, cell, { number: 2, cells: [] }, null, null, null, null);
+    pipeline.appearance.updateSharedBorders(edge, cell, { number: 2, cells: [] }, null, null, null, null);
     assert.equal(edge.style.borderRight, red);
     assert.equal(edge.style.borderBottom, blue);
     assert.equal(JSON.stringify(cell), before);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       edge,
       { ...cell, conditional: { visual: {} } },
       { number: 2, cells: [] },
@@ -210,7 +210,7 @@ test('conditional borders use the same seam and merged-perimeter model and clear
     );
     S.styles.push({ borderTop: black, borderLeft: black });
     const anchor = makeNode(8, 5);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       anchor,
       makeCellData(5, '', { ref: 'E8', style: 2 }),
       row,
@@ -222,7 +222,7 @@ test('conditional borders use the same seam and merged-perimeter model and clear
     assert.equal(anchor.style.borderRight, red);
     assert.equal(anchor.style.borderBottom, blue);
     S.showStyles = false;
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       anchor,
       makeCellData(5, '', { ref: 'E8', style: 2 }),
       row,
@@ -246,7 +246,7 @@ test('a fill hides the default seam from either side and keeps explicit neighbor
     const row: RowData = { number: 2, cells: [] };
     const below: RowData = { number: 3, cells: [] };
     const next = { nextCol: 3 };
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       edge,
       makeCellData(2, '', { ref: 'B2', style: 2 }),
       row,
@@ -258,7 +258,7 @@ test('a fill hides the default seam from either side and keeps explicit neighbor
     );
     assert.equal(edge.style.borderRight, '0px');
     assert.equal(edge.style.borderBottom, '0px');
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       edge,
       makeCellData(2, '', { ref: 'B2' }),
       row,
@@ -270,7 +270,7 @@ test('a fill hides the default seam from either side and keeps explicit neighbor
     );
     assert.equal(edge.style.borderRight, '0px');
     assert.equal(edge.style.borderBottom, black);
-    pipeline.updateSharedBorders(
+    pipeline.appearance.updateSharedBorders(
       edge,
       makeCellData(2, '', { ref: 'B2' }),
       row,

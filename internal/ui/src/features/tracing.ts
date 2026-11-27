@@ -9,6 +9,10 @@ import { beginActivity } from '../core/activity.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { enterMotion, exitMotion, stopMotion } from '../core/motion.ts';
 import type { TraceRefEntry, WorkbookState } from '../grid/state.ts';
+import {
+  decodeTraceStartResponse,
+  decodeTraceStatusApiResponse,
+} from '../core/http-decoders.generated.ts';
 
 export type TraceKind = 'precedents' | 'dependents';
 
@@ -20,12 +24,14 @@ export interface TraceVisibleRect {
   readonly pane: string;
 }
 
-interface TraceStartResponse {
+/** @httpResponse TraceStartResponse */
+export interface TraceStartResponse {
   readonly jobId: string;
   readonly reused?: boolean;
 }
 
-interface TraceStatusApiResponse extends Omit<SearchStatusResponse, 'matches'> {
+/** @httpResponse TraceStatusApiResponse */
+export interface TraceStatusApiResponse extends Omit<SearchStatusResponse, 'matches'> {
   readonly matches?: readonly SearchHit[] | null;
 }
 
@@ -343,7 +349,7 @@ export class Tracing {
     const activity = beginActivity('正在追踪从属公式');
     this.activity = activity;
     try {
-      const start = await this.o.api<TraceStartResponse>('/api/search/start', {
+      const start = await this.o.api('/api/search/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -352,7 +358,7 @@ export class Tracing {
           mode: 'reference',
           scope,
         }),
-      });
+      }, decodeTraceStartResponse);
       if (ticket !== this.request) {
         if (!start.reused) {
           this.o
@@ -370,8 +376,10 @@ export class Tracing {
       this.job = { id: start.jobId, owned: !start.reused };
       const sourceSheet = this.source.sheet;
       while (ticket === this.request) {
-        const data = await this.o.api<TraceStatusApiResponse>(
+        const data = await this.o.api(
           `/api/search/status?id=${encodeURIComponent(start.jobId)}`,
+          undefined,
+          decodeTraceStatusApiResponse,
         );
         if (ticket !== this.request) return;
         activity?.report(data.progress, 100, data.stage);

@@ -14,6 +14,10 @@ import { beginActivity } from '../core/activity.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireSelect } from '../core/dom.ts';
 import { MergedCells } from '../grid/merges.ts';
+import { decodeChoicesResponse, decodeListControlAreas } from '../core/http-decoders.generated.ts';
+
+/** @httpResponse ListControlAreas */
+export type ListControlAreas = readonly ListControlArea[];
 
 function areaKey(r: MergeRange): string {
   return [r.row, r.col, r.endRow, r.endCol].join(',');
@@ -27,7 +31,8 @@ function httpStatus(error: unknown): number | undefined {
   return undefined;
 }
 
-interface ChoicesResponse {
+/** @httpResponse ChoicesResponse */
+export interface ChoicesResponse {
   readonly choices?: readonly string[];
 }
 
@@ -45,7 +50,7 @@ export interface GridValidationListHost {
       readonly encoding?: string;
       readonly document: { readonly revision: string };
     } | null;
-    post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+    post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
     commit(
       action: 'change',
       changes: readonly EditChange[],
@@ -200,11 +205,11 @@ export class GridValidationList {
         const controller = new AbortController();
         this.source = controller;
         this.ready = g.owner
-          .post<readonly ListControlArea[]>(
+          .post(
             'list-areas',
             { book: g.book, sheet: shape.name },
             controller.signal,
-          )
+          ).then(decodeListControlAreas)
           .then((areas) => {
             if (this.source !== controller) return;
             this.base = areas;
@@ -280,11 +285,11 @@ export class GridValidationList {
       }
       if (this.button.hidden) throw new Error('当前格没有可选列表');
       const target = g.ranges.target();
-      const result = await g.owner.post<ChoicesResponse>(
+      const result = await g.owner.post(
         'choices',
         { ...target, ref: cell.ref },
         lookup.signal,
-      );
+      ).then(decodeChoicesResponse);
       if (!current()) return;
       const choices = result.choices;
       if (!choices?.length) throw new Error('当前列表没有可选值');

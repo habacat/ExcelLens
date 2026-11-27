@@ -18,6 +18,7 @@ import {
   isValidAnalysisNumberOptions,
   setAnalysisNumberOptions,
 } from './numbers.ts';
+import { decodeAnalysisDisplayConfig } from '../core/http-decoders.generated.ts';
 
 export interface AnalysisSettingsOptions {
   readonly api: ApiClient;
@@ -148,7 +149,7 @@ export class AnalysisSettings {
     this.busy(true);
     this.status('正在读取设置…');
     try {
-      const config = await this.api<AnalysisDisplayConfig>('/api/settings/analysis-display');
+      const config = await this.api('/api/settings/analysis-display', undefined, decodeAnalysisDisplayConfig);
       if (serial !== this.serial) return;
       this.accept(config);
       this.fill(config.options);
@@ -173,10 +174,10 @@ export class AnalysisSettings {
     this.busy(true);
     this.status('正在保存…');
     try {
-      const config = await this.api<AnalysisDisplayConfig>('/api/settings/analysis-display', {
+      const config = await this.api('/api/settings/analysis-display', {
         method: 'POST',
         body: JSON.stringify({ expectedRevision, options }),
-      });
+      }, decodeAnalysisDisplayConfig);
       if (serial !== this.serial) return;
       this.accept(config);
       this.status('已保存');

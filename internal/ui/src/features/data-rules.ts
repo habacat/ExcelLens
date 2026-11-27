@@ -1,3 +1,5 @@
+import { decodeDataRulesJobStatus } from '../core/http-decoders.generated.ts';
+import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
  * Read-only Data Validation Rules inspector dialog with bounded pagination,
  * inline list and range browsing, and guarded source-area navigation.
@@ -10,7 +12,7 @@ import type {
   DataRuleSummary,
 } from '../contracts/features.ts';
 import type { DataRulesLimits } from '../contracts/formats.ts';
-import { AsyncJobs, type AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
+import { AsyncJobs } from '../core/async-jobs.ts';
 import { columnName } from '../core/cell-address.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import {
@@ -20,6 +22,11 @@ import {
   requireSelect,
 } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeDataRuleDetailEnvelope,
+  decodeDataRuleItemsEnvelope,
+  decodeDataRuleResolveEnvelope,
+} from '../core/http-decoders.generated.ts';
 
 export interface DataRulesOptions {
   readonly state: WorkbookState;
@@ -35,13 +42,15 @@ export interface DataRulesOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-interface DataRulesJobStatus extends AsyncJobStatusEnvelope<DataRulesJobStatus> {
+/** @httpResponse DataRulesJobStatus */
+export interface DataRulesJobStatus extends AsyncJobProgress {
   readonly workbookKey?: string;
   readonly book?: string;
   readonly sheet?: string;
 }
 
-interface DataRuleItemsEnvelope {
+/** @httpResponse DataRuleItemsEnvelope */
+export interface DataRuleItemsEnvelope {
   readonly workbookKey: string;
   readonly book: string;
   readonly sheet: string;
@@ -50,14 +59,16 @@ interface DataRuleItemsEnvelope {
   readonly page: DataRuleListPage;
 }
 
-interface DataRuleDetailEnvelope {
+/** @httpResponse DataRuleDetailEnvelope */
+export interface DataRuleDetailEnvelope {
   readonly workbookKey: string;
   readonly book: string;
   readonly sheet: string;
   readonly detail: DataRuleDetailPage;
 }
 
-interface DataRuleResolveEnvelope {
+/** @httpResponse DataRuleResolveEnvelope */
+export interface DataRuleResolveEnvelope {
   readonly workbookKey: string;
   readonly book: string;
   readonly sheet: string;
@@ -170,6 +181,7 @@ export class DataRules {
     const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.dialog = this.create();
     this.jobs = new AsyncJobs<DataRulesJobStatus, DataRulesJobStatus>({
+      decodeStatus: decodeDataRulesJobStatus,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => this.s.workbookKey,
@@ -444,9 +456,9 @@ export class DataRules {
       type: requireSelect('dataRuleType').value,
       status: requireSelect('dataRuleState').value,
     });
-    const value = await this.api<DataRuleItemsEnvelope>(`/api/data-rules/items?${q.toString()}`, {
+    const value = await this.api(`/api/data-rules/items?${q.toString()}`, {
       signal,
-    });
+    }, decodeDataRuleItemsEnvelope);
     this.validSource(value);
     const p = value.page;
     if (
@@ -612,7 +624,7 @@ export class DataRules {
     requireEl('dataRuleDetail').textContent = '正在读取规则定义…';
     this.controls();
     try {
-      const value = await this.api<DataRuleDetailEnvelope>(
+      const value = await this.api(
         `/api/data-rules/detail?${new URLSearchParams({
           id: job,
           item: String(id),
@@ -620,6 +632,7 @@ export class DataRules {
           listOffset: String(listOffset),
         }).toString()}`,
         { signal: controller.signal },
+        decodeDataRuleDetailEnvelope,
       );
       if (
         serial !== this.detailRequest ||
@@ -894,7 +907,7 @@ export class DataRules {
       key === this.s.workbookKey &&
       sheet === this.s.sheet;
     try {
-      const value = await this.api<DataRuleResolveEnvelope>(
+      const value = await this.api(
         `/api/data-rules/resolve?${new URLSearchParams({
           id: this.job,
           item: String(this.selected),
@@ -902,6 +915,8 @@ export class DataRules {
           workbookKey: key,
           book,
         }).toString()}`,
+        undefined,
+        decodeDataRuleResolveEnvelope,
       );
       if (!resolving() || origin !== JSON.stringify([this.s.sheetEpoch, this.s.selected?.ref])) {
         return;

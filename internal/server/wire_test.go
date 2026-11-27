@@ -102,7 +102,7 @@ func TestCompactViewportHTTPKeepsFinancialTextAndStyle(t *testing.T) {
 	}
 	var small struct {
 		Compact int
-		Rows    []wireRow
+		Rows    []CompactRow
 	}
 	if err := json.Unmarshal(packed.Body.Bytes(), &small); err != nil {
 		t.Fatal(err)

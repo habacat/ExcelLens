@@ -49,6 +49,16 @@ func TestTransposeRangeRetainsInheritedRowStyleWithoutInventingCells(t *testing.
 			t.Fatal("invented blank value", cell)
 		}
 	}
+	blank := decodeResponse[clipboardPayload](t, analysisRequest(t, a, "GET", "/api/range?sheet=Data&start=XFC999999&end=XFD1000000&headerRow=999998&format=json", ""))
+	if len(blank.Rows) != 2 || blank.Rows[0].Row != 999999 || blank.Rows[1].Row != 1000000 ||
+		blank.Header == nil || blank.Header.Row != 999998 {
+		t.Fatal("sparse selection lost its source coordinates", blank)
+	}
+	for _, row := range []clipboardRow{*blank.Header, blank.Rows[0], blank.Rows[1]} {
+		if row.Cells == nil || len(row.Cells) != 0 {
+			t.Fatal("range JSON must send an empty cell list for an empty source row", row)
+		}
+	}
 }
 
 func TestTransposeRangeAllExistingTextAndLegacyAdapters(t *testing.T) {

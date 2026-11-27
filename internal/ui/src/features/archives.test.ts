@@ -2,9 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ApiRequestOptions } from '../contracts/common.ts';
 import type { WorkbookStatusResponse } from '../contracts/workbook.ts';
+import { createTransport } from '../core/transport.ts';
 import { renderSourceIntegrity } from '../grid/grid-workbook-io.ts';
 import { installDom } from '../test-helpers/dom-mock.ts';
 import { Archives } from './archives.ts';
+
+const openedMember = {
+  opened: true, workbookKey: 'content', book: 'member', fileName: 'a.txt', fileSize: 2,
+  sheetCount: 1, activeTab: 0, sheets: [{ name: '数据' }], source: { format: 'txt', readOnly: true },
+};
 
 function setupArchives(
   apiImpl: (url: string, options?: ApiRequestOptions) => Promise<unknown>,
@@ -17,7 +23,6 @@ function setupArchives(
     open: async (data) => {
       opened.push(data);
     },
-    toast: () => undefined,
     fmtBytes: (n) => String(n),
   });
   return { instance, opened, restore: () => dom.restore() };
@@ -61,7 +66,7 @@ test('search keyboard connects directly to member selection and opening', async 
         }
       : url === '/api/archive/open'
         ? { jobId: 'job' }
-        : { status: 'done', result: { opened: true } },
+        : { status: 'done', result: openedMember },
   );
   try {
     h.instance.use({ id: 'one', name: 'archive.zip', total: 2 });
@@ -81,6 +86,36 @@ test('search keyboard connects directly to member selection and opening', async 
   } finally {
     h.restore();
   }
+});
+
+test('an extracting archive can report null until ready and cannot open a member without its source identity', async t => {
+  const dom = installDom({ fromIndexHtml: true });
+  t.after(() => dom.restore());
+  const archive = { id: 'zip', name: 'data.zip', count: 1, total: 1, depth: 0, format: 'ZIP', notice: '' };
+  let polls = 0;
+  let result: unknown = { ...openedMember, book: '' };
+  t.mock.method(globalThis, 'fetch', async (url: string) => {
+    if (url.startsWith('/api/archive/list')) {
+      return Response.json({ archive, items: [{ id: 0, name: 'a.txt', size: 2 }], total: 1, offset: 0, limit: 100 });
+    }
+    if (url === '/api/archive/open') return Response.json({ jobId: 'extract' });
+    assert.match(url, /archive\/job/);
+    const running = ++polls === 1;
+    return Response.json({ id: 'extract', status: running ? 'running' : 'done', stage: '', doneBytes: 0,
+      totalBytes: 2, error: '', result: running ? null : result });
+  });
+  const opened: WorkbookStatusResponse[] = [];
+  const instance = new Archives({ api: createTransport({ token: 'test' }).api,
+    open: value => { opened.push(value); }, fmtBytes: String });
+  instance.use(archive);
+  await instance.load();
+  await instance.openSelected();
+  assert.equal(polls, 2);
+  assert.equal(opened.length, 0);
+  assert.match(document.getElementById('archiveError')?.textContent ?? '', /来源/);
+  result = openedMember;
+  await instance.openSelected();
+  assert.equal(opened[0]?.book, 'member');
 });
 
 test('an obsolete archive opener cannot replace the next archive or its error state', async () => {
@@ -164,7 +199,7 @@ test('incomplete TXT needs a deliberate choice for clicks and keyboard, and rese
           : undefined;
       return { jobId: 'partial' };
     }
-    return { status: 'done', result: { opened: true } };
+    return { status: 'done', result: openedMember };
   });
   try {
     h.instance.use({ id: 'cut', name: 'cut.tar', total: 2, notice });

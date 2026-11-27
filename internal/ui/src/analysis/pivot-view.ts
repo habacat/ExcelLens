@@ -13,7 +13,6 @@ import type {
   AnalysisSortOrder,
   AnalysisTransform,
   AnalysisWorkspaceResponse,
-  DrillResult,
   DrillRow,
 } from '../contracts/analysis.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
@@ -33,6 +32,7 @@ import {
 import type { SnapshotsController } from './snapshots.ts';
 import { sourceScopeCaption } from './sources.ts';
 import type { AnalysisTree, AnalysisTreeRenderer } from './tree.ts';
+import { decodeDrillResult } from '../core/http-decoders.generated.ts';
 
 export const AGGREGATIONS: readonly (readonly [AnalysisAggregateKind, string])[] = Object.freeze([
   ['sum', '求和'] as const,
@@ -61,7 +61,8 @@ export interface EditableAnalysisQuery extends WorkspaceAnalysisQuery {
   layout: '' | 'tree';
 }
 
-export type RestorableAnalysisQuery = Partial<WorkspaceAnalysisQuery> & {
+export type RestorableAnalysisQuery = Partial<Omit<WorkspaceAnalysisQuery, 'rows'>> & {
+  readonly rows?: readonly string[] | null;
   readonly source: string;
 };
 
@@ -184,8 +185,8 @@ export function queryScopeCaption(q: Pick<AnalysisQuery, 'composition' | 'source
 }
 
 export function restoreReportQuery(query: RestorableAnalysisQuery): EditableAnalysisQuery {
-  const raw = JSON.parse(JSON.stringify(query)) as RestorableAnalysisQuery;
-  const rows = Array.isArray(raw.rows) ? [...raw.rows] : [];
+  const raw = structuredClone(query);
+  const rows = [...(raw.rows ?? [])];
   const columns = Array.isArray(raw.columns) ? [...raw.columns] : [];
   const metrics = Array.isArray(raw.metrics) ? raw.metrics.map((m) => ({ ...m })) : [];
   const filters = Array.isArray(raw.filters) ? raw.filters.map((f) => ({ ...f })) : [];
@@ -713,7 +714,7 @@ export class AnalysisPivotView {
     setText('analysisDrillTable', '');
     setText('analysisDrillPaging', '');
     try {
-      const data = await api<DrillResult>('/api/analysis/drill', {
+      const data = await api('/api/analysis/drill', {
         method: 'POST',
         body: JSON.stringify({
           query: q,
@@ -725,7 +726,7 @@ export class AnalysisPivotView {
           limit: 100,
         }),
         signal: controller.signal,
-      });
+      }, decodeDrillResult);
       if (!current() || !isDrawerVisible()) return;
       const rows = data.rows ?? [];
       setText(

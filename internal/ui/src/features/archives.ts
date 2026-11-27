@@ -1,12 +1,18 @@
 /**
  * Archive member browser & streaming extraction dialog controller.
  */
-import type { ActivityHandle, ApiClient, AsyncJobProgress, ToastFn } from '../contracts/common.ts';
+import type { ActivityHandle, ApiClient, AsyncJobProgress } from '../contracts/common.ts';
 import type { ArchiveListResponse, ArchiveMember } from '../contracts/features.ts';
 import type { ArchiveSummary, WorkbookStatusResponse } from '../contracts/workbook.ts';
+import { decodeOpenResult } from '../core/workbook-response.ts';
 import { beginActivity } from '../core/activity.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import { requireButton, requireDialog, requireEl, requireInput } from '../core/dom.ts';
+import {
+  decodeArchiveJobStatusResponse,
+  decodeArchiveListApiResponse,
+  decodeArchiveOpenStartResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface ArchiveDescriptor extends ArchiveSummary {
   readonly id?: string;
@@ -15,27 +21,29 @@ export interface ArchiveDescriptor extends ArchiveSummary {
   readonly depth?: number;
 }
 
-interface ArchiveOpenStartResponse {
+/** @httpResponse ArchiveOpenStartResponse */
+export interface ArchiveOpenStartResponse {
   readonly jobId: string;
 }
 
-interface ArchiveJobStatusResponse extends AsyncJobProgress {
+/** @httpResponse ArchiveJobStatusResponse */
+export interface ArchiveJobStatusResponse extends AsyncJobProgress {
   readonly status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
   readonly stage: string;
   readonly doneBytes: number;
   readonly totalBytes: number;
   readonly error?: string;
-  readonly result?: WorkbookStatusResponse;
+  readonly result: unknown;
 }
 
-interface ArchiveListApiResponse extends Omit<ArchiveListResponse, 'items' | 'archive'> {
+/** @httpResponse ArchiveListApiResponse */
+export interface ArchiveListApiResponse extends Omit<ArchiveListResponse, 'items' | 'archive'> {
   readonly archive?: ArchiveDescriptor;
   readonly items?: readonly ArchiveMember[] | null;
 }
 
 export interface ArchivesOptions {
   readonly api: ApiClient;
-  readonly toast: ToastFn;
   readonly open: (result: WorkbookStatusResponse) => Promise<void> | void;
   readonly fmtBytes: (value: unknown) => string;
   readonly canOpen?: () => boolean;
@@ -55,7 +63,6 @@ export class Archives {
   public job = '';
 
   private readonly api: ApiClient;
-  private readonly toast: ToastFn;
   private readonly openWorkbook: (result: WorkbookStatusResponse) => Promise<void> | void;
   private readonly fmtBytes: (value: unknown) => string;
   private readonly canOpen: () => boolean;
@@ -66,7 +73,6 @@ export class Archives {
 
   constructor(options: ArchivesOptions) {
     this.api = options.api;
-    this.toast = options.toast;
     this.openWorkbook = options.open;
     this.fmtBytes = options.fmtBytes;
     this.canOpen = options.canOpen ?? (() => true);
@@ -196,9 +202,9 @@ export class Archives {
         offset: String(this.offset),
         limit: '100',
       });
-      const data = await this.api<ArchiveListApiResponse>(`/api/archive/list?${params.toString()}`, {
+      const data = await this.api(`/api/archive/list?${params.toString()}`, {
         signal: controller.signal,
-      });
+      }, decodeArchiveListApiResponse);
       if (ticket !== this.ticket) return;
       const previous = this.selected;
       this.items = data.items ? [...data.items] : [];
@@ -353,7 +359,7 @@ export class Archives {
     const bar = requireEl('archiveBar');
     bar.removeAttribute('value');
     try {
-      const started = await this.api<ArchiveOpenStartResponse>('/api/archive/open', {
+      const started = await this.api('/api/archive/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -361,7 +367,7 @@ export class Archives {
           member: this.selected,
           allowPartial: partial && allowPartial.checked,
         }),
-      });
+      }, decodeArchiveOpenStartResponse);
       if (operation !== this.operation) {
         this.api(`/api/archive/job?id=${encodeURIComponent(started.jobId)}`, {
           method: 'POST',
@@ -372,8 +378,10 @@ export class Archives {
       }
       this.job = started.jobId;
       for (;;) {
-        const state = await this.api<ArchiveJobStatusResponse>(
+        const state = await this.api(
           `/api/archive/job?id=${encodeURIComponent(started.jobId)}`,
+          undefined,
+          decodeArchiveJobStatusResponse,
         );
         if (operation === this.operation) activity?.job(state);
         if (operation !== this.operation) return;
@@ -391,14 +399,11 @@ export class Archives {
           break;
         }
         if (state.status === 'done') {
+          const result = decodeOpenResult(state.result);
           this.busy = false;
           this.job = '';
           this.dialog.close();
-          if (state.result) {
-            await this.openWorkbook(state.result);
-          } else {
-            this.toast('未收到压缩包打开结果', 'error');
-          }
+          await this.openWorkbook(result);
           break;
         }
         await delay(240);

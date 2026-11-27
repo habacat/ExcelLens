@@ -94,7 +94,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		a.mu.RLock()
 		startupError := a.startupError
 		a.mu.RUnlock()
-		writeJSON(w, map[string]any{"version": buildinfo.Version, "opened": false, "error": startupError, "archive": a.archiveSummary()})
+		writeJSON(w, ClosedWorkbookResponse{Version: buildinfo.Version, Error: startupError, Archive: a.archiveSummary()})
 		return
 	}
 	a.writeWorkbookStatus(w, wb)
@@ -109,19 +109,10 @@ func (a *App) writeWorkbookStatus(w http.ResponseWriter, wb *workbook.Workbook) 
 	if wb.Format == "db-online" {
 		size = wb.DatabaseSnapshotSize()
 	}
-	writeJSON(w, map[string]any{
-		"version":     buildinfo.Version,
-		"opened":      true,
-		"workbookKey": wb.Fingerprint,
-		"book":        sourceBookID(wb),
-		"fileName":    workbookDisplayName(wb),
-		"fileSize":    size,
-		"sheetCount":  len(wb.Sheets),
-		"activeTab":   wb.ActiveTab,
-		"sheets":      wb.Sheets,
-		"source":      wb.SourceInfo,
-		"archive":     a.archiveSummary(),
-	})
+	status := openedWorkbook(wb, workbookDisplayName(wb), size)
+	status.Version = buildinfo.Version
+	status.Archive = a.archiveSummary()
+	writeJSON(w, status)
 }
 
 // handleStyles sends the resolved, compact visual-style palette once per workbook.
@@ -136,7 +127,7 @@ func (a *App) handleStyles(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "尚未打开工作簿")
 		return
 	}
-	writeJSON(w, map[string]any{"styles": wb.VisualStyles, "richTextNotice": wb.RichTextNotice()})
+	writeJSON(w, StylesResponse{Styles: wb.VisualStyles, RichTextNotice: wb.RichTextNotice()})
 }
 
 func workbookDisplayName(wb *workbook.Workbook) string {
@@ -199,7 +190,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "无法读取压缩包："+err.Error())
 			return
 		}
-		writeJSON(w, map[string]any{"archiveOnly": true, "opened": false, "archive": a.archiveSummary()})
+		writeJSON(w, ClosedWorkbookResponse{ArchiveOnly: true, Archive: a.archiveSummary()})
 		return
 	}
 	a.closeArchive()
@@ -213,17 +204,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	wb.SetDisplayName(filepath.Base(h.Filename))
 	a.replaceWorkbook(wb)
 	a.recordRecent(wb)
-	writeJSON(w, map[string]any{
-		"opened":      true,
-		"workbookKey": wb.Fingerprint,
-		"book":        sourceBookID(wb),
-		"fileName":    filepath.Base(h.Filename),
-		"fileSize":    h.Size,
-		"sheetCount":  len(wb.Sheets),
-		"activeTab":   wb.ActiveTab,
-		"sheets":      wb.Sheets,
-		"source":      wb.SourceInfo,
-	})
+	writeJSON(w, openedWorkbook(wb, filepath.Base(h.Filename), h.Size))
 }
 
 func persistUploadedFile(src interface {

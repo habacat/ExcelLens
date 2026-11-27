@@ -11,11 +11,16 @@ import {
   requireDialog,
   requireEl,
 } from '../core/dom.ts';
+import { DatabaseEvidence } from './database-evidence.ts';
 import {
-  DatabaseEvidence,
-  type DatabaseEvidenceVerifyResult,
-} from './database-evidence.ts';
+  decodeDatabaseEvidenceVerifyResult,
+  decodeDatabaseSnapshotPolicy,
+  decodeDatabaseSnapshotRemovalResponse,
+  decodeDatabaseSnapshotsListResponse,
+} from '../core/http-decoders.generated.ts';
+import { decodeOpenedWorkbook } from '../core/workbook-response.ts';
 
+/** @httpResponse DatabaseSnapshotPolicy */
 export interface DatabaseSnapshotPolicy {
   readonly budgetBytes?: number;
   readonly reviewDays?: number;
@@ -28,7 +33,8 @@ export interface DatabaseSnapshotStage {
   readonly error?: string;
 }
 
-interface DatabaseSnapshotsListResponse {
+/** @httpResponse DatabaseSnapshotsListResponse */
+export interface DatabaseSnapshotsListResponse {
   readonly items?: readonly DatabaseSnapshotSummary[];
   readonly policy?: DatabaseSnapshotPolicy;
   readonly policyError?: string;
@@ -36,7 +42,8 @@ interface DatabaseSnapshotsListResponse {
   readonly stageRoot?: string;
 }
 
-interface DatabaseSnapshotRemovalResponse {
+/** @httpResponse DatabaseSnapshotRemovalResponse */
+export interface DatabaseSnapshotRemovalResponse {
   readonly references?: readonly string[];
 }
 
@@ -139,7 +146,7 @@ export class DatabaseSnapshots {
   }
 
   private async refresh(signal: AbortSignal, message = ''): Promise<void> {
-    const result = await this.api<DatabaseSnapshotsListResponse>(ENDPOINT, { signal });
+    const result = await this.api(ENDPOINT, { signal }, decodeDatabaseSnapshotsListResponse);
     if (signal.aborted) return;
     this.items = result.items ?? [];
     this.policy = result.policy ?? {};
@@ -186,11 +193,11 @@ export class DatabaseSnapshots {
       reviewDays: days || 0,
     };
     void this.run('正在保存提醒', async (signal) => {
-      const saved = await this.api<DatabaseSnapshotPolicy>(ENDPOINT, {
+      const saved = await this.api(ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ action: 'policy', policy }),
         signal,
-      });
+      }, decodeDatabaseSnapshotPolicy);
       if (signal.aborted) return;
       this.policy = saved;
       this.render();
@@ -207,8 +214,8 @@ export class DatabaseSnapshots {
     );
   }
 
-  private request<T = unknown>(action: string, key: string, signal: AbortSignal): Promise<T> {
-    return this.api<T>(ENDPOINT, {
+  private request(action: string, key: string, signal: AbortSignal): Promise<unknown> {
+    return this.api(ENDPOINT, {
       method: 'POST',
       body: JSON.stringify({ action, key }),
       signal,
@@ -353,7 +360,7 @@ export class DatabaseSnapshots {
 
   private verify(item: DatabaseSnapshotSummary): void {
     void this.run(`正在核验 ${item.name}`, async (signal) => {
-      const result = await this.request<DatabaseEvidenceVerifyResult>('verify', item.key, signal);
+      const result = await this.request('verify', item.key, signal).then(decodeDatabaseEvidenceVerifyResult);
       if (signal.aborted) return;
       if (!result.verified || result.key !== item.key) {
         throw new Error('快照核验结果与选择不一致');
@@ -374,11 +381,11 @@ export class DatabaseSnapshots {
 
   private inspectRemoval(item: DatabaseSnapshotSummary): void {
     void this.run('正在检查快照引用', async (signal) => {
-      const result = await this.api<DatabaseSnapshotRemovalResponse>(`${ENDPOINT}/removal`, {
+      const result = await this.api(`${ENDPOINT}/removal`, {
         method: 'POST',
         body: JSON.stringify({ key: item.key }),
         signal,
-      });
+      }, decodeDatabaseSnapshotRemovalResponse);
       if (signal.aborted) return;
       this.setRemoval(item);
       requireEl('dbSnapshotRemovalName').textContent = `${item.name} · ${this.fmtBytes(item.bytes)}`;
@@ -410,7 +417,7 @@ export class DatabaseSnapshots {
   private open(item: DatabaseSnapshotSummary): void {
     void this.run(`正在核验并打开 ${item.name}`, async (signal) => {
       const opened = await this.openWorkbook(
-        () => this.request<WorkbookStatusResponse>('open', item.key, signal),
+        () => this.request('open', item.key, signal).then(decodeOpenedWorkbook),
         '',
         0,
         () => !signal.aborted,

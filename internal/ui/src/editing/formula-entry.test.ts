@@ -114,9 +114,9 @@ test('a delayed reference lookup cannot overwrite newer typing; repeated arrows 
           const empty: unknown = {};
           return empty as T;
         },
-        post: async <T = unknown>(): Promise<T> => {
+        post: async (): Promise<unknown> => {
           const empty: unknown = {};
-          return empty as T;
+          return empty;
         },
         pending: null,
         data: { book: 'book', document: { id: 'doc', binding: 'bound', revision: '1' } },

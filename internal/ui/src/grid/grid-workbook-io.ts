@@ -19,6 +19,7 @@ import { requireButton, requireDialog, requireEl } from '../core/dom.ts';
 import type { FileFormats } from '../core/formats.ts';
 import type { TransportService } from '../core/transport.ts';
 import type { WorkbookState } from './state.ts';
+import { decodeOpenResult, decodeWorkbookStatus } from '../core/workbook-response.ts';
 
 export interface ResettablePanel {
   resetBook(): void;
@@ -296,7 +297,7 @@ export class WorkbookIO {
       activity?.stage('正在打开文件', 0, 60);
     }
     try {
-      const data = await api<WorkbookStatusResponse>('/api/status');
+      const data = await api('/api/status', undefined, decodeWorkbookStatus);
       panels.archiveCenter?.use(data.archive);
       if (!data.opened) {
         if (data.archive) panels.archiveCenter?.present(data.archive);
@@ -481,6 +482,7 @@ export class WorkbookIO {
     data: WorkbookStatusResponse,
     options: AcceptWorkbookOptions = {},
   ): Promise<void> {
+    if (!data.opened && !data.archiveOnly) throw new Error(data.error || '服务未确认工作簿已打开');
     const { fallbackName = '', fallbackSize = 0, activity, revisionRef = '' } = options;
     const {
       S,
@@ -584,11 +586,11 @@ export class WorkbookIO {
     const { api } = this.d;
     return this.openWorkbook(
       () =>
-        api<WorkbookStatusResponse>('/api/tasks/open', {
+        api('/api/tasks/open', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        }),
+        }, decodeOpenResult),
       '',
       0,
       current,

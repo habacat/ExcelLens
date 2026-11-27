@@ -96,7 +96,7 @@ function setupEditor(query: EditableAnalysisQuery) {
   });
   ws.state.fields = [{ id: 'C3', name: '金额', column: 3, numeric: true }];
   ws.state.query = query;
-  ws.renderMetricEditor();
+  ws.queryEditor.renderMetricEditor();
   const list = document.getElementById('analysisMetricEditor');
   assert.ok(list);
   return {
@@ -144,7 +144,7 @@ test('legacy single metrics gain saved comparison settings only on explicit user
     assert.equal(q.metrics[0].field, 'C3');
     assert.deepEqual(complete.metrics, []);
 
-    h.ws.renderMetricEditor();
+    h.ws.queryEditor.renderMetricEditor();
     const axis = h.list.querySelector('.analysis-comparison-axis');
     assert.ok(axis instanceof HTMLSelectElement);
     assert.equal(axis.value, 'rows');

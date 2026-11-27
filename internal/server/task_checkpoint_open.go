@@ -115,7 +115,7 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	a.closeArchive()
 	a.recordRecent(wb)
-	writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": workbookDisplayName(wb), "fileSize": info.Size(), "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo})
+	writeJSON(w, openedWorkbook(wb, workbookDisplayName(wb), info.Size()))
 }
 
 func loadTaskOpenManifest(ctx context.Context, store *checkpoint.Store, req taskCheckpointRequest) (checkpoint.Manifest, error) {

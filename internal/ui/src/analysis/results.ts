@@ -11,6 +11,7 @@ import type {
 } from '../contracts/analysis.ts';
 
 export interface WorkspaceAnalysisQuery extends AnalysisQuery {
+  rows: string[];
   title?: string;
   sourceId?: string;
 }
@@ -140,7 +141,7 @@ export class AnalysisResultCache {
   }
 
   key(book: string, query: AnalysisQuery): string {
-    return JSON.stringify([book, query]);
+    return JSON.stringify([book, { ...query, rows: query.rows ?? [] }]);
   }
 
   clear(): void {
@@ -165,9 +166,9 @@ export class AnalysisResultCache {
     return entry.snapshot;
   }
 
-  set(book: string, query: WorkspaceAnalysisQuery, input: AnalysisResultCacheInput): AnalysisResultSnapshot {
+  set(book: string, query: AnalysisQuery, input: AnalysisResultCacheInput): AnalysisResultSnapshot {
     const key = this.key(book, query);
-    const clonedQuery = JSON.parse(JSON.stringify(query)) as WorkspaceAnalysisQuery;
+    const clonedQuery = structuredClone({ ...query, rows: query.rows ?? [] });
     const snapshot: AnalysisResultSnapshot = {
       book,
       query: clonedQuery,

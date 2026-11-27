@@ -1,3 +1,5 @@
+import { decoder, dictionary, object, text, unknownValue } from './json-contract.ts';
+import { decodeAsyncJobProgress } from './http-decoders.generated.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ApiRequestOptions } from '../contracts/common.ts';
@@ -30,6 +32,11 @@ function setup(maxPolls?: number) {
     Record<string, unknown>,
     AsyncJobStatusEnvelope<Record<string, unknown>>
   >({
+    decodeStatus: value => ({
+      ...decodeAsyncJobProgress(value),
+      ...decoder('TestJob', object({}, { id: text, result: dictionary(unknownValue) }))(value),
+    }),
+    resultFromStatus: status => { assert.ok(status.result); return status.result; },
     identity: () => book,
     sleep: async () => undefined,
     onBusy: (value) => busy.push(value),

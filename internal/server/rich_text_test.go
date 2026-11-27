@@ -54,7 +54,7 @@ func TestRichTextSheetCompactCellAndClipboardKeepTheSameSourceEvidence(t *testin
 		t.Fatal(full.Rows)
 	}
 	compact := decodeResponse[struct {
-		Rows    []wireRow
+		Rows    []CompactRow
 		Compact int
 	}](t, analysisRequest(t, a, "GET", url+"&compact=1", ""))
 	if compact.Compact != 1 || !reflect.DeepEqual(compact.Rows, packViewportRows(full.Rows)) {

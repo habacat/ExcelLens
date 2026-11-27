@@ -10,3 +10,12 @@ validation/** -text
 *.bz2 -text
 *.xz -text
 internal/workbook/testdata/xlsb-excel/*.xls? -text
+
+# GitHub language statistics
+internal/ui/web/dist/** linguist-generated=true
+vendor/** linguist-vendored=true
+internal/ui/src/**/*.ts linguist-language=TypeScript
+tools/qa/** -linguist-detectable
+tools/bench/** -linguist-detectable
+internal/ui/src/contracts/http-wire.generated.ts linguist-generated=true
+internal/ui/src/core/http-decoders.generated.ts linguist-generated=true

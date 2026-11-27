@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { decodeSampledRows, decodeSheetPreview } from './viewport-response.ts';
 import { unpackWireRows } from './wire.ts';
 
 test('compact viewport reconstructs exact identifiers, display and metadata', () => {
@@ -53,4 +54,20 @@ test('compact viewport reconstructs exact identifiers, display and metadata', ()
   assert.equal(row.cells[4].richText.notice, '部分样式待核对');
   assert.equal(row.cells[4].style, 0);
   assert.equal(row.style, 2);
+});
+
+test('invalid nested cells and unsupported wire versions are rejected before publishing partial rows', () => {
+  const first = { n: 1, c: [{ c: 1, v: '001' }] };
+  for (const cell of [
+    { c: 1, v: 123 },
+    { c: 1, v: '', k: 1.5 },
+    { c: 1, v: '', h: { kind: 'broken' } },
+    { c: 1, v: '', x: { runs: [{ end: '3', font: {} }] } },
+  ]) {
+    assert.throws(() => unpackWireRows([first, { n: 2, c: [cell] }]));
+  }
+  assert.throws(() => decodeSampledRows({ rows: [first] }, 2), /版本/);
+  assert.deepEqual(decodeSampledRows({ rows: null }), []);
+  assert.deepEqual(decodeSheetPreview({ available: false, partial: true }), { available: false, partial: true });
+  assert.throws(() => decodeSheetPreview({ available: true, partial: true }));
 });

@@ -2,10 +2,7 @@
  * Two-table Relation & Extraction dialog: left/inner/unmatched/invalid joins,
  * bounded field pickers, preview paging, source navigation, and export handoff.
  */
-import type {
-  CompositionNavigationResponse,
-  CompositionSourceInfo,
-} from '../contracts/analysis.ts';
+import type { CompositionSourceInfo } from '../contracts/analysis.ts';
 import type { ApiClient, ApiRequestOptions, ToastFn } from '../contracts/common.ts';
 import type {
   ReconcileBookChoice,
@@ -46,6 +43,12 @@ import {
   validateRelationResult,
   type RelationOutputModeId,
 } from './relations-model.ts';
+import {
+  decodeCompositionNavigationResponse,
+  decodeRelationSourcesResponse,
+  decodeRelationUploadResponse,
+  decodeSourceTaskResultEnvelope,
+} from '../core/http-decoders.generated.ts';
 
 export interface RelationContext extends SourceTaskContext {
   readonly source: string;
@@ -108,12 +111,14 @@ interface BuiltResultView {
   readonly table: BuiltTableView;
 }
 
-interface RelationSourcesResponse {
+/** @httpResponse RelationSourcesResponse */
+export interface RelationSourcesResponse {
   readonly currentBook: string;
   readonly books: readonly ReconcileBookChoice[];
 }
 
-interface RelationUploadResponse {
+/** @httpResponse RelationUploadResponse */
+export interface RelationUploadResponse {
   readonly book: string;
 }
 
@@ -257,12 +262,12 @@ export class Relations {
     return JSON.stringify([c.bookKey, c.book]);
   }
 
-  private post<T = unknown>(
+  private post(
     path: string,
     value: unknown,
     options: ApiRequestOptions = {},
-  ): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(value), ...options });
+  ): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(value), ...options });
   }
 
   private bind(): void {
@@ -425,7 +430,7 @@ export class Relations {
         const other = this.books.find((book) => book.id !== c.book);
         const primary = this.books.find((book) => book.id === c.book);
         const second =
-          other?.sheets[0] ?? primary?.sheets.find((sheet) => `wb:${sheet.name}` !== c.source);
+          other?.sheets?.[0] ?? primary?.sheets?.find((sheet) => `wb:${sheet.name}` !== c.source);
         this.inputs = [
           { book: c.book, source: c.source || '', headerRow: 1, info: null, columns: [] },
           {
@@ -448,9 +453,10 @@ export class Relations {
     const controller = new AbortController();
     this.controller = controller;
     try {
-      const data = await this.api<RelationSourcesResponse>(
+      const data = await this.api(
         `/api/relation/sources${focus ? `?book=${encodeURIComponent(focus)}` : ''}`,
         { signal: controller.signal },
+        decodeRelationSourcesResponse,
       );
       if (!current()) return;
       if (data.currentBook !== this.context().book) {
@@ -467,7 +473,7 @@ export class Relations {
         const book = this.books.find((item) => item.id === input.book);
         const exists = Boolean(
           book &&
-            (book.sheets.some((sheet) => `wb:${sheet.name}` === input.source) ||
+            (book.sheets?.some((sheet) => `wb:${sheet.name}` === input.source) ||
               (book.scratch ?? []).some((sheet) => `scratch:${sheet.id}` === input.source) ||
               (!book.scratchLoaded && input.source.startsWith('scratch:'))),
         );
@@ -616,7 +622,7 @@ export class Relations {
     let result: { readonly id: string } | undefined;
     try {
       this.message(`正在读取${side ? '右' : '左'}表字段…`);
-      result = await this.fieldsTasks.run({ mode: 'fields', choice }, current);
+      result = await this.fieldsTasks.run(decodeSourceTaskResultEnvelope, { mode: 'fields', choice }, current);
       if (!current() || this.inputs[side] !== input) return;
       const info = validateRelationFields(result, choice, identity, this.formats);
       const fields = info.fields ?? [];
@@ -857,7 +863,7 @@ export class Relations {
     let published = false;
     try {
       this.message('正在关联…');
-      response = await this.tasks.run(
+      response = await this.tasks.run(decodeSourceTaskResultEnvelope,
         { ...request, ...(this.accepted ? { keepId: this.accepted.data.id } : {}) },
         current,
       );
@@ -1110,12 +1116,12 @@ export class Relations {
     form.append('reconcileSource', '1');
     form.append('workbookKey', c.bookKey);
     form.append('primaryBook', c.book);
-    const data = await this.api<RelationUploadResponse>('/api/open', { method: 'POST', body: form });
+    const data = await this.api('/api/open', { method: 'POST', body: form }, decodeRelationUploadResponse);
     if (!current()) return;
     await this.refresh(current, data.book);
     if (!current()) return;
     const book = this.books.find((item) => item.id === data.book);
-    const firstSheet = book?.sheets[0];
+    const firstSheet = book?.sheets?.[0];
     if (!firstSheet) throw new Error('新文件没有可用工作表');
     this.inputs[1] = {
       book: data.book,
@@ -1200,13 +1206,13 @@ export class Relations {
     if (popup) popup.opener = null;
     let handled = false;
     try {
-      const target = await this.post<CompositionNavigationResponse>('/api/relation/navigate', {
+      const target = await this.post('/api/relation/navigate', {
         jobId: accepted.data.id,
         book,
         side,
         row,
         col,
-      });
+      }).then(decodeCompositionNavigationResponse);
       if (
         ticket !== this.navSerial ||
         identity !== this.identity() ||

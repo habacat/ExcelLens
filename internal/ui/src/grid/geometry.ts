@@ -336,3 +336,6 @@ export class Geometry {
     return (kind === 'row' ? this.rows : this.cols).set(index, size);
   }
 }
+
+export const BASE_ROW = 25;
+export const BASE_COL = 132;

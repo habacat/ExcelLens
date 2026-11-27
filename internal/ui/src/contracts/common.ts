@@ -18,18 +18,21 @@ export interface HttpError extends Error {
   status?: number;
 }
 
+export type JsonDecoder<T> = (value: unknown) => T;
+
 export interface ApiClient {
-  <T = unknown>(url: string, options?: ApiRequestOptions, responseType?: 'json'): Promise<T>;
+  <T>(url: string, options: ApiRequestOptions | undefined, decode: JsonDecoder<T>): Promise<T>;
+  (url: string, options?: ApiRequestOptions, responseType?: 'json'): Promise<unknown>;
   (url: string, options: ApiRequestOptions | undefined, responseType: 'text'): Promise<string>;
   (url: string, options: ApiRequestOptions | undefined, responseType: 'blob'): Promise<Blob>;
   (url: string, options: ApiRequestOptions | undefined, responseType: 'response'): Promise<Response>;
 }
 
-export type PostClient = <T = unknown>(
+export type PostClient = (
   url: string,
   payload: unknown,
   options?: ApiRequestOptions,
-) => Promise<T>;
+) => Promise<unknown>;
 
 export interface CellRef {
   readonly row: number;
@@ -72,6 +75,7 @@ export interface AxisSizeRange {
 
 export type AsyncJobStatusKind = 'queued' | 'running' | 'done' | 'error' | 'cancelled';
 
+/** @httpResponse AsyncJobProgress */
 export interface AsyncJobProgress {
   readonly id?: string;
   readonly jobId?: string;

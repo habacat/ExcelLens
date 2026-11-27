@@ -859,7 +859,7 @@ test('the actual main and frozen cell factories share text, styles, filters and 
       updateSharedBorders: () => undefined,
       isPrecedent: () => false,
       isSearchMatch: () => false,
-      applyCellStyle: (node, c) => pipeline.applyCellStyle(node, c),
+      applyCellStyle: (node, c) => pipeline.appearance.applyCellStyle(node, c),
       paintCell: (node, c, r) => pipeline.cellPresenter.paint(node, c, r),
       extendTextIntoBlanks: (node, c, map, cols, index) =>
         pipeline.cellPresenter.overflow(node, c, map, cols, index),

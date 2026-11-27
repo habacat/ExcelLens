@@ -280,13 +280,20 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-ExcelLens-Range", strconv.Itoa(len(numbers)*colCount))
 	if format == "json" {
 		payload := clipboardPayload{WorkbookKey: wb.Fingerprint, Book: sourceBookID(wb), Sheet: meta.Name, StartCol: col1, EndCol: col2, Filtered: filterID != "", Rows: make([]clipboardRow, 0, len(numbers))}
+		rowAt := func(number int) clipboardRow {
+			data := byRow[number]
+			cells := data.Cells
+			if cells == nil {
+				cells = []workbook.CellData{}
+			}
+			return clipboardRow{Row: number, Style: data.Style, Cells: cells, PresentationNotice: data.PresentationNotice}
+		}
 		if headerRow > 0 {
-			data := byRow[headerRow]
-			payload.Header = &clipboardRow{Row: headerRow, Style: data.Style, Cells: data.Cells, PresentationNotice: data.PresentationNotice}
+			header := rowAt(headerRow)
+			payload.Header = &header
 		}
 		for _, number := range numbers {
-			data := byRow[number]
-			payload.Rows = append(payload.Rows, clipboardRow{Row: number, Style: data.Style, Cells: data.Cells, PresentationNotice: data.PresentationNotice})
+			payload.Rows = append(payload.Rows, rowAt(number))
 		}
 		if r.URL.Query().Get("portable") == "1" && formats.EditOOXML(wb.Format) && len(numbers) > 0 {
 			clip, err := a.readerClipboard(r.Context(), wb, meta, idx, numbers, col1, colCount, byRow)

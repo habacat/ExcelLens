@@ -16,6 +16,10 @@ import {
 } from '../core/dom.ts';
 import { confirmOverlay, type ConfirmOverlayOptions } from '../core/overlays.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeBookmarkStoreApiResponse,
+  decodeSourceNotesResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface BookmarkNotePayload {
   readonly sheet: string;
@@ -23,12 +27,14 @@ export interface BookmarkNotePayload {
   readonly text: string;
 }
 
-interface SourceNotesResponse {
+/** @httpResponse SourceNotesResponse */
+export interface SourceNotesResponse {
   readonly items?: readonly SourceNote[] | null;
   readonly threaded?: boolean;
 }
 
-interface BookmarkStoreApiResponse extends Omit<BookmarkStore, 'items'> {
+/** @httpResponse BookmarkStoreApiResponse */
+export interface BookmarkStoreApiResponse extends Omit<BookmarkStore, 'items'> {
   readonly items?: readonly Bookmark[] | null;
 }
 
@@ -122,9 +128,10 @@ export class Bookmarks {
     this.drawNotes(0);
     requireEl('sourceNotesStatus').textContent = '正在读取批注…';
     try {
-      const data = await this.api<SourceNotesResponse>(
+      const data = await this.api(
         `/api/notes?${new URLSearchParams({ book, sheet }).toString()}`,
         { signal: controller.signal },
+        decodeSourceNotesResponse,
       );
       if (serial !== this.noteSerial || book !== this.s.book || sheet !== this.s.sheet) return;
       this.notes = data.items ? [...data.items] : [];
@@ -230,9 +237,9 @@ export class Bookmarks {
     this.pending = ctrl;
     const ticket = ++this.request;
     try {
-      const response = await this.api<BookmarkStoreApiResponse>('/api/bookmarks', {
+      const response = await this.api('/api/bookmarks', {
         signal: ctrl.signal,
-      });
+      }, decodeBookmarkStoreApiResponse);
       if (ctrl.signal.aborted || ticket !== this.request) return false;
       return this.accept(response, book);
     } catch (e: unknown) {
@@ -334,11 +341,11 @@ export class Bookmarks {
     this.saving = true;
     requireButton('bookmarkSaveBtn').disabled = true;
     try {
-      const data = await this.api<BookmarkStoreApiResponse>('/api/bookmarks', {
+      const data = await this.api('/api/bookmarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
-      });
+      }, decodeBookmarkStoreApiResponse);
       if (ticket !== this.request || !this.accept(data, book)) return;
       const draftPending =
         request.sheet === this.s.sheet &&
@@ -389,11 +396,11 @@ export class Bookmarks {
     this.saving = true;
     requireButton('bookmarkSaveBtn').disabled = true;
     try {
-      const data = await this.api<BookmarkStoreApiResponse>('/api/bookmarks', {
+      const data = await this.api('/api/bookmarks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', id: bookmark.id }),
-      });
+      }, decodeBookmarkStoreApiResponse);
       if (ticket !== this.request || !this.accept(data, book)) return;
       this.refreshCurrent(note, tag);
     } catch (e: unknown) {

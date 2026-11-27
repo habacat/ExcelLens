@@ -163,6 +163,7 @@ export interface AnalysisTreeLimits {
   readonly active: number;
 }
 
+/** @httpResponse FileFormatsConfig */
 export interface FileFormatsConfig {
   readonly extensions: readonly string[];
   readonly sources: Readonly<Record<string, SourceCapabilities>>;

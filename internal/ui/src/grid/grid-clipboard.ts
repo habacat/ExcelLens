@@ -23,6 +23,7 @@ import type { FrozenPanes } from './freeze.ts';
 import type { MergeCopyAnchor, MergedCells } from './merges.ts';
 import { MultiSelection } from './multi-selection.ts';
 import type { WorkbookState } from './state.ts';
+import { decodeClipboardPayload } from '../core/http-decoders.generated.ts';
 
 export interface ClipboardReadOptions {
   readonly headerRow?: number;
@@ -404,11 +405,15 @@ export class GridClipboard {
         params.set('conditional', conditional ? '1' : '0');
         if (portable) params.set('portable', '1');
         if (headerRow) params.set('headerRow', String(headerRow));
-        const payload = await api<ClipboardPayload>(`/api/range?${params.toString()}`, { signal });
+        const payload = await api(`/api/range?${params.toString()}`, { signal }, decodeClipboardPayload);
         if (!current()) {
           const err = new Error('复制已取消，来源或选区已变化');
           err.name = 'AbortError';
           throw err;
+        }
+        if (payload.book !== book || payload.workbookKey !== workbookKey || payload.sheet !== sheet ||
+            payload.startCol !== col1 || payload.endCol !== col2) {
+          throw new Error('选区来源已变化，请重新选择');
         }
         const activeEdit = getEditCopy?.();
         if (activeEdit?.grid.active) {

@@ -1,10 +1,12 @@
+import type { AsyncJobProgress } from '../contracts/common.ts';
+import { decodePrintingJobStatus } from '../core/http-decoders.generated.ts';
 /**
  * Print preview dialog controller, page setup form, pagination navigation,
  * and printable HTML manuscript exporter.
  */
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { PrintingLimits, RichTextLimits, SourceCapabilities } from '../contracts/formats.ts';
-import { AsyncJobs, type AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
+import { AsyncJobs } from '../core/async-jobs.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import {
   byId,
@@ -39,7 +41,8 @@ export interface PrintingOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-interface PrintingJobStatus extends AsyncJobStatusEnvelope<PrintingJobStatus> {
+/** @httpResponse PrintingJobStatus */
+export interface PrintingJobStatus extends AsyncJobProgress {
   readonly workbookKey?: string;
   readonly book?: string;
   readonly sheet?: string;
@@ -157,6 +160,7 @@ export class Printing {
     });
     this.dialog = this.create();
     this.jobs = new AsyncJobs<PrintingJobStatus, PrintingJobStatus>({
+      decodeStatus: decodePrintingJobStatus,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => this.s.workbookKey,
@@ -638,6 +642,7 @@ export class Printing {
       this.identity() === identity &&
       this.job === base;
     const jobs = new AsyncJobs<PrintingJobStatus, PrintingJobStatus>({
+      decodeStatus: decodePrintingJobStatus,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => binding.workbookKey,

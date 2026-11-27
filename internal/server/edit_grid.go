@@ -281,5 +281,5 @@ func (a *App) handleEditBase(w http.ResponseWriter, r *http.Request, req editReq
 		return
 	}
 	a.closeArchive()
-	writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": base.Name, "fileSize": f.Size(), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo})
+	writeJSON(w, openedWorkbook(wb, base.Name, f.Size()))
 }

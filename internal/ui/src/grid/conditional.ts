@@ -115,19 +115,17 @@ export function estimateConditionalBytes(p: ConditionalPresentation | null | und
   return p ? 512 + 4 * JSON.stringify(p).length : 0;
 }
 
-export type ConditionalStatsPostFn = (
-  action: 'start' | 'cancel',
-  payload: Record<string, unknown>,
-) => Promise<ConditionalStatsStartResponse | null | undefined>;
-
 export interface ConditionalStatsRequestQueue {
-  start(sheet: string): Promise<ConditionalStatsStartResponse | null | undefined>;
+  start(sheet: string): Promise<ConditionalStatsStartResponse>;
   cancel(id?: string | null): Promise<void>;
 }
 
-export function createStatsRequests(post: ConditionalStatsPostFn): ConditionalStatsRequestQueue {
+export function createStatsRequests(
+  start: (sheet: string) => Promise<ConditionalStatsStartResponse>,
+  cancel: (id: string) => Promise<unknown>,
+): ConditionalStatsRequestQueue {
   let tail: Promise<unknown> = Promise.resolve();
-  let started: Promise<ConditionalStatsStartResponse | null | undefined> | null = null;
+  let started: Promise<ConditionalStatsStartResponse> | null = null;
 
   function enqueue<T>(action: () => Promise<T>): Promise<T> {
     const result = tail.then(action);
@@ -138,8 +136,8 @@ export function createStatsRequests(post: ConditionalStatsPostFn): ConditionalSt
   }
 
   return {
-    start(sheet: string): Promise<ConditionalStatsStartResponse | null | undefined> {
-      started = enqueue(() => post('start', { sheet }));
+    start(sheet: string): Promise<ConditionalStatsStartResponse> {
+      started = enqueue(() => start(sheet));
       return started;
     },
     cancel(id?: string | null): Promise<void> {
@@ -147,7 +145,7 @@ export function createStatsRequests(post: ConditionalStatsPostFn): ConditionalSt
       started = null;
       return enqueue(async () => {
         const target = id || (await prior?.catch(() => null))?.jobId;
-        if (target) await post('cancel', { id: target });
+        if (target) await cancel(target);
       });
     },
   };

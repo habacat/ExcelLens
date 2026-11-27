@@ -12,6 +12,7 @@ import {
   type TaskRecoveryBookState,
   type TaskRecoveryRequestPayload,
 } from './task-recovery-model.ts';
+import { decodeRecoveredTaskStart } from '../core/http-decoders.generated.ts';
 
 export type TaskRecoveryRunAction = Exclude<TaskRecoveryAction, ''> | 'remove';
 
@@ -349,11 +350,11 @@ export class TaskRecovery {
         this.status('');
         return;
       }
-      started = await this.api<RecoveredTaskStart>('/api/tasks/resume', {
+      started = await this.api('/api/tasks/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }, decodeRecoveredTaskStart);
       if (!current()) return;
       if (!started.jobId || started.operation !== TaskRecoveryModel.operation(item)) {
         throw new Error('恢复响应无效，请刷新任务列表');

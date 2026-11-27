@@ -1,7 +1,8 @@
+import { decodeSheetViewport } from './viewport-response.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ActivityHandle, ActivityService, HttpError, SessionService } from '../contracts/common.ts';
-import type { SheetViewportResponse, WorkbookStatusResponse } from '../contracts/workbook.ts';
+import type { WorkbookStatusResponse } from '../contracts/workbook.ts';
 import { installDom } from '../test-helpers/dom-mock.ts';
 import { formatBytes } from './display-format.ts';
 import { createTransport } from './transport.ts';
@@ -105,7 +106,7 @@ test('createTransport waits for session readiness, injects CSRF/session headers,
     });
 
     const transport = createTransport({ session, activity, token: 'csrf-secret' });
-    const pending = transport.post<{ readonly ok: boolean }>(
+    const pending = transport.post(
       '/api/ping',
       { a: 1 },
       { activity: true },
@@ -147,7 +148,7 @@ test('createTransport auto-unpacks compact wire rows and supports text, blob, an
       if (url === '/api/sheet') {
         return new Response(
           JSON.stringify({
-            sheet: 'S1',
+            sheet: 'S1', dimension: 'A1:B2', totalRowsOriginal: 1, filterId: '', columns: null, hyperlinkError: '',
             offset: 0,
             limit: 10,
             totalRows: 1,
@@ -168,7 +169,7 @@ test('createTransport auto-unpacks compact wire rows and supports text, blob, an
     });
 
     const transport = createTransport({ token: 'tok' });
-    const unpacked = await transport.api<SheetViewportResponse>('/api/sheet');
+    const unpacked = await transport.api('/api/sheet', undefined, decodeSheetViewport);
     assert.equal(unpacked.rows.length, 1);
     const firstRow = unpacked.rows[0];
     assert.ok(firstRow);
@@ -289,7 +290,7 @@ test('createTransport.upload streams progress stages, attaches auth headers, and
     xhr1.upload.onprogress?.(progressEvent);
     xhr1.upload.onload?.();
     xhr1.status = 200;
-    xhr1.responseText = JSON.stringify({ opened: true, fileName: 'ledger.csv' });
+    xhr1.responseText = JSON.stringify({ opened: true, fileName: 'ledger.csv', book: 'file', workbookKey: 'fingerprint', sheetCount: 1, activeTab: 0, fileSize: file.size, sheets: [{name: '数据'}], source: {format: 'csv', readOnly: true} });
     xhr1.onload?.();
     const opened: WorkbookStatusResponse = await okPromise;
     assert.equal(opened.opened, true);
@@ -300,7 +301,7 @@ test('createTransport.upload streams progress stages, attaches auth headers, and
     const xhr2 = MockXHR.instances.at(-1);
     assert.ok(xhr2);
     xhr2.status = 200;
-    xhr2.responseText = JSON.stringify({ archiveOnly: true });
+    xhr2.responseText = JSON.stringify({ opened: false, archiveOnly: true, archive: { id:'zip', name:'test.zip', format:'zip', count:2, total:2, depth:0, notice:'' } });
     xhr2.onload?.();
     assert.equal((await archivePromise).archiveOnly, true);
 

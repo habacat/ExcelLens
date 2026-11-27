@@ -3,10 +3,17 @@
  * and source-file relocation dialog controller.
  */
 import type { ApiClient } from '../contracts/common.ts';
-import type { StorageUsageResponse } from '../contracts/features.ts';
 import { errorMessage, formatBytes } from '../core/display-format.ts';
 import { byId, requireButton, requireDialog, requireEl, requireInput, requireSelect } from '../core/dom.ts';
 import { confirmOverlay, type ConfirmOverlayOptions } from '../core/overlays.ts';
+import {
+  decodeStorageActionResponse,
+  decodeStorageJobItem,
+  decodeStorageJobsResponse,
+  decodeStorageSourcesResponse,
+  decodeStorageStagesResponse,
+  decodeStorageUsageResponse,
+} from '../core/http-decoders.generated.ts';
 
 interface StorageJobProgress {
   readonly phase?: string;
@@ -16,7 +23,8 @@ interface StorageJobProgress {
   readonly total?: number;
 }
 
-interface StorageJobItem {
+/** @httpResponse StorageJobItem */
+export interface StorageJobItem {
   readonly id: string;
   readonly action: string;
   readonly state: string;
@@ -33,7 +41,8 @@ interface StorageHistoryIssue {
   readonly revision?: string;
 }
 
-interface StorageJobsResponse {
+/** @httpResponse StorageJobsResponse */
+export interface StorageJobsResponse {
   readonly jobs: readonly StorageJobItem[];
   readonly historyIssue: StorageHistoryIssue | null;
 }
@@ -43,11 +52,13 @@ interface StorageStageItem {
   readonly state: 'active' | 'orphan' | 'unknown';
 }
 
-interface StorageStagesResponse {
+/** @httpResponse StorageStagesResponse */
+export interface StorageStagesResponse {
   readonly stages: readonly StorageStageItem[];
 }
 
-interface StorageActionResponse {
+/** @httpResponse StorageActionResponse */
+export interface StorageActionResponse {
   readonly id?: string;
   readonly message?: string;
 }
@@ -65,7 +76,8 @@ interface StorageSourceItem {
   readonly moves?: readonly StorageSourceMove[];
 }
 
-interface StorageSourcesResponse {
+/** @httpResponse StorageSourcesResponse */
+export interface StorageSourcesResponse {
   readonly items?: readonly StorageSourceItem[];
 }
 
@@ -151,7 +163,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
   }
 
   async function refresh(): Promise<void> {
-    const { roots, groups, conditionalStats } = await api<StorageUsageResponse>('/api/storage');
+    const { roots, groups, conditionalStats } = await api('/api/storage', undefined, decodeStorageUsageResponse);
     if (roots) {
       requireEl('storageRoots').textContent = `用户配置　${roots.config}\n本机数据　${roots.local}`;
     }
@@ -204,8 +216,8 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     body.replaceChildren(fragment);
   }
 
-  const post = <T>(url: string, payload: unknown): Promise<T> =>
-    api<T>(url, {
+  const post = (url: string, payload: unknown): Promise<unknown> =>
+    api(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -260,7 +272,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
 
   async function loadSources(): Promise<void> {
     try {
-      const { items } = await api<StorageSourcesResponse>('/api/storage/sources');
+      const { items } = await api('/api/storage/sources', undefined, decodeStorageSourcesResponse);
       sources = items ?? [];
       const select = requireSelect('storageSource');
       const previous = select.value;
@@ -280,7 +292,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
 
   async function observe(ticket: number): Promise<void> {
     try {
-      const data = await api<StorageJobsResponse>('/api/storage/jobs');
+      const data = await api('/api/storage/jobs', undefined, decodeStorageJobsResponse);
       if (ticket !== serial) return;
       const jobs = data.jobs;
       historyIssue = data.historyIssue;
@@ -337,11 +349,11 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       const ticket = ++serial;
       working(true);
       try {
-        const result = await post<StorageActionResponse>('/api/storage', {
+        const result = await post('/api/storage', {
           action,
           revision,
           confirm: true,
-        });
+        }).then(decodeStorageActionResponse);
         await observe(ticket);
         if (ticket === serial) show(result.message ?? '');
       } catch (error: unknown) {
@@ -385,7 +397,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
         return;
       }
       if (action === 'list-stages') {
-        const { stages } = await post<StorageStagesResponse>('/api/storage', { action, directory });
+        const { stages } = await post('/api/storage', { action, directory }).then(decodeStorageStagesResponse);
         const holder = requireEl('storageStageList');
         holder.replaceChildren();
         for (const stage of stages) {
@@ -433,21 +445,21 @@ export function initStorageDialog(options: StorageDialogOptions): void {
           working(false);
           return;
         }
-        const item = await post<StorageActionResponse>('/api/storage', {
+        const item = await post('/api/storage', {
           action,
           budgetBytes: Math.round(mb) * 1024 * 1024,
-        });
+        }).then(decodeStorageActionResponse);
         await refresh();
         show(item.message ?? '');
         working(false);
         return;
       }
       passwordInput.value = '';
-      const item = await post<StorageActionResponse>('/api/storage', {
+      const item = await post('/api/storage', {
         action,
         directory,
         password: action === 'backup' || action === 'restore' ? password : '',
-      });
+      }).then(decodeStorageActionResponse);
       if (Object.hasOwn(COMMAND_LABELS, action) && item.id) {
         job = item.id;
         await observe(ticket);
@@ -485,12 +497,14 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     request: Readonly<Record<string, unknown>>,
     ticket: number,
   ): Promise<StorageJobItem | null> {
-    const started = await post<StorageActionResponse>('/api/storage/sources', request);
+    const started = await post('/api/storage/sources', request).then(decodeStorageActionResponse);
     if (!started.id) throw new Error('来源核验任务启动失败');
     job = started.id;
     while (ticket === serial && isDialogOpen()) {
-      const item = await api<StorageJobItem>(
+      const item = await api(
         `/api/storage/jobs?id=${encodeURIComponent(started.id)}`,
+        undefined,
+        decodeStorageJobItem,
       );
       if (ticket !== serial || !isDialogOpen()) return null;
       show(describe(item), Boolean(item.error));

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ApiClient, ApiRequestOptions } from '../contracts/common.ts';
+import { decodeSourceTaskResultEnvelope } from './http-decoders.generated.ts';
+import type { ApiRequestOptions } from '../contracts/common.ts';
 import { SourceTasks, type SourceTaskContext } from './source-tasks.ts';
 
 function deferred<T>() {
@@ -23,7 +24,8 @@ function setup() {
     opened: true,
   };
   const calls: RecordedCall[] = [];
-  let handler: ApiClient = async <T = unknown>(
+  type Handler = <T = unknown>(path: string, options?: ApiRequestOptions) => Promise<T>;
+  let handler: Handler = async <T = unknown>(
     path: string,
     options?: ApiRequestOptions,
   ): Promise<T> => {
@@ -64,7 +66,7 @@ function setup() {
     context,
     calls,
     getApi: () => handler,
-    setApi: (next: ApiClient) => {
+    setApi: (next: Handler) => {
       handler = next;
     },
   };
@@ -77,7 +79,7 @@ test('cancelled delayed starts observe and release their exact token', async () 
   h.setApi(<T = unknown>(path: string, opts?: ApiRequestOptions) =>
     path.endsWith('/start') ? (gate.promise as Promise<T>) : base<T>(path, opts),
   );
-  const pending = h.task.run({ mode: 'append' });
+  const pending = h.task.run(decodeSourceTaskResultEnvelope, { mode: 'append' });
   h.task.reset();
   gate.resolve({ jobId: 'late' });
   await assert.rejects(pending, { name: 'AbortError' });
@@ -90,7 +92,7 @@ test('cancelled delayed starts observe and release their exact token', async () 
 
 test('accepted tasks transfer ownership; stale identity and result mismatch clear it', async () => {
   const h = setup();
-  const result = await h.task.run({ mode: 'append' });
+  const result = await h.task.run(decodeSourceTaskResultEnvelope, { mode: 'append' });
   assert.equal(result.id, 'job');
   assert.equal(
     h.calls.some((c) => c.path.endsWith('/clear')),
@@ -104,7 +106,7 @@ test('accepted tasks transfer ownership; stale identity and result mismatch clea
     }
     return value;
   });
-  await assert.rejects(h.task.run({ mode: 'append' }), { name: 'AbortError' });
+  await assert.rejects(h.task.run(decodeSourceTaskResultEnvelope, { mode: 'append' }), { name: 'AbortError' });
   assert.equal(h.calls.at(-1)?.request?.id, 'job');
 });
 
@@ -118,6 +120,6 @@ test('server errors release failed jobs and leave other successful jobs alone', 
     }
     return base<T>(path, opts);
   });
-  await assert.rejects(h.task.run({ mode: 'append' }), /改变/);
+  await assert.rejects(h.task.run(decodeSourceTaskResultEnvelope, { mode: 'append' }), /改变/);
   assert.equal(h.calls.at(-1)?.request?.id, 'job');
 });

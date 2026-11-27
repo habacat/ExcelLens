@@ -27,6 +27,7 @@ export interface ArchiveStep {
   readonly name: string;
 }
 
+/** @httpResponse TextTableHeader */
 export interface TextTableHeader {
   readonly row: number;
   readonly columns: readonly string[];
@@ -54,6 +55,10 @@ export interface SourceInfo {
 }
 
 export interface ArchiveSummary {
+  readonly id?: string;
+  readonly format?: string;
+  readonly count?: number;
+  readonly depth?: number;
   readonly name?: string;
   readonly path?: string;
   readonly entries?: number;
@@ -291,10 +296,7 @@ export interface WorkbookStatusResponse {
   readonly archiveOnly?: boolean;
 }
 
-export interface StylesResponse {
-  readonly styles?: readonly VisualStyle[] | null;
-  readonly richTextNotice?: string;
-}
+export type { StylesWire as StylesResponse } from './http-wire.generated.ts';
 
 export interface SheetViewportResponse {
   readonly hyperlinkError?: string;
@@ -332,6 +334,7 @@ export interface PreviewResponse {
   readonly compact?: number;
 }
 
+/** @httpResponse CellResponse */
 export interface CellResponse {
   readonly sheet: string;
   readonly ref: string;
@@ -346,6 +349,7 @@ export interface ClipboardRow {
   readonly presentationNotice?: string;
 }
 
+/** @httpResponse ClipboardPayload */
 export interface ClipboardPayload {
   readonly portable?: unknown;
   readonly portableNotice?: string;
@@ -359,6 +363,7 @@ export interface ClipboardPayload {
   readonly header?: ClipboardRow;
 }
 
+/** @httpResponse SheetLayoutResponse */
 export interface SheetLayoutResponse {
   readonly rows?: Readonly<Record<string, number>>;
   readonly cols?: Readonly<Record<string, number>>;
@@ -382,6 +387,7 @@ export interface SheetLayoutResponse {
   readonly sourceStateNotice?: string;
 }
 
+/** @httpResponse FreezeViewResponse */
 export interface FreezeViewResponse {
   readonly sheet: string;
   readonly rows: number;
@@ -389,6 +395,7 @@ export interface FreezeViewResponse {
   readonly source: 'saved' | 'original';
 }
 
+/** @httpResponse IndexStartResponse */
 export interface IndexStartResponse {
   readonly ready: boolean;
   readonly jobId: string;
@@ -400,6 +407,7 @@ export interface IndexStartResponse {
   readonly maxCol?: number;
 }
 
+/** @httpResponse IndexStatusResponse */
 export interface IndexStatusResponse {
   readonly id: string;
   readonly sheet: string;
@@ -417,6 +425,7 @@ export interface IndexStatusResponse {
   readonly maxCol?: number;
 }
 
+/** @httpResponse ConditionalStatsStartResponse */
 export interface ConditionalStatsStartResponse {
   readonly sheet: string;
   readonly needed: boolean;
@@ -427,6 +436,12 @@ export interface ConditionalStatsStartResponse {
   readonly error?: string;
 }
 
+/** @httpResponse ConditionalStatsCancelResponse */
+export interface ConditionalStatsCancelResponse {
+  readonly cancelled: boolean;
+}
+
+/** @httpResponse ConditionalStatsStatusResponse */
 export interface ConditionalStatsStatusResponse {
   readonly id: string;
   readonly sheet: string;
@@ -444,12 +459,14 @@ export interface DistinctValue {
   readonly count: number;
 }
 
+/** @httpResponse FilterDistinctResponse */
 export interface FilterDistinctResponse {
   readonly values?: readonly DistinctValue[] | null;
   readonly truncated: boolean;
   readonly cached: boolean;
 }
 
+/** @httpResponse FilterStartResponse */
 export interface FilterStartResponse {
   readonly jobId: string;
   readonly taskId?: string;
@@ -458,6 +475,7 @@ export interface FilterStartResponse {
   readonly filter?: SourceFilterSpec;
 }
 
+/** @httpResponse FilterStatusResponse */
 export interface FilterStatusResponse {
   readonly id: string;
   readonly sheet: string;
@@ -474,6 +492,7 @@ export interface FilterStatusResponse {
   readonly filter?: SourceFilterSpec;
 }
 
+/** @httpResponse FilterLocateResponse */
 export interface FilterLocateResponse {
   readonly found: boolean;
   readonly visualIndex: number;
@@ -483,6 +502,7 @@ export interface FilterLocateResponse {
   readonly pinned?: boolean;
 }
 
+/** @httpResponse NavigateResponse */
 export interface NavigateResponse {
   readonly sheet: string;
   readonly ref: string;
@@ -499,6 +519,7 @@ export interface RowViewChange {
   readonly depth?: number;
 }
 
+/** @httpResponse RowViewState */
 export interface RowViewState {
   readonly id: string;
   readonly sheet: string;
@@ -517,6 +538,7 @@ export interface RowViewState {
   readonly groupCount: number;
 }
 
+/** @httpResponse RowViewStatusResponse */
 export interface RowViewStatusResponse {
   readonly id: string;
   readonly status: string;
@@ -526,6 +548,7 @@ export interface RowViewStatusResponse {
   readonly viewId: string;
 }
 
+/** @httpResponse RowViewGroupsResponse */
 export interface RowViewGroupsResponse {
   readonly id: string;
   readonly groups?: readonly AxisOutlineGroup[] | null;

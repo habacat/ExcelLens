@@ -140,20 +140,15 @@ test('late conditional start is cancelled by its own ID before the next start', 
     status: 'running',
     jobId,
   });
-  const queue = createStatsRequests((action, body) => {
-    const label =
-      typeof body.sheet === 'string'
-        ? body.sheet
-        : typeof body.id === 'string'
-          ? body.id
-          : '';
-    calls.push([action, label]);
+  const queue = createStatsRequests(sheet => {
+    calls.push(['start', sheet]);
     if (calls.length === 1) {
-      return new Promise<ConditionalStatsStartResponse>((resolve) => {
-        finishFirst = resolve;
-      });
+      return new Promise<ConditionalStatsStartResponse>(resolve => { finishFirst = resolve; });
     }
-    return Promise.resolve(makeResp(label, 'second'));
+    return Promise.resolve(makeResp(sheet, 'second'));
+  }, async id => {
+    calls.push(['cancel', id]);
+    return { cancelled: true };
   });
   const first = queue.start('old sheet');
   const cancel = queue.cancel(null);

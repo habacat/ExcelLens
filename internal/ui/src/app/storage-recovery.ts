@@ -3,7 +3,10 @@
  * Polls `/api/storage/recovery`, allows retrying a pending recovery transaction,
  * and shows current storage group usage without pulling in the main workbook bundle.
  */
-import type { StorageRecoveryResponse, StorageUsageResponse } from '../contracts/features.ts';
+import {
+  decodeStorageRecoveryResponse,
+  decodeStorageUsageResponse,
+} from '../core/http-decoders.generated.ts';
 import { errorMessage, formatBytes } from '../core/display-format.ts';
 import { readAppToken, requireButton, requireEl } from '../core/dom.ts';
 
@@ -32,7 +35,7 @@ function initStorageRecovery(): void {
       if (!response.ok) {
         throw new Error(readError(raw) || '无法读取恢复事务');
       }
-      const result = raw as StorageRecoveryResponse;
+      const result = decodeStorageRecoveryResponse(raw);
       if (!result.pending) {
         window.location.replace('/');
         return;
@@ -71,7 +74,7 @@ function initStorageRecovery(): void {
         const response = await fetch('/api/storage', { headers, cache: 'no-store' });
         const raw: unknown = await response.json();
         if (!response.ok) throw new Error(readError(raw) || `请求失败 (${response.status})`);
-        const data = raw as StorageUsageResponse;
+        const data = decodeStorageUsageResponse(raw);
         holder.replaceChildren(
           ...(data.groups ?? []).map((group) => {
             const row = document.createElement('p');

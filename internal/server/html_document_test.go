@@ -21,7 +21,7 @@ func TestHTMLDocumentArchiveHTTPLayoutFilterAndRecent(t *testing.T) {
 	defer app.Close()
 	html := []byte(`<html><table name="section-one"><tr><td colspan="2"><b>报表标题</b></td></tr></table><p><br></p><table id="not-a-tab"><tr><td>编号</td><td>金额</td></tr><tr><td>=&quot;000000000000000001&quot;</td><td>1.2500001</td></tr><tr><td>00002</td><td>2.50</td></tr></table></html>`)
 	uploadArchiveFixture(t, app, "reports.zip", zipArchiveFixture(t, map[string][]byte{"账簿.xls": html}))
-	id := app.archiveSummary()["id"].(string)
+	id := app.archiveSummary().ID
 	awaitArchiveFixture(t, app, id, 0)
 	wb := app.currentWorkbook()
 	if len(wb.Sheets) != 1 || wb.Sheets[0].Name != "账簿" {

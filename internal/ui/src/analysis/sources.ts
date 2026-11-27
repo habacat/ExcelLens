@@ -3,7 +3,6 @@
  * still observed so its own ID can be released, never the newer owner's ID.
  */
 import type {
-  AnalysisSourceBindingResponse,
   CompositionDefinition,
   CompositionTaskResult,
   SourceScope,
@@ -11,6 +10,10 @@ import type {
 import type { ApiClient } from '../contracts/common.ts';
 import type { SourceTaskContext, SourceTasks } from '../core/source-tasks.ts';
 import type { WorkspaceAnalysisQuery } from './results.ts';
+import {
+  decodeAnalysisSourceBindingResponse,
+  decodeCompositionTaskResult,
+} from '../core/http-decoders.generated.ts';
 
 export type AnalysisSourceMode = 'full' | 'filtered' | 'visible' | 'selection';
 
@@ -112,8 +115,8 @@ export class AnalysisSources {
     return JSON.stringify([c.bookKey, c.book, c.opened]);
   }
 
-  private post<T>(path: string, data: unknown): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(data) });
+  private post(path: string, data: unknown): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(data) });
   }
 
   clear(record: AnalysisSourceRecord | null | undefined): void {
@@ -189,7 +192,7 @@ export class AnalysisSources {
       }
       const data =
         prepared ??
-        (await this.tasks.run<CompositionTaskResult>(
+        (await this.tasks.run(decodeCompositionTaskResult,
           {
             mode: 'append',
             definition: cloneValue(composition),
@@ -209,10 +212,10 @@ export class AnalysisSources {
       if (g.workbookKey !== c.bookKey || g.book !== c.book || g.source !== source) {
         throw new Error('请返回工作簿，在此来源工作表选择范围');
       }
-      const data = await this.post<AnalysisSourceBindingResponse>('/api/analysis/source/capture', {
+      const data = await this.post('/api/analysis/source/capture', {
         ...g,
         mode,
-      });
+      }).then(decodeAnalysisSourceBindingResponse);
       id = data.id;
       respSource = data.source;
       respBookKey = data.workbookKey;
@@ -220,12 +223,12 @@ export class AnalysisSources {
       respRows = data.rows;
       respScope = data.sourceScope;
     } else if (!mode && sourceScope) {
-      const data = await this.post<AnalysisSourceBindingResponse>('/api/analysis/source/restore', {
+      const data = await this.post('/api/analysis/source/restore', {
         workbookKey: c.bookKey,
         book: c.book,
         source,
         sourceScope: cloneValue(sourceScope),
-      });
+      }).then(decodeAnalysisSourceBindingResponse);
       id = data.id;
       respSource = data.source;
       respBookKey = data.workbookKey;

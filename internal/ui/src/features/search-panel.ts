@@ -3,7 +3,6 @@
  * server-paged full search, and grid hit navigation.
  */
 import type { ActivityHandle, ApiClient, ToastFn } from '../contracts/common.ts';
-import type { AnalysisFieldsResponse } from '../contracts/analysis.ts';
 import type {
   SearchHit,
   SearchHistoryItem,
@@ -22,6 +21,12 @@ import {
   requireTextArea,
 } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeAnalysisFieldsResponse,
+  decodeSearchHistoryApiResponse,
+  decodeSearchPageApiResponse,
+  decodeSearchStatusApiResponse,
+} from '../core/http-decoders.generated.ts';
 
 const CHUNK_SIZE = 200;
 
@@ -36,15 +41,18 @@ const SNIPPETS: readonly (readonly [string, string])[] = [
   ['公式', 'formula:SUMIF'],
 ];
 
-interface SearchHistoryApiResponse {
+/** @httpResponse SearchHistoryApiResponse */
+export interface SearchHistoryApiResponse {
   readonly items?: readonly SearchHistoryItem[] | null;
 }
 
-interface SearchStatusApiResponse extends Omit<SearchStatusResponse, 'matches'> {
+/** @httpResponse SearchStatusApiResponse */
+export interface SearchStatusApiResponse extends Omit<SearchStatusResponse, 'matches'> {
   readonly matches?: readonly SearchHit[] | null;
 }
 
-interface SearchPageApiResponse extends Omit<SearchPageResponse, 'matches'> {
+/** @httpResponse SearchPageApiResponse */
+export interface SearchPageApiResponse extends Omit<SearchPageResponse, 'matches'> {
   readonly matches?: readonly SearchHit[] | null;
 }
 
@@ -170,7 +178,7 @@ export class SearchPanel {
 
   async refreshHistory(): Promise<void> {
     if (!this.s.opened) return;
-    const data = await this.api<SearchHistoryApiResponse>('/api/search/history');
+    const data = await this.api('/api/search/history', undefined, decodeSearchHistoryApiResponse);
     this.s.serverSearchHistory = data.items ? [...data.items] : [];
     const list = requireEl('searchHistoryList');
     list.replaceChildren();
@@ -405,8 +413,10 @@ export class SearchPanel {
     host.dataset.sheet = sheet;
     host.replaceChildren();
     try {
-      const data = await this.api<AnalysisFieldsResponse>(
+      const data = await this.api(
         `/api/analysis/fields?${new URLSearchParams({ source: `wb:${sheet}`, headerRow: '1' }).toString()}`,
+        undefined,
+        decodeAnalysisFieldsResponse,
       );
       if (host.dataset.sheet !== sheet) return;
       const fragment = document.createDocumentFragment();
@@ -475,8 +485,10 @@ export class SearchPanel {
         if (!alreadyCached) await this.delay(350);
         let data: SearchStatusApiResponse;
         try {
-          data = await this.api<SearchStatusApiResponse>(
+          data = await this.api(
             `/api/search/status?id=${encodeURIComponent(jobID)}`,
+            undefined,
+            decodeSearchStatusApiResponse,
           );
         } catch (error: unknown) {
           if (requestID !== this.s.searchRequestID) return;
@@ -659,9 +671,9 @@ export class SearchPanel {
     this.pageAbort = controller;
     const params = new URLSearchParams({ id: state.id, after: String(after), text, sheet });
     try {
-      const page = await this.api<SearchPageApiResponse>(`/api/search/page?${params.toString()}`, {
+      const page = await this.api(`/api/search/page?${params.toString()}`, {
         signal: controller.signal,
-      });
+      }, decodeSearchPageApiResponse);
       if (serial !== this.pageSerial || state !== this.pages) return;
       if (activeMove === 'next') previous.push(state.after);
       else if (activeMove === 'prev') previous.pop();

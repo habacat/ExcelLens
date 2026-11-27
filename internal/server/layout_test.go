@@ -69,6 +69,14 @@ func TestSheetLayoutPersistsAndIsolated(t *testing.T) {
 	if _, err := os.Stat(layoutFile(app.currentWorkbook())); err != nil {
 		t.Fatal(err)
 	}
+	stale := localTestConnection(httptest.NewRequest("POST", "/api/layout", strings.NewReader(`{"sheet":"First","kind":"col","index":3,"size":300}`)))
+	stale.Header.Set("X-ExcelLens-Token", app.token)
+	stale.Header.Set("X-ExcelLens-Workbook", "previous-workbook")
+	conflict := httptest.NewRecorder()
+	app.Handler().ServeHTTP(conflict, stale)
+	if conflict.Code != http.StatusConflict {
+		t.Fatalf("stale workbook resize returned %d", conflict.Code)
+	}
 	// Rebuilding disposable indexes must not delete view preferences.
 	if err := os.RemoveAll(filepath.Dir(app.currentWorkbook().CacheDir)); err != nil {
 		t.Fatal(err)

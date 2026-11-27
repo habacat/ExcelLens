@@ -2,10 +2,11 @@
  * Non-modal Excel-style column AutoFilter checklist dropdown UI.
  */
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
-import type { AutoFilterState, DistinctValue, FilterDistinctResponse } from '../contracts/workbook.ts';
+import type { AutoFilterState, DistinctValue } from '../contracts/workbook.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import { queryInput, requireButton, requireEl, requireInput } from '../core/dom.ts';
 import type { WorkbookState } from './state.ts';
+import { decodeFilterDistinctResponse } from '../core/http-decoders.generated.ts';
 
 export interface AutoFilterApplyOptions {
   readonly preserveRules?: boolean;
@@ -201,9 +202,10 @@ export class AutoFilterDropdown {
         column: String(col),
         headerRow: String(c.row),
       });
-      const response = await this.api<FilterDistinctResponse>(
+      const response = await this.api(
         `/api/filter/distinct?${query.toString()}`,
         { signal: abort.signal },
+        decodeFilterDistinctResponse,
       );
       if (
         ticket !== this.request ||

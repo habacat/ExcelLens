@@ -1,3 +1,4 @@
+import { decodeNamedViewFilterJobStatus } from '../core/http-decoders.generated.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ApiRequestOptions } from '../contracts/common.ts';
@@ -122,6 +123,7 @@ test('saved-view jobs use a sheet identity without placing Unicode sheet names i
     NamedViewFilterJobStatus,
     AsyncJobStatusEnvelope<NamedViewFilterJobStatus> & NamedViewFilterJobStatus
   >({
+      decodeStatus: decodeNamedViewFilterJobStatus,
     api: async <T = unknown>(url: string, opts?: ApiRequestOptions): Promise<T> => {
       calls.push({ url, opts });
       return (
@@ -239,7 +241,7 @@ test('a successful save invalidates an older catalog response even if abort is i
   const gate = deferred();
   const h = setupNamedViews(async (_url, options) => {
     if (options?.method === 'POST') {
-      return { book: 'book', store: { version: 1, revision: 2, items: [sampleView] }, id: sampleView.id };
+      return { book: 'book', store: { version: 1, revision: 2, fingerprint: 'one', items: [sampleView] }, id: sampleView.id };
     }
     return gate.promise;
   });
@@ -248,7 +250,7 @@ test('a successful save invalidates an older catalog response even if abort is i
     (document.getElementById('namedViewName') as HTMLInputElement).value = '新视图';
     const old = h.instance.refresh();
     await h.instance.save(false);
-    gate.resolve({ book: 'book', store: { version: 1, revision: 1, items: [] } });
+    gate.resolve({ book: 'book', store: { version: 1, revision: 1, fingerprint: 'one', items: [] } });
     await old;
     assert.ok(h.instance.store);
     assert.equal(h.instance.store.revision, 2);

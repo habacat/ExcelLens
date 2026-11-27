@@ -3,12 +3,8 @@
  * advanced filter & multi-sort orchestration, text table headers, row-view
  * adoption, named view capture/apply, task recovery adoption, and search execution.
  */
-import type {
-  ActivityHandle,
-  ApiClient,
-  SelectionArea,
-  ToastTone,
-} from '../contracts/common.ts';
+import { SheetConditionalStats, type ConditionalStatsDeps } from './sheet-conditional-stats.ts';
+import type { ActivityHandle, SelectionArea } from '../contracts/common.ts';
 import type {
   AxisViewSettings,
   SourceFilterRule,
@@ -24,11 +20,7 @@ import type {
   AutoFilterRule,
   AutoFilterState,
   CellData,
-  ConditionalStatsStartResponse,
-  ConditionalStatsStatusResponse,
-  FilterStartResponse,
   FilterStatusResponse,
-  FreezeViewResponse,
   IndexStartResponse,
   IndexStatusResponse,
   RowViewState,
@@ -38,21 +30,9 @@ import type {
 } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
 import { errorMessage, icon } from '../core/display-format.ts';
-import {
-  byId,
-  requireButton,
-  requireEl,
-  requireInput,
-  requireSelect,
-} from '../core/dom.ts';
-import type { FileFormatsRegistry } from '../core/formats.ts';
+import { requireButton, requireEl, requireInput, requireSelect } from '../core/dom.ts';
 import type { AutoFilterDropdown } from './autofilter.ts';
-import {
-  createStatsRequests,
-  estimateConditionalBytes,
-  type ConditionalStatsRequestQueue,
-} from './conditional.ts';
-import type { FrozenPanes } from './freeze.ts';
+import { estimateConditionalBytes } from './conditional.ts';
 import type { Geometry } from './geometry.ts';
 import { paintBackdrop } from './grid-backdrop.ts';
 import type { WorkbookIO } from './grid-workbook-io.ts';
@@ -60,7 +40,7 @@ import type { Pictures } from './images.ts';
 import type { MergedCells } from './merges.ts';
 import type { ReadingMode } from './reading-mode.ts';
 import { estimateRichTextBytes } from './richtext.ts';
-import type { ViewportRequest, WorkbookState } from './state.ts';
+import type { ViewportRequest } from './state.ts';
 import {
   decorateTableHeader,
   isTableHeader,
@@ -68,6 +48,22 @@ import {
   useStickyTableLabels,
 } from './table-headers.ts';
 import { estimateViewportBytes, type TileCache } from './viewport-cache.ts';
+import {
+  decodeCachedJobStart,
+  decodeFilterStartResponse,
+  decodeFilterStatusResponse,
+  decodeFreezeViewResponse,
+  decodeIndexStartResponse,
+  decodeIndexStatusResponse,
+  decodeSheetLayoutResponse,
+  decodeTextTableHeader,
+} from '../core/http-decoders.generated.ts';
+
+/** @httpResponse CachedJobStart */
+export interface CachedJobStart {
+  readonly jobId: string;
+  readonly cached?: boolean;
+}
 
 export interface NamedViewPrepared {
   readonly view: NamedView;
@@ -163,6 +159,7 @@ export interface SheetControllerPanels {
   readonly pictures?: Pictures | null;
 }
 
+/** @httpResponse RecoveredTaskStart */
 export interface RecoveredTaskStart {
   readonly operation: string;
   readonly jobId: string;
@@ -171,14 +168,10 @@ export interface RecoveredTaskStart {
   readonly fileName?: string;
 }
 
-export interface SheetControllerDeps {
-  readonly S: WorkbookState;
-  readonly api: ApiClient;
-  readonly fileFormats: FileFormatsRegistry;
+export interface SheetControllerDeps extends ConditionalStatsDeps {
   readonly geometry: Geometry;
   readonly mergedCells: MergedCells;
   readonly tiles: TileCache;
-  readonly toast: (message: string, tone?: ToastTone) => void;
   readonly setStatus: (text: string) => void;
   readonly colName: (col: number) => string;
   readonly parseColumn: (text: string) => number;
@@ -208,14 +201,6 @@ export interface SheetControllerDeps {
   readonly setVirtualScrollTop: (logical: number) => void;
   readonly updateGeometryBase: () => void;
   readonly updateCanvasSize: () => void;
-  readonly resetGridDOM: () => void;
-  readonly renderGridFromCurrentWindow: () => void;
-  readonly invalidateViewport: (options?: { readonly preserveDOM?: boolean }) => void;
-  readonly loadViewport: (
-    force?: boolean,
-    expectedEpoch?: number,
-    strict?: boolean,
-  ) => Promise<void>;
   readonly viewportKey: (request: ViewportRequest) => string;
   readonly paintInitialPreview: (name: string, epoch: number) => Promise<void>;
   readonly paintRangeFrames: (areas?: readonly SelectionArea[]) => void;
@@ -223,15 +208,7 @@ export interface SheetControllerDeps {
   readonly openDialog: (id: string) => void;
   readonly closeDialog: (id: string) => void;
   readonly showWorkspace: () => void;
-  readonly getCell: (sheet: string, ref: string) => Promise<CellData>;
   readonly cellAt: (row: number, col: number) => CellData;
-  readonly selectCell: (
-    cell: CellData | null | undefined,
-    rowNumber: number,
-    colNumber: number,
-    ref: string,
-    visualIndex: number,
-  ) => void;
   readonly selectInitialCell: () => void;
   readonly navigateToCell: (
     sheet: string,
@@ -239,7 +216,6 @@ export interface SheetControllerDeps {
     preserveTrace?: boolean,
     guard?: (() => boolean) | null,
   ) => Promise<boolean>;
-  readonly getFrozenPanes: () => FrozenPanes;
   readonly getWorkbookIO: () => WorkbookIO;
   readonly delay?: (ms: number) => Promise<void>;
   readonly panels: SheetControllerPanels;
@@ -261,266 +237,12 @@ export function searchKey(mode: string, scope: string, query: string, sheet: str
 }
 
 export class SheetController {
+  readonly conditional: SheetConditionalStats;
   private readonly d: SheetControllerDeps;
-  private statsRequests: ConditionalStatsRequestQueue | null = null;
 
   constructor(deps: SheetControllerDeps) {
     this.d = deps;
-  }
-
-  private getConditionalStatsRequests(): ConditionalStatsRequestQueue {
-    this.statsRequests ??= createStatsRequests((action, body) =>
-      this.d.api<ConditionalStatsStartResponse>(`/api/conditional-stats/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        activity: false,
-      }),
-    );
-    return this.statsRequests;
-  }
-
-  updateSourceAppearance(): void {
-    const { S, fileFormats } = this.d;
-    const workspace = requireEl('workspace');
-    workspace.classList.toggle(
-      'source-sheet-view',
-      S.showStyles && fileFormats.source(S.source?.format).styled,
-    );
-    workspace.classList.toggle('source-no-gridlines', S.showStyles && !S.sourceGridLines);
-    workspace.classList.toggle('source-html-view', S.showStyles && S.source?.format === 'xls-html');
-  }
-
-  toggleOriginalFormat(): void {
-    const { S, resetGridDOM, renderGridFromCurrentWindow, getFrozenPanes } = this.d;
-    S.showStyles = !S.showStyles;
-    this.updateSourceAppearance();
-    const formatBtn = requireButton('formatBtn');
-    formatBtn.classList.toggle('format-active', S.showStyles);
-    formatBtn.setAttribute('aria-pressed', String(S.showStyles));
-    if (!S.showStyles) {
-      if (S.conditionalStatsJob) this.cancelConditionalStats(true, false);
-      else this.updateConditionalStatsUI('');
-    }
-    resetGridDOM();
-    renderGridFromCurrentWindow();
-    getFrozenPanes().schedule(true);
-    if (S.showStyles && S.indexReady && S.sheet) {
-      const skipped = S.tilesSkippedConditional;
-      if (skipped) this.refreshViewportForConditionalStats(S.sheetEpoch);
-      if (S.conditionalStatsState !== 'done' && S.conditionalStatsState !== 'not_needed') {
-        void this.startConditionalStats(S.sheet, S.sheetEpoch, {
-          refreshOnReady: !skipped && Boolean(S.viewportData?.data.conditionalStatsPending),
-        });
-      }
-    }
-  }
-
-  updateConditionalStatsUI(
-    state: string,
-    text = '',
-    options: { readonly canCancel?: boolean; readonly canRetry?: boolean } = {},
-  ): void {
-    const { canCancel = false, canRetry = false } = options;
-    const { S } = this.d;
-    const box = byId('conditionalStatsStatus');
-    S.conditionalStatsState = state || '';
-    if (!box) return;
-    const visible = Boolean(
-      S.opened && S.showStyles && state && state !== 'done' && state !== 'not_needed',
-    );
-    box.hidden = !visible;
-    box.dataset.state = state || '';
-    if (!visible) return;
-    requireEl('conditionalStatsText').textContent = text;
-    requireEl('conditionalStatsCancel').hidden = !canCancel;
-    requireEl('conditionalStatsRetry').hidden = !canRetry;
-  }
-
-  refreshViewportForConditionalStats(epoch: number): void {
-    const {
-      S,
-      invalidateViewport,
-      loadViewport,
-      toast,
-      getFrozenPanes,
-      getCell,
-      selectCell,
-    } = this.d;
-    if (epoch !== S.sheetEpoch || !S.indexReady || !S.sheet || !S.showStyles) return;
-    S.tilesSkippedConditional = false;
-    const cached = S.sheetViews.get(S.sheet);
-    if (cached) {
-      S.sheetViewsBytes -= cached.bytes;
-      S.sheetViews.delete(S.sheet);
-    }
-    invalidateViewport({ preserveDOM: true });
-    const frozenPanes = getFrozenPanes();
-    frozenPanes.reset({ preserveDOM: true });
-    loadViewport(true, epoch).catch((error: unknown) => {
-      if (epoch === S.sheetEpoch && !(error instanceof Error && error.name === 'AbortError')) {
-        toast(errorMessage(error), 'error');
-      }
-    });
-    frozenPanes.schedule(true);
-    if (S.selected?.ref) {
-      const ref = S.selected.ref;
-      const row = S.selected.row;
-      const col = S.selected.col;
-      const visual = S.selectedVisualIndex;
-      getCell(S.sheet, ref)
-        .then((cell) => {
-          if (epoch === S.sheetEpoch && S.selected?.ref === ref) {
-            selectCell(cell, row, col, ref, visual);
-          }
-        })
-        .catch(() => {
-          // Ignore stale cell refresh errors.
-        });
-    }
-  }
-
-  cancelConditionalStats(sendCancel = true, showCancelled = false): void {
-    const { S } = this.d;
-    const epoch = S.sheetEpoch;
-    ++S.conditionalStatsSeq;
-    if (S.conditionalStatsTimer) {
-      clearTimeout(S.conditionalStatsTimer);
-      S.conditionalStatsTimer = 0;
-    }
-    const jobID =
-      S.conditionalStatsJob && S.conditionalStatsJob !== 'starting'
-        ? S.conditionalStatsJob
-        : null;
-    const hadActive = Boolean(S.conditionalStatsJob);
-    S.conditionalStatsJob = null;
-    let cancelPromise: Promise<unknown> = Promise.resolve();
-    if (sendCancel && hadActive) {
-      cancelPromise = this.getConditionalStatsRequests()
-        .cancel(jobID)
-        .catch(() => undefined);
-    }
-    if (showCancelled && S.showStyles && S.indexReady) {
-      this.updateConditionalStatsUI('cancelled', '条件统计已取消', { canRetry: true });
-      void cancelPromise.then(() => {
-        if (epoch === S.sheetEpoch && S.showStyles && S.conditionalStatsState === 'cancelled') {
-          this.refreshViewportForConditionalStats(epoch);
-        }
-      });
-    } else {
-      this.updateConditionalStatsUI('');
-    }
-  }
-
-  async startConditionalStats(
-    sheetName: string,
-    epoch: number,
-    options: { readonly refreshOnReady?: boolean } = {},
-  ): Promise<void> {
-    const { refreshOnReady = false } = options;
-    const { S, api } = this.d;
-    if (!S.showStyles || !S.indexReady || !sheetName || epoch !== S.sheetEpoch || S.conditionalStatsJob) {
-      return;
-    }
-    const seq = ++S.conditionalStatsSeq;
-    S.conditionalStatsJob = 'starting';
-    try {
-      const start = await this.getConditionalStatsRequests().start(sheetName);
-      if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !this.d.S.showStyles || !start) return;
-      if (!start.needed) {
-        S.conditionalStatsJob = null;
-        this.updateConditionalStatsUI('not_needed');
-        if (refreshOnReady) this.refreshViewportForConditionalStats(epoch);
-        return;
-      }
-      if (start.ready) {
-        S.conditionalStatsJob = null;
-        this.updateConditionalStatsUI('done');
-        if (refreshOnReady) this.refreshViewportForConditionalStats(epoch);
-        return;
-      }
-      if (start.status === 'error' || !start.jobId) {
-        S.conditionalStatsJob = null;
-        this.updateConditionalStatsUI(
-          'error',
-          start.error ? `条件统计失败：${start.error}` : '条件统计失败',
-          { canRetry: true },
-        );
-        return;
-      }
-      const jobId = start.jobId;
-      S.conditionalStatsJob = jobId;
-      const baseLabel = start.damaged ? '条件统计重建中' : '条件统计计算中';
-      this.updateConditionalStatsUI(start.status || 'running', baseLabel, { canCancel: true });
-      const poll = async (): Promise<void> => {
-        if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) return;
-        try {
-          const st = await api<ConditionalStatsStatusResponse>(
-            `/api/conditional-stats/status?id=${encodeURIComponent(jobId)}`,
-            { activity: false },
-          );
-          if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !reread(() => S.showStyles)) return;
-          if (st.status === 'done') {
-            S.conditionalStatsJob = null;
-            this.updateConditionalStatsUI('done');
-            this.refreshViewportForConditionalStats(epoch);
-            return;
-          }
-          if (st.status === 'cancelled') {
-            S.conditionalStatsJob = null;
-            this.updateConditionalStatsUI('cancelled', '条件统计已取消', { canRetry: true });
-            this.refreshViewportForConditionalStats(epoch);
-            return;
-          }
-          if (st.status === 'error') {
-            S.conditionalStatsJob = null;
-            this.updateConditionalStatsUI(
-              'error',
-              st.error ? `条件统计失败：${st.error}` : '条件统计失败',
-              { canRetry: true },
-            );
-            this.refreshViewportForConditionalStats(epoch);
-            return;
-          }
-          const label = st.damaged ? '条件统计重建中' : '条件统计计算中';
-          const pct =
-            st.totalRows > 0
-              ? ` ${Math.min(99, Math.floor((st.doneRows * 100) / st.totalRows))}%`
-              : '';
-          const rowsText =
-            st.totalRows > 0
-              ? `（${st.doneRows.toLocaleString()} / ${st.totalRows.toLocaleString()} 行）`
-              : '';
-          this.updateConditionalStatsUI(st.status || 'running', `${label}${pct}${rowsText}`, {
-            canCancel: true,
-          });
-          S.conditionalStatsTimer = window.setTimeout(() => {
-            void poll();
-          }, 280);
-        } catch (error: unknown) {
-          if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !reread(() => S.showStyles)) return;
-          S.conditionalStatsJob = null;
-          this.updateConditionalStatsUI(
-            'error',
-            `条件统计状态读取失败：${errorMessage(error)}`,
-            { canRetry: true },
-          );
-        }
-      };
-      S.conditionalStatsTimer = window.setTimeout(() => {
-        void poll();
-      }, 120);
-    } catch (error: unknown) {
-      if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch) return;
-      S.conditionalStatsJob = null;
-      if (reread(() => S.showStyles)) {
-        this.updateConditionalStatsUI(
-          'error',
-          `条件统计启动失败：${errorMessage(error)}`,
-          { canRetry: true },
-        );
-      }
-    }
+    this.conditional = new SheetConditionalStats(deps);
   }
 
   private sheetPresentationKey(): string {
@@ -643,8 +365,10 @@ export class SheetController {
     const { S, api, getWorkbookIO } = this.d;
     while (epoch === S.sheetEpoch) {
       await delay(320);
-      const progress = await api<IndexStatusResponse>(
+      const progress = await api(
         `/api/index/status?id=${encodeURIComponent(jobID)}`,
+        undefined,
+        decodeIndexStatusResponse,
       );
       if (epoch !== S.sheetEpoch) return null;
       getWorkbookIO().reportIndexProgress(activity, progress);
@@ -742,7 +466,7 @@ export class SheetController {
     const workbookIO = getWorkbookIO();
     if (S.indexJob) void workbookIO.cancelIndex(S.indexJob);
     if (S.filterJob) void this.cancelFilter(S.filterJob);
-    this.cancelConditionalStats(true, false);
+    this.conditional.cancelConditionalStats(true, false);
     S.tilesSkippedConditional = false;
     invalidateViewport({ preserveDOM: true });
     S.reusableSheetRows = warm?.presentation === this.sheetPresentationKey() ? warm.rows : null;
@@ -766,7 +490,7 @@ export class SheetController {
     S.sourceDefaultRow = 0;
     S.sourceDefaultCol = 0;
     S.sourceGridLines = S.source?.format !== 'xls-html';
-    this.updateSourceAppearance();
+    this.conditional.updateSourceAppearance();
     S.index = null;
     S.indexReady = false;
     S.sheetLayout = null;
@@ -823,12 +547,12 @@ export class SheetController {
     try {
       const start: IndexStartResponse = warm
         ? { ...(warm.index as IndexStartResponse), ready: true }
-        : await api<IndexStartResponse>('/api/index/start', {
+        : await api('/api/index/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sheet: name }),
             signal: opening.signal,
-          });
+          }, decodeIndexStartResponse);
       if (epoch !== S.sheetEpoch) return undefined;
       if (start.ready) {
         S.index = start;
@@ -859,9 +583,9 @@ export class SheetController {
       try {
         const sizes =
           warm?.layout ??
-          (await api<SheetLayoutResponse>(`/api/layout?sheet=${encodeURIComponent(name)}`, {
+          (await api(`/api/layout?sheet=${encodeURIComponent(name)}`, {
             signal: opening.signal,
-          }));
+          }, decodeSheetLayoutResponse));
         if (epoch !== S.sheetEpoch) return undefined;
         S.sheetLayout = sizes;
         mergedCells.load(sizes.sourceMerges);
@@ -872,7 +596,7 @@ export class SheetController {
         S.sourceGridLines = sizes.sourceGridLines ?? S.source?.format !== 'xls-html';
         S.sourceDefaultRow = sizes.sourceDefaultRow ?? 0;
         S.sourceDefaultCol = sizes.sourceDefaultCol ?? 0;
-        this.updateSourceAppearance();
+        this.conditional.updateSourceAppearance();
         S.columnSourceRanges = sizes.sourceHidden ? [...sizes.sourceHidden] : [];
         S.columnMode = sizes.columnMode || 'original';
         S.columnOverrides = { ...(sizes.columnVisibility ?? {}) };
@@ -893,9 +617,9 @@ export class SheetController {
       try {
         const view =
           warm?.freeze ??
-          (await api<FreezeViewResponse>(`/api/view?sheet=${encodeURIComponent(name)}`, {
+          (await api(`/api/view?sheet=${encodeURIComponent(name)}`, {
             signal: opening.signal,
-          }));
+          }, decodeFreezeViewResponse));
         if (epoch !== S.sheetEpoch) return undefined;
         S.freeze = { rows: view.rows || 0, cols: view.cols || 0 };
       } catch {
@@ -1038,7 +762,7 @@ export class SheetController {
       if (epoch !== S.sheetEpoch) return undefined;
       this.finishSheetSwitch(epoch);
       if (S.showStyles && (!warm?.conditionalStatsReady || !warm.hasConditionalData)) {
-        void this.startConditionalStats(name, epoch, {
+        void this.conditional.startConditionalStats(name, epoch, {
           refreshOnReady: Boolean(S.viewportData?.data.conditionalStatsPending),
         });
       } else if (warm?.conditionalStatsReady) {
@@ -1217,7 +941,7 @@ export class SheetController {
     const activity = beginActivity('正在搜索', { slot: 'searchActivity' });
     S.searchActivity = activity;
     try {
-      const start = await api<{ readonly jobId: string; readonly cached?: boolean }>(
+      const start = await api(
         '/api/search/start',
         {
           method: 'POST',
@@ -1233,6 +957,7 @@ export class SheetController {
             workbookKey,
           }),
         },
+        decodeCachedJobStart,
       );
       if (!current()) {
         void this.cancelSearch(start.jobId, false);
@@ -1618,8 +1343,10 @@ export class SheetController {
         return;
       }
       try {
-        header = await api<TextTableHeader>(
+        header = await api(
           `/api/table/header?${new URLSearchParams({ sheet, row: String(number) }).toString()}`,
+          undefined,
+          decodeTextTableHeader,
         );
       } catch (error: unknown) {
         if (epoch === S.sheetEpoch) toast(`读取表头失败：${errorMessage(error)}`, 'error');
@@ -1872,11 +1599,11 @@ export class SheetController {
     const activity = beginActivity('正在筛选数据', { slot: 'filterActivity' });
     S.filterActivity = activity;
     try {
-      const start = await api<FilterStartResponse>('/api/filter/start', {
+      const start = await api('/api/filter/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheet, rules, ...options, workbookKey: book, book: S.book }),
-      });
+      }, decodeFilterStartResponse);
       if (!current()) {
         if (S.filterJob === `pending:${ticket}`) S.filterJob = null;
         api('/api/filter/cancel', {
@@ -2221,7 +1948,7 @@ export class SheetController {
       formatBtn.setAttribute('aria-pressed', String(S.showStyles));
       requireButton('formulaViewBtn').setAttribute('aria-pressed', String(S.showFormulas));
       applyColumnVisibility();
-      this.updateSourceAppearance();
+      this.conditional.updateSourceAppearance();
       this.updateFreezeUI();
       this.updateAutoFilterButton();
       const frozenPanes = getFrozenPanes();
@@ -2296,8 +2023,10 @@ export class SheetController {
       const wait = this.d.delay ?? delay;
       while (S.filterJob === jobID) {
         await wait(350);
-        const data = await api<FilterStatusResponse>(
+        const data = await api(
           `/api/filter/status?id=${encodeURIComponent(jobID)}`,
+          undefined,
+          decodeFilterStatusResponse,
         );
         if (S.filterJob !== jobID) return false;
         if (S.sheet !== sheet || S.sheetEpoch !== epoch) {

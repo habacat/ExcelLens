@@ -55,10 +55,15 @@ function setup() {
       return (await apiImpl(path, data)) as T;
     },
     tasks: {
-      run: async <T = unknown>(
+      run: async <T extends { readonly id?: string }>(
+        decode: (value: unknown) => T,
         request: Record<string, unknown>,
         guard?: () => boolean,
-      ): Promise<T> => (await taskRunImpl(request, guard)) as T,
+      ): Promise<T & { readonly id: string }> => {
+        const result = decode(await taskRunImpl(request, guard));
+        assert.ok(result.id);
+        return { ...result, id: result.id };
+      },
     },
   });
 

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"context"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -127,10 +128,10 @@ func TestRARWorkbookOpen(t *testing.T) {
 			}
 
 			summary := app.archiveSummary()
-			if summary["format"] != "RAR" || app.currentWorkbook() != nil {
+			if summary.Format != "RAR" || app.currentWorkbook() != nil {
 				t.Fatal(summary)
 			}
-			id := summary["id"].(string)
+			id := summary.ID
 			list := featureCall(t, app, "GET", "/api/archive/list?id="+id+"&q="+url.QueryEscape("明细"), "")
 			items := decodeResponse[struct {
 				Items []struct {
@@ -185,8 +186,8 @@ func TestTruncatedTARRecoveryNoticeIndexAndRecent(t *testing.T) {
 		t.Fatal(uploaded)
 	}
 	summary := app.archiveSummary()
-	id := summary["id"].(string)
-	if !strings.Contains(summary["notice"].(string), "不完整") {
+	id := summary.ID
+	if !strings.Contains(summary.Notice, "不完整") {
 		t.Fatal(summary)
 	}
 	list := featureCall(t, app, "GET", "/api/archive/list?id="+id, "")
@@ -260,7 +261,7 @@ func TestArchiveUploadMemberIndexStatsExportRecentAndCleanup(t *testing.T) {
 		t.Fatal("archive should first show its directory")
 	}
 	view := app.archiveSummary()
-	id := view["id"].(string)
+	id := view.ID
 	listed := decodeResponse[struct {
 		Total int
 		Items []struct {
@@ -351,7 +352,7 @@ func TestArchiveNativeLaunchNestedAndSessionIsolation(t *testing.T) {
 	if !strings.Contains(status.Body.String(), "outer.zip") {
 		t.Fatal("shell launch did not preserve archive", status.Body.String())
 	}
-	id := session.archiveSummary()["id"].(string)
+	id := session.archiveSummary().ID
 	denied := rawArchiveCall(app, "GET", "/api/archive/list?id="+id, "")
 	if denied.Code != 404 {
 		t.Fatal("archive leaked across sessions")
@@ -361,7 +362,7 @@ func TestArchiveNativeLaunchNestedAndSessionIsolation(t *testing.T) {
 	if result["archiveOnly"] != true {
 		t.Fatal("nested archive not browsable", result)
 	}
-	newID := session.archiveSummary()["id"].(string)
+	newID := session.archiveSummary().ID
 	result = awaitArchiveFixture(t, session, newID, 0)
 	if result["opened"] != true || session.currentWorkbook().SourceInfo.ArchiveMember != "one.csv" {
 		t.Fatal(result)
@@ -390,6 +391,16 @@ func TestArchiveNativeLaunchNestedAndSessionIsolation(t *testing.T) {
 	if response.Code != 200 || reopened.currentWorkbook() == nil || reopened.currentWorkbook().SourceInfo.ArchiveMember != "one.csv" {
 		t.Fatal("nested recent could not rebuild cleared caches", response.Body.String())
 	}
+	// A renamed member in a saved chain must not displace the directory the user is browsing.
+	previousView, previousBook := reopened.archiveSummary().ID, reopened.currentWorkbook()
+	missing := recents.Items[0]
+	missing.ArchiveMember = "renamed.csv"
+	if _, err := reopened.reopenArchiveRecent(context.Background(), missing); err == nil {
+		t.Fatal("missing nested member reopened")
+	}
+	if reopened.archiveSummary().ID != previousView || reopened.currentWorkbook() != previousBook {
+		t.Fatal("failed recent open displaced the active directory or workbook")
+	}
 }
 
 func TestArchiveCachePinsProtectActiveAndReleaseInactiveMembers(t *testing.T) {
@@ -406,7 +417,7 @@ func TestArchiveCachePinsProtectActiveAndReleaseInactiveMembers(t *testing.T) {
 	if err := app.OpenPath(path); err != nil {
 		t.Fatal(err)
 	}
-	id := app.archiveSummary()["id"].(string)
+	id := app.archiveSummary().ID
 	awaitArchiveFixture(t, app, id, 0)
 	app.archiveMu.Lock()
 	dir := app.archiveView.file.CacheDir()
@@ -457,7 +468,7 @@ func TestArchiveDirectoryNetworkWriteDoesNotHoldSessionState(t *testing.T) {
 	if err := app.OpenPath(path); err != nil {
 		t.Fatal(err)
 	}
-	id := app.archiveSummary()["id"].(string)
+	id := app.archiveSummary().ID
 	writer := &blockedArchiveResponse{ResponseRecorder: httptest.NewRecorder(), started: make(chan struct{}), release: make(chan struct{})}
 	done := make(chan struct{})
 	go func() {

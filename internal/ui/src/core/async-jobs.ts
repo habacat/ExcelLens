@@ -9,7 +9,9 @@ import type {
   AsyncJobProgress,
   AsyncJobStatusKind,
 } from '../contracts/common.ts';
+import { decodeAsyncJobStartResponse } from './http-decoders.generated.ts';
 
+/** @httpResponse AsyncJobStartResponse */
 export interface AsyncJobStartResponse {
   readonly jobId?: string;
 }
@@ -18,22 +20,21 @@ export interface AsyncJobStatusEnvelope<TResult = unknown> extends AsyncJobProgr
   readonly id?: string;
   readonly status?: AsyncJobStatusKind;
   readonly result?: TResult;
-  readonly sourceFields?: unknown;
-  readonly query?: unknown;
   readonly error?: string;
 }
 
-export interface AsyncJobCompleted<TResult> {
+export interface AsyncJobCompleted<TResult, TStatus> {
   readonly result: TResult;
   readonly job: string;
-  readonly sourceFields: unknown;
-  readonly query: unknown;
+  readonly status: TStatus;
   readonly current: () => boolean;
 }
 
 export interface AsyncJobsOptions<TStatus extends AsyncJobStatusEnvelope<TResult>, TResult> {
   readonly api: ApiClient;
   readonly identity: () => string;
+  readonly decodeStatus: (value: unknown) => TStatus;
+  readonly cancelEndpoint?: string;
   readonly requestIdentity?: () => string;
   readonly sleep: (ms: number) => Promise<void>;
   readonly onBusy?: (busy: boolean) => void;
@@ -43,7 +44,7 @@ export interface AsyncJobsOptions<TStatus extends AsyncJobStatusEnvelope<TResult
   readonly slot?: string | null;
   readonly maxPolls?: number;
   readonly activity?: ActivityService;
-  readonly resultFromStatus?: (status: TStatus) => TResult;
+  readonly resultFromStatus: (status: TStatus) => TResult;
 }
 
 interface ActiveTask {
@@ -72,6 +73,8 @@ export class AsyncJobs<
 > {
   private readonly api: ApiClient;
   private readonly identity: () => string;
+  private readonly decodeStatus: (value: unknown) => TStatus;
+  private readonly cancelEndpoint: string;
   private readonly requestIdentity: () => string;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly onBusy: (busy: boolean) => void;
@@ -89,6 +92,7 @@ export class AsyncJobs<
 
   constructor(options: AsyncJobsOptions<TStatus, TResult>) {
     this.api = options.api;
+    this.decodeStatus = options.decodeStatus;
     this.identity = options.identity;
     this.requestIdentity = options.requestIdentity ?? options.identity;
     this.sleep = options.sleep;
@@ -103,12 +107,12 @@ export class AsyncJobs<
         // default no-op
       });
     this.endpoint = options.endpoint ?? '/api/analysis/query';
+    this.cancelEndpoint = options.cancelEndpoint ?? `${this.endpoint}/cancel`;
     this.label = options.label ?? '分析';
     this.slot = options.slot ?? null;
     this.maxPolls = options.maxPolls ?? 1800;
     this.activity = options.activity;
-    this.resultFromStatus =
-      options.resultFromStatus ?? ((status: TStatus) => status.result as TResult);
+    this.resultFromStatus = options.resultFromStatus;
   }
 
   current(task: ActiveTask): boolean {
@@ -122,7 +126,7 @@ export class AsyncJobs<
   cancelServer(task: ActiveTask): void {
     if (!task.id || task.cancelSent || task.finished) return;
     task.cancelSent = true;
-    this.api(`${this.endpoint}/cancel`, {
+    this.api(this.cancelEndpoint, {
       method: 'POST',
       body: JSON.stringify({ id: task.id }),
     }).catch(() => {
@@ -154,7 +158,7 @@ export class AsyncJobs<
   async execute(
     query: unknown,
     options: { readonly main?: boolean } = {},
-  ): Promise<AsyncJobCompleted<TResult>> {
+  ): Promise<AsyncJobCompleted<TResult, TStatus>> {
     const isMain = options.main ?? false;
     if (isMain) this.cancelMain();
     const task: ActiveTask = {
@@ -178,11 +182,11 @@ export class AsyncJobs<
       this.onBusy(true);
     }
     try {
-      const started = await this.api<AsyncJobStartResponse>(`${this.endpoint}/start`, {
+      const started = await this.api(`${this.endpoint}/start`, {
         method: 'POST',
         headers: { 'X-ExcelLens-Workbook': task.requestBook },
         body: JSON.stringify(query),
-      });
+      }, decodeAsyncJobStartResponse);
       if (typeof started.jobId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(started.jobId)) {
         throw new Error(`${this.label}任务标识无效，请重试`);
       }
@@ -191,9 +195,10 @@ export class AsyncJobs<
       for (let tick = 0; this.maxPolls === 0 || tick < this.maxPolls; tick++) {
         await this.sleep(tick < 12 ? 240 : 420);
         if (!this.current(task)) throw makeAbortError(this.label);
-        const status = await this.api<TStatus>(
+        const status = await this.api(
           `${this.endpoint}/status?id=${encodeURIComponent(task.id)}`,
           { signal: task.controller.signal },
+          this.decodeStatus,
         );
         if (!this.current(task)) throw makeAbortError(this.label);
         if (
@@ -210,8 +215,7 @@ export class AsyncJobs<
           return {
             result: this.resultFromStatus(status),
             job: task.id,
-            sourceFields: status.sourceFields,
-            query: status.query,
+            status,
             current: () => this.current(task),
           };
         }

@@ -9,13 +9,13 @@ import (
 
 // Optional viewport transport v1. Duplicate display text and derivable cell
 // references are reconstructed before rendering or using the cell model.
-type wireRow struct {
-	Number             int        `json:"n"`
-	Style              int        `json:"s,omitempty"`
-	Cells              []wireCell `json:"c"`
-	PresentationNotice string     `json:"p,omitempty"`
+type CompactRow struct {
+	Number             int           `json:"n"`
+	Style              int           `json:"s,omitempty"`
+	Cells              []CompactCell `json:"c"`
+	PresentationNotice string        `json:"p,omitempty"`
 }
-type wireCell struct {
+type CompactCell struct {
 	Currency    string                            `json:"cu,omitempty"`
 	SourceType  string                            `json:"st,omitempty"`
 	Col         int                               `json:"c"`
@@ -40,14 +40,14 @@ var wireColumns = func() [formats.ExcelColumns + 1]string {
 	return names
 }()
 
-func packViewportRows(rows []workbook.RowData) []wireRow {
-	packed := make([]wireRow, len(rows))
+func packViewportRows(rows []workbook.RowData) []CompactRow {
+	packed := make([]CompactRow, len(rows))
 	for i, row := range rows {
-		out := wireRow{Number: row.Number, Style: row.Style, Cells: make([]wireCell, len(row.Cells)), PresentationNotice: row.PresentationNotice}
+		out := CompactRow{Number: row.Number, Style: row.Style, Cells: make([]CompactCell, len(row.Cells)), PresentationNotice: row.PresentationNotice}
 		suffix := strconv.Itoa(row.Number)
 		for j := range row.Cells {
 			cell := &row.Cells[j]
-			value := wireCell{SourceType: cell.SourceType, Currency: cell.Currency, Col: cell.Col, Raw: cell.Raw, Type: cell.Type, Style: cell.Style, Formula: cell.Formula, Color: cell.ValueColor, Hyperlink: cell.Hyperlink, RichText: cell.RichText, Conditional: cell.Conditional}
+			value := CompactCell{SourceType: cell.SourceType, Currency: cell.Currency, Col: cell.Col, Raw: cell.Raw, Type: cell.Type, Style: cell.Style, Formula: cell.Formula, Color: cell.ValueColor, Hyperlink: cell.Hyperlink, RichText: cell.RichText, Conditional: cell.Conditional}
 			if cell.Display != cell.Raw {
 				value.Display = &cell.Display
 			}

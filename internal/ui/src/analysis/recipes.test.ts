@@ -1,3 +1,7 @@
+import {
+  decodeRecipeCaptureStatus,
+  decodeAnalysisQueryStatusResponse,
+} from '../core/http-decoders.generated.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type {
@@ -197,8 +201,7 @@ test('catalog conflicts retain the full-input draft and retry only its commit', 
       return {
         job: 'cap-1',
         result: { captureId: 'validated' },
-        sourceFields: undefined,
-        query: undefined,
+        status: { status: 'done' },
         current: () => true,
       };
     };
@@ -242,6 +245,8 @@ test('cancelled type capture reclaims a late job without committing a catalog en
     const gate = deferred<{ jobId: string }>();
     const cancelled: string[] = [];
     h.captureJobs = new AsyncJobs({
+      decodeStatus: decodeRecipeCaptureStatus,
+      resultFromStatus: status => { assert.ok(status.result); return status.result; },
       api: async <T = unknown>(url: string, options?: ApiRequestOptions): Promise<T> => {
         if (url.endsWith('/start')) return (await gate.promise) as T;
         if (url.endsWith('/cancel')) {
@@ -290,8 +295,7 @@ test('a stale catalog response cannot overwrite a successfully saved plan', asyn
     h.captureJobs.execute = async () => ({
       job: 'cap',
       result: { captureId: 'draft' },
-      sourceFields: undefined,
-      query: undefined,
+      status: { status: 'done' },
       current: () => true,
     });
     const stale = h.refresh();
@@ -346,6 +350,7 @@ test('replay failures and cancelled late completions preserve the active result'
       AnalysisQueryStatusResponse | AnalysisResult,
       AnalysisQueryStatusResponse
     >({
+      decodeStatus: decodeAnalysisQueryStatusResponse,
       api: async <T = unknown>(url: string, options?: ApiRequestOptions): Promise<T> => {
         if (url.endsWith('/start')) return (await gate.promise) as T;
         if (url.endsWith('/cancel')) {
@@ -384,8 +389,7 @@ test('completed replay cannot adopt into a newer analysis intent', async () => {
     const gate = deferred<{
       job: string;
       result: AnalysisQueryStatusResponse;
-      sourceFields: unknown;
-      query: unknown;
+      status: AnalysisQueryStatusResponse;
       current: () => boolean;
     }>();
     h.preview = preview;
@@ -404,8 +408,7 @@ test('completed replay cannot adopt into a newer analysis intent', async () => {
     gate.resolve({
       job: 'run-1',
       result: status,
-      sourceFields: undefined,
-      query: status.query,
+      status,
       current: () => true,
     });
     await pending;
@@ -456,8 +459,7 @@ test('a native dialog close blocks capture publication before its queued close e
     const gate = deferred<{
       job: string;
       result: { captureId: string };
-      sourceFields: unknown;
-      query: unknown;
+      status: { status: 'done' };
       current: () => boolean;
     }>();
     h.captureJobs.execute = () => gate.promise;
@@ -466,8 +468,7 @@ test('a native dialog close blocks capture publication before its queued close e
     gate.resolve({
       job: 'cap',
       result: { captureId: 'late-draft' },
-      sourceFields: undefined,
-      query: undefined,
+      status: { status: 'done' },
       current: () => true,
     });
     await pending;

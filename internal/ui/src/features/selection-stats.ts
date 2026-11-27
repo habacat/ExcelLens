@@ -9,6 +9,7 @@ import { errorMessage } from '../core/display-format.ts';
 import { byId, requireEl } from '../core/dom.ts';
 import { MultiSelection } from '../grid/multi-selection.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import { decodeSelectionStatsResponse } from '../core/http-decoders.generated.ts';
 
 export type SelectionStatsMetric =
   | 'average'
@@ -396,7 +397,7 @@ export class SelectionStats {
         const ctrl = new AbortController();
         this.abort = ctrl;
         try {
-          const result = await this.api<SelectionStatsResponse>('/api/selection/stats', {
+          const result = await this.api('/api/selection/stats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -408,7 +409,7 @@ export class SelectionStats {
               edit,
             }),
             signal: ctrl.signal,
-          });
+          }, decodeSelectionStatsResponse);
           if (ctrl.signal.aborted || ticket !== this.ticket || key !== this.lastKey) return;
           this.cache.set(key, result);
           if (this.cache.size > 64) {

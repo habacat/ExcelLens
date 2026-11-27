@@ -20,6 +20,7 @@ export interface CalculatorSuggestion {
   readonly preview: string;
 }
 
+/** @httpResponse CalculatorCellResult */
 export interface CalculatorCellResult {
   readonly kind?: string;
   readonly display: string;

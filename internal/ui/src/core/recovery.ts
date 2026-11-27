@@ -4,6 +4,7 @@
  */
 import type { ApiClient, HttpError, SessionService } from '../contracts/common.ts';
 import { errorMessage } from './display-format.ts';
+import { decodeRecoveryListResponse, decodeRecoverySaveResponse } from './http-decoders.generated.ts';
 
 export type RecoveryKind = 'calculator' | 'analysis';
 
@@ -13,6 +14,7 @@ export interface RecoverySnapshotResponse<TRecord = unknown> {
   readonly recovered?: boolean;
 }
 
+/** @httpResponse RecoverySaveResponse */
 export interface RecoverySaveResponse {
   readonly revision: number;
 }
@@ -24,6 +26,7 @@ export interface RecoveryListEntry {
   readonly backup?: boolean;
 }
 
+/** @httpResponse RecoveryListResponse */
 export interface RecoveryListResponse {
   readonly entries?: readonly RecoveryListEntry[];
 }
@@ -209,7 +212,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
         // Ignore storage failures.
       }
       this.owner = validID(saved) ? saved : sessionId;
-      const snapshot = await this.api<RecoverySnapshotResponse<TRecord>>(
+      const snapshot = await this.api(
         `/api/recovery?kind=${this.kind}&owner=${encodeURIComponent(this.owner)}`,
       );
       this.validateSnapshot(snapshot);
@@ -344,13 +347,13 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
           const timeout = setTimeout(() => controller.abort(), 15000);
           let meta: RecoverySaveResponse;
           try {
-            meta = await this.api<RecoverySaveResponse>('/api/recovery', {
+            meta = await this.api('/api/recovery', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body,
               keepalive,
               signal: controller.signal,
-            });
+            }, decodeRecoverySaveResponse);
           } finally {
             clearTimeout(timeout);
           }
@@ -423,7 +426,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
   async importCopy(entry: RecoveryListEntry): Promise<RecoveryImportResult> {
     await this.ready;
     if (this.running) await this.running;
-    const snapshot = await this.api<RecoverySnapshotResponse<TRecord>>(
+    const snapshot = await this.api(
       `/api/recovery?kind=${this.kind}&owner=${encodeURIComponent(entry.owner)}${entry.backup ? '&backup=1' : ''}`,
     );
     this.validateSnapshot(snapshot);
@@ -584,7 +587,7 @@ export function showRecoveryDialog<TRecord>(
   message();
 
   void journal.ready
-    .then(() => journal.api<RecoveryListResponse>(`/api/recovery/list?kind=${journal.kind}`))
+    .then(() => journal.api(`/api/recovery/list?kind=${journal.kind}`, undefined, decodeRecoveryListResponse))
     .then((data) => {
       if (!el.open) return;
       list.replaceChildren();
@@ -609,7 +612,7 @@ export function showRecoveryDialog<TRecord>(
             load.hidden = true;
             preview.hidden = false;
             preview.textContent = '正在读取…';
-            const copy = await journal.api<RecoverySnapshotResponse<TRecord>>(
+            const copy = await journal.api(
               `/api/recovery?kind=${journal.kind}&owner=${encodeURIComponent(entry.owner)}${entry.backup ? '&backup=1' : ''}`,
             );
             if (ticket !== serial || !el.open) return;

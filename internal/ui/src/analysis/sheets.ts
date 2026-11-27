@@ -22,6 +22,18 @@ import type {
 } from '../grid/clipboard-panels.ts';
 import type { AnalysisDraftEntry, AnalysisDrafts } from './drafts.ts';
 import type { AnalysisResultCache } from './results.ts';
+import {
+  decodeAnalysisSheetPage,
+  decodeAnalysisSheetPageWire,
+  decodeSheetBatchResult,
+  decodeSheetCreateResponse,
+  decodeSheetRevisionResponse,
+} from '../core/http-decoders.generated.ts';
+
+/** @httpResponse AnalysisSheetPageWire */
+export type AnalysisSheetPageWire = Omit<AnalysisSheetPage, 'rows'> & {
+          readonly rows: readonly (readonly string[])[] | null;
+        };
 
 export interface MutableAnalysisSheetPage {
   readonly id: string;
@@ -57,16 +69,19 @@ export interface AnalysisPasteTargetContext extends PasteSpecialTargetContext {
   readonly revision: number | undefined;
 }
 
+/** @httpResponse SheetBatchResult */
 export interface SheetBatchResult {
   readonly revision: number;
   readonly previous: readonly AnalysisCellChange[];
 }
 
-interface SheetCreateResponse {
+/** @httpResponse SheetCreateResponse */
+export interface SheetCreateResponse {
   readonly id: string;
 }
 
-interface SheetRevisionResponse {
+/** @httpResponse SheetRevisionResponse */
+export interface SheetRevisionResponse {
   readonly revision: number;
 }
 
@@ -233,7 +248,7 @@ export class AnalysisSheetsController {
     );
     if (!name) return;
     try {
-      const data = await post<SheetCreateResponse>('/api/analysis/sheet/create', { name });
+      const data = await post('/api/analysis/sheet/create', { name }).then(decodeSheetCreateResponse);
       state.loadedSheet = data.id;
       state.sheetPage = 0;
       await refreshWorkspace();
@@ -367,12 +382,12 @@ export class AnalysisSheetsController {
       validateClipboardChanges(changes);
       // Resolve expected version INSIDE the serialized write queue.
       const expectedRevision = state.sheetRevisions.get(id) ?? 0;
-      const saved = await post<SheetBatchResult>('/api/analysis/sheet/batch', {
+      const saved = await post('/api/analysis/sheet/batch', {
         id,
         workbookKey: book,
         expectedRevision,
         changes,
-      });
+      }).then(decodeSheetBatchResult);
       if (book === state.fingerprint) {
         state.sheetRevisions.set(id, saved.revision);
         state.reportCache.clear();
@@ -493,17 +508,14 @@ export class AnalysisSheetsController {
     try {
       // Reuse the fetch page size across loads; cap DOM nodes for wide grids.
       const pageSize = this.sheetPageSize(id);
-      const raw = await api<
-        Omit<AnalysisSheetPage, 'rows'> & {
-          readonly rows: readonly (readonly string[])[] | null;
-        }
-      >(
+      const raw = await api(
         `/api/analysis/sheet?${new URLSearchParams({
           id,
           offset: String(page * pageSize),
           limit: String(pageSize),
         }).toString()}`,
         { signal: controller.signal },
+        decodeAnalysisSheetPageWire,
       );
       if (seq !== state.sheetLoadSeq || state.loadedSheet !== id || state.sheetPage !== page) {
         return;
@@ -822,8 +834,10 @@ export class AnalysisSheetsController {
     if (!state.loadedSheet) return;
     const id = state.loadedSheet;
     const book = state.fingerprint;
-    const data = await api<AnalysisSheetPage>(
+    const data = await api(
       `/api/analysis/sheet?${new URLSearchParams({ id, offset: '0', limit: '1' }).toString()}`,
+      undefined,
+      decodeAnalysisSheetPage,
     );
     if (data.columns.length >= 80) {
       toast('编辑工作表最多80列', 'warning');
@@ -834,12 +848,12 @@ export class AnalysisSheetsController {
     try {
       await this.queueWrite(async () => {
         if (book !== state.fingerprint) throw new Error('工作簿已切换');
-        const result = await post<SheetRevisionResponse>('/api/analysis/sheet/columns', {
+        const result = await post('/api/analysis/sheet/columns', {
           id,
           workbookKey: book,
           expectedRevision: data.revision,
           columns: [...data.columns, name],
-        });
+        }).then(decodeSheetRevisionResponse);
         state.sheetRevisions.set(id, result.revision);
       });
       if (book === state.fingerprint) {
@@ -859,12 +873,12 @@ export class AnalysisSheetsController {
     try {
       await this.queueWrite(async () => {
         if (book !== state.fingerprint) throw new Error('工作簿已切换');
-        const result = await post<SheetRevisionResponse>('/api/analysis/sheet/rows', {
+        const result = await post('/api/analysis/sheet/rows', {
           id,
           workbookKey: book,
           expectedRevision: state.sheetRevisions.get(id) ?? 0,
           count: 10,
-        });
+        }).then(decodeSheetRevisionResponse);
         state.sheetRevisions.set(id, result.revision);
       });
       if (book === state.fingerprint) {

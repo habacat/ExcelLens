@@ -74,7 +74,7 @@ test('analysis conversion controls select explicit date order without starting a
   };
   const h = setupWorkspace(makeQuery({ transforms: [step] }));
   try {
-    h.ws.renderTransforms();
+    h.ws.queryEditor.renderTransforms();
     const list = document.getElementById('analysisTransformList');
     assert.ok(list);
     const box = list.children[0];
@@ -124,7 +124,7 @@ test('removing a conversion also removes dependent fields and invalid query refe
   });
   const h = setupWorkspace(query);
   try {
-    h.ws.removeTransform('D_date');
+    h.ws.queryEditor.removeTransform('D_date');
     assert.deepEqual(
       query.transforms.map((t) => t.id),
       ['D_keep'],

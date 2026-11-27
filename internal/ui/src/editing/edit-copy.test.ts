@@ -121,9 +121,9 @@ test('clearing a sorted range edits only returned source rows and keeps covered 
     tools: { tableAt: () => null },
     colName: (c) => String.fromCharCode(64 + c),
     advanced: () => null,
-    post: async <T = unknown>(): Promise<T> => {
+    post: async (): Promise<unknown> => {
       const empty: unknown = {};
-      return empty as T;
+      return empty;
     },
     commit: async (_action, changes) => {
       committed = changes ?? [];

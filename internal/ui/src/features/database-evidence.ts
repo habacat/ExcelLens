@@ -51,6 +51,7 @@ export interface DatabaseEvidencePayload {
   readonly tables: readonly DatabaseEvidenceTable[];
 }
 
+/** @httpResponse DatabaseEvidenceVerifyResult */
 export interface DatabaseEvidenceVerifyResult {
   readonly verified: boolean;
   readonly key: string;

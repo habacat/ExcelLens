@@ -5,11 +5,7 @@
  * dependency injection. Exposes ONLY the narrow QA bridge in `runtime-bridge.ts`.
  */
 import type { ToastTone } from '../contracts/common.ts';
-import type {
-  CellData,
-  SheetViewportResponse,
-  WorkbookStatusResponse,
-} from '../contracts/workbook.ts';
+import type { CellData } from '../contracts/workbook.ts';
 import { createActivityService, setActivityService } from '../core/activity.ts';
 import {
   columnName,
@@ -139,6 +135,8 @@ import {
   exposeSessionBridge,
   exposeWorkbookReadyBridge,
 } from './runtime-bridge.ts';
+import { decodeSheetViewport } from '../core/viewport-response.ts';
+import { decodeOpenResult, decodeWorkbookStatus } from '../core/workbook-response.ts';
 
 const MAX_BROWSER_SCROLL_PIXELS = 15_000_000;
 
@@ -671,7 +669,7 @@ function bootstrap(): void {
       getSheetController().decorateTableColumnHeader(head, col),
     finishSheetSwitch: (epoch, ready) => getSheetController().finishSheetSwitch(epoch, ready),
     startConditionalStats: (sheetName, epoch, options) =>
-      getSheetController().startConditionalStats(sheetName, epoch, options),
+      getSheetController().conditional.startConditionalStats(sheetName, epoch, options),
     visibleReferenceAreas: (refs, filtered, pinnedRows, rowNumberByVisual, mergeAt) =>
       visibleReferenceAreas(refs, filtered, pinnedRows, rowNumberByVisual, mergeAt),
     panels: pipelinePanels,
@@ -735,7 +733,7 @@ function bootstrap(): void {
     sourceRowLimit,
     sourceColLimit,
     fontExists: isKnownFont,
-    setDisplayFontSelection: (font) => pipeline.setDisplayFontSelection(font),
+    setDisplayFontSelection: (font) => pipeline.appearance.setDisplayFontSelection(font),
     rowHeight: (row) => pipeline.rowHeight(row),
     colWidth: (col) => pipeline.colWidth(col),
     headerHeight: () => pipeline.headerHeight(),
@@ -865,7 +863,7 @@ function bootstrap(): void {
     setStatus,
     showWelcome,
     showWorkspace,
-    loadStylePalette: () => pipeline.loadStylePalette(),
+    loadStylePalette: () => pipeline.appearance.loadStylePalette(),
     selectSheet: (name, targetRef, preserveTrace, navigationGuard, openingActivity) =>
       sheetController.selectSheet(
         name,
@@ -879,7 +877,7 @@ function bootstrap(): void {
     invalidateViewport: (options) => pipeline.invalidateViewport(options),
     cancelFilter: (jobID) => sheetController.cancelFilter(jobID),
     cancelConditionalStats: (sendCancel, showCancelled) =>
-      sheetController.cancelConditionalStats(sendCancel, showCancelled),
+      sheetController.conditional.cancelConditionalStats(sendCancel, showCancelled),
     panels: workbookIOPanels,
   });
   workbookIORef = workbookIO;
@@ -898,7 +896,7 @@ function bootstrap(): void {
     colLeft: (col) => pipeline.colLeft(col),
     headerHeight: () => pipeline.headerHeight(),
     colName: columnName,
-    bindResizeGrip: (grip, kind, index) => pipeline.bindResizeGrip(grip, kind, index),
+    bindResizeGrip: (grip, kind, index) => pipeline.sizing.bindResizeGrip(grip, kind, index),
     sourceRowTop: (row) => pipeline.sourceRowTop(row),
     sourceRowHeight: (row) => pipeline.sourceRowHeight(row),
     getVirtualScrollTop: () => pipeline.getVirtualScrollTop(),
@@ -912,7 +910,7 @@ function bootstrap(): void {
       belowRow,
       context,
     ) =>
-      pipeline.updateSharedBorders(
+      pipeline.appearance.updateSharedBorders(
         el,
         cell,
         row,
@@ -924,7 +922,7 @@ function bootstrap(): void {
       ),
     isPrecedent: (row, col) => nav.isPrecedent(row, col),
     isSearchMatch: (sheet, ref) => getSearchPanel().isMatch(sheet, ref),
-    applyCellStyle: (node, cell) => pipeline.applyCellStyle(node, cell),
+    applyCellStyle: (node, cell) => pipeline.appearance.applyCellStyle(node, cell),
     onRender: () => {
       pipeline.applySelectionClasses();
       traceUIRef?.refreshPulse();
@@ -1021,11 +1019,11 @@ function bootstrap(): void {
     open: (item) =>
       workbookIO.openWorkbook(
         () =>
-          api<WorkbookStatusResponse>('/api/recent', {
+          api('/api/recent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'open', id: item.id }),
-          }),
+          }, decodeOpenResult),
         item.name,
         item.fileSize,
       ),
@@ -1251,7 +1249,7 @@ function bootstrap(): void {
               rowWindow: '1',
             });
             if (S.rowView) params.set('viewId', S.rowView.id);
-            const data = await api<SheetViewportResponse>(`/api/sheet?${params.toString()}`);
+            const data = await api(`/api/sheet?${params.toString()}`, undefined, decodeSheetViewport);
             if (!snapshot.current()) throw new Error('选区已变化，请重新粘贴');
             rows.push(...data.rows.map((row) => row.number));
             if (data.rows.length < size) break;
@@ -1354,7 +1352,7 @@ function bootstrap(): void {
       const only = areas[0];
       if (!only) throw new Error('请在工作簿中保留一个连续选区');
       const pts = MultiSelection.points(only, columnName);
-      return { ...base, start: pts.start, end: pts.end };
+      return { ...base, ...pts };
     }
     return base;
   };
@@ -1512,7 +1510,6 @@ function bootstrap(): void {
 
   const archiveCenter = new Archives({
     api,
-    toast,
     open: (data) => workbookIO.acceptOpenedWorkbook(data),
     fmtBytes: formatBytes,
     canOpen: () => workbookIO.canOpenWorkbook(),
@@ -1644,9 +1641,7 @@ function bootstrap(): void {
 
   exposeAnalyticsDiagnosticsBridge({
     diagnostics: () => analytics.diagnostics(),
-    refresh: () => {
-      void analytics.refresh();
-    },
+    refresh: () => analytics.refresh(),
   });
 
   const reconcileCenter = new Reconcile({
@@ -1927,19 +1922,19 @@ function bootstrap(): void {
     buttonCommand('命名视图', 'namedViewOpenBtn', '保存 应用 视图 筛选 排序 布局'),
     buttonCommand('分页预览', 'printPreviewOpenBtn', '打印 纸张 页边距 缩放 重复标题', 'Ctrl+P'),
     buttonCommand('全屏', 'fullscreenBtn', '窗口', 'F11'),
-    { name: '设置当前行高', shortcut: 'Alt+H,O,H', tags: '行高 调整 大小', run: () => pipeline.promptResize('row') },
-    { name: '设置当前列宽', shortcut: 'Alt+H,O,W', tags: '列宽 调整 大小', run: () => pipeline.promptResize('col') },
+    { name: '设置当前行高', shortcut: 'Alt+H,O,H', tags: '行高 调整 大小', run: () => pipeline.sizing.promptResize('row') },
+    { name: '设置当前列宽', shortcut: 'Alt+H,O,W', tags: '列宽 调整 大小', run: () => pipeline.sizing.promptResize('col') },
     {
       name: '当前列宽自动适应',
       shortcut: 'Alt+H,O,I',
       tags: '列宽 自动 调整',
-      run: () => pipeline.autoFitSize('col', S.selected?.col || 1),
+      run: () => pipeline.sizing.autoFitSize('col', S.selected?.col || 1),
     },
     {
       name: '当前行高自动适应',
       shortcut: 'Alt+H,O,A',
       tags: '行高 自动 调整',
-      run: () => pipeline.autoFitSize('row', S.selected?.row || 1),
+      run: () => pipeline.sizing.autoFitSize('row', S.selected?.row || 1),
     },
     buttonCommand('对账', 'reconcileOpenBtn', '双表对账 主键 差异 未匹配 重复键'),
     buttonCommand('关联', 'relationsOpenBtn', '关联提取 连接 左表 右表 未匹配'),
@@ -2018,7 +2013,7 @@ function bootstrap(): void {
   const databasePanel = new DatabasePanel({
     api,
     onOpened: async (result) => {
-      const current = await api<WorkbookStatusResponse>('/api/status');
+      const current = await api('/api/status', undefined, decodeWorkbookStatus);
       if (!current.opened || current.workbookKey !== result.workbookKey) {
         throw new Error('工作簿已切换');
       }
@@ -2108,8 +2103,8 @@ function bootstrap(): void {
     stepSearch: (delta) => searchPanel.step(delta),
     toggleAutoFilter: () => sheetController.toggleAutoFilter(),
     toggleFormulaView: () => pipeline.toggleFormulaView(),
-    toggleOriginalFormat: () => sheetController.toggleOriginalFormat(),
-    changeDisplayFont: (font) => pipeline.changeDisplayFont(font),
+    toggleOriginalFormat: () => sheetController.conditional.toggleOriginalFormat(),
+    changeDisplayFont: (font) => pipeline.appearance.changeDisplayFont(font),
     openFilter: (column) => sheetController.openFilter(column),
     addFilterRule: (column, operator, value) =>
       sheetController.addFilterRule(column, operator, value),
@@ -2122,9 +2117,9 @@ function bootstrap(): void {
     applyTextTableHeader: (number, automatic) =>
       sheetController.applyTextTableHeader(number, automatic),
     disableTextTableHeader: () => sheetController.disableTextTableHeader(),
-    promptResize: (kind, explicitIndex) => pipeline.promptResize(kind, explicitIndex),
-    commitResize: (kind, index, size) => pipeline.commitResize(kind, index, size),
-    autoFitSize: (kind, index) => pipeline.autoFitSize(kind, index),
+    promptResize: (kind, explicitIndex) => pipeline.sizing.promptResize(kind, explicitIndex),
+    commitResize: async (kind, index, size) => { await pipeline.sizing.commitResize(kind, index, size); },
+    autoFitSize: (kind, index) => pipeline.sizing.autoFitSize(kind, index),
     setColumnVisibility: (mode, index, hidden, end) =>
       columnController.setVisibility(mode, index, hidden, end),
     tracePrecedents: () => traceUI.open('precedents'),
@@ -2166,12 +2161,12 @@ function bootstrap(): void {
   }));
 
   byId('conditionalStatsCancel')?.addEventListener('click', () => {
-    sheetController.cancelConditionalStats(true, true);
+    sheetController.conditional.cancelConditionalStats(true, true);
   });
   byId('conditionalStatsRetry')?.addEventListener('click', () => {
     if (!S.indexReady || !S.sheet || !S.showStyles) return;
     S.conditionalStatsState = '';
-    void sheetController.startConditionalStats(S.sheet, S.sheetEpoch, { refreshOnReady: true });
+    void sheetController.conditional.startConditionalStats(S.sheet, S.sheetEpoch, { refreshOnReady: true });
   });
 
   gridInteractions.bindEvents();

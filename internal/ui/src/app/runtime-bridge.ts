@@ -32,7 +32,7 @@ export interface PerformanceSnapshot {
 
 export interface AnalyticsDiagnosticsBridge {
   diagnostics(): Readonly<Record<string, unknown>>;
-  refresh?(): void;
+  refresh?(): Promise<boolean | undefined>;
 }
 
 declare global {

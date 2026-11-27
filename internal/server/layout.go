@@ -149,6 +149,10 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "尚未打开工作簿")
 		return
 	}
+	if key := r.Header.Get("X-ExcelLens-Workbook"); key != "" && key != wb.Fingerprint {
+		writeError(w, http.StatusConflict, "工作簿已切换，请重新调整显示设置")
+		return
+	}
 	sheet := r.URL.Query().Get("sheet")
 	var input struct {
 		Sheet  string `json:"sheet"`

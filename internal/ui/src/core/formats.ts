@@ -8,31 +8,12 @@ import type {
   SourceCapabilities,
 } from '../contracts/formats.ts';
 
+import { decodeFileFormatsConfig } from './http-decoders.generated.ts';
+
 export type { FileFormatsRegistry, FileFormatsRegistry as FileFormats };
 
 let cachedRaw: string | null = null;
 let cachedInstance: FileFormatsRegistry | null = null;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFileFormatsConfig(value: unknown): value is FileFormatsConfig {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.extensions) &&
-    isRecord(value.sources) &&
-    typeof value.largeDataRows === 'number'
-  );
-}
-
-function parseConfigJson(raw: string): FileFormatsConfig {
-  const parsed: unknown = JSON.parse(raw);
-  if (!isFileFormatsConfig(parsed)) {
-    throw new Error('Invalid fileFormats bootstrap configuration');
-  }
-  return parsed;
-}
 
 export function createFileFormats(config: FileFormatsConfig): FileFormatsRegistry {
   const extensions = new Set(config.extensions);
@@ -72,7 +53,7 @@ export function currentFileFormats(): FileFormatsRegistry | null {
     typeof document !== 'undefined' ? (document.getElementById('fileFormats')?.textContent ?? '') : '';
   if (cachedInstance && text === cachedRaw) return cachedInstance;
   if (!text) return null;
-  cachedInstance = createFileFormats(parseConfigJson(text));
+  cachedInstance = createFileFormats(decodeFileFormatsConfig(JSON.parse(text)));
   cachedRaw = text;
   return cachedInstance;
 }

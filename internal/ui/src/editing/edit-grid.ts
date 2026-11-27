@@ -14,10 +14,8 @@ import type {
 import type {
   EditAddress,
   EditChange,
-  EditGridProjectionResponse,
   EditKey,
   EditOperationAction,
-  EditReadResponse,
   EditSheetMeta,
   EditStateResponse,
   EditStructure,
@@ -57,6 +55,11 @@ import type { IdentifiedClipboard } from './edit-grid-paste.ts';
 import { GridRangeEditor } from './edit-grid-range.ts';
 import type { DragPointKind, DragPointResult } from './edit-reference-view.ts';
 import { closeFormula, displayFormula, type FormulaPoint } from './formula-entry-model.ts';
+import {
+  decodeEditGridProjectionResponse,
+  decodeEditReadResponse,
+  decodeEditStateResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface SheetViewportRect {
   readonly left: number;
@@ -142,7 +145,7 @@ export interface SheetEditorOwner {
   };
   context(): { readonly book: string; readonly sheet: string | null; readonly ref?: string };
   colName(col: number): string;
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   run(
     message: string,
     action: (signal: AbortSignal) => Promise<void>,
@@ -533,11 +536,11 @@ export class SheetEditor {
     const doc = data.document;
     const book = this.book;
     const cells = changes?.map(({ sheet, row, col }) => ({ sheet, row, col }));
-    const result = await this.owner.post<EditGridProjectionResponse>(
+    const result = await this.owner.post(
       'grid',
       { document: keyOf(doc), revision: doc.revision, book, cells, mode: 'projection' },
       signal,
-    );
+    ).then(decodeEditGridProjectionResponse);
     const current = this.owner.data?.document;
     if (
       this.book !== book ||
@@ -835,7 +838,7 @@ export class SheetEditor {
       this.entry.changed(field);
       const request = { document: keyOf(doc), revision: doc.revision, sheet: address.sheet, ref: d.ref };
       d.ready = this.owner
-        .post<EditReadResponse>('read', request)
+        .post('read', request).then(decodeEditReadResponse)
         .then((source) => {
           if (this.draft !== d) return false;
           if (source.readOnly || (this.owner.data?.encoding && source.value.kind === 'missing')) {
@@ -998,11 +1001,11 @@ export class SheetEditor {
     const kind = requireSelect('editGridKind').value;
     await this.owner.run('正在刷新修订…', async (signal) => {
       if (!this.owner.data) return;
-      const nextData = await this.owner.post<EditStateResponse>(
+      const nextData = await this.owner.post(
         'state',
         { document: keyOf(this.owner.data.document) },
         signal,
-      );
+      ).then(decodeEditStateResponse);
       this.owner.data = nextData;
       const { sheet, ref } = this.owner.context();
       if (await this.owner.bindGridBase(nextData, signal, sheet, ref)) {

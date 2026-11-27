@@ -8,6 +8,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.app.json --noEmit",
     "lint": "eslint internal/ui/src --max-warnings=0",
+    "generate:http": "go run ./tools/httpcontract && node tools/frontend/generate-http.mjs",
     "arch:check": "node tools/frontend/check-arch.mjs",
     "build:ui": "node tools/frontend/build.mjs",
     "build:ui:check": "node tools/frontend/build.mjs --check",

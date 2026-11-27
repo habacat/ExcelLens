@@ -36,6 +36,7 @@
 | [user/comparison-snapshots.md](user/comparison-snapshots.md) | 完成分析的精确快照、小趋势和分类比较 |
 | [user/functions.md](user/functions.md) | 从引擎生成的函数清单 |
 | [development/frontend-typescript.md](development/frontend-typescript.md) | 前端 TypeScript 五层架构、类型契约、构建与测试规范 |
+| [releases/1.20.1.md](releases/1.20.1.md) | 运行时响应契约、网格尺寸保存与选区分析 |
 | [releases/1.20.0.md](releases/1.20.0.md) | 前端 TypeScript 迁移与交互回归 |
 | [development/architecture.md](development/architecture.md) | 包职责、依赖规则和格式接入方式 |
 | [development/xlsb-compatibility.md](development/xlsb-compatibility.md) | BIFF12 解析、网格呈现边界及原生同源样本复现 |

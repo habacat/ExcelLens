@@ -4,31 +4,21 @@
  * fetching/projection/scheduling, canvas fallback tiles, incremental DOM
  * rendering, range frames, selection highlighting, and initial preview.
  */
+import { GridAppearance } from './grid-appearance.ts';
 import type { ApiClient, MergeRange, SelectionArea, ToastTone } from '../contracts/common.ts';
-import type {
-  CellData,
-  PreviewResponse,
-  RowData,
-  SheetViewportResponse,
-  StylesResponse,
-  VisualStyle,
-} from '../contracts/workbook.ts';
+import type { CellData, RowData, SheetViewportResponse, VisualStyle } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
 import { errorMessage } from '../core/display-format.ts';
-import { byId, requireButton, requireEl, requireSelect } from '../core/dom.ts';
+import { byId, requireButton, requireEl } from '../core/dom.ts';
 import type { FileFormatsRegistry } from '../core/formats.ts';
-import { askOverlay } from '../core/overlays.ts';
 import { CellPresenter, isTextCell, selectionFill, type ColumnLayoutItem } from './cell-view.ts';
-import { conditionalColor, conditionalVisual, sameConditional } from './conditional.ts';
-import type { BorderEdgeContext, FrozenPanes } from './freeze.ts';
-import { Geometry } from './geometry.ts';
+import { conditionalColor, sameConditional } from './conditional.ts';
+import type { FrozenPanes } from './freeze.ts';
+import { BASE_ROW, Geometry } from './geometry.ts';
+import { fontStack } from './display-font.ts';
+import { GridSizing } from './grid-sizing.ts';
 import { paintMissingCells, type PaintMissingTheme } from './grid-backdrop.ts';
-import {
-  borderRuns,
-  chooseBorder,
-  paintBorder,
-  usedBorderWidth,
-} from './grid-borders.ts';
+import { usedBorderWidth } from './grid-borders.ts';
 import type { Pictures } from './images.ts';
 import type { MergedCells } from './merges.ts';
 import { MultiSelection, type SelectionHighlight } from './multi-selection.ts';
@@ -63,6 +53,9 @@ import {
 } from './viewport-cache.ts';
 import { ViewportScheduler, type SchedulerItem } from './viewport-scheduler.ts';
 import type { ScrollMotion, VirtualScroll } from './virtual-scroll.ts';
+import { decodeSheetPreview, decodeSheetViewport } from '../core/viewport-response.ts';
+export { BASE_ROW, BASE_COL } from './geometry.ts';
+export { fontStack, isKnownFont } from './display-font.ts';
 
 const reread = <T>(read: () => T): T => read();
 
@@ -71,9 +64,6 @@ interface GridColumnLayout extends ColumnLayoutItem {
   readonly letter: string;
   readonly left: number;
 }
-
-export const BASE_ROW = 25;
-export const BASE_COL = 132;
 export const HEADER_BASE = 27;
 export const DOM_MARGIN_BUDGET = 2600;
 export const PREFETCH_CELL_BUDGET = 12000;
@@ -81,68 +71,6 @@ export const TEXT_SPILL_LOOKAHEAD = 12;
 export const MAX_ROWS_PER_REQUEST = 150;
 export const MAX_COLS_PER_REQUEST = 80;
 export const VIEWPORT_CACHE_BUDGET = 24 * 1024 * 1024;
-
-export const FONT_STACKS: Readonly<Record<string, string>> = Object.freeze({
-  宋体: '"SimSun", "宋体", "Songti SC", "Noto Serif CJK SC", serif',
-  新宋体: '"NSimSun", "新宋体", "SimSun", "宋体", serif',
-  楷体: '"KaiTi", "楷体", "Kaiti SC", "STKaiti", serif',
-  仿宋: '"FangSong", "仿宋", "STFangsong", serif',
-  微软雅黑: '"Microsoft YaHei", "微软雅黑", "Microsoft YaHei UI", sans-serif',
-  等线: '"DengXian", "等线", "Microsoft YaHei", sans-serif',
-  黑体: '"SimHei", "黑体", "Microsoft YaHei", sans-serif',
-  华文宋体: '"STSong", "华文宋体", "SimSun", serif',
-  华文楷体: '"STKaiti", "华文楷体", "KaiTi", serif',
-  华文仿宋: '"STFangsong", "华文仿宋", "FangSong", serif',
-  隶书: '"LiSu", "隶书", "SimSun", serif',
-  Arial: 'Arial, "Microsoft YaHei", sans-serif',
-  'Microsoft Sans Serif': '"Microsoft Sans Serif", "SimSun", "宋体", sans-serif',
-  Carlito: 'Carlito, Calibri, "Microsoft YaHei", sans-serif',
-  Calibri: 'Calibri, Carlito, "Microsoft YaHei", sans-serif',
-  Consolas: 'Consolas, "Microsoft YaHei", monospace',
-});
-
-export const FONT_ALIASES: Readonly<Record<string, string>> = Object.freeze({
-  SimSun: '宋体',
-  NSimSun: '新宋体',
-  KaiTi: '楷体',
-  FangSong: '仿宋',
-  DengXian: '等线',
-  SimHei: '黑体',
-  'Microsoft YaHei': '微软雅黑',
-  'Microsoft YaHei UI': '微软雅黑',
-  STKaiti: '华文楷体',
-  STSong: '华文宋体',
-  STFangsong: '华文仿宋',
-  LiSu: '隶书',
-});
-
-export function fontStack(value: string | null | undefined): string {
-  const name = (value ?? '').trim().slice(0, 96);
-  if (!name) return '';
-  const normalized = FONT_ALIASES[name] ?? name;
-  const known = FONT_STACKS[normalized];
-  if (known) return known;
-  return `"${name.replace(/["\\\n\r]/g, '')}", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`;
-}
-
-export function isKnownFont(font: string): boolean {
-  return Object.hasOwn(FONT_STACKS, font);
-}
-
-const STYLE_ALIGN: Readonly<Record<string, string>> = {
-  left: 'flex-start',
-  center: 'center',
-  right: 'flex-end',
-  justify: 'space-between',
-  distributed: 'space-around',
-  centerContinuous: 'center',
-};
-
-const STYLE_VERTICAL: Readonly<Record<string, string>> = {
-  top: 'flex-start',
-  center: 'center',
-  bottom: 'flex-end',
-};
 
 export function sameRenderedCell(
   a: CellData | null | undefined,
@@ -323,6 +251,8 @@ export interface ViewportPipelineDeps {
 }
 
 export class ViewportPipeline {
+  readonly sizing: GridSizing;
+  readonly appearance: GridAppearance;
   private readonly d: ViewportPipelineDeps;
   public readonly cellPresenter: CellPresenter;
   public readonly frozenPresenter: CellPresenter;
@@ -333,7 +263,6 @@ export class ViewportPipeline {
   private columnVisibilityKey = '';
   public foregroundLookups = 0;
   public foregroundHits = 0;
-  private readonly cellStyleCache = new Map<string, string>();
   private fallbackPalette: CanvasThemePalette | null = null;
   private readonly styleTiles = new Map<string, CachedCanvasTile>();
   private styleIdentity = '';
@@ -345,14 +274,23 @@ export class ViewportPipeline {
   private poolCells = 0;
   private selectionRasterRatio = 0;
   private selectionRasterStep = 1;
-  private readonly autoFitCtx: CanvasRenderingContext2D | null;
 
   constructor(deps: ViewportPipelineDeps) {
     this.d = deps;
+    this.appearance = new GridAppearance({
+      S: deps.S, api: deps.api, colName: deps.colName, toast: deps.toast,
+      rowTop: row => this.rowTop(row), colLeft: col => this.colLeft(col),
+      activeMerge: (row, col) => this.activeMerge(row, col),
+      nextVisibleRow: row => this.nextVisibleRow(row),
+      repaint: () => {
+        this.renderGridFromCurrentWindow();
+        deps.getFrozenPanes().schedule(true);
+      },
+    });
     const presenterOptions = {
       state: deps.S,
       applyStyle: (node: HTMLElement, cell: Partial<CellData> | null | undefined) =>
-        this.applyCellStyle(node, cell),
+        this.appearance.applyCellStyle(node, cell),
       colName: deps.colName,
       scale: () => this.scale(),
       fontStack,
@@ -370,8 +308,12 @@ export class ViewportPipeline {
     this.scheduler = new ViewportScheduler<TileJobItem, ViewportEntry | undefined>((job, signal) =>
       this.readViewportTile(job, signal),
     );
-    const canvas = document.createElement('canvas');
-    this.autoFitCtx = canvas.getContext('2d');
+    this.sizing = new GridSizing({
+      S: deps.S, geometry: deps.geometry, api: deps.api, toast: deps.toast,
+      colName: deps.colName, sourceColLimit: deps.sourceColLimit,
+      scale: () => this.scale(), rowHeight: row => this.rowHeight(row),
+      colWidth: col => this.colWidth(col), relayoutGrid: () => this.relayoutGrid(),
+    });
   }
 
   // ---- Geometry & Virtual Scroll ----
@@ -498,315 +440,6 @@ export class ViewportPipeline {
     return this.colLeft(count + 1);
   }
 
-  // ---- Style Palette & Fonts ----
-
-  async loadStylePalette(): Promise<void> {
-    const { S, api, toast } = this.d;
-    try {
-      const response = await api<StylesResponse>('/api/styles');
-      S.styles = [...(response.styles ?? [])];
-      if (response.richTextNotice) toast(response.richTextNotice, 'warning');
-    } catch (error: unknown) {
-      S.styles = [];
-      toast(`原始格式暂不可用：${errorMessage(error)}`, 'error');
-    }
-  }
-
-  applyDisplayFont(node: HTMLElement, sourceName: string | undefined): void {
-    const { S } = this.d;
-    const chosen = S.fontOverride || (S.showStyles ? (sourceName ?? '') : '');
-    if (chosen) node.style.fontFamily = fontStack(chosen);
-    else node.style.removeProperty('font-family');
-  }
-
-  repaintDisplayFonts(): void {
-    this.renderGridFromCurrentWindow();
-    this.d.getFrozenPanes().schedule(true);
-  }
-
-  setDisplayFontSelection(font: string): void {
-    this.d.S.fontOverride = font;
-    const picker = requireSelect('fontSelect');
-    picker.value = font;
-    picker.title = `显示字体（${picker.selectedOptions[0]?.text || font}）`;
-  }
-
-  async changeDisplayFont(font: string): Promise<void> {
-    const { S, api, toast } = this.d;
-    if (!S.indexReady || !S.sheet || (!isKnownFont(font) && font !== '')) return;
-    this.setDisplayFontSelection(font);
-    this.repaintDisplayFonts();
-    const sheet = S.sheet;
-    try {
-      await api('/api/layout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet, kind: 'font', font }),
-      });
-    } catch (err: unknown) {
-      toast(`字体设置保存失败：${errorMessage(err)}`, 'error');
-    }
-  }
-
-  applyCellStyle(node: HTMLElement, cell: Partial<CellData> | null | undefined): void {
-    const { S } = this.d;
-    if (!cell || node.style.cssText || cell.conditional) {
-      this.writeCellStyle(node, cell);
-      return;
-    }
-    const numeric =
-      cell.type === 'n' || (!cell.type && Boolean(cell.raw) && Number.isFinite(Number(cell.raw)));
-    const key = [
-      cell.style ?? 0,
-      S.showStyles,
-      S.zoom,
-      S.fontOverride,
-      cell.valueColor ?? '',
-      numeric,
-    ].join('|');
-    let css = this.cellStyleCache.get(key);
-    if (css === undefined) {
-      this.writeCellStyle(node, cell);
-      css = node.style.cssText;
-      if (this.cellStyleCache.size >= 512) this.cellStyleCache.clear();
-      this.cellStyleCache.set(key, css);
-    } else if (css) {
-      node.style.cssText = css;
-    }
-  }
-
-  writeCellStyle(node: HTMLElement, cell: Partial<CellData> | null | undefined): void {
-    const { S } = this.d;
-    const p = node.style;
-    for (const property of ['--xl-fill', '--xl-color']) p.removeProperty(property);
-    p.fontSize = '';
-    p.fontWeight = '';
-    p.fontStyle = '';
-    p.textDecoration = '';
-    p.textDecorationStyle = '';
-    p.textUnderlinePosition = '';
-    p.justifyContent = '';
-    p.alignItems = '';
-    p.textAlign = '';
-    p.whiteSpace = '';
-    p.wordBreak = '';
-    if (!cell) {
-      this.applyDisplayFont(node, '');
-      return;
-    }
-    const visual = this.cellPresenter.style(cell);
-    if (!S.showStyles || !visual) {
-      this.applyDisplayFont(node, '');
-      return;
-    }
-    if (visual.background) p.setProperty('--xl-fill', visual.background);
-    const ink = conditionalColor(cell, visual);
-    if (ink) p.setProperty('--xl-color', ink);
-    this.applyDisplayFont(node, visual.fontName);
-    if (visual.fontSize) p.fontSize = `${((visual.fontSize * (4 / 3) * S.zoom) / 100)}px`;
-    if (visual.bold) p.fontWeight = '700';
-    if (visual.italic) p.fontStyle = 'italic';
-    if (visual.underline || visual.strike) {
-      p.textDecoration = [visual.underline && 'underline', visual.strike && 'line-through']
-        .filter(Boolean)
-        .join(' ');
-    }
-    const underline = cell.conditional?.style?.font.underline || visual.underlineStyle || '';
-    if (underline === 'double' || underline === 'doubleAccounting') {
-      p.textDecorationStyle = 'double';
-    }
-    if (underline.endsWith('Accounting')) p.textUnderlinePosition = 'under';
-    const horiz = visual.horizontal ? STYLE_ALIGN[visual.horizontal] : undefined;
-    if (horiz) {
-      p.justifyContent = horiz;
-      if (visual.wrap && visual.horizontal) {
-        p.textAlign = visual.horizontal === 'centerContinuous' ? 'center' : visual.horizontal;
-      }
-    } else if (
-      (!visual.horizontal || visual.horizontal === 'general') &&
-      (cell.type === 'n' || (!cell.type && Boolean(cell.raw) && Number.isFinite(Number(cell.raw))))
-    ) {
-      p.justifyContent = 'flex-end';
-    }
-    const vert = visual.vertical ? STYLE_VERTICAL[visual.vertical] : undefined;
-    if (vert) p.alignItems = vert;
-    if (visual.wrap) {
-      p.whiteSpace = 'normal';
-      p.wordBreak = 'break-word';
-    }
-  }
-
-  visualForBorder(cell: CellData | null | undefined, row?: RowData | null): VisualStyle {
-    const { S } = this.d;
-    if (!S.showStyles) return {};
-    return conditionalVisual(cell, S.styles, row?.style ?? 0) ?? {};
-  }
-
-  private mergedVisualBorder(
-    own: VisualStyle,
-    range: MergeRange,
-    models: ReadonlyMap<string, CellData> = this.d.S.cellMap,
-  ): VisualStyle {
-    const { S, colName } = this.d;
-    const at = (r: number, c: number): VisualStyle => {
-      const ref = `${colName(c)}${r}`;
-      return this.visualForBorder(models.get(ref) ?? S.frozenCellMap.get(ref));
-    };
-    const tr = at(range.row, range.endCol);
-    const bl = at(range.endRow, range.col);
-    const br = at(range.endRow, range.endCol);
-    return {
-      ...own,
-      borderTop: own.borderTop || tr.borderTop,
-      borderLeft: own.borderLeft || bl.borderLeft,
-      borderRight: tr.borderRight || br.borderRight || own.borderRight,
-      borderBottom: bl.borderBottom || br.borderBottom || own.borderBottom,
-    };
-  }
-
-  updateSharedBorders(
-    node: GridCellElement,
-    cell: CellData | null | undefined,
-    row: RowData | null | undefined,
-    rightCell: CellData | null | undefined,
-    rightRow: RowData | null | undefined,
-    belowCell: CellData | null | undefined,
-    belowRow: RowData | null | undefined,
-    edge: BorderEdgeContext = {},
-  ): void {
-    const { S, colName } = this.d;
-    const r = Number(node.dataset.row);
-    const c = Number(node.dataset.col);
-    const merge = edge.mergeFree ? null : this.activeMerge(r, c);
-    const anchor = merge?.row === r && merge.col === c;
-    if (merge && !anchor) return;
-    if (!S.showStyles) {
-      paintBorder(node, 'right', '', (idx) => this.rowTop(idx));
-      paintBorder(node, 'bottom', '', (idx) => this.colLeft(idx));
-      if (node._xlOuterLeft) {
-        node.style.removeProperty('border-left');
-        node._xlOuterLeft = '';
-      }
-      if (node._xlOuterTop) {
-        node.style.removeProperty('border-top');
-        node._xlOuterTop = '';
-      }
-      return;
-    }
-    if (edge.mergeFree && edge.nextCol && belowRow && !edge.outerTop && !edge.outerLeft) {
-      const own = this.visualForBorder(cell, row);
-      const right = this.visualForBorder(rightCell, rightRow);
-      const below = this.visualForBorder(belowCell, belowRow);
-      const x =
-        chooseBorder(own.borderRight, right.borderLeft) ||
-        (own.background || right.background ? '0px' : '');
-      const y =
-        chooseBorder(own.borderBottom, below.borderTop) ||
-        (own.background || below.background ? '0px' : '');
-      paintBorder(node, 'right', x, (idx) => this.rowTop(idx), y);
-      paintBorder(node, 'bottom', y, (idx) => this.colLeft(idx), x);
-      if (node._xlOuterLeft) {
-        node.style.removeProperty('border-left');
-        node._xlOuterLeft = '';
-      }
-      if (node._xlOuterTop) {
-        node.style.removeProperty('border-top');
-        node._xlOuterTop = '';
-      }
-      return;
-    }
-    const models = edge.cellMap ?? S.cellMap;
-    const own = anchor
-      ? this.mergedVisualBorder(this.visualForBorder(cell, row), merge, models)
-      : this.visualForBorder(cell, row);
-    const endRow = merge?.endRow ?? r;
-    const endCol = merge?.endCol ?? c;
-    const rightCol = anchor
-      ? (edge.columns?.find((col) => col > endCol) ?? endCol + 1)
-      : (edge.nextCol ?? c + 1);
-    const under = !anchor && belowRow ? belowRow.number : this.nextVisibleRow(endRow + 1) || endRow + 1;
-    const opposite = (
-      nr: number,
-      nc: number,
-      data: RowData | null | undefined,
-      direct: CellData | null | undefined,
-    ): VisualStyle => {
-      const range = edge.mergeFree ? null : this.activeMerge(nr, nc);
-      if (!range && direct !== undefined) return this.visualForBorder(direct, data);
-      const rr = range?.row ?? nr;
-      const cc = range?.col ?? nc;
-      const ref = `${colName(cc)}${rr}`;
-      const record = data?.number === rr ? data : edge.rows?.get(rr);
-      const model =
-        (rr === nr && cc === nc ? direct : null) ??
-        models.get(ref) ??
-        S.frozenCellMap.get(ref) ??
-        record?.cells.find((item) => item.col === cc);
-      const visual = this.visualForBorder(model, record);
-      return range ? this.mergedVisualBorder(visual, range, models) : visual;
-    };
-    const directRight = endCol === c && edge.nextCol ? (rightCell ?? null) : undefined;
-    const directBelow = endRow === r && belowRow ? (belowCell ?? null) : undefined;
-    const seam = (
-      primary: string | undefined,
-      neighbor: VisualStyle,
-      side: 'borderLeft' | 'borderTop',
-    ): string => chooseBorder(primary, neighbor[side]) || (own.background || neighbor.background ? '0px' : '');
-    const rightAt = (rr: number): string =>
-      seam(
-        own.borderRight,
-        opposite(rr, rightCol, rr === r ? rightRow : null, rr === r ? directRight : undefined),
-        'borderLeft',
-      );
-    const bottomAt = (cc: number): string =>
-      seam(
-        own.borderBottom,
-        opposite(under, cc, belowRow, cc === c ? directBelow : undefined),
-        'borderTop',
-      );
-    const fallback = own.background ? '0px' : '';
-    const right =
-      endRow === r
-        ? rightAt(r)
-        : borderRuns(
-            r,
-            endRow,
-            edge.lastRow ?? endRow,
-            (idx) => this.nextVisibleRow(idx),
-            rightAt,
-            own.borderRight || fallback,
-            edge.firstRow,
-          );
-    const bottom =
-      endCol === c
-        ? bottomAt(c)
-        : borderRuns(
-            c,
-            endCol,
-            edge.columns?.at(-1) ?? endCol,
-            (i) => i,
-            bottomAt,
-            own.borderBottom || fallback,
-            edge.columns?.[0],
-          );
-    const left = edge.outerLeft && this.colLeft(c) === 0 ? (own.borderLeft ?? '') : '';
-    const top = edge.outerTop ? (own.borderTop ?? '') : '';
-    const bottomCross = typeof bottom === 'string' ? bottom : '';
-    const rightCross = typeof right === 'string' ? right : '';
-    paintBorder(node, 'right', right, (idx) => this.rowTop(idx), top || bottomCross);
-    paintBorder(node, 'bottom', bottom, (idx) => this.colLeft(idx), left || rightCross);
-    if (node._xlOuterLeft !== left) {
-      node._xlOuterLeft = left;
-      if (left) node.style.borderLeft = left;
-      else node.style.removeProperty('border-left');
-    }
-    if (node._xlOuterTop !== top) {
-      node._xlOuterTop = top;
-      if (top) node.style.borderTop = top;
-      else node.style.removeProperty('border-top');
-    }
-  }
-
   // ---- Canvas Sizing & Resize / AutoFit ----
 
   syncFreezeScrollGutters(): void {
@@ -868,231 +501,6 @@ export class ViewportPipeline {
       S.maxRow = neededRows;
       S.maxCol = neededCols;
       this.updateCanvasSize();
-    }
-  }
-
-  async commitResize(kind: 'row' | 'col', index: number, size: number): Promise<void> {
-    const { S, geometry, api, toast } = this.d;
-    if (!S.indexReady || !S.sheet) return;
-    if (kind === 'row' && S.filtered) {
-      toast('筛选视图暂不调整单行高度，请清除筛选后操作', 'warning');
-      return;
-    }
-    const sheet = S.sheet;
-    const epoch = S.sheetEpoch;
-    const axis = kind === 'row' ? geometry.rows : geometry.cols;
-    const original = axis.values.get(index) ?? 0;
-    const sizeStore = kind === 'col' ? S.columnWidths : S.rowSizes;
-    const previousLayoutSize = sizeStore[String(index)];
-    if (kind === 'col' && S.hiddenColumns.has(index)) {
-      toast('请先显示该列，再调整列宽', 'warning');
-      return;
-    }
-    const effective = size || (kind === 'col' ? (S.sourceColumnWidths[String(index)] ?? 0) : 0);
-    if (!geometry.set(kind, index, effective)) return;
-    if (size) sizeStore[String(index)] = size;
-    else Reflect.deleteProperty(sizeStore, String(index));
-    try {
-      await api('/api/layout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet, kind, index, size }),
-      });
-    } catch (error: unknown) {
-      if (S.sheet === sheet && S.sheetEpoch === epoch) {
-        geometry.set(kind, index, original);
-        if (previousLayoutSize) sizeStore[String(index)] = previousLayoutSize;
-        else Reflect.deleteProperty(sizeStore, String(index));
-      }
-      toast(`保存尺寸失败：${errorMessage(error)}`, 'error');
-    }
-    if (S.sheet !== sheet || S.sheetEpoch !== epoch) return;
-    this.relayoutGrid();
-  }
-
-  async promptResize(kind: 'row' | 'col', explicitIndex?: number): Promise<void> {
-    const { S, colName, toast } = this.d;
-    if (kind === 'row' && S.filtered) {
-      toast('请先清除筛选，再调整单行高度', 'warning');
-      return;
-    }
-    const index = explicitIndex ?? (kind === 'row' ? (S.selected?.row ?? 1) : (S.selected?.col ?? 1));
-    const oldValue = kind === 'row' ? this.rowHeight(index) : this.colWidth(index);
-    const low = kind === 'row' ? 14 : 32;
-    const high = kind === 'row' ? 500 : 800;
-    const sheet = S.sheet;
-    const epoch = S.sheetEpoch;
-    const valid = (text: string): boolean =>
-      /^\d+$/.test(text) && (Number(text) === 0 || (Number(text) >= low && Number(text) <= high));
-    const answer = await askOverlay({
-      title: kind === 'row' ? `第 ${index} 行的行高` : `${colName(index)} 列的列宽`,
-      label: `像素，${low}–${high}`,
-      value: String(Math.round(oldValue / this.scale())),
-      inputMode: 'numeric',
-      alternative: '恢复默认',
-      validate: (text) => (valid(text) ? '' : `请输入 ${low} 到 ${high} 之间的整数`),
-    });
-    if (!answer || S.sheet !== sheet || S.sheetEpoch !== epoch) return;
-    await this.commitResize(kind, index, answer.alternative ? 0 : Number(answer.value));
-  }
-
-  bindResizeGrip(grip: HTMLElement, kind: 'row' | 'col', index: number): void {
-    const { S, colName, toast } = this.d;
-    grip.title =
-      kind === 'row'
-        ? `拖动调整第 ${index} 行高度；双击按内容自动适应`
-        : `拖动调整 ${colName(index)} 列宽度；双击抽样全部数据自动适应`;
-    grip.addEventListener('pointerdown', (event: PointerEvent) => {
-      if (event.button !== 0) return;
-      if (kind === 'row' && S.filtered) {
-        event.preventDefault();
-        event.stopPropagation();
-        toast('请先清除筛选，再调整单行高度', 'warning');
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      const start = kind === 'row' ? event.clientY : event.clientX;
-      const previous = kind === 'row' ? this.rowHeight(index) : this.colWidth(index);
-      const guide = requireEl('resizeGuide');
-      let next = previous / this.scale();
-      const host = requireEl('grid').getBoundingClientRect();
-      const update = (delta: number): void => {
-        next = Math.max(
-          kind === 'row' ? 14 : 32,
-          Math.min(kind === 'row' ? 500 : 800, (previous + delta) / this.scale()),
-        );
-        guide.hidden = false;
-        guide.className = `resize-guide ${kind === 'row' ? 'horizontal' : 'vertical'}`;
-        if (kind === 'row') {
-          guide.style.top = `${Math.min(host.height - 1, Math.max(0, event.clientY - host.top + delta))}px`;
-          guide.style.left = '0';
-          guide.style.width = '100%';
-        } else {
-          guide.style.left = `${Math.min(host.width - 1, Math.max(0, event.clientX - host.left + delta))}px`;
-          guide.style.top = '0';
-          guide.style.height = '100%';
-        }
-      };
-      const move = (e: PointerEvent): void => {
-        e.preventDefault();
-        update((kind === 'row' ? e.clientY : e.clientX) - start);
-      };
-      const end = (e: Event): void => {
-        document.removeEventListener('pointermove', move, true);
-        document.removeEventListener('pointerup', end, true);
-        document.removeEventListener('pointercancel', cancel, true);
-        window.removeEventListener('blur', cancel);
-        guide.hidden = true;
-        if (e.type === 'pointercancel') return;
-        const px =
-          kind === 'row' ? Math.max(14, Math.min(500, next)) : Math.max(32, Math.min(800, next));
-        void this.commitResize(kind, index, Math.round(px));
-      };
-      const cancel = (e: Event): void => end(e);
-      document.addEventListener('pointermove', move, true);
-      document.addEventListener('pointerup', end, true);
-      document.addEventListener('pointercancel', cancel, true);
-      window.addEventListener('blur', cancel);
-      update(0);
-    });
-    grip.addEventListener('click', (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
-    grip.addEventListener('dblclick', (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void this.autoFitSize(kind, index);
-    });
-  }
-
-  private measureAutoFit(
-    text: string,
-    visual: VisualStyle | null | undefined,
-  ): { readonly size: number; readonly width: number; readonly lines: readonly string[] } {
-    const { S } = this.d;
-    const size = S.showStyles && visual?.fontSize && visual.fontSize > 0
-      ? Math.min(80, (visual.fontSize * 4) / 3)
-      : 11;
-    if (this.autoFitCtx) {
-      const name = S.fontOverride || (S.showStyles ? visual?.fontName : '') || 'Segoe UI';
-      this.autoFitCtx.font = `${visual?.italic ? 'italic ' : ''}${visual?.bold ? 'bold ' : ''}${size}px ${fontStack(name)}`;
-    }
-    const lines = text.slice(0, 2048).split(/\r?\n/);
-    const widths = lines.map((line) =>
-      this.autoFitCtx ? this.autoFitCtx.measureText(line).width : line.length * size * 0.8,
-    );
-    return { size, width: Math.max(0, ...widths), lines };
-  }
-
-  async autoFitSize(kind: 'row' | 'col', index: number): Promise<void> {
-    const { S, api, geometry, colName, sourceColLimit, toast } = this.d;
-    if (!S.indexReady || !S.sheet) return;
-    if (kind === 'row' && S.filtered) {
-      toast('筛选后请先清除筛选，再自动调整行高', 'warning');
-      return;
-    }
-    const sheet = S.sheet;
-    const epoch = S.sheetEpoch;
-    const params = new URLSearchParams({ sheet, kind, index: String(index) });
-    if (kind === 'row') {
-      const first = S.window?.startCol ?? 1;
-      params.set('firstCol', String(first));
-      params.set('lastCol', String(Math.min(sourceColLimit(), first + 79)));
-    }
-    try {
-      const data = await api<{ readonly rows?: readonly RowData[] }>(`/api/autofit?${params.toString()}`);
-      if (epoch !== S.sheetEpoch || sheet !== S.sheet) return;
-      let result = kind === 'col' ? 65 : BASE_ROW;
-      if (kind === 'col') {
-        for (const row of data.rows ?? []) {
-          for (const cell of row.cells) {
-            const text = cell.display || cell.raw;
-            if (!text) continue;
-            const width = this.measureAutoFit(text, S.styles[cell.style ?? 0]).width;
-            result = Math.max(result, Math.min(800, Math.ceil(width + 22)));
-          }
-        }
-        result = Math.max(32, Math.min(800, result));
-      } else {
-        for (const row of data.rows ?? []) {
-          for (const cell of row.cells) {
-            const visual = S.showStyles ? S.styles[cell.style ?? 0] : null;
-            const text = cell.display || cell.raw;
-            if (!text) continue;
-            const measured = this.measureAutoFit(text, visual);
-            let lines = measured.lines.length;
-            if (visual?.wrap) {
-              const width = Math.max(24, geometry.cols.measure(cell.col) - 16);
-              lines = measured.lines.reduce(
-                (n, line) =>
-                  n +
-                  Math.max(
-                    1,
-                    Math.ceil(
-                      (this.autoFitCtx
-                        ? this.autoFitCtx.measureText(line).width
-                        : line.length * measured.size * 0.8) / width,
-                    ),
-                  ),
-                0,
-              );
-            }
-            result = Math.max(result, Math.ceil(lines * measured.size * 1.35 + 8));
-          }
-        }
-        result = Math.max(14, Math.min(500, result));
-      }
-      await this.commitResize(kind, index, result);
-      if (epoch === S.sheetEpoch) {
-        toast(
-          `${kind === 'col' ? `${colName(index)} 列` : `第 ${index} 行`}已根据${kind === 'col' ? '抽样内容' : '当前查看列'}自动调整`,
-          'success',
-        );
-      }
-    } catch (err: unknown) {
-      if (epoch === S.sheetEpoch) toast(`自动调整失败：${errorMessage(err)}`, 'error');
     }
   }
 
@@ -1620,7 +1028,7 @@ export class ViewportPipeline {
           return { background: theme.band };
         }
       }
-      return this.visualForBorder(data, record.row);
+      return this.appearance.visualForBorder(data, record.row);
     };
     let deferred = false;
     for (const { key, tx, ty, visible } of desired) {
@@ -1736,7 +1144,7 @@ export class ViewportPipeline {
     this.cancelGridWork();
     this.rowPool.clear();
     this.poolCells = 0;
-    this.cellStyleCache.clear();
+    this.appearance.clearCache();
     this.finishedCells.clear();
     this.scheduler.reset();
     motion.reset();
@@ -1983,10 +1391,10 @@ export class ViewportPipeline {
     } else {
       params.set('row', String(request.row));
     }
-    const data = await api<SheetViewportResponse>(`/api/sheet?${params.toString()}`, {
+    const data = await api(`/api/sheet?${params.toString()}`, {
       signal,
       activity: false,
-    });
+    }, decodeSheetViewport);
     if (signal.aborted || job.epoch !== S.sheetEpoch || request.context !== this.viewportContext()) {
       return undefined;
     }
@@ -2111,9 +1519,10 @@ export class ViewportPipeline {
     const controller = new AbortController();
     S.previewAbort = controller;
     try {
-      const data = await api<PreviewResponse>(
+      const data = await api(
         `/api/preview?compact=1&sheet=${encodeURIComponent(name)}`,
         { signal: controller.signal },
+        decodeSheetPreview,
       );
       if (controller.signal.aborted || epoch !== S.sheetEpoch || S.indexReady || !data.available) {
         return;
@@ -2852,7 +2261,7 @@ export class ViewportPipeline {
         rowHead.title = `${rowNumber} · 拖动下边缘调整行高`;
         const grip = document.createElement('span');
         grip.className = 'row-resize-grip';
-        this.bindResizeGrip(grip, 'row', rowNumber);
+        this.sizing.bindResizeGrip(grip, 'row', rowNumber);
         rowHead.append(grip);
         row.appendChild(rowHead);
         newNodes.appendChild(row);
@@ -3064,7 +2473,7 @@ export class ViewportPipeline {
         this.updateGridCellGeometry(cell, layout);
         cell._xlNextCol = nextCol;
         if (!cloned) {
-          this.updateSharedBorders(
+          this.appearance.updateSharedBorders(
             cell,
             cellData,
             rowData,
@@ -3086,7 +2495,7 @@ export class ViewportPipeline {
           );
         }
         if (layoutIndex === 0 && col === 1) {
-          const border = this.visualForBorder(cellData, rowData).borderLeft ?? '';
+          const border = this.appearance.visualForBorder(cellData, rowData).borderLeft ?? '';
           if (row._xlHeaderSeam !== border) {
             row._xlHeaderSeam = border;
             if (headChild instanceof HTMLElement) {
@@ -3288,7 +2697,7 @@ export class ViewportPipeline {
       }
       const grip = document.createElement('span');
       grip.className = 'column-resize-grip';
-      this.bindResizeGrip(grip, 'col', col);
+      this.sizing.bindResizeGrip(grip, 'col', col);
       head.append(grip);
       head.addEventListener('click', (event: MouseEvent) => {
         if (

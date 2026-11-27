@@ -3,13 +3,7 @@
  * data-edge jump, browsing history, hyperlink traversal, and selection updates.
  */
 import type { CellPoint, CellRef, MergeRange, SelectionArea } from '../contracts/common.ts';
-import type {
-  CellData,
-  CellHyperlink,
-  CellResponse,
-  FilterLocateResponse,
-  NavigateResponse,
-} from '../contracts/workbook.ts';
+import type { CellData, CellHyperlink } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireEl, requireInput } from '../core/dom.ts';
 import type { FileFormats } from '../core/formats.ts';
@@ -18,6 +12,11 @@ import type { FrozenPanes } from './freeze.ts';
 import type { MergedCells } from './merges.ts';
 import { MultiSelection, type SelectionHighlight } from './multi-selection.ts';
 import type { ViewportRequest, WorkbookState } from './state.ts';
+import {
+  decodeCellResponse,
+  decodeFilterLocateResponse,
+  decodeNavigateResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface ParsedNameAddress {
   readonly sheet: string;
@@ -569,7 +568,7 @@ export class GridNavigation {
       excludeThroughRow: String(through),
     });
     if (S.rowView) params.set('viewId', S.rowView.id);
-    const match = await api<FilterLocateResponse>(`/api/filter/locate?${params.toString()}`);
+    const match = await api(`/api/filter/locate?${params.toString()}`, undefined, decodeFilterLocateResponse);
     return match.found && match.row === row ? match.visualIndex : 0;
   }
 
@@ -577,7 +576,7 @@ export class GridNavigation {
     const { S, api } = this.d;
     const params = new URLSearchParams({ sheet, ref });
     if (!S.showStyles) params.set('conditional', '0');
-    const data = await api<CellResponse>(`/api/cell?${params.toString()}`);
+    const data = await api(`/api/cell?${params.toString()}`, undefined, decodeCellResponse);
     return data.cell;
   }
 
@@ -859,9 +858,9 @@ export class GridNavigation {
     setStatus(`正在查找 ${direction === 'up' || direction === 'down' ? '列' : '行'}数据边界…`);
     try {
       const params = new URLSearchParams({ sheet, ref: origin, direction });
-      const result = await api<NavigateResponse>(`/api/navigate?${params.toString()}`, {
+      const result = await api(`/api/navigate?${params.toString()}`, {
         signal: abort.signal,
-      });
+      }, decodeNavigateResponse);
       if (abort.signal.aborted || ticket !== S.navigationTicket || S.sheetEpoch !== epoch || S.sheet !== sheet) {
         return;
       }

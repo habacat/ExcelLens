@@ -291,25 +291,31 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			writeError(w, 404, "文件已移动或不存在。可以从列表移除该记录，或重新选择文件。")
 			return
 		}
+		var wb *workbook.Workbook
 		if item.ArchivePath != "" {
-			err = a.reopenArchiveRecent(req.Context(), item)
+			wb, err = a.reopenArchiveRecent(req.Context(), item)
 			if err == nil {
-				a.recordRecent(a.currentWorkbook())
+				a.recordRecent(wb)
 			}
 		} else {
-			err = a.openPathAs(item.Path, item.Name)
+			wb, err = a.openPathAs(item.Path, item.Name)
 		}
 		if err != nil {
 			writeError(w, 400, fmt.Sprintf("无法打开最近文件：%v", err))
 			return
 		}
-		wb := a.currentWorkbook()
+		if wb == nil || wb != a.currentWorkbook() {
+			writeError(w, http.StatusConflict, "工作簿已切换，请重新打开最近文件")
+			return
+		}
 		memberStat, statErr := os.Stat(wb.Path)
 		if statErr != nil {
 			writeError(w, 404, "刚打开的源文件已移动或删除，请重新选择")
 			return
 		}
-		writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "fileName": workbookDisplayName(wb), "fileSize": memberStat.Size(), "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo, "archive": a.archiveSummary()})
+		status := openedWorkbook(wb, workbookDisplayName(wb), memberStat.Size())
+		status.Archive = a.archiveSummary()
+		writeJSON(w, status)
 		return
 	default:
 		writeError(w, 400, "不支持的历史记录操作")

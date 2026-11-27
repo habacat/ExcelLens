@@ -1,14 +1,10 @@
 /**
  * Pivot table axis layout editor (rows, columns, and lazy-loaded page item filters).
  */
-import type {
-  PivotChoicesResponse,
-  PivotInfo,
-  PivotItem,
-  PivotPage,
-} from '../contracts/edit.ts';
+import type { PivotInfo, PivotItem, PivotPage } from '../contracts/edit.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireEl, requireInput, requireSelect } from '../core/dom.ts';
+import { decodePivotChoicesResponse } from '../core/http-decoders.generated.ts';
 
 export type PivotAxisKey = 'rows' | 'columns' | 'pages';
 
@@ -30,7 +26,7 @@ export interface PivotLayoutOwner {
   readonly tools: {
     readonly measures: { positions(): void };
   };
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   controls(): void;
 }
 
@@ -309,7 +305,7 @@ export class PivotLayout {
       const info = this.info;
       if (!doc || !info) return;
       try {
-        const reply = await this.editor.post<PivotChoicesResponse>(
+        const reply = await this.editor.post(
           'pivot-items',
           {
             document: { id: doc.id, binding: doc.binding },
@@ -321,7 +317,7 @@ export class PivotLayout {
             offset,
           },
           signal,
-        );
+        ).then(decodePivotChoicesResponse);
         if (current !== ticket || signal?.aborted || !box.isConnected) return;
         for (const item of reply.items) {
           const label = document.createElement('label');

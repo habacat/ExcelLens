@@ -11,16 +11,18 @@ import type {
   SessionService,
   ToastFn,
 } from '../contracts/common.ts';
-import type {
-  BackgroundItem,
-  BackgroundStatusResponse,
-  TaskCheckpointInfo,
-} from '../contracts/features.ts';
+import type { BackgroundItem, TaskCheckpointInfo } from '../contracts/features.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireDialog, requireEl } from '../core/dom.ts';
 import { confirmOverlay } from '../core/overlays.ts';
 import type { ReconcileJobStatus } from './reconcile.ts';
 import type { RecoveredTaskStart } from '../grid/sheet-controller.ts';
+import {
+  decodeAnalysisQueryStatusResponse,
+  decodeBackgroundJobStatusPayload,
+  decodeBackgroundStatusResponse,
+  decodeReconcileJobStatus,
+} from '../core/http-decoders.generated.ts';
 
 const KIND_NAMES: Readonly<Record<string, string>> = {
   analysis: '分析',
@@ -42,7 +44,8 @@ function requireDetails(id: string): HTMLDetailsElement {
   return node;
 }
 
-interface BackgroundJobStatusPayload {
+/** @httpResponse BackgroundJobStatusPayload */
+export interface BackgroundJobStatusPayload {
   readonly status: AsyncJobStatusKind;
   readonly error?: string;
   readonly filter?: SourceFilterSpec;
@@ -94,20 +97,20 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
     if (item.state !== 'done') throw new Error(item.error || item.stage || '任务仍在运行');
     const statusUrl = `${endpoint(item.kind)}/status?id=${encodeURIComponent(item.id)}`;
     if (item.kind === 'analysis') {
-      const status = await api<AnalysisQueryStatusResponse>(statusUrl);
+      const status = await api(statusUrl, undefined, decodeAnalysisQueryStatusResponse);
       if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
       requireDialog('storageDialog').close();
       await analysis(item.id, status);
       return;
     }
     if (item.kind === 'reconcile') {
-      const status = await api<ReconcileJobStatus>(statusUrl);
+      const status = await api(statusUrl, undefined, decodeReconcileJobStatus);
       if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
       requireDialog('storageDialog').close();
       await reconcile(item.id, status);
       return;
     }
-    const status = await api<BackgroundJobStatusPayload>(statusUrl);
+    const status = await api(statusUrl, undefined, decodeBackgroundJobStatusPayload);
     if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
     requireDialog('storageDialog').close();
     if (item.kind !== 'export' && item.kind !== 'search' && item.kind !== 'filter') {
@@ -173,7 +176,7 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
     clearTimeout(timer);
     const ticket = ++serial;
     try {
-      const { items, sessions } = await api<BackgroundStatusResponse>('/api/background');
+      const { items, sessions } = await api('/api/background', undefined, decodeBackgroundStatusResponse);
       if (ticket !== serial || !box.open || !requireDialog('storageDialog').open) return;
       holder.replaceChildren();
       const itemList = items ?? [];
@@ -244,7 +247,7 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
         void (async () => {
           try {
             await workbookReady?.();
-            const { items } = await api<BackgroundStatusResponse>('/api/background');
+            const { items } = await api('/api/background', undefined, decodeBackgroundStatusResponse);
             const item = items?.find((x) => x.id === job && x.session === session.id);
             if (!item) throw new Error('后台结果已到期，请查看已保存的可恢复任务');
             await openResult(item);

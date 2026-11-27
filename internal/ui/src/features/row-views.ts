@@ -4,13 +4,7 @@
  */
 import type { AxisViewSettings } from '../contracts/analysis.ts';
 import type { ApiClient, ApiRequestOptions, ToastFn } from '../contracts/common.ts';
-import type {
-  RowViewChange,
-  RowViewGroupsResponse,
-  RowViewState,
-  RowViewStatusResponse,
-  WorkbookStatusResponse,
-} from '../contracts/workbook.ts';
+import type { RowViewChange, RowViewState } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
 import { errorMessage } from '../core/display-format.ts';
 import {
@@ -22,6 +16,13 @@ import {
 } from '../core/dom.ts';
 import { RowVisibility } from '../grid/row-visibility.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeRowViewGroupsResponse,
+  decodeRowViewStartResponse,
+  decodeRowViewState,
+  decodeRowViewStatusResponse,
+} from '../core/http-decoders.generated.ts';
+import { decodeWorkbookStatus } from '../core/workbook-response.ts';
 
 export interface RowViewsOptions {
   readonly state: WorkbookState;
@@ -57,7 +58,8 @@ export interface RowViewChangeOptions {
   readonly guard?: () => boolean;
 }
 
-interface RowViewStartResponse {
+/** @httpResponse RowViewStartResponse */
+export interface RowViewStartResponse {
   readonly jobId?: string;
 }
 
@@ -143,12 +145,12 @@ export class RowViews {
     });
   }
 
-  private post<T = unknown>(
+  private post(
     url: string,
     body: unknown,
     options: ApiRequestOptions = {},
-  ): Promise<T> {
-    return this.api<T>(url, {
+  ): Promise<unknown> {
+    return this.api(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -300,9 +302,9 @@ export class RowViews {
     signal?.addEventListener('abort', stop, { once: true });
     try {
       if (!this.s.book) {
-        const status = await this.api<WorkbookStatusResponse>('/api/status', {
+        const status = await this.api('/api/status', {
           signal: abort.signal,
-        });
+        }, decodeWorkbookStatus);
         if (!current() || status.workbookKey !== book) {
           throw new DOMException('已切换来源', 'AbortError');
         }
@@ -322,7 +324,7 @@ export class RowViews {
       if (persist) request.expectedRevision = revision;
       // Keep ownership of a late start response even if the caller is gone;
       // its server task must be cancelled, rather than losing the returned ID.
-      const started = await this.post<RowViewStartResponse>('/api/row-view/start', request);
+      const started = await this.post('/api/row-view/start', request).then(decodeRowViewStartResponse);
       owned = started.jobId ?? '';
       if (!owned) {
         owned = '';
@@ -331,9 +333,10 @@ export class RowViews {
       if (!current()) throw new DOMException('已取消', 'AbortError');
       this.job = owned;
       for (;;) {
-        const state = await this.api<RowViewStatusResponse>(
+        const state = await this.api(
           `/api/row-view/status?id=${encodeURIComponent(owned)}`,
           { signal: abort.signal },
+          decodeRowViewStatusResponse,
         );
         if (!current()) throw new DOMException('已取消', 'AbortError');
         activity?.job({ scanned: state.scanned, total: state.total });
@@ -351,9 +354,9 @@ export class RowViews {
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 60));
       }
-      const data = await this.api<RowViewState>(`/api/row-view?id=${encodeURIComponent(owned)}`, {
+      const data = await this.api(`/api/row-view?id=${encodeURIComponent(owned)}`, {
         signal: abort.signal,
-      });
+      }, decodeRowViewState);
       if (!current()) throw interrupted();
       this.validate(data, sheet, filterId);
       if (data.id !== owned) throw new Error('可见行任务结果不一致，请重试');
@@ -397,9 +400,10 @@ export class RowViews {
     try {
       if (cached?.filterId === filterId && !this.recoverySettings && !requestedSettings) {
         try {
-          data = await this.api<RowViewState>(
+          data = await this.api(
             `/api/row-view?id=${encodeURIComponent(cached.id)}`,
             { signal },
+            decodeRowViewState,
           );
           if (!current() || ticket !== this.serial) throw interrupted();
           if (data.id !== cached.id) throw new Error('可见行快照不一致，请重试');
@@ -484,8 +488,10 @@ export class RowViews {
     const ticket = ++this.pageSerial;
     if (!id) return;
     try {
-      const data = await this.api<RowViewGroupsResponse>(
+      const data = await this.api(
         `/api/row-view/groups?id=${encodeURIComponent(id)}&offset=${this.page * 200}&limit=200`,
+        undefined,
+        decodeRowViewGroupsResponse,
       );
       if (ticket !== this.pageSerial || id !== this.s.rowView?.id) return;
       const list = requireEl('rowsGroupList');

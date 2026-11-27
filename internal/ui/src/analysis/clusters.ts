@@ -2,6 +2,7 @@
  * Text clustering (near-duplicate candidate inspection, variant selection,
  * mapping transform creation, and CSV export) modal controller.
  */
+import { decodeAsyncJobProgress } from '../core/http-decoders.generated.ts';
 import type {
   AnalysisField,
   AnalysisTransform,
@@ -23,6 +24,12 @@ import {
   requireInput,
   requireSelect,
 } from '../core/dom.ts';
+import {
+  decodeClusterConfirmResponse,
+  decodeClusterDetailPayload,
+  decodeClusterGroupsResponse,
+  decodeClusterResolveResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface ClusterContext {
   readonly bookKey: string;
@@ -35,14 +42,17 @@ export interface ClusterContext {
   readonly sourceId: string;
 }
 
+/** @httpResponse ClusterDetailPayload */
 export interface ClusterDetailPayload extends ClusterDetailResponse {
   readonly column?: number;
 }
 
+/** @httpResponse ClusterConfirmResponse */
 export interface ClusterConfirmResponse extends ClusterEnvelope {
   readonly transform?: AnalysisTransform;
 }
 
+/** @httpResponse ClusterResolveResponse */
 export interface ClusterResolveResponse extends ClusterEnvelope {
   readonly row: number;
   readonly column: number;
@@ -203,6 +213,7 @@ export class AnalysisClusters {
 
     this.dialog = requireDialog('analysisClustersDialog');
     this.jobs = new AsyncJobs({
+      decodeStatus: decodeAsyncJobProgress,
       api: this.api,
       identity: () => this.identity(),
       requestIdentity: () => this.context().bookKey,
@@ -407,8 +418,10 @@ export class AnalysisClusters {
       if (!isOpened() || ticket !== this.serial || identity !== this.identity()) {
         throw makeAbortError();
       }
-      const page = await this.api<ClusterGroupsResponse>(
+      const page = await this.api(
         `/api/analysis/clusters/groups?${new URLSearchParams({ id: candidate, offset: '0' }).toString()}`,
+        undefined,
+        decodeClusterGroupsResponse,
       );
       if (!isOpened() || ticket !== this.serial || identity !== this.identity()) {
         throw makeAbortError();
@@ -455,9 +468,10 @@ export class AnalysisClusters {
     this.pageController?.abort();
     this.pageController = controller;
     try {
-      const data = await this.api<ClusterGroupsResponse>(
+      const data = await this.api(
         `/api/analysis/clusters/groups?${new URLSearchParams({ id: snapshot.job, offset: String(offset) }).toString()}`,
         { signal: controller.signal },
+        decodeClusterGroupsResponse,
       );
       if (!this.current(snapshot) || ticket !== this.pageSerial || controller.signal.aborted) return;
       validateClusterOwner(data, snapshot.context, snapshot.job, snapshot.field.id, this.scopeKey);
@@ -489,13 +503,14 @@ export class AnalysisClusters {
     this.renderDetail();
     this.controls();
     try {
-      const data = await this.api<ClusterDetailPayload>(
+      const data = await this.api(
         `/api/analysis/clusters/detail?${new URLSearchParams({
           id: snapshot.job,
           group: String(group),
           offset: String(offset),
         }).toString()}`,
         { signal: controller.signal },
+        decodeClusterDetailPayload,
       );
       if (!this.current(snapshot) || ticket !== this.detailSerial || controller.signal.aborted) {
         return;
@@ -649,7 +664,7 @@ export class AnalysisClusters {
     this.confirming = true;
     this.controls();
     try {
-      const data = await this.api<ClusterConfirmResponse>('/api/analysis/clusters/confirm', {
+      const data = await this.api('/api/analysis/clusters/confirm', {
         method: 'POST',
         body: JSON.stringify({
           id: snapshot.job,
@@ -657,7 +672,7 @@ export class AnalysisClusters {
           book: snapshot.context.book,
           choices: [{ group: detail.group, representative: choice }],
         }),
-      });
+      }, decodeClusterConfirmResponse);
       if (
         !this.current(snapshot) ||
         ticket !== this.serial ||
@@ -695,7 +710,7 @@ export class AnalysisClusters {
     if (!this.current(snapshot) || !detail) return;
     const serial = this.serial;
     try {
-      const data = await this.api<ClusterResolveResponse>(
+      const data = await this.api(
         `/api/analysis/clusters/resolve?${new URLSearchParams({
           id: snapshot.job,
           group: String(detail.group),
@@ -704,6 +719,8 @@ export class AnalysisClusters {
           workbookKey: snapshot.context.bookKey,
           book: snapshot.context.book,
         }).toString()}`,
+        undefined,
+        decodeClusterResolveResponse,
       );
       if (!this.current(snapshot) || serial !== this.serial || ticket !== this.navSerial) return;
       validateClusterOwner(data, snapshot.context, snapshot.job, snapshot.field.id, this.scopeKey);

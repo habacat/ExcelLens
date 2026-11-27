@@ -3,7 +3,6 @@
  * exact/tolerance comparison, audit record rebinding, version/batch comparison,
  * and background job resumption.
  */
-import type { CompositionNavigationResponse } from '../contracts/analysis.ts';
 import type {
   ApiClient,
   ApiRequestOptions,
@@ -30,6 +29,13 @@ import {
   requireSelect,
 } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeCompositionNavigationResponse,
+  decodeReconcileJobStatus,
+  decodeReconcileSourceInfo,
+  decodeReconcileUploadResponse,
+  decodereconcileReconcileSourcesResponse,
+} from '../core/http-decoders.generated.ts';
 
 type ReconcileSide = 'left' | 'right';
 
@@ -38,6 +44,7 @@ export interface ReconcileResultWithMeta extends ReconcileResult {
   readonly exceptionGroupsSHA256?: string;
 }
 
+/** @httpResponse ReconcileJobStatus */
 export interface ReconcileJobStatus extends AsyncJobStatusEnvelope<ReconcileResult> {
   readonly recordError?: string;
   readonly exceptionGroupsSHA256?: string;
@@ -102,12 +109,14 @@ export interface ReconcileOptions {
   readonly recordBytes: number;
 }
 
-interface ReconcileSourcesResponse {
+/** @httpResponse reconcileReconcileSourcesResponse */
+export interface ReconcileSourcesResponse {
   readonly books?: readonly ReconcileBookChoice[];
   readonly currentBook: string;
 }
 
-interface ReconcileUploadResponse {
+/** @httpResponse ReconcileUploadResponse */
+export interface ReconcileUploadResponse {
   readonly book: string;
   readonly name: string;
 }
@@ -492,6 +501,7 @@ export class Reconcile {
 
     this.dialog = requireDialog('reconcileDialog');
     this.jobs = new AsyncJobs<ReconcileResultWithMeta, ReconcileJobStatus>({
+      decodeStatus: decodeReconcileJobStatus,
       api: this.api,
       identity: () => this.s.workbookKey,
       sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
@@ -542,12 +552,12 @@ export class Reconcile {
     return requireEl(`${this.sidePrefix(side)}Info`);
   }
 
-  private post<T = unknown>(
+  private post(
     path: string,
     value: unknown,
     options: ApiRequestOptions = {},
-  ): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(value), ...options });
+  ): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(value), ...options });
   }
 
   private bind(): void {
@@ -675,9 +685,10 @@ export class Reconcile {
     this.catalogController = controller;
     try {
       requireEl('reconcileSourceNotice').textContent = '正在读取来源…';
-      const data = await this.api<ReconcileSourcesResponse>(
+      const data = await this.api(
         `/api/reconcile/sources${focus ? `?book=${encodeURIComponent(focus)}` : ''}`,
         { signal: controller.signal },
+        decodereconcileReconcileSourcesResponse,
       );
       if (epoch !== this.epoch || serial !== this.catalogSerial) return;
       const previous = new Map(this.books.map((book) => [book.id, book]));
@@ -830,9 +841,9 @@ export class Reconcile {
       const ref = this.ref(side);
       if (!ref.book || !ref.source) throw new Error('请先选择文件和工作表');
       this.infoEl(side).textContent = '正在读取字段…';
-      const info = await this.post<ReconcileSourceInfo>('/api/reconcile/fields', ref, {
+      const info = await this.post('/api/reconcile/fields', ref, {
         signal: controller.signal,
-      });
+      }).then(decodeReconcileSourceInfo);
       if (epoch !== this.epoch || serial !== this.sides[side].serial) return;
       state.info = info;
       this.infoEl(side).textContent =
@@ -1172,11 +1183,11 @@ export class Reconcile {
       form.append('workbookKey', this.s.workbookKey);
       form.append('primaryBook', this.primaryBook);
       requireEl('reconcileSourceNotice').textContent = '正在添加核对文件…';
-      const result = await this.api<ReconcileUploadResponse>('/api/open', {
+      const result = await this.api('/api/open', {
         method: 'POST',
         body: form,
         signal: controller.signal,
-      });
+      }, decodeReconcileUploadResponse);
       if (epoch !== this.epoch) return;
       await this.refresh(result.book);
       if (epoch !== this.epoch) return;
@@ -1449,12 +1460,12 @@ export class Reconcile {
     if (popup) popup.opener = null;
     let popupHandled = false;
     try {
-      const target = await this.post<CompositionNavigationResponse>('/api/reconcile/navigate', {
+      const target = await this.post('/api/reconcile/navigate', {
         jobId: job,
         side,
         row,
         col: column,
-      });
+      }).then(decodeCompositionNavigationResponse);
       if (epoch !== this.epoch || job !== this.job) return;
       if (target.sameBook) {
         popup?.close();

@@ -2,17 +2,28 @@
  * Asynchronous source preparation task runner shared by composition and relation
  * workflows. Each preparation owns its own runtime token, including late starts.
  */
-import type {
-  ActivityHandle,
-  ActivityService,
-  ApiClient,
-  AsyncJobProgress,
-} from '../contracts/common.ts';
+import type { ActivityHandle, ActivityService, ApiClient } from '../contracts/common.ts';
+import type { AsyncJobProgress } from '../contracts/common.ts';
+import { decodeSourceTaskProgress, decodeSourceTaskStartResponse } from './http-decoders.generated.ts';
 
 export interface SourceTaskContext {
   readonly bookKey: string;
   readonly book: string;
   readonly opened: boolean;
+}
+
+/** @httpResponse SourceTaskProgress */
+export interface SourceTaskProgress extends Omit<AsyncJobProgress, 'done' | 'total'> {
+  readonly done?: string | number;
+  readonly total?: string | number;
+}
+
+function progressCount(value: number | string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'string' && !/^(0|[1-9]\d*)$/.test(value)) throw new Error('来源任务的进度计数无效');
+  const count = Number(value);
+  if (count < 0) throw new Error('来源任务的进度计数无效');
+  return Number.isSafeInteger(count) ? count : undefined;
 }
 
 export interface SourceTasksOptions {
@@ -24,10 +35,12 @@ export interface SourceTasksOptions {
   readonly activity?: ActivityService;
 }
 
+/** @httpResponse SourceTaskStartResponse */
 export interface SourceTaskStartResponse {
   readonly jobId?: string;
 }
 
+/** @httpResponse SourceTaskResultEnvelope */
 export interface SourceTaskResultEnvelope {
   readonly id?: string;
   readonly workbookKey?: string;
@@ -66,8 +79,8 @@ export class SourceTasks {
     this.activity = options.activity;
   }
 
-  post<T = unknown>(path: string, data: unknown): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(data) });
+  post(path: string, data: unknown): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(data) });
   }
 
   clear(id: string): Promise<unknown> {
@@ -88,6 +101,7 @@ export class SourceTasks {
   }
 
   async run<TResult extends SourceTaskResultEnvelope>(
+    decode: (value: unknown) => TResult,
     request: Record<string, unknown>,
     guard: () => boolean = () => true,
   ): Promise<TResult & { readonly id: string }> {
@@ -111,11 +125,11 @@ export class SourceTasks {
     let accepted = false;
     try {
       if (!current()) throw makeAbortError();
-      const start = await this.post<SourceTaskStartResponse>(`${this.endpoint}/start`, {
+      const start = await this.post(`${this.endpoint}/start`, {
         ...request,
         workbookKey: c.bookKey,
         book: c.book,
-      });
+      }).then(decodeSourceTaskStartResponse);
       if (typeof start.jobId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(start.jobId)) {
         record.id = '';
         throw new Error(`${this.label}任务未创建，请重试`);
@@ -123,11 +137,13 @@ export class SourceTasks {
       record.id = start.jobId;
       if (!current()) throw makeAbortError();
       for (;;) {
-        const status = await this.api<AsyncJobProgress>(
+        const status = await this.api(
           `${this.endpoint}/status?id=${encodeURIComponent(record.id)}`,
+          undefined,
+          decodeSourceTaskProgress,
         );
         if (!current()) throw makeAbortError();
-        record.activity?.job(status);
+        record.activity?.job({ ...status, done: progressCount(status.done), total: progressCount(status.total) });
         if (
           typeof status.status !== 'string' ||
           !VALID_STATUSES.has(status.status) ||
@@ -143,8 +159,9 @@ export class SourceTasks {
         await this.sleep(250);
         if (!current()) throw makeAbortError();
       }
-      const result = await this.api<TResult>(
+      const result = await this.api(
         `${this.endpoint}/result?id=${encodeURIComponent(record.id)}`,
+        undefined, decode,
       );
       if (!current()) throw makeAbortError();
       if (result.id !== record.id || result.workbookKey !== c.bookKey || result.book !== c.book) {

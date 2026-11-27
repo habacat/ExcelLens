@@ -6,7 +6,6 @@
 import type { ActivityHandle } from '../contracts/common.ts';
 import type {
   EditAddress,
-  EditBatchPreviewResponse,
   EditChange,
   EditClipboard,
   EditSheetMeta,
@@ -16,6 +15,13 @@ import type {
 import type { EditLimits } from '../contracts/formats.ts';
 import { requireButton, requireDialog } from '../core/dom.ts';
 import type { EditCopyClipboardSnapshot } from '../grid/grid-clipboard.ts';
+import {
+  decodeEditBatchPreviewResponse,
+  decodeOptionalPortableClipboard,
+} from '../core/http-decoders.generated.ts';
+
+/** @httpResponse OptionalPortableClipboard */
+export type OptionalPortableClipboard = PortableClipboard | null;
 
 export interface GridPasteRect {
   readonly top: number;
@@ -53,7 +59,7 @@ export type IdentifiedClipboard =
 export interface GridPasteOwnerHost {
   readonly limits: EditLimits;
   colName(col: number): string;
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   commit(
     action: 'change' | 'structure',
     changes: readonly EditChange[] | undefined,
@@ -176,7 +182,7 @@ export async function fetchNativePaste(
   const bytes = new TextEncoder().encode(raw.replaceAll('\r\n', '\n').replace(/\n$/, ''));
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const proof = Array.from(hash, (b) => b.toString(16).padStart(2, '0')).join('');
-  return owner.post<PortableClipboard | null>('native-paste', { ...target, proof });
+  return owner.post('native-paste', { ...target, proof }).then(decodeOptionalPortableClipboard);
 }
 
 export async function resolvePasteDestination(
@@ -275,12 +281,12 @@ export async function pastePortableRange(
     ...(ranges.view.mappedRows() ? { targetRows: rows } : {}),
   };
   if (!selection.merges?.length) {
-    const preview = await ranges.owner.post<EditBatchPreviewResponse>('preview', {
+    const preview = await ranges.owner.post('preview', {
       ...target,
       mode: 'portable',
       proof: clip.proof,
       operation: { structure },
-    });
+    }).then(decodeEditBatchPreviewResponse);
     ranges.current(target);
     if (!preview.structure) {
       return ranges.owner.commit('change', preview.changes, {

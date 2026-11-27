@@ -4,14 +4,7 @@
  * cut-source marching border, typed/portable/TSV clipboard copy & paste.
  */
 import type { ActivityHandle, HttpError, MergeRange, SelectionArea } from '../contracts/common.ts';
-import type {
-  EditAddress,
-  EditBatchPreviewResponse,
-  EditChange,
-  EditClipboard,
-  EditSheetMeta,
-  EditStructure,
-} from '../contracts/edit.ts';
+import type { EditAddress, EditChange, EditSheetMeta, EditStructure } from '../contracts/edit.ts';
 import type { EditLimits } from '../contracts/formats.ts';
 import type { SelectedCell } from '../contracts/workbook.ts';
 import { requireEl } from '../core/dom.ts';
@@ -30,6 +23,14 @@ import {
   type GridPasteTarget,
   type IdentifiedClipboard,
 } from './edit-grid-paste.ts';
+import {
+  decodeEditBatchPreviewResponse,
+  decodeEditClipboard,
+  decodeStringList,
+} from '../core/http-decoders.generated.ts';
+
+/** @httpResponse StringList */
+export type StringList = readonly string[];
 
 export type GridRangeBounds = GridPasteRect;
 
@@ -73,7 +74,7 @@ export interface GridRangeEditorOwner {
   };
   colName(col: number): string;
   advanced(tool?: string): unknown;
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   commit(
     action: 'change' | 'structure',
     changes: readonly EditChange[] | undefined,
@@ -466,7 +467,7 @@ export class GridRangeEditor {
       direct: true,
     };
     if (input) args.operation = { changes: [input] };
-    const preview = await this.owner.post<EditBatchPreviewResponse>('preview', args);
+    const preview = await this.owner.post('preview', args).then(decodeEditBatchPreviewResponse);
     this.current(target);
     if (!preview.changes?.length) return true;
     const entryAnchor = input
@@ -563,13 +564,13 @@ export class GridRangeEditor {
       revision: target.revision,
     };
     try {
-      const clip = await this.owner.post<EditClipboard>('copy', {
+      const clip = await this.owner.post('copy', {
         ...target,
         ref: snapshot.start,
         end: snapshot.end,
         mode: 'grid',
         visibleRows,
-      });
+      }).then(decodeEditClipboard);
       return { ...source, clip };
     } catch (error: unknown) {
       // The normal HTML/TSV copy still works for a large typed payload.
@@ -658,14 +659,14 @@ export class GridRangeEditor {
       const clipPayload = isEditClipboard(local.clip)
         ? { ...local.clip, portable: undefined }
         : undefined;
-      const plan = await this.owner.post<EditBatchPreviewResponse>('preview', {
+      const plan = await this.owner.post('preview', {
         ...target,
         mode: 'all',
         ref,
         end,
         clipboard: clipPayload,
         direct: true,
-      });
+      }).then(decodeEditBatchPreviewResponse);
       this.current(target);
       if (!plan.changes?.length) return true;
       return this.owner.commit('change', plan.changes, {
@@ -704,7 +705,7 @@ export class GridRangeEditor {
     }
     const kinds: readonly string[] = textFile
       ? []
-      : await this.owner.post<readonly string[]>('input-kinds', { ...target, cells: addresses });
+      : await this.owner.post('input-kinds', { ...target, cells: addresses }).then(decodeStringList);
     this.current(target);
     function* changes(): Generator<EditChange> {
       for (const [i, a] of addresses.entries()) {

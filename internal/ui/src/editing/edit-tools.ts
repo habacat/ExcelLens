@@ -23,6 +23,7 @@ import { PivotCalculatedItems } from './edit-pivot-items.ts';
 import { PivotMeasures } from './edit-pivot-measures.ts';
 import { PivotValues } from './edit-pivot-values.ts';
 import { EditSheetTabs } from './edit-sheet-tabs.ts';
+import { decodePivotInfo } from '../core/http-decoders.generated.ts';
 
 const RANGE_KINDS = new Set([
   'mergeCells',
@@ -85,7 +86,7 @@ export interface EditToolsOwner {
   };
   context(): { readonly sheet: string | null };
   colName(col: number): string;
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
   controls(): void;
   clearPreview(): void;
   close(): void;
@@ -522,7 +523,7 @@ export class EditTools {
     const meta: PivotMetaLoad = { key, pending: true, controller: new AbortController() };
     this.meta = meta;
     try {
-      meta.info = await this.editor.post<PivotInfo>(
+      meta.info = await this.editor.post(
         'pivot-layout',
         {
           document: { id: doc.id, binding: doc.binding },
@@ -531,7 +532,7 @@ export class EditTools {
           pivot: saved.name,
         },
         meta.controller.signal,
-      );
+      ).then(decodePivotInfo);
     } catch (error: unknown) {
       meta.error = errorMessage(error);
     }

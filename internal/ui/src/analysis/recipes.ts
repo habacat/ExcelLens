@@ -2,6 +2,7 @@
  * Saved analysis plans contain only declared operations and field bindings.
  * Capture, preview and replay share the normal cancellable analysis jobs.
  */
+import type { AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
 import type {
   AnalysisQueryStatusResponse,
   AnalysisResult,
@@ -21,6 +22,13 @@ import {
   requireInput,
   requireSelect,
 } from '../core/dom.ts';
+import {
+  decodeAnalysisQueryStatusResponse,
+  decodeRecipeCaptureStatus,
+  decodeRecipeCatalogResponse,
+  decodeRecipeCommitResponse,
+  decodeRecipePreviewResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface RecipeSourceChoice {
   readonly value: string;
@@ -44,16 +52,21 @@ export interface RecipeCaptureRequest {
   readonly format: string;
 }
 
-interface RecipeCatalogResponse {
+/** @httpResponse RecipeCatalogResponse */
+export interface RecipeCatalogResponse {
   readonly book: string;
   readonly store: RecipeStore;
 }
+
+/** @httpResponse RecipeCaptureStatus */
+export type RecipeCaptureStatus = AsyncJobStatusEnvelope<RecipeCaptureResult>;
 
 interface RecipeCaptureResult {
   readonly captureId: string;
 }
 
-interface RecipeCommitResponse {
+/** @httpResponse RecipeCommitResponse */
+export interface RecipeCommitResponse {
   readonly id: string;
   readonly revision: number;
 }
@@ -65,6 +78,7 @@ export interface RecipeTargetRef {
   readonly stamp?: string;
 }
 
+/** @httpResponse RecipePreviewResponse */
 export interface RecipePreviewResponse {
   readonly recipe: Recipe;
   readonly fields: readonly RecipeField[];
@@ -234,6 +248,11 @@ export class RecipesController {
       maxPolls: 0,
       onProgress,
       endpoint: '/api/recipes/capture',
+      decodeStatus: decodeRecipeCaptureStatus,
+      resultFromStatus: status => {
+        if (!status.result) throw new Error('方案字段核对缺少已完成的结果');
+        return status.result;
+      },
       label: '方案字段核对',
     });
 
@@ -248,6 +267,7 @@ export class RecipesController {
       maxPolls: 0,
       onProgress,
       endpoint: '/api/recipes/run',
+      decodeStatus: decodeAnalysisQueryStatusResponse,
       label: '方案分析',
       resultFromStatus: (status) => status,
     });
@@ -299,8 +319,8 @@ export class RecipesController {
     );
   }
 
-  private post<T>(url: string, data: unknown, options: ApiRequestOptions = {}): Promise<T> {
-    return this.api<T>(url, { method: 'POST', body: JSON.stringify(data), ...options });
+  private post(url: string, data: unknown, options: ApiRequestOptions = {}): Promise<unknown> {
+    return this.api(url, { method: 'POST', body: JSON.stringify(data), ...options });
   }
 
   status(text: string, error = false): void {
@@ -451,9 +471,9 @@ export class RecipesController {
     this.catalogLoading = true;
     this.controls();
     try {
-      const data = await this.api<RecipeCatalogResponse>('/api/recipes', {
+      const data = await this.api('/api/recipes', {
         signal: controller.signal,
-      });
+      }, decodeRecipeCatalogResponse);
       if (
         serial !== this.catalogSerial ||
         epoch !== this.epoch ||
@@ -536,18 +556,18 @@ export class RecipesController {
       this.mode = 'commit';
       this.controls();
       this.status('正在保存分析方案…');
-      const saved = await this.post<RecipeCommitResponse>('/api/recipes/capture/commit', {
+      const saved = await this.post('/api/recipes/capture/commit', {
         id: this.draft.id,
         name,
         book: this.book,
         workbookKey: key,
         expectedRevision: this.store.revision,
-      });
+      }).then(decodeRecipeCommitResponse);
       if (!current()) return;
       this.draft = null;
       this.store = { ...this.store, revision: saved.revision };
       try {
-        const data = await this.api<RecipeCatalogResponse>('/api/recipes');
+        const data = await this.api('/api/recipes', undefined, decodeRecipeCatalogResponse);
         if (current()) this.setCatalog(data, saved.id);
       } catch {
         if (current()) this.status('方案已保存；刷新列表后查看。');
@@ -581,11 +601,11 @@ export class RecipesController {
     this.mode = 'delete';
     this.controls();
     try {
-      const data = await this.post<RecipeCatalogResponse>('/api/recipes', {
+      const data = await this.post('/api/recipes', {
         action: 'delete',
         id: selected.id,
         expectedRevision: this.store.revision,
-      });
+      }).then(decodeRecipeCatalogResponse);
       if (this.current(serial, epoch, key)) {
         this.setCatalog(data);
         this.status('已删除所选分析方案');
@@ -633,7 +653,7 @@ export class RecipesController {
       if (useCurrent && (!sourceId || c.source !== target.source || !c.sourceScope)) {
         throw new Error('当前分析范围已变化，请重新选择');
       }
-      const data = await this.post<RecipePreviewResponse>(
+      const data = await this.post(
         '/api/recipes/preview',
         {
           id: selected.id,
@@ -643,7 +663,7 @@ export class RecipesController {
           ...(sourceId ? { sourceId } : {}),
         },
         { signal: controller.signal },
-      );
+      ).then(decodeRecipePreviewResponse);
       if (!this.current(serial, epoch, key)) return;
       this.preview = { ...data, sourceId, ref: { ...target, stamp: data.target.stamp } };
       this.renderPreview();

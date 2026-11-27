@@ -359,7 +359,7 @@ test('source navigation closes blank popups after stale results, errors or same-
       await h.goSource('right', 2, 2);
       assert.equal(closed, 2);
 
-      apiImpl = async () => ({ sameBook: true, kind: 'workbook', sheet: 'sheet' });
+      apiImpl = async () => ({ sameBook: true, kind: 'workbook', sheet: 'sheet', analysisSheet: '', row: 2, col: 2 });
       await h.goSource('right', 2, 2);
       assert.equal(closed, 3);
       assert.equal(navigated, 1);

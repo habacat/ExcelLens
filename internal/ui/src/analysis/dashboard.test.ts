@@ -44,10 +44,7 @@ function setup(fields: readonly AnalysisField[], templates: readonly AnalysisTem
     root,
     state,
     templates,
-    post: async <T = unknown>() => {
-      const empty: unknown = {};
-      return empty as T;
-    },
+    post: async () => ({}),
     toast: (msg, tone) => {
       toasts.push({ msg, tone });
     },

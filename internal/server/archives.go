@@ -30,23 +30,23 @@ type archiveTask struct {
 	mu                         sync.RWMutex
 	id, status, stage, failure string
 	doneBytes, totalBytes      int64
-	result                     map[string]any
+	result                     any
 	cancel                     context.CancelFunc
 	done                       chan struct{}
 }
 
-func (a *App) archiveSummary() map[string]any {
+func (a *App) archiveSummary() *ArchiveSummary {
 	a.archiveMu.Lock()
 	defer a.archiveMu.Unlock()
 	return summarizeArchive(a.archiveView)
 }
 
-func summarizeArchive(view *archiveView) map[string]any {
+func summarizeArchive(view *archiveView) *ArchiveSummary {
 	if view == nil {
 		return nil
 	}
 	f := view.file
-	return map[string]any{"id": view.id, "name": f.Name, "format": f.Format, "count": len(f.Members), "total": f.Total, "depth": view.depth, "notice": archiveNotice(view)}
+	return &ArchiveSummary{ID: view.id, Name: f.Name, Format: f.Format, Count: len(f.Members), Total: f.Total, Depth: view.depth, Notice: archiveNotice(view)}
 }
 
 func archiveNotice(view *archiveView) string {
@@ -199,7 +199,7 @@ func (a *App) runArchiveOpen(ctx context.Context, view *archiveView, id int, job
 	}
 	var wb *workbook.Workbook
 	var nested *archives.Archive
-	var result map[string]any
+	var result any
 	var fileSize int64
 	if err == nil {
 		if member.Archive {
@@ -234,13 +234,15 @@ func (a *App) runArchiveOpen(ctx context.Context, view *archiveView, id int, job
 		} else if nested != nil {
 			chain := append(append([]archiveHop(nil), view.chain...), archiveHop{Member: id, Name: member.Name})
 			a.archiveView = &archiveView{id: randomID(), file: nested, depth: view.depth + 1, rootPath: view.rootPath, rootName: view.rootName, chain: chain, parentNotice: archiveNotice(view)}
-			result = map[string]any{"archiveOnly": true, "opened": false, "archive": summarizeArchive(a.archiveView)}
+			result = ClosedWorkbookResponse{ArchiveOnly: true, Archive: summarizeArchive(a.archiveView)}
 		} else {
 			wb.SetDisplayName(filepath.Base(member.Name))
 			decorateArchiveWorkbook(wb, view, member)
 			wb.ArchiveOrigin = &workbook.ArchiveOrigin{Path: view.rootPath, Name: view.rootName, Member: member.Name, MemberID: id, Chain: append([]archiveHop(nil), view.chain...), Partial: member.Incomplete}
 			a.replaceWorkbook(wb)
-			result = map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": wb.DisplayName, "fileSize": fileSize, "sheets": wb.Sheets, "activeTab": wb.ActiveTab, "source": wb.SourceInfo, "archive": summarizeArchive(view)}
+			status := openedWorkbook(wb, wb.DisplayName, fileSize)
+			status.Archive = summarizeArchive(view)
+			result = status
 		}
 		a.archiveMu.Unlock()
 		if err == nil && nested != nil {
@@ -315,36 +317,38 @@ func (a *App) archiveRecent(wb *workbook.Workbook, item *recentEntry) {
 	}
 }
 
-func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) error {
-	if err := a.openArchive(ctx, item.ArchivePath, item.ArchiveName, 0); err != nil {
-		return err
+func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) (*workbook.Workbook, error) {
+	root, err := archives.Open(ctx, item.ArchivePath, item.ArchiveName)
+	if err != nil {
+		return nil, err
 	}
-	a.archiveMu.Lock()
-	view := a.archiveView
-	a.archiveMu.Unlock()
+	view := &archiveView{id: randomID(), file: root, rootPath: item.ArchivePath, rootName: item.ArchiveName}
+	// Keep the candidate chain private until its member has opened successfully.
+	defer func() {
+		if view != nil {
+			_ = view.file.Close()
+		}
+	}()
 	for _, hop := range item.ArchiveChain {
 		id, err := findArchiveMember(view.file, hop.Member, hop.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		path, member, err := view.file.Extract(ctx, id, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		nested, err := archives.Open(ctx, path, member.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		next := &archiveView{id: randomID(), file: nested, depth: view.depth + 1, rootPath: view.rootPath, rootName: view.rootName, chain: append(append([]archiveHop(nil), view.chain...), hop), parentNotice: archiveNotice(view)}
-		a.archiveMu.Lock()
-		a.archiveView = next
-		a.archiveMu.Unlock()
 		_ = view.file.Close()
 		view = next
 	}
 	id, err := findArchiveMember(view.file, item.ArchiveEntry, item.ArchiveMember)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var path string
 	var m archives.Member
@@ -354,7 +358,7 @@ func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) error {
 		path, m, err = view.file.Extract(ctx, id, nil)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var wb *workbook.Workbook
 	if m.Incomplete {
@@ -363,13 +367,19 @@ func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) error {
 		wb, err = workbook.OpenWorkbook(path)
 	}
 	if err != nil {
-		return fmt.Errorf("读取压缩包成员失败：%w", err)
+		return nil, fmt.Errorf("读取压缩包成员失败：%w", err)
 	}
 	wb.SetDisplayName(item.Name)
 	decorateArchiveWorkbook(wb, view, m)
 	wb.ArchiveOrigin = &workbook.ArchiveOrigin{Path: item.ArchivePath, Name: item.ArchiveName, Member: m.Name, MemberID: id, Chain: append([]archiveHop(nil), view.chain...), Partial: m.Incomplete}
+	a.archiveMu.Lock()
+	old, job := a.detachArchiveLocked()
+	a.archiveView = view
 	a.replaceWorkbook(wb)
-	return nil
+	a.archiveMu.Unlock()
+	view = nil
+	finishClosedArchive(old, job)
+	return wb, nil
 }
 
 func findArchiveMember(a *archives.Archive, id int, name string) (int, error) {

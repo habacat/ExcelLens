@@ -10,6 +10,7 @@ import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import { columnName } from '../core/cell-address.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireDialog, requireEl, requireInput } from '../core/dom.ts';
+import { decodeAnalysisIssuesMaterializeResponse } from '../core/http-decoders.generated.ts';
 
 export interface AnalysisIssuesSnapshot {
   readonly book: string;
@@ -18,6 +19,7 @@ export interface AnalysisIssuesSnapshot {
   readonly result: AnalysisResult;
 }
 
+/** @httpResponse AnalysisIssuesMaterializeResponse */
 export interface AnalysisIssuesMaterializeResponse {
   readonly id: string;
   readonly rows: number;
@@ -202,10 +204,10 @@ export class AnalysisIssues {
     if (!name || !this.current(snapshot)) return;
     this.busy = true;
     try {
-      const data = await this.api<AnalysisIssuesMaterializeResponse>('/api/analysis/issues/materialize', {
+      const data = await this.api('/api/analysis/issues/materialize', {
         method: 'POST',
         body: JSON.stringify({ jobId: snapshot.job, name, limit: 10000 }),
-      });
+      }, decodeAnalysisIssuesMaterializeResponse);
       if (!this.current(snapshot)) return;
       await this.onMaterialized(data);
       this.toast(

@@ -214,7 +214,7 @@ export interface AnalysisQuery {
   sourceScope?: SourceScope;
   composition?: CompositionDefinition;
   headerRow?: number;
-  rows: string[];
+  rows: string[] | null;
   columns?: string[];
   value?: string;
   aggregate: AnalysisAggregateKind;
@@ -288,7 +288,7 @@ export interface AnalysisIssue {
 }
 
 export interface AnalysisResult {
-  readonly rowFields: readonly string[];
+  readonly rowFields: readonly string[] | null;
   readonly columnField?: string;
   readonly columnKeys: readonly string[];
   readonly rows: readonly AnalysisResultRow[];
@@ -316,6 +316,7 @@ export interface DrillRow {
   readonly origin?: SourceOrigin;
 }
 
+/** @httpResponse DrillResult */
 export interface DrillResult {
   readonly fields: readonly AnalysisField[];
   readonly rows: readonly DrillRow[] | null;
@@ -338,6 +339,7 @@ export interface AnalysisSheetSummary {
   readonly revision: number;
 }
 
+/** @httpResponse AnalysisSheetPage */
 export interface AnalysisSheetPage {
   readonly id: string;
   readonly name: string;
@@ -362,6 +364,7 @@ export interface AnalysisSheetMeta {
   readonly sourceName?: string;
 }
 
+/** @httpResponse AnalysisWorkspaceResponse */
 export interface AnalysisWorkspaceResponse {
   readonly sheets: readonly AnalysisSheetSummary[];
   readonly reports: readonly AnalysisReport[];
@@ -371,6 +374,7 @@ export interface AnalysisWorkspaceResponse {
   readonly fingerprint: string;
 }
 
+/** @httpResponse AnalysisFieldsResponse */
 export interface AnalysisFieldsResponse {
   readonly fields: readonly AnalysisField[];
   readonly preview: readonly DrillRow[];
@@ -382,6 +386,7 @@ export interface AnalysisFieldsResponse {
   readonly sourceStamp?: string;
 }
 
+/** @httpResponse AnalysisProfileResponse */
 export interface AnalysisProfileResponse {
   readonly field: string;
   readonly name: string;
@@ -399,6 +404,7 @@ export interface AnalysisProfileResponse {
   readonly frequent: readonly { readonly value: string; readonly count: number }[];
 }
 
+/** @httpResponse AnalysisSourceBindingResponse */
 export interface AnalysisSourceBindingResponse {
   readonly id: string;
   readonly source: string;
@@ -408,6 +414,7 @@ export interface AnalysisSourceBindingResponse {
   readonly book: string;
 }
 
+/** @httpResponse AnalysisQueryStatusResponse */
 export interface AnalysisQueryStatusResponse {
   readonly id?: string;
   readonly status: AsyncJobStatusKind;
@@ -423,6 +430,7 @@ export interface AnalysisQueryStatusResponse {
   readonly exportFormat?: 'csv' | 'xlsx';
 }
 
+/** @httpResponse AnalysisTreeStatusResponse */
 export interface AnalysisTreeStatusResponse {
   readonly id?: string;
   readonly status: AsyncJobStatusKind;
@@ -441,6 +449,7 @@ export interface AnalysisDisplayOptions {
   scientificExponent: 9 | 12 | 15;
 }
 
+/** @httpResponse AnalysisDisplayConfig */
 export interface AnalysisDisplayConfig {
   readonly version: number;
   readonly revision: number;
@@ -609,6 +618,7 @@ export interface ClusterGroupSummary {
   readonly variants: number;
 }
 
+/** @httpResponse ClusterGroupsResponse */
 export interface ClusterGroupsResponse extends ClusterEnvelope {
   readonly items: readonly ClusterGroupSummary[];
   readonly offset: number;
@@ -686,6 +696,7 @@ export interface CompositionPreviewRecord {
   readonly cells: readonly CompositionPreviewCell[];
 }
 
+/** @httpResponse CompositionTaskResult */
 export interface CompositionTaskResult {
   readonly id: string;
   readonly mode: 'fields' | 'append';
@@ -708,6 +719,7 @@ export interface SavedComposition {
   readonly updated: string;
 }
 
+/** @httpResponse CompositionDefinitionStore */
 export interface CompositionDefinitionStore {
   readonly version: number;
   readonly revision: number;
@@ -752,6 +764,7 @@ export interface QuickSegment {
   readonly summary: QuickSummary;
 }
 
+/** @httpResponse CompositionNavigationResponse */
 export type CompositionNavigationResponse =
   | {
       readonly sameBook: true;

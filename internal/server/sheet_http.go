@@ -449,29 +449,20 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	payload := map[string]any{
-		"hyperlinkError": linkError,
-		"sheet":          meta.Name, "dimension": idx.Dimension,
-		"offset": offset, "limit": limit, "totalRows": totalRows,
-		"totalRowsOriginal": idx.RowCount(), "filtered": filterID != "", "filterId": filterID,
-		"maxRow": idx.MaxRow, "maxCol": idx.MaxCol,
-		"startCol": startCol, "colCount": colCount, "columns": sparseCols,
-		"rows": rows,
-	}
-	if conditionalStatsPending {
-		payload["conditionalStatsPending"] = true
+	header := ViewportHeader{
+		Sheet: meta.Name, Dimension: idx.Dimension, Offset: offset, Limit: limit, TotalRows: totalRows, TotalRowsOriginal: idx.RowCount(),
+		Filtered: filterID != "", FilterID: filterID, MaxRow: idx.MaxRow, MaxCol: idx.MaxCol, StartCol: startCol, ColCount: colCount,
+		Columns: sparseCols, HyperlinkError: linkError, ConditionalStatsPending: conditionalStatsPending, PinnedThroughRow: pinnedThrough,
 	}
 	if visible != nil {
-		payload["viewId"] = visible.data.id
-	}
-	if pinnedThrough > 0 {
-		payload["pinnedThroughRow"] = pinnedThrough
+		header.ViewID = visible.data.id
 	}
 	if query.Get("compact") == "1" {
-		payload["rows"] = packViewportRows(rows)
-		payload["compact"] = 1
+		header.Compact = 1
+		writeJSON(w, viewportResponse[CompactRow]{header, packViewportRows(rows)})
+		return
 	}
-	writeJSON(w, payload)
+	writeJSON(w, viewportResponse[workbook.RowData]{header, rows})
 }
 
 // handleFilterLocate maps an actual Excel row number to its current visible

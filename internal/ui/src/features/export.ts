@@ -3,7 +3,6 @@
  * No workbook cell data is copied into the browser to build the export.
  */
 import type { ActivityHandle, ApiClient, HttpError, ToastFn } from '../contracts/common.ts';
-import type { ExportStatusResponse } from '../contracts/features.ts';
 import type { SourceCapabilities } from '../contracts/formats.ts';
 import { beginActivity } from '../core/activity.ts';
 import { errorMessage, formatBytes } from '../core/display-format.ts';
@@ -18,6 +17,11 @@ import {
 import type { ClipboardSnapshot, ExportCenterClipboardBridge } from '../grid/grid-clipboard.ts';
 import { MultiSelection, type SelectionEndpoints } from '../grid/multi-selection.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeExportStartResponse,
+  decodeExportStatusResponse,
+  decodeReconcileReportOpenResponse,
+} from '../core/http-decoders.generated.ts';
 
 const CONTROL_IDS = [
   'exportScope',
@@ -44,11 +48,13 @@ interface ExportBeginRequest {
   readonly ctrl: AbortController;
 }
 
-interface ExportStartResponse {
+/** @httpResponse ExportStartResponse */
+export interface ExportStartResponse {
   readonly jobId: string;
 }
 
-interface ReconcileReportOpenResponse {
+/** @httpResponse ReconcileReportOpenResponse */
+export interface ReconcileReportOpenResponse {
   readonly url: string;
 }
 
@@ -165,10 +171,10 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     }
     popup.opener = null;
     try {
-      const data = await this.api<ReconcileReportOpenResponse>('/api/reconcile/report/open', {
+      const data = await this.api('/api/reconcile/report/open', {
         method: 'POST',
         body: JSON.stringify({ id: job }),
-      });
+      }, decodeReconcileReportOpenResponse);
       if (job !== this.job || serial !== this.serial) {
         popup.close();
         return;
@@ -439,7 +445,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     this.resultSource = [this.s.fileName, payloadSheet, label].filter(Boolean).join(' · ');
     try {
       const upload = payload instanceof FormData;
-      const started = await this.api<ExportStartResponse>(
+      const started = await this.api(
         path,
         upload
           ? { method: 'POST', body: payload, signal: ctrl.signal }
@@ -448,6 +454,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             },
+        decodeExportStartResponse,
       );
       if (!current()) {
         void this.cancelOwned(started.jobId);
@@ -539,9 +546,10 @@ export class ExportCenter implements ExportCenterClipboardBridge {
       book === this.s.workbookKey &&
       !ctrl.signal.aborted;
     try {
-      const data = await this.api<ExportStatusResponse>(
+      const data = await this.api(
         `/api/export/status?id=${encodeURIComponent(job)}`,
         { signal: ctrl.signal },
+        decodeExportStatusResponse,
       );
       if (!current()) return;
       this.failures = 0;

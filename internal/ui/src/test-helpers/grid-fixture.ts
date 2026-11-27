@@ -201,8 +201,8 @@ export function makeNoopApi(): ApiClient {
 export function makeTestTransport(api: ApiClient = makeNoopApi()): TransportService {
   return {
     api,
-    post: async <T = unknown>(url: string, body?: unknown): Promise<T> =>
-      api<T>(url, {
+    post: async (url: string, body?: unknown): Promise<unknown> =>
+      api(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body ?? {}),

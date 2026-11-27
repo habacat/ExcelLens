@@ -168,8 +168,8 @@ function setupSheetViews(
     },
   });
   const controller = new SheetController(deps);
-  controller.startConditionalStats = async () => undefined;
-  controller.cancelConditionalStats = () => undefined;
+  controller.conditional.startConditionalStats = async () => undefined;
+  controller.conditional.cancelConditionalStats = () => undefined;
   controller.updateAutoFilterButton = () => undefined;
   controller.updateFreezeUI = () => undefined;
 
@@ -357,8 +357,8 @@ test('an expired filter during visible-row preparation restores source order whi
       ...h.deps,
       panels: { ...h.deps.panels, rowViews },
     });
-    controller.startConditionalStats = async () => undefined;
-    controller.cancelConditionalStats = () => undefined;
+    controller.conditional.startConditionalStats = async () => undefined;
+    controller.conditional.cancelConditionalStats = () => undefined;
     controller.updateAutoFilterButton = () => undefined;
     controller.updateFreezeUI = () => undefined;
 

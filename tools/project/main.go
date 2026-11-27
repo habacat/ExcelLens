@@ -94,6 +94,12 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "generate" {
+		if err := command(goExe, env, "run", "./tools/httpcontract"); err != nil {
+			return err
+		}
+		if err := command("node", env, "tools/frontend/generate-http.mjs"); err != nil {
+			return err
+		}
 		if err := command(goExe, env, "run", "./tools/formulacatalog", "docs/user/functions.md"); err != nil {
 			return err
 		}
@@ -351,6 +357,10 @@ func checkReleaseFiles() error {
 }
 
 func checkFrontend(files, env []string) error {
+	if err := command(filepath.Join(runtime.GOROOT(), "bin", "go"), env, "run", "./tools/httpcontract", "-check"); err != nil {
+		return err
+	}
+
 	node, err := exec.LookPath("node")
 	if err != nil {
 		return errors.New("Node.js 22.18 (22.x) or 24+ is required for development checks; the released app does not need Node")

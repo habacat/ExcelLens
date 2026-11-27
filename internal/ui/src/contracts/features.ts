@@ -41,6 +41,7 @@ export interface RecentEntry {
   readonly available: boolean;
 }
 
+/** @httpResponse ExportStatusResponse */
 export interface ExportStatusResponse {
   readonly id: string;
   readonly status: string;
@@ -191,6 +192,7 @@ export interface CatalogueListItem {
   readonly areas: number;
 }
 
+/** @httpResponse CatalogueItemsResponse */
 export interface CatalogueItemsResponse {
   readonly items: readonly CatalogueListItem[];
   readonly offset: number;
@@ -517,6 +519,7 @@ export interface ProfileResponse {
   readonly distribution?: NumericDistribution;
 }
 
+/** @httpResponse SelectionStatsResponse */
 export interface SelectionStatsResponse {
   readonly total: number;
   readonly nonEmpty: number;
@@ -603,7 +606,7 @@ export interface ReconcileBookChoice {
   readonly name: string;
   readonly attached: boolean;
   readonly incomplete: boolean;
-  readonly sheets: readonly SheetMeta[];
+  readonly sheets: readonly SheetMeta[] | null;
   readonly scratch: readonly { readonly id: string; readonly name: string }[] | null;
   readonly scratchLoaded: boolean;
 }
@@ -625,6 +628,7 @@ export interface ReconcileRecord {
   readonly values: Readonly<Record<string, ReconcileValue>>;
 }
 
+/** @httpResponse ReconcileSourceInfo */
 export interface ReconcileSourceInfo {
   readonly id: string;
   readonly name: string;
@@ -820,6 +824,7 @@ export interface DBConfig {
   readonly ca: string;
 }
 
+/** @httpResponse DBImportProgress */
 export interface DBImportProgress {
   readonly id: string;
   readonly status: string;
@@ -894,11 +899,13 @@ export interface BackgroundSession {
   readonly file: string;
 }
 
+/** @httpResponse BackgroundStatusResponse */
 export interface BackgroundStatusResponse {
   readonly items: readonly BackgroundItem[] | null;
   readonly sessions: readonly BackgroundSession[] | null;
 }
 
+/** @httpResponse StorageRecoveryResponse */
 export interface StorageRecoveryResponse {
   readonly pending: boolean;
   readonly reason: string;
@@ -923,6 +930,7 @@ export interface StorageGroupUsage {
   readonly error?: string;
 }
 
+/** @httpResponse StorageUsageResponse */
 export interface StorageUsageResponse {
   readonly groups?: readonly StorageGroupUsage[] | null;
   readonly roots?: { readonly config: string; readonly local: string };

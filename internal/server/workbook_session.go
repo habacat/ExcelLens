@@ -30,12 +30,13 @@ func (a *App) OpenPath(filePath string) error {
 	if a.rootApp().restoreState.pending() {
 		return errors.New("请先完成恢复事务")
 	}
-	return a.openPathAs(filePath, "")
+	_, err := a.openPathAs(filePath, "")
+	return err
 }
 
-func (a *App) openPathAs(filePath, displayName string) error {
+func (a *App) openPathAs(filePath, displayName string) (*workbook.Workbook, error) {
 	if archives.IsPath(filePath) {
-		return a.openArchive(context.Background(), filePath, filepath.Base(filePath), 0)
+		return nil, a.openArchive(context.Background(), filePath, filepath.Base(filePath), 0)
 	}
 	a.closeArchive()
 	wb, release, err := a.openPinnedWorkbook(filePath)
@@ -43,7 +44,7 @@ func (a *App) openPathAs(filePath, displayName string) error {
 		a.mu.Lock()
 		a.startupError = err.Error()
 		a.mu.Unlock()
-		return err
+		return nil, err
 	}
 	defer release()
 	if displayName != "" {
@@ -51,7 +52,7 @@ func (a *App) openPathAs(filePath, displayName string) error {
 	}
 	a.replaceWorkbook(wb)
 	a.recordRecent(wb)
-	return nil
+	return wb, nil
 }
 
 func (a *App) replaceWorkbook(wb *workbook.Workbook) {

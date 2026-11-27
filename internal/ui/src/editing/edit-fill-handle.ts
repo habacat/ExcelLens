@@ -4,10 +4,11 @@
  * commits bounded auto-fill previews via the editable copy API.
  */
 import type { ActivityHandle, SelectionArea } from '../contracts/common.ts';
-import type { EditBatchPreviewResponse, EditChange } from '../contracts/edit.ts';
+import type { EditChange } from '../contracts/edit.ts';
 import type { DragPointKind, DragPointResult } from './edit-reference-view.ts';
 import type { ReferenceHighlightArea } from './edit-formula-entry.ts';
 import type { FormulaPoint } from './formula-entry-model.ts';
+import { decodeEditBatchPreviewResponse } from '../core/http-decoders.generated.ts';
 
 export interface FillHandleTarget {
   readonly document: { readonly id: string; readonly binding: string };
@@ -23,7 +24,7 @@ export interface FillHandleHost {
   readonly owner: {
     readonly data: { readonly encoding?: string } | null;
     colName(col: number): string;
-    post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T>;
+    post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown>;
     commit(
       action: 'change',
       changes: readonly EditChange[],
@@ -195,7 +196,7 @@ export class FillHandle {
         const ref = (row: number, col: number): string => `${g.owner.colName(col)}${row}`;
         g.ranges.current(d.target);
         g.ranges.checkSize(area.row1, area.row2, area.col1, area.col2);
-        const plan = await g.owner.post<EditBatchPreviewResponse>('preview', {
+        const plan = await g.owner.post('preview', {
           ...d.target,
           mode: 'auto-fill',
           ref: ref(d.top, d.left),
@@ -203,7 +204,7 @@ export class FillHandle {
           destination: ref(destination.row, destination.col),
           alternate,
           direct: true,
-        });
+        }).then(decodeEditBatchPreviewResponse);
         g.ranges.current(d.target);
         if (
           plan.changes?.length &&

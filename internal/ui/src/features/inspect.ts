@@ -11,8 +11,10 @@ import { requireButton, requireEl, requireInput, requireSelect } from '../core/d
 import { currentFileFormats } from '../core/formats.ts';
 import { MultiSelection } from '../grid/multi-selection.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import { decodeInspectApiResponse } from '../core/http-decoders.generated.ts';
 
-interface InspectApiResponse extends Omit<InspectResponse, 'matches'> {
+/** @httpResponse InspectApiResponse */
+export interface InspectApiResponse extends Omit<InspectResponse, 'matches'> {
   readonly matches?: readonly SearchHit[] | null;
 }
 
@@ -256,12 +258,12 @@ export class SelectionInspector {
       const key = JSON.stringify([book, opt]);
       let res = this.cache.get(key);
       if (!res) {
-        res = await this.api<InspectApiResponse>('/api/inspect', {
+        res = await this.api('/api/inspect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(opt),
           signal: abort.signal,
-        });
+        }, decodeInspectApiResponse);
         if (!current()) return;
         if (this.cache.size >= 10) {
           const oldest = this.cache.keys().next();

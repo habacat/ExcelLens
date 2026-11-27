@@ -10,13 +10,20 @@ import {
   requireEl,
   requireInput,
 } from '../core/dom.ts';
+import {
+  decodeDBImportProgress,
+  decodeDatabaseCancelResponse,
+  decodeDatabaseConnectResponse,
+  decodeDatabaseOptionsResponse,
+} from '../core/http-decoders.generated.ts';
 
 export interface DatabasePanelOptions {
   readonly api: ApiClient;
   readonly onOpened: (status: DBImportProgress) => Promise<void>;
 }
 
-interface DatabaseOptionsResponse {
+/** @httpResponse DatabaseOptionsResponse */
+export interface DatabaseOptionsResponse {
   readonly engines: readonly DBEngine[];
   readonly certificateBytes: number;
   readonly tablesLimit: number;
@@ -33,13 +40,15 @@ interface DatabaseIndexedTable extends DatabaseTableEntry {
   readonly searchKey: string;
 }
 
-interface DatabaseConnectResponse {
+/** @httpResponse DatabaseConnectResponse */
+export interface DatabaseConnectResponse {
   readonly name: string;
   readonly tables: readonly DatabaseTableEntry[];
   readonly truncated: boolean;
 }
 
-interface DatabaseCancelResponse {
+/** @httpResponse DatabaseCancelResponse */
+export interface DatabaseCancelResponse {
   readonly status?: string;
 }
 
@@ -151,7 +160,7 @@ export class DatabasePanel {
     if (!this.options) {
       requireButton('databaseConnect').disabled = true;
       try {
-        this.options = await this.api<DatabaseOptionsResponse>('/api/database/options');
+        this.options = await this.api('/api/database/options', undefined, decodeDatabaseOptionsResponse);
         this.selectField('engine').replaceChildren(
           ...this.options.engines.map((engine) => new Option(engine.label, engine.id)),
         );
@@ -227,11 +236,11 @@ export class DatabasePanel {
         tls: tlsValue,
         ca,
       };
-      const result = await this.post<DatabaseConnectResponse>(
+      const result = await this.post(
         '/api/database/connect',
         cfg,
         controller.signal,
-      );
+      ).then(decodeDatabaseConnectResponse);
       if (controller.signal.aborted || !this.dialog.open) return;
       this.credentials = cfg;
       this.tables = result.tables.map((table) => {
@@ -261,8 +270,8 @@ export class DatabasePanel {
     }
   }
 
-  private post<T = unknown>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-    return this.api<T>(path, { method: 'POST', body: JSON.stringify(body), signal });
+  private post(path: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
+    return this.api(path, { method: 'POST', body: JSON.stringify(body), signal });
   }
 
   private renderTables(): void {
@@ -388,10 +397,10 @@ export class DatabasePanel {
     this.feedback('正在连接数据库');
     try {
       const tables = Array.from(this.selected, ({ schema, name }) => ({ schema, name }));
-      let status = await this.post<DBImportProgress>('/api/database/import', {
+      let status = await this.post('/api/database/import', {
         connection: this.credentials,
         tables,
-      });
+      }).then(decodeDBImportProgress);
       this.job = status.id;
       if (this.isCancelRequested()) await this.cancelJob();
       for (;;) {
@@ -420,8 +429,10 @@ export class DatabasePanel {
           this.feedback('正在打开工作表');
         }
         await delay(300);
-        status = await this.api<DBImportProgress>(
+        status = await this.api(
           `/api/database/import?id=${encodeURIComponent(this.job)}`,
+          undefined,
+          decodeDBImportProgress,
         );
       }
     } catch (error: unknown) {
@@ -437,7 +448,7 @@ export class DatabasePanel {
   private async cancelJob(): Promise<void> {
     if (!this.job) return;
     try {
-      const status = await this.post<DatabaseCancelResponse>('/api/database/cancel', { id: this.job });
+      const status = await this.post('/api/database/cancel', { id: this.job }).then(decodeDatabaseCancelResponse);
       this.feedback(status.status === 'opening' ? '正在打开工作表' : '正在取消');
     } catch (error: unknown) {
       this.cancelRequested = false;

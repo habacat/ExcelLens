@@ -100,7 +100,14 @@ test('a previous workbook index reply cannot read a cell or evict a pending look
   const newIndex = Promise.withResolvers<Response>();
   let starts = 0;
   let reads = 0;
-  t.mock.method(globalThis, 'fetch', () => (++starts === 1 ? oldIndex.promise : newIndex.promise));
+  const oldStarted = Promise.withResolvers<undefined>();
+  t.mock.method(globalThis, 'fetch', () => {
+    if (++starts === 1) {
+      oldStarted.resolve(undefined);
+      return oldIndex.promise;
+    }
+    return newIndex.promise;
+  });
   try {
     const inspector = new FormulaInspector({
       state: createInitialWorkbookState(100, 20),
@@ -114,13 +121,14 @@ test('a previous workbook index reply cannot read a cell or evict a pending look
       sheetExists: () => true, notify: () => undefined, copy: () => true, navigate: async () => true,
     });
     const previous = inspector.readCell('明细', 'A1', () => undefined);
+    await oldStarted.promise;
     inspector.resetWorkbook();
     const next = inspector.readCell('明细', 'A1', () => undefined);
-    oldIndex.resolve(Response.json({ ready: true }));
+    oldIndex.resolve(Response.json({ ready: true, jobId: '' }));
     await assert.rejects(previous, { name: 'AbortError' });
     assert.equal(reads, 0);
     const joined = inspector.readCell('明细', 'A1', () => undefined);
-    newIndex.resolve(Response.json({ ready: true }));
+    newIndex.resolve(Response.json({ ready: true, jobId: '' }));
     const values = await Promise.all([next, joined]);
     assert.strictEqual(values[0], values[1]);
     assert.equal(starts, 2);

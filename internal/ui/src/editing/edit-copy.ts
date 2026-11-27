@@ -9,7 +9,6 @@ import type {
   EditArtifact,
   EditBatchPreviewResponse,
   EditChange,
-  EditClipboard,
   EditCommitResponse,
   EditInfo,
   EditKey,
@@ -23,7 +22,6 @@ import type {
   EditStructure,
   EditValue,
   EditValueKind,
-  WhatIfResult,
 } from '../contracts/edit.ts';
 import type { EditLimits } from '../contracts/formats.ts';
 import type { SourceInfo } from '../contracts/workbook.ts';
@@ -44,6 +42,19 @@ import { EditModel } from './edit-copy-model.ts';
 import { SheetEditor, type SheetEditorBridge } from './edit-grid.ts';
 import { EditTools } from './edit-tools.ts';
 import { displayFormula } from './formula-entry-model.ts';
+import {
+  decodeEditArtifact,
+  decodeEditBatchPreviewResponse,
+  decodeEditChoicesResponse,
+  decodeEditClipboard,
+  decodeEditCommitResponse,
+  decodeEditListResponse,
+  decodeEditReadResponse,
+  decodeEditStateResponse,
+  decodeWhatIfResult,
+} from '../core/http-decoders.generated.ts';
+
+import { decodeOpenedWorkbook } from '../core/workbook-response.ts';
 
 const RULE_INPUTS = [
   'RuleStart',
@@ -71,11 +82,13 @@ interface EditListItem extends EditInfo {
   readonly error?: string;
 }
 
-interface EditListResponse {
+/** @httpResponse EditListResponse */
+export interface EditListResponse {
   readonly items: readonly EditListItem[];
 }
 
-interface EditChoicesResponse {
+/** @httpResponse EditChoicesResponse */
+export interface EditChoicesResponse {
   readonly revision: string;
   readonly choices: readonly string[];
 }
@@ -355,8 +368,8 @@ export class EditCopy {
       Boolean(source?.archiveMember);
   }
 
-  post<T = unknown>(command: string, body: unknown, signal?: AbortSignal): Promise<T> {
-    return this.api<T>(`/api/edits/${command}`, {
+  post(command: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
+    return this.api(`/api/edits/${command}`, {
       method: 'POST',
       signal,
       headers: { 'Content-Type': 'application/json' },
@@ -472,11 +485,11 @@ export class EditCopy {
         trial.secondValues = listField('SecondValues');
         if (secondText) trial.second = parseAddress(secondText);
       }
-      const result = await this.post<WhatIfResult>(
+      const result = await this.post(
         'what-if',
         { document: keyOf(doc), revision: doc.revision, book: dataSnapshot.book, trial },
         signal,
-      );
+      ).then(decodeWhatIfResult);
       el('TrialStatus').textContent =
         `${result.status} · ${result.iterations} 次计算` +
         `${result.residual !== undefined ? ` · 残差 ${result.residual}` : ''} · 修订 ${doc.revision}`;
@@ -509,7 +522,7 @@ export class EditCopy {
     openBtn.disabled = true;
     label.textContent = '正在检查…';
     const ok = await this.run('正在检查编辑源…', async (signal) => {
-      const data = await this.post<EditStateResponse>('start', { book }, signal);
+      const data = await this.post('start', { book }, signal).then(decodeEditStateResponse);
       if (this.context().book !== book || document.body.classList.contains('home-view')) {
         throw new Error('当前文件已切换');
       }
@@ -591,7 +604,7 @@ export class EditCopy {
     el('ListView').hidden = false;
     el('Title').textContent = '已保存的编辑';
     void this.run('正在读取编辑副本…', async (signal) => {
-      const { items } = await this.api<EditListResponse>('/api/edits', { signal });
+      const { items } = await this.api('/api/edits', { signal }, decodeEditListResponse);
       const listEl = el('List');
       listEl.replaceChildren();
       for (const item of items) {
@@ -608,7 +621,7 @@ export class EditCopy {
 
   resume(item: EditKey): void {
     void this.run('正在恢复编辑修订…', async (signal) => {
-      const data = await this.post<EditStateResponse>('state', { document: keyOf(item) }, signal);
+      const data = await this.post('state', { document: keyOf(item) }, signal).then(decodeEditStateResponse);
       const { sheet, ref } = this.context();
       if (!(await this.bindGridBase(data, signal, sheet, ref))) {
         await this.activate(data, sheet, ref, signal, false);
@@ -798,7 +811,7 @@ export class EditCopy {
     if (!this.data) return;
     const doc = this.data.document;
     EditModel.target(addressInput.value, shape);
-    const cell = await this.post<EditReadResponse>(
+    const cell = await this.post(
       'read',
       {
         document: keyOf(doc),
@@ -807,7 +820,7 @@ export class EditCopy {
         ref: addressInput.value.trim().toUpperCase(),
       },
       signal,
-    );
+    ).then(decodeEditReadResponse);
     this.invalidated = false;
     this.setCell(cell);
     this.status(this.data.encoding && cell.value.kind === 'missing' ? '该记录缺少此列' : '');
@@ -892,11 +905,11 @@ export class EditCopy {
       ruleInput && JSON.stringify(ruleInput) !== this.initialRule ? ruleInput : null;
     this.clearPreview();
     void this.run('正在读取最新修订…', async (signal) => {
-      const data = await this.post<EditStateResponse>(
+      const data = await this.post(
         'state',
         { document: keyOf(currentData.document) },
         signal,
-      );
+      ).then(decodeEditStateResponse);
       this.data = data;
       this.renderState();
       if (this.grid.active) {
@@ -1010,7 +1023,7 @@ export class EditCopy {
     return this.run('正在保存编辑…', async (signal) => {
       let result: EditCommitResponse;
       try {
-        result = await this.post<EditCommitResponse>('commit', request, signal);
+        result = await this.post('commit', request, signal).then(decodeEditCommitResponse);
       } catch (error: unknown) {
         const status = httpStatus(error);
         if (status !== undefined && status >= 400 && status < 500 && status !== 408) {
@@ -1035,11 +1048,11 @@ export class EditCopy {
       try {
         if (this.grid.active && result.book !== this.context().book) {
           const { sheet, ref } = this.context();
-          const next = await this.post<EditStateResponse>(
+          const next = await this.post(
             'state',
             { document: keyOf(result.document) },
             signal,
-          );
+          ).then(decodeEditStateResponse);
           const op = request.operation.structure;
           const followWorkbook = Boolean(
             op && (op.kind === 'copySheet' || op.kind === 'newSheet' || op.kind === 'deleteSheet'),
@@ -1087,7 +1100,7 @@ export class EditCopy {
     ref?: string,
   ): Promise<boolean> {
     if (data.book === this.context().book) return false;
-    const base = await this.post<EditOpenWorkbookResponse>(
+    const base = await this.post(
       'base',
       {
         document: keyOf(data.document),
@@ -1095,7 +1108,7 @@ export class EditCopy {
         book: this.context().book,
       },
       signal,
-    );
+    ).then(decodeOpenedWorkbook);
     const index = preferredSheet ? base.sheets.findIndex((s) => s.name === preferredSheet) : -1;
     const adoptedBase: EditOpenWorkbookResponse =
       index >= 0 ? { ...base, activeTab: index } : base;
@@ -1118,7 +1131,7 @@ export class EditCopy {
       return true;
     }
     return this.run('正在打开原工作簿…', async (signal) => {
-      const base = await this.post<EditOpenWorkbookResponse>(
+      const base = await this.post(
         'base',
         {
           document: keyOf(dataSnapshot.document),
@@ -1126,7 +1139,7 @@ export class EditCopy {
           mode: 'original',
         },
         signal,
-      );
+      ).then(decodeOpenedWorkbook);
       await this.adopt(base);
     });
   }
@@ -1155,11 +1168,11 @@ export class EditCopy {
   copy(): void {
     if (!this.editable || this.dirty || this.abort || this.pending) return;
     void this.run('正在读取复制区域…', async (signal) => {
-      const clip = await this.post<EditClipboard>(
+      const clip = await this.post(
         'copy',
         { ...this.editTarget(), end: inputEl('CopyEnd').value.trim().toUpperCase() },
         signal,
-      );
+      ).then(decodeEditClipboard);
       const text = JSON.stringify(clip);
       try {
         await navigator.clipboard.writeText(text);
@@ -1219,7 +1232,7 @@ export class EditCopy {
     const target = this.editTarget();
     this.setChoices([]);
     void this.run('正在读取列表选项…', async (signal) => {
-      const result = await this.post<EditChoicesResponse>('choices', target, signal);
+      const result = await this.post('choices', target, signal).then(decodeEditChoicesResponse);
       if (result.revision !== target.revision) throw new Error('编辑修订已变化，请刷新后重试');
       this.setChoices(result.choices);
       this.status(`已读取 ${result.choices.length} 项`);
@@ -1301,11 +1314,11 @@ export class EditCopy {
         allowBlank: inputEl('AllowBlank').checked,
       };
       void this.run('正在核对规则范围…', async (signal) => {
-        const plan = await this.post<EditBatchPreviewResponse>(
+        const plan = await this.post(
           'preview',
           { ...this.editTarget(), mode: 'rule', rule },
           signal,
-        );
+        ).then(decodeEditBatchPreviewResponse);
         this.showPreview(plan, 'rule');
       });
     } catch (error: unknown) {
@@ -1355,7 +1368,7 @@ export class EditCopy {
       ) {
         const last = EditModel.target(inputEl('FillEnd').value, shape);
         void this.run('正在核对填充区域…', async (signal) => {
-          const plan = await this.post<EditBatchPreviewResponse>(
+          const plan = await this.post(
             'preview',
             {
               ...this.editTarget(),
@@ -1364,7 +1377,7 @@ export class EditCopy {
               step: inputEl('FillStep').value.trim(),
             },
             signal,
-          );
+          ).then(decodeEditBatchPreviewResponse);
           this.showPreview(plan, mode);
         });
         return;
@@ -1380,7 +1393,7 @@ export class EditCopy {
           throw new Error('请粘贴有类型数据');
         }
         void this.run('正在核对粘贴区域…', async (signal) => {
-          const plan = await this.post<EditBatchPreviewResponse>(
+          const plan = await this.post(
             'preview',
             {
               ...this.editTarget(),
@@ -1389,7 +1402,7 @@ export class EditCopy {
               skipBlank: inputEl('SkipBlank').checked,
             },
             signal,
-          );
+          ).then(decodeEditBatchPreviewResponse);
           this.showPreview(plan, mode);
         });
         return;
@@ -1414,7 +1427,7 @@ export class EditCopy {
               this.limits,
             );
       void this.run('正在核对目标区域…', async (signal) => {
-        const checked = await this.post<EditBatchPreviewResponse>(
+        const checked = await this.post(
           'preview',
           {
             ...this.editTarget(),
@@ -1423,7 +1436,7 @@ export class EditCopy {
             operation: { changes: plan.changes },
           },
           signal,
-        );
+        ).then(decodeEditBatchPreviewResponse);
         this.showPreview(checked, mode);
       });
     } catch (error: unknown) {
@@ -1501,11 +1514,11 @@ export class EditCopy {
       ? { encoding: selectEl('Encoding').value, protect: inputEl('Protect').checked }
       : {};
     return this.run('正在生成并核对副本…', async (signal) => {
-      const artifact = await this.post<EditArtifact>(
+      const artifact = await this.post(
         'save',
         { document: keyOf(doc), revision: doc.revision, options },
         signal,
-      );
+      ).then(decodeEditArtifact);
       if (this.data) {
         this.data = {
           ...this.data,
@@ -1526,11 +1539,11 @@ export class EditCopy {
     void this.run(
       '正在打开生成的副本…',
       async (signal) => {
-        const data = await this.post<EditOpenWorkbookResponse>(
+        const data = await this.post(
           'open',
           { document: keyOf(doc), artifact: artifact.key, book },
           signal,
-        );
+        ).then(decodeOpenedWorkbook);
         if (this.grid.active) this.grid.leave();
         dialogEl().close();
         await this.adopt(data);

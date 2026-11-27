@@ -38,10 +38,11 @@ func (a *App) handlePreview(w http.ResponseWriter, r *http.Request) {
 			maxCol = max(maxCol, cell.Col)
 		}
 	}
-	payload := map[string]any{"available": len(rows) > 0, "partial": true, "sheet": meta.Name, "startCol": 1, "colCount": 40, "rows": rows, "maxRow": maxRow, "maxCol": maxCol, "totalRows": len(rows)}
+	header := PreviewHeader{Available: len(rows) > 0, Partial: true, Sheet: meta.Name, StartCol: 1, ColCount: 40, MaxRow: maxRow, MaxCol: maxCol, TotalRows: len(rows)}
 	if r.URL.Query().Get("compact") == "1" {
-		payload["rows"] = packViewportRows(rows)
-		payload["compact"] = 1
+		header.Compact = 1
+		writeJSON(w, previewResponse[CompactRow]{header, packViewportRows(rows)})
+		return
 	}
-	writeJSON(w, payload)
+	writeJSON(w, previewResponse[workbook.RowData]{header, rows})
 }

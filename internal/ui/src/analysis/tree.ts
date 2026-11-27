@@ -2,6 +2,7 @@
  * Lazy branches own only bounded responses. Runtime job IDs never enter a
  * saved query, and a cancelled late start is cleared by its own job owner.
  */
+import { decodeAnalysisTreeStatusResponse } from '../core/http-decoders.generated.ts';
 import type {
   AnalysisCell,
   AnalysisMetric,
@@ -395,7 +396,7 @@ export class AnalysisTree {
       arraysEqual(result.tree.path, node.path) &&
       result.tree.levels === q.rows.length &&
       result.tree.hasChildren === (node.path.length + 1 < q.rows.length) &&
-      arraysEqual(result.rowFields, q.rows.slice(0, node.path.length + 1)) &&
+      arraysEqual(result.rowFields ?? [], q.rows.slice(0, node.path.length + 1)) &&
       result.columnKeys.every((col) => this.root?.result.columnKeys.includes(col)) &&
       result.rows.every(
         (row) => row.keys.length === node.path.length + 1 && isPrefix(node.path, row.keys),
@@ -421,22 +422,14 @@ export class AnalysisTree {
 
     // Cancel also forgets any completed response. AsyncJobs observes a
     // start response even after cancellation, so its late ID is not lost.
-    const treeApi: ApiClient = ((
-      url: string,
-      options?: Parameters<ApiClient>[1],
-      responseType?: Parameters<ApiClient>[2],
-    ) =>
-      this.api(
-        url === '/api/analysis/tree/cancel' ? '/api/analysis/tree/clear' : url,
-        options,
-        responseType as 'json',
-      )) as ApiClient;
 
     const jobs = new AsyncJobs<
       AnalysisTreeStatusResponse | AnalysisResult | null,
       AnalysisTreeStatusResponse
     >({
-      api: treeApi,
+      api: this.api,
+      decodeStatus: decodeAnalysisTreeStatusResponse,
+      cancelEndpoint: '/api/analysis/tree/clear',
       identity: () => `${this.identity()}:${node.version}`,
       requestIdentity: () => root.bookKey,
       sleep: this.sleep,

@@ -14,12 +14,15 @@ import {
   closeFormula as defaultCloseFormula,
   formulaContext as defaultFormulaContext,
   FormulaTable,
-  type CalculatorCellResult,
   type CalculatorRowRecord,
   type CalculatorSourceRef,
   type CalculatorSuggestion,
   type FormulaInputContext,
 } from './calculator-model.ts';
+import {
+  decodeCalculatorCellResult,
+  decodeCalculatorFunctionsResponse,
+} from '../core/http-decoders.generated.ts';
 
 const ROW_HEIGHT = 26;
 const HEADER_HEIGHT = 26;
@@ -31,7 +34,8 @@ export interface CalculatorFunctionInfo {
   readonly signature: string;
 }
 
-interface CalculatorFunctionsResponse {
+/** @httpResponse CalculatorFunctionsResponse */
+export interface CalculatorFunctionsResponse {
   readonly items?: readonly CalculatorFunctionInfo[] | null;
 }
 
@@ -741,12 +745,12 @@ export class Calculator {
     const { index, revision, controller } = job;
     const row = this.model.ensure(index);
     try {
-      const result = await this.o.api<CalculatorCellResult>('/api/calculator/formula', {
+      const result = await this.o.api('/api/calculator/formula', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: job.body,
         signal: controller.signal,
-      });
+      }, decodeCalculatorCellResult);
       if (controller.signal.aborted || row.revision !== revision) return;
       row.result = result;
       row.error = '';
@@ -871,7 +875,7 @@ export class Calculator {
 
   loadFunctions(): Promise<void> {
     this.catalogPromise ??= Promise.resolve()
-      .then(() => this.o.api<CalculatorFunctionsResponse>('/api/calculator/functions'))
+      .then(() => this.o.api('/api/calculator/functions', undefined, decodeCalculatorFunctionsResponse))
       .then((data) => {
         this.catalog = data.items ? [...data.items] : [];
       })

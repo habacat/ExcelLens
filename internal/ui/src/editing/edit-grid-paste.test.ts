@@ -80,10 +80,7 @@ test('resolvePasteDestination enforces rectangle multiples, batch capacity, filt
         requestBytes: 1_048_576,
       },
       colName: (c) => String.fromCharCode(64 + c),
-      post: async <T = unknown>() => {
-        const empty: unknown = {};
-        return empty as T;
-      },
+      post: async () => ({}),
       commit: async () => true,
     },
     grid: { shape: { name: 'Sheet1', firstRow: 1, firstCol: 1, rows: 10, cols: 5 } },
@@ -134,9 +131,9 @@ test('fetchNativePaste normalizes CRLF and trailing newline before SHA-256 proof
   const sent: { readonly command: string; readonly body: unknown }[] = [];
   await fetchNativePaste(
     {
-      post: async <T = unknown>(command: string, body: unknown) => {
+      post: async (command: string, body: unknown) => {
         sent.push({ command, body });
-        return null as T;
+        return null;
       },
     },
     { document: { id: 'doc-1', binding: 'bind-1' }, revision: '3', sheet: 'Sheet1' },
@@ -144,9 +141,9 @@ test('fetchNativePaste normalizes CRLF and trailing newline before SHA-256 proof
   );
   await fetchNativePaste(
     {
-      post: async <T = unknown>(command: string, body: unknown) => {
+      post: async (command: string, body: unknown) => {
         sent.push({ command, body });
-        return null as T;
+        return null;
       },
     },
     { document: { id: 'doc-1', binding: 'bind-1' }, revision: '3', sheet: 'Sheet1' },
@@ -183,7 +180,7 @@ test('pastePortableRange respects hidden-row prompt choices and routes change vs
           requestBytes: 1_048_576,
         },
         colName: (c) => String.fromCharCode(64 + c),
-        post: async <T = unknown>(_cmd: string, body: unknown) => {
+        post: async (_cmd: string, body: unknown) => {
           previews.push(body);
           const reply: EditBatchPreviewResponse = {
             proof: 'preview-proof',
@@ -191,7 +188,7 @@ test('pastePortableRange respects hidden-row prompt choices and routes change vs
             last: { sheet: 'Sheet1', row: 2, col: 1 },
             changes: [{ sheet: 'Sheet1', row: 2, col: 1, value: { kind: 'text', raw: 'ok' } }],
           };
-          return reply as T;
+          return reply;
         },
         commit: async (action, _changes, options) => {
           commits.push({ action, options });

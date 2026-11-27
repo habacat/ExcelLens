@@ -3,12 +3,16 @@
  * formula bar preview. Never evaluates formulas or mutates the workbook.
  */
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
-import type { CellData, IndexStartResponse, IndexStatusResponse } from '../contracts/workbook.ts';
+import type { CellData } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
 import { columnName, columnNumber } from '../core/cell-address.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { byId } from '../core/dom.ts';
 import type { WorkbookState } from '../grid/state.ts';
+import {
+  decodeIndexStartResponse,
+  decodeIndexStatusResponse,
+} from '../core/http-decoders.generated.ts';
 
 const MAX_ROW = 1_048_576;
 const MAX_COL = 16_384;
@@ -780,12 +784,12 @@ export class FormulaInspector {
     const { signal } = this.workbook;
     const activity = beginActivity('正在读取引用工作表');
     const task = (async (): Promise<void> => {
-      const started = await this.o.api<IndexStartResponse>('/api/index/start', {
+      const started = await this.o.api('/api/index/start', {
         signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheet }),
-      });
+      }, decodeIndexStartResponse);
       signal.throwIfAborted();
       if (started.ready) {
         this.readySheets.add(sheet);
@@ -794,9 +798,10 @@ export class FormulaInspector {
       for (;;) {
         await new Promise<void>((r) => setTimeout(r, 270));
         signal.throwIfAborted();
-        const result = await this.o.api<IndexStatusResponse>(
+        const result = await this.o.api(
           `/api/index/status?id=${encodeURIComponent(started.jobId)}`,
           { signal },
+          decodeIndexStatusResponse,
         );
         signal.throwIfAborted();
         activity?.job({

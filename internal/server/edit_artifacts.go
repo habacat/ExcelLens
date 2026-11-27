@@ -142,5 +142,5 @@ func (a *App) handleEditOpen(w http.ResponseWriter, r *http.Request, req editReq
 	}
 	a.closeArchive()
 	a.recordRecent(wb)
-	writeJSON(w, map[string]any{"opened": true, "workbookKey": wb.Fingerprint, "book": sourceBookID(wb), "fileName": artifact.Name, "fileSize": artifact.Bytes, "sheetCount": len(wb.Sheets), "activeTab": wb.ActiveTab, "sheets": wb.Sheets, "source": wb.SourceInfo})
+	writeJSON(w, openedWorkbook(wb, artifact.Name, artifact.Bytes))
 }

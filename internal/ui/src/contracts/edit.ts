@@ -178,6 +178,7 @@ export interface EditClipboardCell {
   readonly builtinFormat?: number;
 }
 
+/** @httpResponse EditClipboard */
 export interface EditClipboard {
   readonly portable?: PortableClipboard;
   readonly format: 'ExcelLens.EditSelection';
@@ -244,6 +245,7 @@ export interface TextSaveOptions {
   readonly protect: boolean;
 }
 
+/** @httpResponse EditArtifact */
 export interface EditArtifact {
   readonly version: number;
   readonly key: string;
@@ -289,6 +291,7 @@ export interface GeneratedArea extends EditArea {
   readonly pivot?: boolean;
 }
 
+/** @httpResponse PivotChoicesResponse */
 export interface PivotChoicesResponse {
   readonly items: readonly PivotItem[];
   readonly more: boolean;
@@ -303,6 +306,7 @@ export interface PivotGroupField {
   readonly english?: boolean;
 }
 
+/** @httpResponse PivotInfo */
 export interface PivotInfo {
   readonly dateFilters?: readonly PivotDateFilter[];
   readonly groupFields?: Readonly<Record<string, PivotGroupField>>;
@@ -337,6 +341,7 @@ export interface EditSheetMeta {
   readonly sourceRules?: boolean;
 }
 
+/** @httpResponse EditStateResponse */
 export interface EditStateResponse {
   readonly tables?: readonly TableRange[];
   readonly chartSheets?: readonly string[];
@@ -351,6 +356,7 @@ export interface EditStateResponse {
   readonly artifacts: readonly EditArtifact[];
 }
 
+/** @httpResponse EditReadResponse */
 export interface EditReadResponse {
   readonly address: EditAddress;
   readonly ref: string;
@@ -370,6 +376,7 @@ export interface EditGridRuleArea extends EditArea {
   readonly list?: boolean;
 }
 
+/** @httpResponse EditGridProjectionResponse */
 export interface EditGridProjectionResponse {
   readonly cells: Readonly<Record<string, Readonly<Record<string, CellData | null>>>>;
   readonly calculated?: Readonly<Record<string, Readonly<Record<string, CellData | null>>>>;
@@ -378,6 +385,7 @@ export interface EditGridProjectionResponse {
   readonly rules?: readonly EditGridRuleArea[];
 }
 
+/** @httpResponse EditBatchPreviewResponse */
 export interface EditBatchPreviewResponse {
   readonly structure?: boolean;
   readonly changes?: readonly EditChange[];
@@ -387,6 +395,7 @@ export interface EditBatchPreviewResponse {
   readonly proof?: string;
 }
 
+/** @httpResponse EditCommitResponse */
 export interface EditCommitResponse {
   readonly document: EditInfo;
   readonly committed: string;
@@ -418,6 +427,7 @@ export interface TrialPoint {
   readonly error?: string;
 }
 
+/** @httpResponse WhatIfResult */
 export interface WhatIfResult {
   readonly status: string;
   readonly iterations: number;

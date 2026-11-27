@@ -141,7 +141,7 @@ func TestConditionalHTTPViewportCellClipboardAndSortedRowsUseOneSourceCoordinate
 	if find(full.Rows[0], 4).Conditional.Notice == "" || !find(full.Rows[0], 4).CacheMissing {
 		t.Fatal("missing formula result became zero", full.Rows[0])
 	}
-	compact := decodeResponse[struct{ Rows []wireRow }](t, featureCall(t, a, "GET", url+"&compact=1", ""))
+	compact := decodeResponse[struct{ Rows []CompactRow }](t, featureCall(t, a, "GET", url+"&compact=1", ""))
 	if !reflect.DeepEqual(compact.Rows, packViewportRows(full.Rows)) || compact.Rows[1].Cells[0].Flags&16 == 0 {
 		t.Fatal("compact viewport lost conditional provenance", compact)
 	}

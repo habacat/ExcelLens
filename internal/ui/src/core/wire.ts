@@ -2,22 +2,25 @@
  * Compact viewport wire protocol decoder (`compact=1` responses from `/api/sheet`
  * and `/api/preview`). Reconstructs full `RowData` and `CellData` models.
  */
-import type { CellData, RowData, WireRow } from '../contracts/workbook.ts';
+import { decodeCompactRowWire } from './http-decoders.generated.ts';
+import type { CellData, RowData } from '../contracts/workbook.ts';
 import { columnName } from './cell-address.ts';
 
-const own = (value: object, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(value, key);
-
-export function unpackWireRows(rows: readonly WireRow[]): RowData[] {
-  return rows.map((row) => {
+export function unpackWireRows(rows: unknown): RowData[] {
+  if (!Array.isArray(rows)) throw new Error('工作表响应缺少行列表');
+  return rows.map((input: unknown) => {
+    const row = decodeCompactRowWire(input);
+    if (!Number.isSafeInteger(row.n) || row.n < 1 || !row.c) throw new Error('工作表行坐标或单元格列表无效');
     const suffix = String(row.n);
     const cells: CellData[] = row.c.map((value) => {
+      if (!Number.isSafeInteger(value.c) || value.c < 1) throw new Error('工作表列坐标无效');
       const flags = value.k ?? 0;
+      if (!Number.isInteger(flags) || flags < 0 || flags > 255) throw new Error('工作表单元格标志无效');
       const cell: CellData = {
         col: value.c,
-        ref: own(value, 'r') && value.r !== undefined ? value.r : `${columnName(value.c)}${suffix}`,
+        ref: value.r ?? `${columnName(value.c)}${suffix}`,
         raw: value.v,
-        display: own(value, 'd') && value.d !== undefined ? value.d : value.v,
+        display: value.d ?? value.v,
         hasFormula: Boolean(flags & 1),
       };
       if (value.t) cell.type = value.t;
@@ -28,7 +31,11 @@ export function unpackWireRows(rows: readonly WireRow[]): RowData[] {
       if (value.st) cell.sourceType = value.st;
       if (value.cu) cell.currency = value.cu;
       if (value.o) cell.valueColor = value.o;
-      if (value.h) cell.hyperlink = value.h;
+      if (value.h) {
+        const kind = value.h.kind;
+        if (kind !== 'internal' && kind !== 'external') throw new Error('工作表超链接类型无效');
+        cell.hyperlink = { ...value.h, kind };
+      }
       if (value.x) cell.richText = value.x;
       if (value.q) cell.conditional = value.q;
       if (flags & 16) cell.presentationOnly = true;

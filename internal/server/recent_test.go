@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -83,8 +82,11 @@ func TestRecentFilesReopenPinRemoveAndMissing(t *testing.T) {
 	}
 	defer b.Close()
 	response := featureCall(t, b, "POST", "/api/recent", `{"action":"open","id":"`+id+`"}`)
-	if !strings.Contains(response.Body.String(), "audited.xlsx") || b.currentWorkbook() == nil {
-		t.Fatal("reopen failed")
+	reopened := decodeResponse[OpenedWorkbookResponse](t, response)
+	wb := b.currentWorkbook()
+	if wb == nil || !reopened.Opened || reopened.FileName != "audited.xlsx" ||
+		reopened.Book == "" || reopened.Book != sourceBookID(wb) || reopened.WorkbookKey != wb.Fingerprint {
+		t.Fatalf("recent entry did not reopen with its source identity: %+v", reopened)
 	}
 	if err := os.Remove(file); err != nil {
 		t.Fatal(err)
