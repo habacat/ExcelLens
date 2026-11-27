@@ -1,0 +1,82 @@
+{
+    "result":  "PASS",
+    "version":  "1.20.2",
+    "release":  "https://github.com/habacat/ExcelLens/releases/tag/v1.20.2",
+    "releaseId":  460717343,
+    "publishedAt":  "2026-11-27T14:41:09Z",
+    "verifiedAt":  "2026-11-27T14:49:57.7246251Z",
+    "latest":  true,
+    "publicCommit":  "9d7706fc9a8691e1153508a6003eaee487810c05",
+    "tagObject":  "96108c2d54801c74069de0b9f3c3222e67741def",
+    "refs":  {
+                 "refs/heads/main":  "9d7706fc9a8691e1153508a6003eaee487810c05",
+                 "refs/tags/v1.20.2":  "96108c2d54801c74069de0b9f3c3222e67741def",
+                 "refs/tags/v1.20.2^{}":  "9d7706fc9a8691e1153508a6003eaee487810c05"
+             },
+    "publicTree":  {
+                       "tree":  "ed0339f45aaf76ebfc25ba184d368febb4458cb6",
+                       "filesVerified":  3699
+                   },
+    "ci":  {
+               "main":  {
+                            "conclusion":  "success",
+                            "url":  "https://github.com/habacat/ExcelLens/actions/runs/46018082162",
+                            "jobs":  [
+                                         {
+                                             "name":  "check (ubuntu-latest)",
+                                             "conclusion":  "success"
+                                         },
+                                         {
+                                             "name":  "check (windows-latest)",
+                                             "conclusion":  "success"
+                                         }
+                                     ],
+                            "linuxRace":  "PASS"
+                        },
+               "tag":  {
+                           "conclusion":  "success",
+                           "url":  "https://github.com/habacat/ExcelLens/actions/runs/46018089119",
+                           "jobs":  [
+                                        {
+                                            "name":  "check (ubuntu-latest)",
+                                            "conclusion":  "success"
+                                        },
+                                        {
+                                            "name":  "check (windows-latest)",
+                                            "conclusion":  "success"
+                                        }
+                                    ],
+                           "linuxRace":  "PASS"
+                       }
+           },
+    "assets":  [
+                   {
+                       "name":  "ExcelLens_1.20.2_Performance.json",
+                       "bytes":  108389,
+                       "sha256":  "c4c121f74a09f04db5d0d2c0152bfc566219dbe15715c85a3f1a207b802f6922",
+                       "url":  "https://github.com/habacat/ExcelLens/releases/download/v1.20.2/ExcelLens_1.20.2_Performance.json",
+                       "verifiedAnonymousDownload":  true
+                   },
+                   {
+                       "name":  "ExcelLens_1.20.2_SHA256SUMS.txt",
+                       "bytes":  303,
+                       "sha256":  "c875a9f2809a1489cd02d1b6aece2827214a5cd6e87a656ac001fc875931d8a3",
+                       "url":  "https://github.com/habacat/ExcelLens/releases/download/v1.20.2/ExcelLens_1.20.2_SHA256SUMS.txt",
+                       "verifiedAnonymousDownload":  true
+                   },
+                   {
+                       "name":  "ExcelLens_1.20.2_Source_Full.zip",
+                       "bytes":  15418620,
+                       "sha256":  "837ce8c282016e176aba7b49d4a6745c0e70eb4d7e6897753b935d28e4626260",
+                       "url":  "https://github.com/habacat/ExcelLens/releases/download/v1.20.2/ExcelLens_1.20.2_Source_Full.zip",
+                       "verifiedAnonymousDownload":  true
+                   },
+                   {
+                       "name":  "ExcelLens_1.20.2_Windows_x64_Full.zip",
+                       "bytes":  10412962,
+                       "sha256":  "12fe5ec8ce98e4ca91cbcb99238dedb14722fe8ffe207ff9aeee89f873e7dbe3",
+                       "url":  "https://github.com/habacat/ExcelLens/releases/download/v1.20.2/ExcelLens_1.20.2_Windows_x64_Full.zip",
+                       "verifiedAnonymousDownload":  true
+                   }
+               ]
+}

@@ -1,0 +1,3575 @@
+{
+  "schema": 2,
+  "profile": "release",
+  "version": "1.20.2",
+  "checkoutHead": "9d7706fc9a8691e1153508a6003eaee487810c05",
+  "modifiedBuildInputs": false,
+  "started": "2026-11-27T14:27:54.765Z",
+  "host": {
+    "platform": "win32",
+    "os": "10.0.19045",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "logicalCPUs": 12,
+    "ramBytes": 68441210880,
+    "node": "v24.18.0",
+    "go": "go version go1.27.4 windows/amd64",
+    "browser": "Chrome/158.0.8127.88"
+  },
+  "samples": [
+    {
+      "name": "csv-1000000.csv",
+      "rows": 1000000,
+      "bytes": 33889637,
+      "sha256": "b7f66b5d52ebe5bace6d6a0600720835d562b798cd6c854ebf2e1203883fa735"
+    },
+    {
+      "name": "csv-5000000.csv",
+      "rows": 5000000,
+      "bytes": 169448280,
+      "sha256": "f2e710b6af6f80d9f3448333c5f7075617e6cf4becab9578d75d94bd02c6598c"
+    },
+    {
+      "name": "csv-10000000.csv",
+      "rows": 10000000,
+      "bytes": 338896585,
+      "sha256": "a2eaee440518956af6f7630ff4e7352c9dfc292cc8695a2953a0d55e1ffbe335"
+    },
+    {
+      "name": "xlsx-100000.xlsx",
+      "rows": 100000,
+      "bytes": 1847499,
+      "sha256": "17cf16ea964db6a26e6b037a30060eabbc9669b54ed1b65d24d03099966aa2b3"
+    },
+    {
+      "name": "xlsx-500000.xlsx",
+      "rows": 500000,
+      "bytes": 9111803,
+      "sha256": "14620a0356ff47e3540bc735279ba0305f7719c892a5e09c5b7b71b1be32899c"
+    },
+    {
+      "name": "xlsx-1000000.xlsx",
+      "rows": 1000000,
+      "bytes": 18192593,
+      "sha256": "719dea4e03588ceee6634c4febbf7cfd22cd5e3c31c4364f4d4041d96d01b4ef"
+    },
+    {
+      "name": "csv-1000001.csv",
+      "rows": 1000001,
+      "bytes": 33889669,
+      "sha256": "8023679d08338f38a23fc4053360280ac7ea20773c836de321c94a149566c9d2"
+    },
+    {
+      "name": "csv-1000001-right.csv",
+      "rows": 1000001,
+      "bytes": 33889670,
+      "sha256": "84de01017f8469210ddbbc9eccf0c3e0008e46f4053606371cb30312d7b7e69b"
+    },
+    {
+      "name": "csv-501.csv",
+      "rows": 501,
+      "bytes": 16909,
+      "sha256": "4699181fb40162ae28505c6c4161e340fde8013313d3d68c20b7737682a5f978"
+    }
+  ],
+  "readings": [
+    {
+      "format": "csv",
+      "rows": 1000000,
+      "firstVisibleMs": 551.9000000059605,
+      "indexRequestToReadyMs": 673.7999999970198,
+      "visibleCoverageMs": 1268.6000000089407,
+      "peakServiceRSSBytes": 177631232,
+      "sampledPeakServiceRSSBytes": 177627136,
+      "initialServiceRSSBytes": 25403392
+    },
+    {
+      "format": "csv",
+      "rows": 5000000,
+      "firstVisibleMs": 2552.3999999910593,
+      "indexRequestToReadyMs": 3003.699999988079,
+      "visibleCoverageMs": 5574.29999999702,
+      "peakServiceRSSBytes": 224182272,
+      "sampledPeakServiceRSSBytes": 221417472,
+      "initialServiceRSSBytes": 25489408
+    },
+    {
+      "format": "csv",
+      "rows": 10000000,
+      "firstVisibleMs": 4908.100000008941,
+      "indexRequestToReadyMs": 4313.5999999940395,
+      "visibleCoverageMs": 9269,
+      "peakServiceRSSBytes": 224198656,
+      "sampledPeakServiceRSSBytes": 223158272,
+      "initialServiceRSSBytes": 25542656
+    },
+    {
+      "format": "xlsx",
+      "rows": 100000,
+      "firstVisibleMs": 781.5,
+      "indexRequestToReadyMs": 680,
+      "visibleCoverageMs": 1510.7000000029802,
+      "peakServiceRSSBytes": 36442112,
+      "sampledPeakServiceRSSBytes": 35926016,
+      "initialServiceRSSBytes": 22618112
+    },
+    {
+      "format": "xlsx",
+      "rows": 500000,
+      "firstVisibleMs": 414.70000000298023,
+      "indexRequestToReadyMs": 2660.5,
+      "visibleCoverageMs": 3192.2999999970198,
+      "peakServiceRSSBytes": 75923456,
+      "sampledPeakServiceRSSBytes": 75919360,
+      "initialServiceRSSBytes": 25899008
+    },
+    {
+      "format": "xlsx",
+      "rows": 1000000,
+      "firstVisibleMs": 492.90000000596046,
+      "indexRequestToReadyMs": 5320.29999999702,
+      "visibleCoverageMs": 5853.5999999940395,
+      "peakServiceRSSBytes": 135131136,
+      "sampledPeakServiceRSSBytes": 135122944,
+      "initialServiceRSSBytes": 22523904
+    }
+  ],
+  "cleanup": [
+    {
+      "scenario": "csv-1000000",
+      "code": "EPERM"
+    },
+    {
+      "scenario": "lifecycle",
+      "code": "EPERM"
+    },
+    {
+      "scenario": "edit",
+      "code": "EPERM"
+    }
+  ],
+  "result": "PASS",
+  "productionSHA256": "458d556109c052dd6acc5c8184747b137f631377cd7a28b91a70f0cbf31fae30",
+  "suiteSHA256": "03e561c4af0ae90c8602ab218110b366e3a82b795208de038891fb1a442252bc",
+  "scroll": {
+    "durationMs": 60000.69999999106,
+    "logicalVelocityPxPerSec": 900,
+    "virtualScrollScale": 1.6667394044661008,
+    "frames": 3429,
+    "fps": 57.14933325778717,
+    "p95FrameMs": 17,
+    "noCoverageFrames": 0,
+    "emptyFrames": 0
+  },
+  "fullSearch": {
+    "rows": 5000000,
+    "hits": 50000,
+    "searchMs": 6489.89,
+    "csvStreamAndVerifyMs": 109.16,
+    "everyCoordinateVerified": true
+  },
+  "reconcile": {
+    "rowsPerLedger": 1000000,
+    "elapsedMs": 12328.49,
+    "peakServiceRSSBytes": 247656448,
+    "peakAdditionalDataBytes": 96000480,
+    "counts": {
+      "withinTolerance": 0,
+      "equal": 999999,
+      "different": 1,
+      "leftOnly": 0,
+      "rightOnly": 0,
+      "duplicate": 0,
+      "review": 0,
+      "invalidKeys": 0,
+      "leftRecords": 1000000,
+      "rightRecords": 1000000
+    }
+  },
+  "tabs": [
+    {
+      "pages": 10,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 19,
+        "sampledProcesses": 19,
+        "sumWorkingSetBytes": 1888817152,
+        "sumHandles": 7516
+      },
+      "requests": 30,
+      "p95StatusMs": 38.28,
+      "serviceRSSBytes": 29204480,
+      "serviceHandles": 218,
+      "initialRSSBytes": 28602368,
+      "peakRSSBytes": 30191616
+    },
+    {
+      "pages": 30,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 39,
+        "sampledProcesses": 39,
+        "sumWorkingSetBytes": 4387229696,
+        "sumHandles": 15504
+      },
+      "requests": 90,
+      "p95StatusMs": 144.22,
+      "serviceRSSBytes": 33689600,
+      "serviceHandles": 218,
+      "initialRSSBytes": 29204480,
+      "peakRSSBytes": 34107392
+    },
+    {
+      "pages": 64,
+      "perWorkbookRows": 501,
+      "browser": {
+        "reportedProcesses": 70,
+        "sampledProcesses": 70,
+        "sumWorkingSetBytes": 8464994304,
+        "sumHandles": 28767
+      },
+      "requests": 192,
+      "p95StatusMs": 277.05,
+      "serviceRSSBytes": 43528192,
+      "serviceHandles": 227,
+      "initialRSSBytes": 33689600,
+      "peakRSSBytes": 44380160
+    }
+  ],
+  "lifecycle": {
+    "rounds": 100,
+    "method": "close actual tab then release detached session through the task center",
+    "baseline": {
+      "rssBytes": 25268224,
+      "processPeakRSSBytes": 25272320,
+      "handles": 160
+    },
+    "samples": [
+      {
+        "round": 10,
+        "rssBytes": 29437952,
+        "processPeakRSSBytes": 29667328,
+        "handles": 211
+      },
+      {
+        "round": 20,
+        "rssBytes": 28884992,
+        "processPeakRSSBytes": 30826496,
+        "handles": 219
+      },
+      {
+        "round": 30,
+        "rssBytes": 27090944,
+        "processPeakRSSBytes": 30826496,
+        "handles": 219
+      },
+      {
+        "round": 40,
+        "rssBytes": 29908992,
+        "processPeakRSSBytes": 30863360,
+        "handles": 219
+      },
+      {
+        "round": 50,
+        "rssBytes": 29270016,
+        "processPeakRSSBytes": 30863360,
+        "handles": 219
+      },
+      {
+        "round": 60,
+        "rssBytes": 31449088,
+        "processPeakRSSBytes": 31453184,
+        "handles": 219
+      },
+      {
+        "round": 70,
+        "rssBytes": 29503488,
+        "processPeakRSSBytes": 32104448,
+        "handles": 219
+      },
+      {
+        "round": 80,
+        "rssBytes": 30425088,
+        "processPeakRSSBytes": 32104448,
+        "handles": 219
+      },
+      {
+        "round": 90,
+        "rssBytes": 30511104,
+        "processPeakRSSBytes": 32632832,
+        "handles": 219
+      },
+      {
+        "round": 100,
+        "rssBytes": 29925376,
+        "processPeakRSSBytes": 32632832,
+        "handles": 219
+      }
+    ],
+    "deltaRSSBytes": 4657152,
+    "deltaHandles": 59
+  },
+  "edit": {
+    "rows": 100000,
+    "saveAndVerifyMs": 4287.94,
+    "peakServiceRSSBytes": 264978432,
+    "fidelity": {
+      "recalcMetadataVerified": true,
+      "dependentFormulaPreservedAndCacheCleared": true,
+      "otherPartsMatched": 4,
+      "unchangedCells": 300000,
+      "sheetFeaturesMatched": 3,
+      "editedCell": "B3",
+      "value": "4242.5"
+    }
+  },
+  "rowQuery": {
+    "sourceRows": 1000000,
+    "matchedDataRows": 10000,
+    "filterAndSortMs": 5695.915799999959,
+    "warmPageSamplesMs": [
+      23.44069999997737,
+      19.62550000002375,
+      16.87699999997858,
+      25.768700000015087,
+      27.103199999954086,
+      17.089500000001863,
+      14.04500000004191,
+      11.098800000036135,
+      12.251399999950081,
+      10.48230000003241,
+      10.979300000006333,
+      16.113599999982398,
+      13.468900000036228,
+      11.721599999989849,
+      12.006300000008196,
+      13.055799999972805
+    ],
+    "warmPageMedianMs": 13.756950000039069,
+    "warmPageP95Ms": 27.103199999954086,
+    "peakServiceRSSBytes": 209108992,
+    "peakAdditionalDataBytes": 0,
+    "everyCoordinateAndRawValueVerified": true
+  },
+  "conditional": {
+    "statistics": [
+      {
+        "rows": 1000000,
+        "distinctKeys": 10000,
+        "repetitions": 3,
+        "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+        "sourceIndexMedianMs": 3907,
+        "preparationMedianMs": 5421.1833,
+        "firstViewportMedianMs": 4.4956,
+        "warmViewportMedianMs": 2.9927,
+        "warmViewportP95Ms": 3.9962,
+        "reopenAndIndexMedianMs": 49.6903,
+        "reopenedViewportMedianMs": 3.9867,
+        "sharedIndexBytes": 8388608,
+        "runs": [
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 10000,
+            "firstViewportMs": 5.307,
+            "reopenAndIndexMs": 57.8747,
+            "reopenedViewportMs": 4.9878,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=100",
+              "SUMIF($A:$A,$A2,$C:$C)=200",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,10000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 8388608,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 5826,
+            "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+            "statisticsPreparationMs": 7549.1217,
+            "warmViewportMaxMs": 4.5915,
+            "warmViewportMedianMs": 3.62505,
+            "warmViewportSamplesMs": [
+              2.5076,
+              2.8343,
+              2.9927,
+              3.0313,
+              3.0695,
+              3.0742,
+              3.0995,
+              3.4697,
+              3.7804,
+              3.8466,
+              3.9874,
+              3.9884,
+              3.9885,
+              3.9895,
+              4.1315,
+              4.5915
+            ],
+            "warmViewports": 16
+          },
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 10000,
+            "firstViewportMs": 4.4956,
+            "reopenAndIndexMs": 41.3974,
+            "reopenedViewportMs": 2.9921,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=100",
+              "SUMIF($A:$A,$A2,$C:$C)=200",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,10000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 8388608,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 3907,
+            "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+            "statisticsPreparationMs": 5421.1833,
+            "warmViewportMaxMs": 3.6546,
+            "warmViewportMedianMs": 2.46235,
+            "warmViewportSamplesMs": [
+              1.6359,
+              1.7213,
+              1.9936,
+              1.9946,
+              2.142,
+              2.1621,
+              2.1741,
+              2.3795,
+              2.5452,
+              2.731,
+              2.7451,
+              2.9939,
+              3.0544,
+              3.3166,
+              3.4398,
+              3.6546
+            ],
+            "warmViewports": 16
+          },
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 10000,
+            "firstViewportMs": 2.9147,
+            "reopenAndIndexMs": 49.6903,
+            "reopenedViewportMs": 3.9867,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=100",
+              "SUMIF($A:$A,$A2,$C:$C)=200",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=50",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=100",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,10000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 8388608,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 3705,
+            "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+            "statisticsPreparationMs": 5159.6649,
+            "warmViewportMaxMs": 3.9962,
+            "warmViewportMedianMs": 2.9463999999999997,
+            "warmViewportSamplesMs": [
+              1.7917,
+              1.9901,
+              1.9949,
+              2.5094,
+              2.5448,
+              2.7106,
+              2.7631,
+              2.9408,
+              2.952,
+              2.9923,
+              2.9927,
+              3.0267,
+              3.0323,
+              3.1636,
+              3.7369,
+              3.9962
+            ],
+            "warmViewports": 16
+          }
+        ]
+      },
+      {
+        "rows": 1000000,
+        "distinctKeys": 500000,
+        "repetitions": 3,
+        "sourceSHA256": "59394ee4b6c2ffb53d5e8f02a539efa4f2b2c0938f2e2e8566535660a5e7e41d",
+        "sourceIndexMedianMs": 3916,
+        "preparationMedianMs": 15882.6412,
+        "firstViewportMedianMs": 3.1264,
+        "warmViewportMedianMs": 3.0697,
+        "warmViewportP95Ms": 4.8829,
+        "reopenAndIndexMedianMs": 49.8027,
+        "reopenedViewportMedianMs": 4.9872,
+        "sharedIndexBytes": 268435456,
+        "runs": [
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 500000,
+            "firstViewportMs": 2.787,
+            "reopenAndIndexMs": 49.8027,
+            "reopenedViewportMs": 3.9493,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=2",
+              "SUMIF($A:$A,$A2,$C:$C)=4",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=1",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=2",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,500000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 268435456,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 4698,
+            "sourceSHA256": "59394ee4b6c2ffb53d5e8f02a539efa4f2b2c0938f2e2e8566535660a5e7e41d",
+            "statisticsPreparationMs": 17105.4674,
+            "warmViewportMaxMs": 4.3322,
+            "warmViewportMedianMs": 2.873,
+            "warmViewportSamplesMs": [
+              1.9949,
+              2.001,
+              2.1684,
+              2.2361,
+              2.5037,
+              2.513,
+              2.5133,
+              2.7531,
+              2.9929,
+              3.0034,
+              3.5512,
+              3.5718,
+              3.8609,
+              3.9803,
+              4.0888,
+              4.3322
+            ],
+            "warmViewports": 16
+          },
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 500000,
+            "firstViewportMs": 3.6925,
+            "reopenAndIndexMs": 55.5463,
+            "reopenedViewportMs": 4.9872,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=2",
+              "SUMIF($A:$A,$A2,$C:$C)=4",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=1",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=2",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,500000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 268435456,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 3916,
+            "sourceSHA256": "59394ee4b6c2ffb53d5e8f02a539efa4f2b2c0938f2e2e8566535660a5e7e41d",
+            "statisticsPreparationMs": 15882.6412,
+            "warmViewportMaxMs": 5.3769,
+            "warmViewportMedianMs": 3.43405,
+            "warmViewportSamplesMs": [
+              2.6065,
+              3.1206,
+              3.1277,
+              3.1601,
+              3.1936,
+              3.2284,
+              3.2287,
+              3.2366,
+              3.6315,
+              3.6383,
+              3.726,
+              3.7829,
+              4.3861,
+              4.4759,
+              4.8829,
+              5.3769
+            ],
+            "warmViewports": 16
+          },
+          {
+            "cellsPerViewport": 120,
+            "distinctKeys": 500000,
+            "firstViewportMs": 3.1264,
+            "reopenAndIndexMs": 47.8958,
+            "reopenedViewportMs": 5.9827,
+            "result": "PASS",
+            "rows": 1000000,
+            "rules": [
+              "COUNTIF($A:$A,$A2)=2",
+              "SUMIF($A:$A,$A2,$C:$C)=4",
+              "COUNTIFS($A:$A,$A2,$B:$B,$B2)=1",
+              "SUMIFS($C:$C,$A:$A,$A2,$B:$B,$B2)=2",
+              "MATCH($A2,$A:$A,0)=MOD(ROW()-2,500000)+2",
+              "SUM($C2:$C4)=6"
+            ],
+            "sharedIndexBytes": 268435456,
+            "sharedIndexUnchangedOnWarmAndReopen": true,
+            "sourceIndexMs": 3516,
+            "sourceSHA256": "59394ee4b6c2ffb53d5e8f02a539efa4f2b2c0938f2e2e8566535660a5e7e41d",
+            "statisticsPreparationMs": 15637.3068,
+            "warmViewportMaxMs": 5.0082,
+            "warmViewportMedianMs": 2.73065,
+            "warmViewportSamplesMs": [
+              1.9954,
+              2.0609,
+              2.162,
+              2.5354,
+              2.5523,
+              2.576,
+              2.6761,
+              2.6785,
+              2.7828,
+              2.808,
+              2.8138,
+              2.993,
+              3.0188,
+              3.2499,
+              3.6842,
+              5.0082
+            ],
+            "warmViewports": 16
+          }
+        ]
+      }
+    ],
+    "inlinePresentation": {
+      "simple/styled_true": [
+        {
+          "nsPerViewport": 1771245,
+          "bytesPerViewport": 264120,
+          "allocationsPerViewport": 2007
+        },
+        {
+          "nsPerViewport": 1642985,
+          "bytesPerViewport": 264125,
+          "allocationsPerViewport": 2007
+        },
+        {
+          "nsPerViewport": 1704202,
+          "bytesPerViewport": 264120,
+          "allocationsPerViewport": 2007
+        }
+      ],
+      "simple/styled_false": [
+        {
+          "nsPerViewport": 1432586,
+          "bytesPerViewport": 264107,
+          "allocationsPerViewport": 2006
+        },
+        {
+          "nsPerViewport": 1553730,
+          "bytesPerViewport": 264100,
+          "allocationsPerViewport": 2006
+        },
+        {
+          "nsPerViewport": 1525061,
+          "bytesPerViewport": 264103,
+          "allocationsPerViewport": 2006
+        }
+      ],
+      "four_runs/styled_true": [
+        {
+          "nsPerViewport": 33540460,
+          "bytesPerViewport": 6503555,
+          "allocationsPerViewport": 171648
+        },
+        {
+          "nsPerViewport": 36272860,
+          "bytesPerViewport": 6503644,
+          "allocationsPerViewport": 171649
+        },
+        {
+          "nsPerViewport": 37405956,
+          "bytesPerViewport": 6503966,
+          "allocationsPerViewport": 171654
+        }
+      ],
+      "four_runs/styled_false": [
+        {
+          "nsPerViewport": 8652139,
+          "bytesPerViewport": 842099,
+          "allocationsPerViewport": 3287
+        },
+        {
+          "nsPerViewport": 8032273,
+          "bytesPerViewport": 842093,
+          "allocationsPerViewport": 3286
+        },
+        {
+          "nsPerViewport": 8995702,
+          "bytesPerViewport": 842095,
+          "allocationsPerViewport": 3286
+        }
+      ]
+    },
+    "conditionalViewports": {
+      "column_step_1": [
+        {
+          "nsPerViewport": 5672016,
+          "bytesPerViewport": 2686799,
+          "allocationsPerViewport": 11271
+        },
+        {
+          "nsPerViewport": 7261112,
+          "bytesPerViewport": 2686432,
+          "allocationsPerViewport": 11265
+        },
+        {
+          "nsPerViewport": 11044229,
+          "bytesPerViewport": 2686059,
+          "allocationsPerViewport": 11265
+        }
+      ],
+      "column_step_7": [
+        {
+          "nsPerViewport": 3261936,
+          "bytesPerViewport": 1245838,
+          "allocationsPerViewport": 8215
+        },
+        {
+          "nsPerViewport": 3227313,
+          "bytesPerViewport": 1245796,
+          "allocationsPerViewport": 8215
+        },
+        {
+          "nsPerViewport": 2748305,
+          "bytesPerViewport": 1245869,
+          "allocationsPerViewport": 8215
+        }
+      ]
+    },
+    "sourceNumberReads": {
+      "single": [
+        {
+          "nsPerViewport": 250721,
+          "bytesPerViewport": 17700,
+          "allocationsPerViewport": 18
+        },
+        {
+          "nsPerViewport": 298822,
+          "bytesPerViewport": 17699,
+          "allocationsPerViewport": 18
+        },
+        {
+          "nsPerViewport": 256036,
+          "bytesPerViewport": 17700,
+          "allocationsPerViewport": 18
+        }
+      ],
+      "forward": [
+        {
+          "nsPerViewport": 538937,
+          "bytesPerViewport": 173898,
+          "allocationsPerViewport": 256
+        },
+        {
+          "nsPerViewport": 540042,
+          "bytesPerViewport": 173890,
+          "allocationsPerViewport": 256
+        },
+        {
+          "nsPerViewport": 507043,
+          "bytesPerViewport": 173896,
+          "allocationsPerViewport": 256
+        }
+      ],
+      "reverse": [
+        {
+          "nsPerViewport": 580910,
+          "bytesPerViewport": 173895,
+          "allocationsPerViewport": 256
+        },
+        {
+          "nsPerViewport": 526221,
+          "bytesPerViewport": 173894,
+          "allocationsPerViewport": 256
+        },
+        {
+          "nsPerViewport": 504113,
+          "bytesPerViewport": 173898,
+          "allocationsPerViewport": 256
+        }
+      ],
+      "scattered": [
+        {
+          "nsPerViewport": 379053,
+          "bytesPerViewport": 19853,
+          "allocationsPerViewport": 38
+        },
+        {
+          "nsPerViewport": 357023,
+          "bytesPerViewport": 19853,
+          "allocationsPerViewport": 38
+        },
+        {
+          "nsPerViewport": 353659,
+          "bytesPerViewport": 19853,
+          "allocationsPerViewport": 38
+        }
+      ]
+    },
+    "perCell": {
+      "runs": [
+        {
+          "nsPerCell": 1059,
+          "bytesPerCell": 264,
+          "allocationsPerCell": 3
+        },
+        {
+          "nsPerCell": 939.2,
+          "bytesPerCell": 264,
+          "allocationsPerCell": 3
+        },
+        {
+          "nsPerCell": 958.7,
+          "bytesPerCell": 264,
+          "allocationsPerCell": 3
+        }
+      ],
+      "medianNs": 958.7,
+      "medianBytes": 264,
+      "medianAllocs": 3
+    },
+    "browser": [
+      {
+        "mode": "complex",
+        "sourceFile": "complex-conditional-fixture.xlsx",
+        "sourceSHA256": "652f0a9cb6fc91f6fc58d8a7a747eeed0a027c972b7ec5400ba2a5fcc3f7773f",
+        "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+        "platform": "win32",
+        "node": "v24.18.0",
+        "viewport": [
+          1120,
+          780
+        ],
+        "desktopManualAcceptance": false,
+        "passes": [
+          {
+            "originalFormat": true,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 800.5999999999999,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 38,
+                "checkedFrames": 37,
+                "fps": 47.46,
+                "settleMs": 3.5,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 37,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 37,
+                "conditionalReadyFrames": 37,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 1,
+                "cancels": 0,
+                "maxNodes": 660,
+                "maxCacheBytes": 1952944,
+                "end": [
+                  0,
+                  760
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 33.5
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 917.5,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 12,
+                "checkedFrames": 11,
+                "fps": 13.08,
+                "settleMs": 102.3,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 8,
+                "textReadyFrames": 7,
+                "textReadyPct": 63.64,
+                "conditionalCheckedFrames": 11,
+                "conditionalReadyFrames": 7,
+                "conditionalReadyPct": 63.64,
+                "foregroundLookups": 11,
+                "foregroundHits": 11,
+                "requests": 4,
+                "cancels": 0,
+                "maxNodes": 720,
+                "maxCacheBytes": 4946176,
+                "end": [
+                  0,
+                  6160
+                ],
+                "p95FrameMs": 116.8,
+                "p99FrameMs": 116.8
+              },
+              {
+                "phase": "fastHorizontal",
+                "durationMs": 800.5,
+                "logicalDeltaX": 2768,
+                "logicalDeltaY": 0,
+                "actualLogicalDeltaY": 0,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 3460,
+                "frames": 23,
+                "checkedFrames": 22,
+                "fps": 28.73,
+                "settleMs": 4.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 22,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 6,
+                "conditionalReadyFrames": 6,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 2,
+                "cancels": 0,
+                "maxNodes": 884,
+                "maxCacheBytes": 6382704,
+                "end": [
+                  2768,
+                  6160
+                ],
+                "p95FrameMs": 66.7,
+                "p99FrameMs": 66.8
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 884.1000000000004,
+                "logicalDeltaX": -2352,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 5787,
+                "frames": 14,
+                "checkedFrames": 13,
+                "fps": 15.84,
+                "settleMs": 54.1,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 3,
+                "textReadyFrames": 13,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 1,
+                "conditionalReadyFrames": 1,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 13,
+                "foregroundHits": 13,
+                "requests": 3,
+                "cancels": 0,
+                "maxNodes": 1008,
+                "maxCacheBytes": 7030448,
+                "end": [
+                  416,
+                  1840
+                ],
+                "p95FrameMs": 83.4,
+                "p99FrameMs": 83.4
+              },
+              {
+                "phase": "jump",
+                "durationMs": 16.699999999999818,
+                "logicalDeltaX": 968,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 24000,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 59.88,
+                "settleMs": 475.7,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": 0,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 0,
+                "requests": 6,
+                "cancels": 0,
+                "maxNodes": 670,
+                "maxCacheBytes": 7030448,
+                "end": [
+                  1384,
+                  25840
+                ],
+                "p95FrameMs": 16.7,
+                "p99FrameMs": 16.7
+              }
+            ],
+            "visual": {
+              "sampledFrames": 13,
+              "eligiblePixels": 7593653,
+              "correctStylePct": 90.43,
+              "whitePct": 0,
+              "samples": [
+                {
+                  "id": 1,
+                  "phase": "normal",
+                  "x": 0,
+                  "y": 16,
+                  "eligible": 573604,
+                  "correct": 573384,
+                  "white": 13,
+                  "correctStylePct": 99.96,
+                  "whitePct": 0
+                },
+                {
+                  "id": 17,
+                  "phase": "normal",
+                  "x": 0,
+                  "y": 364,
+                  "eligible": 575955,
+                  "correct": 575955,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 38,
+                  "phase": "normal",
+                  "x": 0,
+                  "y": 760,
+                  "eligible": 575090,
+                  "correct": 575090,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 39,
+                  "phase": "fastVertical",
+                  "x": 0,
+                  "y": 860,
+                  "eligible": 574668,
+                  "correct": 574668,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 44,
+                  "phase": "fastVertical",
+                  "x": 0,
+                  "y": 2462,
+                  "eligible": 567442,
+                  "correct": 553945,
+                  "white": 0,
+                  "correctStylePct": 97.62,
+                  "whitePct": 0
+                },
+                {
+                  "id": 49,
+                  "phase": "fastVertical",
+                  "x": 0,
+                  "y": 5665,
+                  "eligible": 566033,
+                  "correct": 433217,
+                  "white": 0,
+                  "correctStylePct": 76.54,
+                  "whitePct": 0
+                },
+                {
+                  "id": 51,
+                  "phase": "fastHorizontal",
+                  "x": 57,
+                  "y": 6160,
+                  "eligible": 597307,
+                  "correct": 597218,
+                  "white": 0,
+                  "correctStylePct": 99.99,
+                  "whitePct": 0
+                },
+                {
+                  "id": 62,
+                  "phase": "fastHorizontal",
+                  "x": 1211,
+                  "y": 6160,
+                  "eligible": 594790,
+                  "correct": 594790,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 73,
+                  "phase": "fastHorizontal",
+                  "x": 2768,
+                  "y": 6160,
+                  "eligible": 594119,
+                  "correct": 594119,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 74,
+                  "phase": "reverse",
+                  "x": 2722,
+                  "y": 6075,
+                  "eligible": 594151,
+                  "correct": 594151,
+                  "white": 0,
+                  "correctStylePct": 100,
+                  "whitePct": 0
+                },
+                {
+                  "id": 80,
+                  "phase": "reverse",
+                  "x": 1707,
+                  "y": 4210,
+                  "eligible": 594027,
+                  "correct": 593357,
+                  "white": 0,
+                  "correctStylePct": 99.89,
+                  "whitePct": 0
+                },
+                {
+                  "id": 87,
+                  "phase": "reverse",
+                  "x": 416,
+                  "y": 1840,
+                  "eligible": 607141,
+                  "correct": 607007,
+                  "white": 0,
+                  "correctStylePct": 99.98,
+                  "whitePct": 0
+                },
+                {
+                  "id": 88,
+                  "phase": "jump",
+                  "x": 1384,
+                  "y": 25840,
+                  "eligible": 579326,
+                  "correct": 0,
+                  "white": 0,
+                  "correctStylePct": 0,
+                  "whitePct": 0
+                }
+              ]
+            }
+          },
+          {
+            "originalFormat": false,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 800.7000000000007,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 48,
+                "checkedFrames": 47,
+                "fps": 59.95,
+                "settleMs": 1.9,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 47,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 600,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  0,
+                  760
+                ],
+                "p95FrameMs": 16.8,
+                "p99FrameMs": 17
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 934.2000000000007,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 31,
+                "checkedFrames": 30,
+                "fps": 33.18,
+                "settleMs": 3.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 1,
+                "textReadyFrames": 30,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 13,
+                "foregroundHits": 13,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 1020,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  0,
+                  6160
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 50.5
+              },
+              {
+                "phase": "fastHorizontal",
+                "durationMs": 817.3000000000011,
+                "logicalDeltaX": 2768,
+                "logicalDeltaY": 0,
+                "actualLogicalDeltaY": 0,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 3460,
+                "frames": 39,
+                "checkedFrames": 38,
+                "fps": 47.72,
+                "settleMs": 2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 38,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 756,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  2768,
+                  6160
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 34
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 884.0999999999985,
+                "logicalDeltaX": -2352,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 5787,
+                "frames": 21,
+                "checkedFrames": 20,
+                "fps": 23.75,
+                "settleMs": 2.4,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 4,
+                "textReadyFrames": 20,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 12,
+                "foregroundHits": 12,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 1497,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  416,
+                  1840
+                ],
+                "p95FrameMs": 66.7,
+                "p99FrameMs": 66.8
+              },
+              {
+                "phase": "jump",
+                "durationMs": 33.29999999999927,
+                "logicalDeltaX": 968,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 24000,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 30.03,
+                "settleMs": 199.7,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 1,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 840,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  1384,
+                  25840
+                ],
+                "p95FrameMs": 33.3,
+                "p99FrameMs": 33.3
+              }
+            ],
+            "visual": null
+          },
+          {
+            "originalFormat": true,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 800.6000000000022,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 44,
+                "checkedFrames": 43,
+                "fps": 54.96,
+                "settleMs": 3.5,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 43,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 43,
+                "conditionalReadyFrames": 43,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 675,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  0,
+                  760
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 33.4
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 900.7000000000007,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 22,
+                "checkedFrames": 21,
+                "fps": 24.43,
+                "settleMs": 32.6,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 3,
+                "textReadyFrames": 21,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 21,
+                "conditionalReadyFrames": 21,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 18,
+                "foregroundHits": 18,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 915,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  0,
+                  6160
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 66.6
+              },
+              {
+                "phase": "fastHorizontal",
+                "durationMs": 800.7999999999993,
+                "logicalDeltaX": 2768,
+                "logicalDeltaY": 0,
+                "actualLogicalDeltaY": 0,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 3460,
+                "frames": 39,
+                "checkedFrames": 38,
+                "fps": 48.7,
+                "settleMs": 2.5,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 38,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 8,
+                "conditionalReadyFrames": 8,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 8,
+                "foregroundHits": 8,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 756,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  2768,
+                  6160
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 33.5
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 867.2000000000007,
+                "logicalDeltaX": -2352,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 5787,
+                "frames": 19,
+                "checkedFrames": 18,
+                "fps": 21.91,
+                "settleMs": 52.1,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 1,
+                "textReadyFrames": 18,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 1,
+                "conditionalReadyFrames": 1,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 15,
+                "foregroundHits": 15,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 1260,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  416,
+                  1840
+                ],
+                "p95FrameMs": 66.8,
+                "p99FrameMs": 66.8
+              },
+              {
+                "phase": "jump",
+                "durationMs": 16.700000000000728,
+                "logicalDeltaX": 968,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 24000,
+                "virtualScrollScale": 1,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 59.88,
+                "settleMs": 142,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": 0,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 1,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 683,
+                "maxCacheBytes": 11045464,
+                "end": [
+                  1384,
+                  25840
+                ],
+                "p95FrameMs": 16.7,
+                "p99FrameMs": 16.7
+              }
+            ],
+            "visual": null
+          }
+        ],
+        "openToInteractiveGridMs": 850,
+        "interactiveSnapshot": {
+          "gridInert": false,
+          "pendingCells": 124,
+          "conditionalStatsVisible": false,
+          "conditionalStatsText": "",
+          "k2MatchedImmediately": 0
+        },
+        "openToStyledGridMs": 1080,
+        "strategyVerification": {
+          "directExpr": {
+            "ref": "A2",
+            "text": "K0000",
+            "matched": 1,
+            "fill": "#F4B6C2",
+            "pending": false
+          },
+          "viewportCacheShortSum": {
+            "ref": "B2",
+            "text": "2",
+            "matched": 1,
+            "fill": "#A8D8B9",
+            "pending": false
+          },
+          "slidingWindow24Sum": {
+            "ref": "C2",
+            "text": "3",
+            "matched": 1,
+            "fill": "#FCE38A",
+            "pending": false
+          },
+          "sharedAggregateFixedSum": {
+            "ref": "D2",
+            "text": "20",
+            "matched": 1,
+            "fill": "#B5D3E7",
+            "pending": false
+          },
+          "diskPrefixDynamicSum": {
+            "ref": "E12",
+            "text": "24",
+            "matched": 1,
+            "fill": "#D4B5E7",
+            "pending": false
+          },
+          "diskGroupCountIf": {
+            "ref": "F2",
+            "text": "G0",
+            "matched": 1,
+            "fill": "#F6C89F",
+            "pending": false
+          },
+          "diskMatchPositions": [
+            "G2",
+            "G402"
+          ]
+        },
+        "storageConditionalSummary": "当前 256 KB / 上限 2 GB（在用 1 个）",
+        "storageBudgetUpdateStatus": "条件统计缓存上限已设为 512.0 MB。",
+        "resources": {
+          "peakServiceRSSBytes": 48836608,
+          "peakDataBytes": 9066714,
+          "peakHandles": 225
+        },
+        "profileCleanup": "complete",
+        "sourceUnchanged": true,
+        "result": "PASS"
+      },
+      {
+        "mode": "external",
+        "sourceFile": "conditional-ledger.xlsx",
+        "sourceSHA256": "2536fecb8552e6b94bf2b7258ff89f4f2a27668ef44d8f7163881996707072bc",
+        "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+        "platform": "win32",
+        "node": "v24.18.0",
+        "viewport": [
+          1120,
+          780
+        ],
+        "desktopManualAcceptance": false,
+        "passes": [
+          {
+            "originalFormat": true,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 817.5,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760.0238143795783,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 33,
+                "checkedFrames": 32,
+                "fps": 40.37,
+                "settleMs": 2.4,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 32,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 32,
+                "conditionalReadyFrames": 32,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 10,
+                "foregroundHits": 10,
+                "requests": 2,
+                "cancels": 0,
+                "maxNodes": 528,
+                "maxCacheBytes": 2078092,
+                "end": [
+                  0,
+                  570
+                ],
+                "p95FrameMs": 50,
+                "p99FrameMs": 50.1
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 917.3999999999996,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400.169207433846,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 22,
+                "checkedFrames": 21,
+                "fps": 23.98,
+                "settleMs": 41.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 20,
+                "textReadyPct": 95.24,
+                "conditionalCheckedFrames": 21,
+                "conditionalReadyFrames": 20,
+                "conditionalReadyPct": 95.24,
+                "foregroundLookups": 21,
+                "foregroundHits": 21,
+                "requests": 5,
+                "cancels": 0,
+                "maxNodes": 495,
+                "maxCacheBytes": 4866444,
+                "end": [
+                  0,
+                  4620
+                ],
+                "p95FrameMs": 66.7,
+                "p99FrameMs": 66.7
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 884,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320.135365947077,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 5082,
+                "frames": 23,
+                "checkedFrames": 22,
+                "fps": 26.02,
+                "settleMs": 19.4,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 1,
+                "textReadyFrames": 21,
+                "textReadyPct": 95.45,
+                "conditionalCheckedFrames": 22,
+                "conditionalReadyFrames": 21,
+                "conditionalReadyPct": 95.45,
+                "foregroundLookups": 13,
+                "foregroundHits": 13,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 847,
+                "maxCacheBytes": 5563532,
+                "end": [
+                  0,
+                  1380
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 66.8
+              },
+              {
+                "phase": "jump",
+                "durationMs": 16.69999999999891,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 23999.41865792637,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 59.88,
+                "settleMs": 146.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": 0,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 0,
+                "requests": 4,
+                "cancels": 0,
+                "maxNodes": 594,
+                "maxCacheBytes": 5563532,
+                "end": [
+                  0,
+                  19379
+                ],
+                "p95FrameMs": 16.7,
+                "p99FrameMs": 16.7
+              }
+            ],
+            "visual": null
+          },
+          {
+            "originalFormat": false,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 817.4000000000015,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760.0238143795783,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 43,
+                "checkedFrames": 42,
+                "fps": 52.61,
+                "settleMs": 1.8,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 42,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 10,
+                "foregroundHits": 10,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 484,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  570
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 33.4
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 900.7999999999993,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400.169207433846,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 26,
+                "checkedFrames": 25,
+                "fps": 28.86,
+                "settleMs": 42.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 24,
+                "textReadyPct": 96,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 25,
+                "foregroundHits": 25,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 484,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  4620
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 50.5
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 867.4000000000015,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320.135365947077,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 5082,
+                "frames": 26,
+                "checkedFrames": 25,
+                "fps": 29.97,
+                "settleMs": 38,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 21,
+                "textReadyPct": 84,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 14,
+                "foregroundHits": 14,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 627,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  1380
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 50.1
+              },
+              {
+                "phase": "jump",
+                "durationMs": 16.700000000000728,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 23999.41865792637,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 59.88,
+                "settleMs": 151.8,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": null,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 1,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 561,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  19379
+                ],
+                "p95FrameMs": 16.7,
+                "p99FrameMs": 16.7
+              }
+            ],
+            "visual": null
+          },
+          {
+            "originalFormat": true,
+            "phases": [
+              {
+                "phase": "normal",
+                "durationMs": 817.268,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 760,
+                "actualLogicalDeltaY": 760.0238143795783,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 950,
+                "frames": 40,
+                "checkedFrames": 39,
+                "fps": 48.94,
+                "settleMs": 4.5,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 39,
+                "textReadyPct": 100,
+                "conditionalCheckedFrames": 39,
+                "conditionalReadyFrames": 39,
+                "conditionalReadyPct": 100,
+                "foregroundLookups": 10,
+                "foregroundHits": 10,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 484,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  570
+                ],
+                "p95FrameMs": 33.4,
+                "p99FrameMs": 33.5
+              },
+              {
+                "phase": "fastVertical",
+                "durationMs": 917.4000000000015,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 5400,
+                "actualLogicalDeltaY": 5400.169207433846,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 6000,
+                "frames": 23,
+                "checkedFrames": 22,
+                "fps": 25.07,
+                "settleMs": 46.2,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 21,
+                "textReadyPct": 95.45,
+                "conditionalCheckedFrames": 22,
+                "conditionalReadyFrames": 21,
+                "conditionalReadyPct": 95.45,
+                "foregroundLookups": 22,
+                "foregroundHits": 22,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 484,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  4620
+                ],
+                "p95FrameMs": 50.1,
+                "p99FrameMs": 66.7
+              },
+              {
+                "phase": "reverse",
+                "durationMs": 850.8999999999978,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": -4320,
+                "actualLogicalDeltaY": -4320.135365947077,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 5082,
+                "frames": 25,
+                "checkedFrames": 24,
+                "fps": 29.38,
+                "settleMs": 107.6,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 23,
+                "textReadyPct": 95.83,
+                "conditionalCheckedFrames": 24,
+                "conditionalReadyFrames": 23,
+                "conditionalReadyPct": 95.83,
+                "foregroundLookups": 20,
+                "foregroundHits": 20,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 616,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  1380
+                ],
+                "p95FrameMs": 50.2,
+                "p99FrameMs": 50.2
+              },
+              {
+                "phase": "jump",
+                "durationMs": 16.80000000000291,
+                "logicalDeltaX": 0,
+                "logicalDeltaY": 24000,
+                "actualLogicalDeltaY": 23999.41865792637,
+                "virtualScrollScale": 1.3333751129466287,
+                "logicalVelocityPxPerSec": 0,
+                "frames": 1,
+                "checkedFrames": 0,
+                "fps": 59.52,
+                "settleMs": 194.1,
+                "emptyFrames": 0,
+                "incompleteCoverageFrames": 0,
+                "textReadyFrames": 0,
+                "textReadyPct": null,
+                "conditionalCheckedFrames": 0,
+                "conditionalReadyFrames": 0,
+                "conditionalReadyPct": null,
+                "foregroundLookups": 1,
+                "foregroundHits": 1,
+                "requests": 0,
+                "cancels": 0,
+                "maxNodes": 572,
+                "maxCacheBytes": 8357516,
+                "end": [
+                  0,
+                  19379
+                ],
+                "p95FrameMs": 16.8,
+                "p99FrameMs": 16.8
+              }
+            ],
+            "visual": null
+          }
+        ],
+        "openToInteractiveGridMs": 5073,
+        "interactiveSnapshot": {
+          "gridInert": false,
+          "pendingCells": 175,
+          "conditionalStatsVisible": false,
+          "conditionalStatsText": "",
+          "k2MatchedImmediately": 1
+        },
+        "openToStyledGridMs": 11440,
+        "storageConditionalSummary": "当前 8 MB / 上限 2 GB（在用 1 个）",
+        "storageBudgetUpdateStatus": "条件统计缓存上限已设为 512.0 MB。",
+        "resources": {
+          "peakServiceRSSBytes": 87584768,
+          "peakDataBytes": 171154261,
+          "peakHandles": 236
+        },
+        "profileCleanup": "complete",
+        "sourceUnchanged": true,
+        "result": "PASS"
+      }
+    ]
+  },
+  "sourceDigestsVerified": true,
+  "comparison": {
+    "comparable": true,
+    "baseline": "validation/1.20.0/performance-baseline.json",
+    "deltas": {
+      "csv.1000000.firstVisibleMs": {
+        "previous": 566.1000000089407,
+        "current": 551.9000000059605,
+        "change": -14.200000002980232,
+        "changePercent": -2.51
+      },
+      "csv.1000000.visibleCoverageMs": {
+        "previous": 1284.6000000089407,
+        "current": 1268.6000000089407,
+        "change": -16,
+        "changePercent": -1.25
+      },
+      "csv.1000000.indexRequestToReadyMs": {
+        "previous": 675.4000000059605,
+        "current": 673.7999999970198,
+        "change": -1.6000000089406967,
+        "changePercent": -0.24
+      },
+      "csv.1000000.peakServiceRSSBytes": {
+        "previous": 177913856,
+        "current": 177631232,
+        "change": -282624,
+        "changePercent": -0.16
+      },
+      "csv.5000000.firstVisibleMs": {
+        "previous": 1999.6000000089407,
+        "current": 2552.3999999910593,
+        "change": 552.7999999821186,
+        "changePercent": 27.65
+      },
+      "csv.5000000.visibleCoverageMs": {
+        "previous": 4345.100000008941,
+        "current": 5574.29999999702,
+        "change": 1229.199999988079,
+        "changePercent": 28.29
+      },
+      "csv.5000000.indexRequestToReadyMs": {
+        "previous": 2296.2000000029802,
+        "current": 3003.699999988079,
+        "change": 707.4999999850988,
+        "changePercent": 30.81
+      },
+      "csv.5000000.peakServiceRSSBytes": {
+        "previous": 224313344,
+        "current": 224182272,
+        "change": -131072,
+        "changePercent": -0.06
+      },
+      "csv.10000000.firstVisibleMs": {
+        "previous": 4218.9000000059605,
+        "current": 4908.100000008941,
+        "change": 689.2000000029802,
+        "changePercent": 16.34
+      },
+      "csv.10000000.visibleCoverageMs": {
+        "previous": 8193.20000000298,
+        "current": 9269,
+        "change": 1075.7999999970198,
+        "changePercent": 13.13
+      },
+      "csv.10000000.indexRequestToReadyMs": {
+        "previous": 3931,
+        "current": 4313.5999999940395,
+        "change": 382.59999999403954,
+        "changePercent": 9.73
+      },
+      "csv.10000000.peakServiceRSSBytes": {
+        "previous": 224112640,
+        "current": 224198656,
+        "change": 86016,
+        "changePercent": 0.04
+      },
+      "xlsx.100000.firstVisibleMs": {
+        "previous": 724.3999999910593,
+        "current": 781.5,
+        "change": 57.1000000089407,
+        "changePercent": 7.88
+      },
+      "xlsx.100000.visibleCoverageMs": {
+        "previous": 1433.2000000029802,
+        "current": 1510.7000000029802,
+        "change": 77.5,
+        "changePercent": 5.41
+      },
+      "xlsx.100000.indexRequestToReadyMs": {
+        "previous": 668.4000000059605,
+        "current": 680,
+        "change": 11.599999994039536,
+        "changePercent": 1.74
+      },
+      "xlsx.100000.peakServiceRSSBytes": {
+        "previous": 36032512,
+        "current": 36442112,
+        "change": 409600,
+        "changePercent": 1.14
+      },
+      "xlsx.500000.firstVisibleMs": {
+        "previous": 361.90000000596046,
+        "current": 414.70000000298023,
+        "change": 52.79999999701977,
+        "changePercent": 14.59
+      },
+      "xlsx.500000.visibleCoverageMs": {
+        "previous": 2799.7000000029802,
+        "current": 3192.2999999970198,
+        "change": 392.59999999403954,
+        "changePercent": 14.02
+      },
+      "xlsx.500000.indexRequestToReadyMs": {
+        "previous": 2319.7000000029802,
+        "current": 2660.5,
+        "change": 340.79999999701977,
+        "changePercent": 14.69
+      },
+      "xlsx.500000.peakServiceRSSBytes": {
+        "previous": 76103680,
+        "current": 75923456,
+        "change": -180224,
+        "changePercent": -0.24
+      },
+      "xlsx.1000000.firstVisibleMs": {
+        "previous": 436.5,
+        "current": 492.90000000596046,
+        "change": 56.400000005960464,
+        "changePercent": 12.92
+      },
+      "xlsx.1000000.visibleCoverageMs": {
+        "previous": 5398.5,
+        "current": 5853.5999999940395,
+        "change": 455.09999999403954,
+        "changePercent": 8.43
+      },
+      "xlsx.1000000.indexRequestToReadyMs": {
+        "previous": 4944.0999999940395,
+        "current": 5320.29999999702,
+        "change": 376.20000000298023,
+        "changePercent": 7.61
+      },
+      "xlsx.1000000.peakServiceRSSBytes": {
+        "previous": 136351744,
+        "current": 135131136,
+        "change": -1220608,
+        "changePercent": -0.9
+      },
+      "scroll.fps": {
+        "previous": 55.29961595175096,
+        "current": 57.14933325778717,
+        "change": 1.8497173060362115,
+        "changePercent": 3.34
+      },
+      "scroll.p95FrameMs": {
+        "previous": 33.39999999999418,
+        "current": 17,
+        "change": -16.39999999999418,
+        "changePercent": -49.1
+      },
+      "scroll.emptyFrames": {
+        "previous": 0,
+        "current": 0,
+        "change": 0,
+        "changePercent": null
+      },
+      "scroll.noCoverageFrames": {
+        "previous": 0,
+        "current": 0,
+        "change": 0,
+        "changePercent": null
+      },
+      "reconcile.elapsedMs": {
+        "previous": 10397.48,
+        "current": 12328.49,
+        "change": 1931.0100000000002,
+        "changePercent": 18.57
+      },
+      "reconcile.peakAdditionalDataBytes": {
+        "previous": 96000480,
+        "current": 96000480,
+        "change": 0,
+        "changePercent": 0
+      },
+      "fullSearch.searchMs": {
+        "previous": 5305.57,
+        "current": 6489.89,
+        "change": 1184.3200000000006,
+        "changePercent": 22.32
+      },
+      "fullSearch.csvStreamAndVerifyMs": {
+        "previous": 94.82,
+        "current": 109.16,
+        "change": 14.340000000000003,
+        "changePercent": 15.12
+      },
+      "edit.saveAndVerifyMs": {
+        "previous": 3390.29,
+        "current": 4287.94,
+        "change": 897.6499999999996,
+        "changePercent": 26.48
+      },
+      "lifecycle.deltaRSSBytes": {
+        "previous": 3923968,
+        "current": 4657152,
+        "change": 733184,
+        "changePercent": 18.68
+      },
+      "lifecycle.deltaHandles": {
+        "previous": 50,
+        "current": 59,
+        "change": 9,
+        "changePercent": 18
+      },
+      "rowQuery.filterAndSortMs": {
+        "previous": 1788.5668999999762,
+        "current": 5695.915799999959,
+        "change": 3907.3488999999827,
+        "changePercent": 218.46
+      },
+      "rowQuery.warmPageMedianMs": {
+        "previous": 8.072200000024168,
+        "current": 13.756950000039069,
+        "change": 5.684750000014901,
+        "changePercent": 70.42
+      },
+      "rowQuery.warmPageP95Ms": {
+        "previous": 13.784099999989849,
+        "current": 27.103199999954086,
+        "change": 13.319099999964237,
+        "changePercent": 96.63
+      },
+      "rowQuery.peakServiceRSSBytes": {
+        "previous": 210276352,
+        "current": 209108992,
+        "change": -1167360,
+        "changePercent": -0.56
+      },
+      "rowQuery.peakAdditionalDataBytes": {
+        "previous": 0,
+        "current": 0,
+        "change": 0,
+        "changePercent": null
+      },
+      "tabs.10.p95StatusMs": {
+        "previous": 34.27,
+        "current": 38.28,
+        "change": 4.009999999999998,
+        "changePercent": 11.7
+      },
+      "tabs.10.serviceRSSBytes": {
+        "previous": 28606464,
+        "current": 29204480,
+        "change": 598016,
+        "changePercent": 2.09
+      },
+      "tabs.10.serviceHandles": {
+        "previous": 221,
+        "current": 218,
+        "change": -3,
+        "changePercent": -1.36
+      },
+      "tabs.10.browser.sumWorkingSetBytes": {
+        "previous": 1881620480,
+        "current": 1888817152,
+        "change": 7196672,
+        "changePercent": 0.38
+      },
+      "tabs.10.browser.sumHandles": {
+        "previous": 7439,
+        "current": 7516,
+        "change": 77,
+        "changePercent": 1.04
+      },
+      "tabs.30.p95StatusMs": {
+        "previous": 119.45,
+        "current": 144.22,
+        "change": 24.769999999999996,
+        "changePercent": 20.74
+      },
+      "tabs.30.serviceRSSBytes": {
+        "previous": 33021952,
+        "current": 33689600,
+        "change": 667648,
+        "changePercent": 2.02
+      },
+      "tabs.30.serviceHandles": {
+        "previous": 229,
+        "current": 218,
+        "change": -11,
+        "changePercent": -4.8
+      },
+      "tabs.30.browser.sumWorkingSetBytes": {
+        "previous": 4364521472,
+        "current": 4387229696,
+        "change": 22708224,
+        "changePercent": 0.52
+      },
+      "tabs.30.browser.sumHandles": {
+        "previous": 15306,
+        "current": 15504,
+        "change": 198,
+        "changePercent": 1.29
+      },
+      "tabs.64.p95StatusMs": {
+        "previous": 193.58,
+        "current": 277.05,
+        "change": 83.47,
+        "changePercent": 43.12
+      },
+      "tabs.64.serviceRSSBytes": {
+        "previous": 45072384,
+        "current": 43528192,
+        "change": -1544192,
+        "changePercent": -3.43
+      },
+      "tabs.64.serviceHandles": {
+        "previous": 230,
+        "current": 227,
+        "change": -3,
+        "changePercent": -1.3
+      },
+      "tabs.64.browser.sumWorkingSetBytes": {
+        "previous": 8425463808,
+        "current": 8464994304,
+        "change": 39530496,
+        "changePercent": 0.47
+      },
+      "tabs.64.browser.sumHandles": {
+        "previous": 28157,
+        "current": 28767,
+        "change": 610,
+        "changePercent": 2.17
+      },
+      "conditional.10000.sourceIndexMedianMs": {
+        "previous": 3427,
+        "current": 3907,
+        "change": 480,
+        "changePercent": 14.01
+      },
+      "conditional.10000.preparationMedianMs": {
+        "previous": 4774.8879,
+        "current": 5421.1833,
+        "change": 646.2954,
+        "changePercent": 13.54
+      },
+      "conditional.10000.firstViewportMedianMs": {
+        "previous": 2.8491,
+        "current": 4.4956,
+        "change": 1.6464999999999996,
+        "changePercent": 57.79
+      },
+      "conditional.10000.warmViewportMedianMs": {
+        "previous": 2.41505,
+        "current": 2.9927,
+        "change": 0.5776500000000002,
+        "changePercent": 23.92
+      },
+      "conditional.10000.warmViewportP95Ms": {
+        "previous": 3.9878,
+        "current": 3.9962,
+        "change": 0.008399999999999963,
+        "changePercent": 0.21
+      },
+      "conditional.10000.reopenAndIndexMedianMs": {
+        "previous": 42.6808,
+        "current": 49.6903,
+        "change": 7.009500000000003,
+        "changePercent": 16.42
+      },
+      "conditional.10000.reopenedViewportMedianMs": {
+        "previous": 3.0021,
+        "current": 3.9867,
+        "change": 0.9845999999999999,
+        "changePercent": 32.8
+      },
+      "conditional.10000.sharedIndexBytes": {
+        "previous": 8388608,
+        "current": 8388608,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.500000.sourceIndexMedianMs": {
+        "previous": 3642,
+        "current": 3916,
+        "change": 274,
+        "changePercent": 7.52
+      },
+      "conditional.500000.preparationMedianMs": {
+        "previous": 13849.5706,
+        "current": 15882.6412,
+        "change": 2033.070600000001,
+        "changePercent": 14.68
+      },
+      "conditional.500000.firstViewportMedianMs": {
+        "previous": 2.228,
+        "current": 3.1264,
+        "change": 0.8983999999999996,
+        "changePercent": 40.32
+      },
+      "conditional.500000.warmViewportMedianMs": {
+        "previous": 2.2315,
+        "current": 3.0697,
+        "change": 0.8382000000000001,
+        "changePercent": 37.56
+      },
+      "conditional.500000.warmViewportP95Ms": {
+        "previous": 4.3092,
+        "current": 4.8829,
+        "change": 0.5737000000000005,
+        "changePercent": 13.31
+      },
+      "conditional.500000.reopenAndIndexMedianMs": {
+        "previous": 40.2335,
+        "current": 49.8027,
+        "change": 9.569200000000002,
+        "changePercent": 23.78
+      },
+      "conditional.500000.reopenedViewportMedianMs": {
+        "previous": 4.9676,
+        "current": 4.9872,
+        "change": 0.019599999999999618,
+        "changePercent": 0.39
+      },
+      "conditional.500000.sharedIndexBytes": {
+        "previous": 268435456,
+        "current": 268435456,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.cell.medianNs": {
+        "previous": 858,
+        "current": 958.7,
+        "change": 100.70000000000005,
+        "changePercent": 11.74
+      },
+      "conditional.cell.medianBytes": {
+        "previous": 264,
+        "current": 264,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.cell.medianAllocs": {
+        "previous": 3,
+        "current": 3,
+        "change": 0,
+        "changePercent": 0
+      },
+      "inline.simple/styled_true.nsPerViewport": {
+        "previous": 1294714,
+        "current": 1704202,
+        "change": 409488,
+        "changePercent": 31.63
+      },
+      "inline.simple/styled_true.bytesPerViewport": {
+        "previous": 264132,
+        "current": 264120,
+        "change": -12,
+        "changePercent": 0
+      },
+      "inline.simple/styled_true.allocationsPerViewport": {
+        "previous": 2007,
+        "current": 2007,
+        "change": 0,
+        "changePercent": 0
+      },
+      "inline.simple/styled_false.nsPerViewport": {
+        "previous": 1314305,
+        "current": 1525061,
+        "change": 210756,
+        "changePercent": 16.04
+      },
+      "inline.simple/styled_false.bytesPerViewport": {
+        "previous": 264120,
+        "current": 264103,
+        "change": -17,
+        "changePercent": -0.01
+      },
+      "inline.simple/styled_false.allocationsPerViewport": {
+        "previous": 2006,
+        "current": 2006,
+        "change": 0,
+        "changePercent": 0
+      },
+      "inline.four_runs/styled_true.nsPerViewport": {
+        "previous": 28812369,
+        "current": 36272860,
+        "change": 7460491,
+        "changePercent": 25.89
+      },
+      "inline.four_runs/styled_true.bytesPerViewport": {
+        "previous": 6503604,
+        "current": 6503644,
+        "change": 40,
+        "changePercent": 0
+      },
+      "inline.four_runs/styled_true.allocationsPerViewport": {
+        "previous": 171649,
+        "current": 171649,
+        "change": 0,
+        "changePercent": 0
+      },
+      "inline.four_runs/styled_false.nsPerViewport": {
+        "previous": 7329973,
+        "current": 8652139,
+        "change": 1322166,
+        "changePercent": 18.04
+      },
+      "inline.four_runs/styled_false.bytesPerViewport": {
+        "previous": 842099,
+        "current": 842095,
+        "change": -4,
+        "changePercent": 0
+      },
+      "inline.four_runs/styled_false.allocationsPerViewport": {
+        "previous": 3286,
+        "current": 3286,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.viewport.column_step_1.nsPerViewport": {
+        "previous": 4576804,
+        "current": 7261112,
+        "change": 2684308,
+        "changePercent": 58.65
+      },
+      "conditional.viewport.column_step_1.bytesPerViewport": {
+        "previous": 2686244,
+        "current": 2686432,
+        "change": 188,
+        "changePercent": 0.01
+      },
+      "conditional.viewport.column_step_1.allocationsPerViewport": {
+        "previous": 11264,
+        "current": 11265,
+        "change": 1,
+        "changePercent": 0.01
+      },
+      "conditional.viewport.column_step_7.nsPerViewport": {
+        "previous": 2264431,
+        "current": 3227313,
+        "change": 962882,
+        "changePercent": 42.52
+      },
+      "conditional.viewport.column_step_7.bytesPerViewport": {
+        "previous": 1245795,
+        "current": 1245838,
+        "change": 43,
+        "changePercent": 0
+      },
+      "conditional.viewport.column_step_7.allocationsPerViewport": {
+        "previous": 8215,
+        "current": 8215,
+        "change": 0,
+        "changePercent": 0
+      },
+      "source.read.single.nsPerViewport": {
+        "previous": 224714,
+        "current": 256036,
+        "change": 31322,
+        "changePercent": 13.94
+      },
+      "source.read.single.bytesPerViewport": {
+        "previous": 17699,
+        "current": 17700,
+        "change": 1,
+        "changePercent": 0.01
+      },
+      "source.read.single.allocationsPerViewport": {
+        "previous": 18,
+        "current": 18,
+        "change": 0,
+        "changePercent": 0
+      },
+      "source.read.forward.nsPerViewport": {
+        "previous": 443345,
+        "current": 538937,
+        "change": 95592,
+        "changePercent": 21.56
+      },
+      "source.read.forward.bytesPerViewport": {
+        "previous": 173899,
+        "current": 173896,
+        "change": -3,
+        "changePercent": 0
+      },
+      "source.read.forward.allocationsPerViewport": {
+        "previous": 256,
+        "current": 256,
+        "change": 0,
+        "changePercent": 0
+      },
+      "source.read.reverse.nsPerViewport": {
+        "previous": 451831,
+        "current": 526221,
+        "change": 74390,
+        "changePercent": 16.46
+      },
+      "source.read.reverse.bytesPerViewport": {
+        "previous": 173897,
+        "current": 173895,
+        "change": -2,
+        "changePercent": 0
+      },
+      "source.read.reverse.allocationsPerViewport": {
+        "previous": 256,
+        "current": 256,
+        "change": 0,
+        "changePercent": 0
+      },
+      "source.read.scattered.nsPerViewport": {
+        "previous": 279908,
+        "current": 357023,
+        "change": 77115,
+        "changePercent": 27.55
+      },
+      "source.read.scattered.bytesPerViewport": {
+        "previous": 19853,
+        "current": 19853,
+        "change": 0,
+        "changePercent": 0
+      },
+      "source.read.scattered.allocationsPerViewport": {
+        "previous": 38,
+        "current": 38,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.openToInteractiveGridMs": {
+        "previous": 865,
+        "current": 850,
+        "change": -15,
+        "changePercent": -1.73
+      },
+      "conditional.complex.openToStyledGridMs": {
+        "previous": 1091,
+        "current": 1080,
+        "change": -11,
+        "changePercent": -1.01
+      },
+      "conditional.complex.peakServiceRSSBytes": {
+        "previous": 50671616,
+        "current": 48836608,
+        "change": -1835008,
+        "changePercent": -3.62
+      },
+      "conditional.complex.peakDataBytes": {
+        "previous": 9066713,
+        "current": 9066714,
+        "change": 1,
+        "changePercent": 0
+      },
+      "conditional.complex.peakHandles": {
+        "previous": 232,
+        "current": 225,
+        "change": -7,
+        "changePercent": -3.02
+      },
+      "conditional.complex.0.pixels.correctStylePct": {
+        "previous": 92.34,
+        "current": 90.43,
+        "change": -1.9099999999999966,
+        "changePercent": -2.07
+      },
+      "conditional.complex.0.pixels.whitePct": {
+        "previous": 0,
+        "current": 0,
+        "change": 0,
+        "changePercent": null
+      },
+      "conditional.complex.0.normal.fps": {
+        "previous": 53.7,
+        "current": 47.46,
+        "change": -6.240000000000002,
+        "changePercent": -11.62
+      },
+      "conditional.complex.0.normal.p95FrameMs": {
+        "previous": 33.3,
+        "current": 33.4,
+        "change": 0.10000000000000142,
+        "changePercent": 0.3
+      },
+      "conditional.complex.0.normal.p99FrameMs": {
+        "previous": 33.4,
+        "current": 33.5,
+        "change": 0.10000000000000142,
+        "changePercent": 0.3
+      },
+      "conditional.complex.0.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.normal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.normal.settleMs": {
+        "previous": 2.7,
+        "current": 3.5,
+        "change": 0.7999999999999998,
+        "changePercent": 29.63
+      },
+      "conditional.complex.0.fastVertical.fps": {
+        "previous": 27.76,
+        "current": 13.08,
+        "change": -14.680000000000001,
+        "changePercent": -52.88
+      },
+      "conditional.complex.0.fastVertical.p95FrameMs": {
+        "previous": 50.1,
+        "current": 116.8,
+        "change": 66.69999999999999,
+        "changePercent": 133.13
+      },
+      "conditional.complex.0.fastVertical.p99FrameMs": {
+        "previous": 66.9,
+        "current": 116.8,
+        "change": 49.89999999999999,
+        "changePercent": 74.59
+      },
+      "conditional.complex.0.fastVertical.textReadyPct": {
+        "previous": 100,
+        "current": 63.64,
+        "change": -36.36,
+        "changePercent": -36.36
+      },
+      "conditional.complex.0.fastVertical.conditionalReadyPct": {
+        "previous": 100,
+        "current": 63.64,
+        "change": -36.36,
+        "changePercent": -36.36
+      },
+      "conditional.complex.0.fastVertical.settleMs": {
+        "previous": 42.5,
+        "current": 102.3,
+        "change": 59.8,
+        "changePercent": 140.71
+      },
+      "conditional.complex.0.fastHorizontal.fps": {
+        "previous": 34.97,
+        "current": 28.73,
+        "change": -6.239999999999998,
+        "changePercent": -17.84
+      },
+      "conditional.complex.0.fastHorizontal.p95FrameMs": {
+        "previous": 50.1,
+        "current": 66.7,
+        "change": 16.6,
+        "changePercent": 33.13
+      },
+      "conditional.complex.0.fastHorizontal.p99FrameMs": {
+        "previous": 66.7,
+        "current": 66.8,
+        "change": 0.09999999999999432,
+        "changePercent": 0.15
+      },
+      "conditional.complex.0.fastHorizontal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.fastHorizontal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.fastHorizontal.settleMs": {
+        "previous": 2.4,
+        "current": 4.2,
+        "change": 1.8000000000000003,
+        "changePercent": 75
+      },
+      "conditional.complex.0.reverse.fps": {
+        "previous": 19.6,
+        "current": 15.84,
+        "change": -3.7600000000000016,
+        "changePercent": -19.18
+      },
+      "conditional.complex.0.reverse.p95FrameMs": {
+        "previous": 66.8,
+        "current": 83.4,
+        "change": 16.60000000000001,
+        "changePercent": 24.85
+      },
+      "conditional.complex.0.reverse.p99FrameMs": {
+        "previous": 66.8,
+        "current": 83.4,
+        "change": 16.60000000000001,
+        "changePercent": 24.85
+      },
+      "conditional.complex.0.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.reverse.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.reverse.settleMs": {
+        "previous": 47.8,
+        "current": 54.1,
+        "change": 6.300000000000004,
+        "changePercent": 13.18
+      },
+      "conditional.complex.0.jump.fps": {
+        "previous": 59.88,
+        "current": 59.88,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.jump.p95FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.jump.p99FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.0.jump.settleMs": {
+        "previous": 240.3,
+        "current": 475.7,
+        "change": 235.39999999999998,
+        "changePercent": 97.96
+      },
+      "conditional.complex.1.normal.fps": {
+        "previous": 59.93,
+        "current": 59.95,
+        "change": 0.020000000000003126,
+        "changePercent": 0.03
+      },
+      "conditional.complex.1.normal.p95FrameMs": {
+        "previous": 16.8,
+        "current": 16.8,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.normal.p99FrameMs": {
+        "previous": 16.9,
+        "current": 17,
+        "change": 0.10000000000000142,
+        "changePercent": 0.59
+      },
+      "conditional.complex.1.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.normal.settleMs": {
+        "previous": 2.5,
+        "current": 1.9,
+        "change": -0.6000000000000001,
+        "changePercent": -24
+      },
+      "conditional.complex.1.fastVertical.fps": {
+        "previous": 43.3,
+        "current": 33.18,
+        "change": -10.119999999999997,
+        "changePercent": -23.37
+      },
+      "conditional.complex.1.fastVertical.p95FrameMs": {
+        "previous": 33.5,
+        "current": 50.1,
+        "change": 16.6,
+        "changePercent": 49.55
+      },
+      "conditional.complex.1.fastVertical.p99FrameMs": {
+        "previous": 33.5,
+        "current": 50.5,
+        "change": 17,
+        "changePercent": 50.75
+      },
+      "conditional.complex.1.fastVertical.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.fastVertical.settleMs": {
+        "previous": 50,
+        "current": 3.2,
+        "change": -46.8,
+        "changePercent": -93.6
+      },
+      "conditional.complex.1.fastHorizontal.fps": {
+        "previous": 52.61,
+        "current": 47.72,
+        "change": -4.890000000000001,
+        "changePercent": -9.29
+      },
+      "conditional.complex.1.fastHorizontal.p95FrameMs": {
+        "previous": 33.4,
+        "current": 33.4,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.fastHorizontal.p99FrameMs": {
+        "previous": 33.4,
+        "current": 34,
+        "change": 0.6000000000000014,
+        "changePercent": 1.8
+      },
+      "conditional.complex.1.fastHorizontal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.fastHorizontal.settleMs": {
+        "previous": 1.5,
+        "current": 2,
+        "change": 0.5,
+        "changePercent": 33.33
+      },
+      "conditional.complex.1.reverse.fps": {
+        "previous": 30.56,
+        "current": 23.75,
+        "change": -6.809999999999999,
+        "changePercent": -22.28
+      },
+      "conditional.complex.1.reverse.p95FrameMs": {
+        "previous": 50.1,
+        "current": 66.7,
+        "change": 16.6,
+        "changePercent": 33.13
+      },
+      "conditional.complex.1.reverse.p99FrameMs": {
+        "previous": 50.2,
+        "current": 66.8,
+        "change": 16.599999999999994,
+        "changePercent": 33.07
+      },
+      "conditional.complex.1.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.1.reverse.settleMs": {
+        "previous": 40.3,
+        "current": 2.4,
+        "change": -37.9,
+        "changePercent": -94.04
+      },
+      "conditional.complex.1.jump.fps": {
+        "previous": 60.24,
+        "current": 30.03,
+        "change": -30.21,
+        "changePercent": -50.15
+      },
+      "conditional.complex.1.jump.p95FrameMs": {
+        "previous": 16.6,
+        "current": 33.3,
+        "change": 16.699999999999996,
+        "changePercent": 100.6
+      },
+      "conditional.complex.1.jump.p99FrameMs": {
+        "previous": 16.6,
+        "current": 33.3,
+        "change": 16.699999999999996,
+        "changePercent": 100.6
+      },
+      "conditional.complex.1.jump.settleMs": {
+        "previous": 103.8,
+        "current": 199.7,
+        "change": 95.89999999999999,
+        "changePercent": 92.39
+      },
+      "conditional.complex.2.normal.fps": {
+        "previous": 59.96,
+        "current": 54.96,
+        "change": -5,
+        "changePercent": -8.34
+      },
+      "conditional.complex.2.normal.p95FrameMs": {
+        "previous": 16.8,
+        "current": 33.4,
+        "change": 16.599999999999998,
+        "changePercent": 98.81
+      },
+      "conditional.complex.2.normal.p99FrameMs": {
+        "previous": 16.9,
+        "current": 33.4,
+        "change": 16.5,
+        "changePercent": 97.63
+      },
+      "conditional.complex.2.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.normal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.normal.settleMs": {
+        "previous": 1.9,
+        "current": 3.5,
+        "change": 1.6,
+        "changePercent": 84.21
+      },
+      "conditional.complex.2.fastVertical.fps": {
+        "previous": 35.97,
+        "current": 24.43,
+        "change": -11.54,
+        "changePercent": -32.08
+      },
+      "conditional.complex.2.fastVertical.p95FrameMs": {
+        "previous": 50,
+        "current": 50.1,
+        "change": 0.10000000000000142,
+        "changePercent": 0.2
+      },
+      "conditional.complex.2.fastVertical.p99FrameMs": {
+        "previous": 50.1,
+        "current": 66.6,
+        "change": 16.499999999999993,
+        "changePercent": 32.93
+      },
+      "conditional.complex.2.fastVertical.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.fastVertical.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.fastVertical.settleMs": {
+        "previous": 22.8,
+        "current": 32.6,
+        "change": 9.8,
+        "changePercent": 42.98
+      },
+      "conditional.complex.2.fastHorizontal.fps": {
+        "previous": 42.46,
+        "current": 48.7,
+        "change": 6.240000000000002,
+        "changePercent": 14.7
+      },
+      "conditional.complex.2.fastHorizontal.p95FrameMs": {
+        "previous": 33.5,
+        "current": 33.4,
+        "change": -0.10000000000000142,
+        "changePercent": -0.3
+      },
+      "conditional.complex.2.fastHorizontal.p99FrameMs": {
+        "previous": 33.6,
+        "current": 33.5,
+        "change": -0.10000000000000142,
+        "changePercent": -0.3
+      },
+      "conditional.complex.2.fastHorizontal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.fastHorizontal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.fastHorizontal.settleMs": {
+        "previous": 1.9,
+        "current": 2.5,
+        "change": 0.6000000000000001,
+        "changePercent": 31.58
+      },
+      "conditional.complex.2.reverse.fps": {
+        "previous": 25.86,
+        "current": 21.91,
+        "change": -3.9499999999999993,
+        "changePercent": -15.27
+      },
+      "conditional.complex.2.reverse.p95FrameMs": {
+        "previous": 50.1,
+        "current": 66.8,
+        "change": 16.699999999999996,
+        "changePercent": 33.33
+      },
+      "conditional.complex.2.reverse.p99FrameMs": {
+        "previous": 50.1,
+        "current": 66.8,
+        "change": 16.699999999999996,
+        "changePercent": 33.33
+      },
+      "conditional.complex.2.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.reverse.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.reverse.settleMs": {
+        "previous": 49.6,
+        "current": 52.1,
+        "change": 2.5,
+        "changePercent": 5.04
+      },
+      "conditional.complex.2.jump.fps": {
+        "previous": 59.88,
+        "current": 59.88,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.jump.p95FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.jump.p99FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.complex.2.jump.settleMs": {
+        "previous": 132.9,
+        "current": 142,
+        "change": 9.099999999999994,
+        "changePercent": 6.85
+      },
+      "conditional.external.openToInteractiveGridMs": {
+        "previous": 5857,
+        "current": 5073,
+        "change": -784,
+        "changePercent": -13.39
+      },
+      "conditional.external.openToStyledGridMs": {
+        "previous": 12266,
+        "current": 11440,
+        "change": -826,
+        "changePercent": -6.73
+      },
+      "conditional.external.peakServiceRSSBytes": {
+        "previous": 87224320,
+        "current": 87584768,
+        "change": 360448,
+        "changePercent": 0.41
+      },
+      "conditional.external.peakDataBytes": {
+        "previous": 171154262,
+        "current": 171154261,
+        "change": -1,
+        "changePercent": 0
+      },
+      "conditional.external.peakHandles": {
+        "previous": 232,
+        "current": 236,
+        "change": 4,
+        "changePercent": 1.72
+      },
+      "conditional.external.0.normal.fps": {
+        "previous": 39.15,
+        "current": 40.37,
+        "change": 1.2199999999999989,
+        "changePercent": 3.12
+      },
+      "conditional.external.0.normal.p95FrameMs": {
+        "previous": 50,
+        "current": 50,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.normal.p99FrameMs": {
+        "previous": 66.9,
+        "current": 50.1,
+        "change": -16.800000000000004,
+        "changePercent": -25.11
+      },
+      "conditional.external.0.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.normal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.normal.settleMs": {
+        "previous": 4,
+        "current": 2.4,
+        "change": -1.6,
+        "changePercent": -40
+      },
+      "conditional.external.0.fastVertical.fps": {
+        "previous": 18.53,
+        "current": 23.98,
+        "change": 5.449999999999999,
+        "changePercent": 29.41
+      },
+      "conditional.external.0.fastVertical.p95FrameMs": {
+        "previous": 83.5,
+        "current": 66.7,
+        "change": -16.799999999999997,
+        "changePercent": -20.12
+      },
+      "conditional.external.0.fastVertical.p99FrameMs": {
+        "previous": 83.5,
+        "current": 66.7,
+        "change": -16.799999999999997,
+        "changePercent": -20.12
+      },
+      "conditional.external.0.fastVertical.textReadyPct": {
+        "previous": 100,
+        "current": 95.24,
+        "change": -4.760000000000005,
+        "changePercent": -4.76
+      },
+      "conditional.external.0.fastVertical.conditionalReadyPct": {
+        "previous": 100,
+        "current": 95.24,
+        "change": -4.760000000000005,
+        "changePercent": -4.76
+      },
+      "conditional.external.0.fastVertical.settleMs": {
+        "previous": 50.1,
+        "current": 41.2,
+        "change": -8.899999999999999,
+        "changePercent": -17.76
+      },
+      "conditional.external.0.reverse.fps": {
+        "previous": 23.75,
+        "current": 26.02,
+        "change": 2.2699999999999996,
+        "changePercent": 9.56
+      },
+      "conditional.external.0.reverse.p95FrameMs": {
+        "previous": 66.7,
+        "current": 50.1,
+        "change": -16.6,
+        "changePercent": -24.89
+      },
+      "conditional.external.0.reverse.p99FrameMs": {
+        "previous": 66.7,
+        "current": 66.8,
+        "change": 0.09999999999999432,
+        "changePercent": 0.15
+      },
+      "conditional.external.0.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 95.45,
+        "change": -4.549999999999997,
+        "changePercent": -4.55
+      },
+      "conditional.external.0.reverse.conditionalReadyPct": {
+        "previous": 100,
+        "current": 95.45,
+        "change": -4.549999999999997,
+        "changePercent": -4.55
+      },
+      "conditional.external.0.reverse.settleMs": {
+        "previous": 36.9,
+        "current": 19.4,
+        "change": -17.5,
+        "changePercent": -47.43
+      },
+      "conditional.external.0.jump.fps": {
+        "previous": 59.88,
+        "current": 59.88,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.jump.p95FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.jump.p99FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.0.jump.settleMs": {
+        "previous": 274.4,
+        "current": 146.2,
+        "change": -128.2,
+        "changePercent": -46.72
+      },
+      "conditional.external.1.normal.fps": {
+        "previous": 44.04,
+        "current": 52.61,
+        "change": 8.57,
+        "changePercent": 19.46
+      },
+      "conditional.external.1.normal.p95FrameMs": {
+        "previous": 33.5,
+        "current": 33.4,
+        "change": -0.10000000000000142,
+        "changePercent": -0.3
+      },
+      "conditional.external.1.normal.p99FrameMs": {
+        "previous": 50.1,
+        "current": 33.4,
+        "change": -16.700000000000003,
+        "changePercent": -33.33
+      },
+      "conditional.external.1.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.1.normal.settleMs": {
+        "previous": 2.3,
+        "current": 1.8,
+        "change": -0.4999999999999998,
+        "changePercent": -21.74
+      },
+      "conditional.external.1.fastVertical.fps": {
+        "previous": 23.98,
+        "current": 28.86,
+        "change": 4.879999999999999,
+        "changePercent": 20.35
+      },
+      "conditional.external.1.fastVertical.p95FrameMs": {
+        "previous": 66.7,
+        "current": 50.1,
+        "change": -16.6,
+        "changePercent": -24.89
+      },
+      "conditional.external.1.fastVertical.p99FrameMs": {
+        "previous": 66.8,
+        "current": 50.5,
+        "change": -16.299999999999997,
+        "changePercent": -24.4
+      },
+      "conditional.external.1.fastVertical.textReadyPct": {
+        "previous": 95.24,
+        "current": 96,
+        "change": 0.7600000000000051,
+        "changePercent": 0.8
+      },
+      "conditional.external.1.fastVertical.settleMs": {
+        "previous": 66.2,
+        "current": 42.2,
+        "change": -24,
+        "changePercent": -36.25
+      },
+      "conditional.external.1.reverse.fps": {
+        "previous": 18.45,
+        "current": 29.97,
+        "change": 11.52,
+        "changePercent": 62.44
+      },
+      "conditional.external.1.reverse.p95FrameMs": {
+        "previous": 83.4,
+        "current": 50.1,
+        "change": -33.300000000000004,
+        "changePercent": -39.93
+      },
+      "conditional.external.1.reverse.p99FrameMs": {
+        "previous": 83.4,
+        "current": 50.1,
+        "change": -33.300000000000004,
+        "changePercent": -39.93
+      },
+      "conditional.external.1.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 84,
+        "change": -16,
+        "changePercent": -16
+      },
+      "conditional.external.1.reverse.settleMs": {
+        "previous": 42.5,
+        "current": 38,
+        "change": -4.5,
+        "changePercent": -10.59
+      },
+      "conditional.external.1.jump.fps": {
+        "previous": 59.88,
+        "current": 59.88,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.1.jump.p95FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.1.jump.p99FrameMs": {
+        "previous": 16.7,
+        "current": 16.7,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.1.jump.settleMs": {
+        "previous": 157.5,
+        "current": 151.8,
+        "change": -5.699999999999989,
+        "changePercent": -3.62
+      },
+      "conditional.external.2.normal.fps": {
+        "previous": 33.72,
+        "current": 48.94,
+        "change": 15.219999999999999,
+        "changePercent": 45.14
+      },
+      "conditional.external.2.normal.p95FrameMs": {
+        "previous": 50.1,
+        "current": 33.4,
+        "change": -16.700000000000003,
+        "changePercent": -33.33
+      },
+      "conditional.external.2.normal.p99FrameMs": {
+        "previous": 50.1,
+        "current": 33.5,
+        "change": -16.6,
+        "changePercent": -33.13
+      },
+      "conditional.external.2.normal.textReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.2.normal.conditionalReadyPct": {
+        "previous": 100,
+        "current": 100,
+        "change": 0,
+        "changePercent": 0
+      },
+      "conditional.external.2.normal.settleMs": {
+        "previous": 3.4,
+        "current": 4.5,
+        "change": 1.1,
+        "changePercent": 32.35
+      },
+      "conditional.external.2.fastVertical.fps": {
+        "previous": 19.27,
+        "current": 25.07,
+        "change": 5.800000000000001,
+        "changePercent": 30.1
+      },
+      "conditional.external.2.fastVertical.p95FrameMs": {
+        "previous": 83.4,
+        "current": 50.1,
+        "change": -33.300000000000004,
+        "changePercent": -39.93
+      },
+      "conditional.external.2.fastVertical.p99FrameMs": {
+        "previous": 83.4,
+        "current": 66.7,
+        "change": -16.700000000000003,
+        "changePercent": -20.02
+      },
+      "conditional.external.2.fastVertical.textReadyPct": {
+        "previous": 94.12,
+        "current": 95.45,
+        "change": 1.3299999999999983,
+        "changePercent": 1.41
+      },
+      "conditional.external.2.fastVertical.conditionalReadyPct": {
+        "previous": 94.12,
+        "current": 95.45,
+        "change": 1.3299999999999983,
+        "changePercent": 1.41
+      },
+      "conditional.external.2.fastVertical.settleMs": {
+        "previous": 35.7,
+        "current": 46.2,
+        "change": 10.5,
+        "changePercent": 29.41
+      },
+      "conditional.external.2.reverse.fps": {
+        "previous": 23.06,
+        "current": 29.38,
+        "change": 6.32,
+        "changePercent": 27.41
+      },
+      "conditional.external.2.reverse.p95FrameMs": {
+        "previous": 66.7,
+        "current": 50.2,
+        "change": -16.5,
+        "changePercent": -24.74
+      },
+      "conditional.external.2.reverse.p99FrameMs": {
+        "previous": 66.8,
+        "current": 50.2,
+        "change": -16.599999999999994,
+        "changePercent": -24.85
+      },
+      "conditional.external.2.reverse.textReadyPct": {
+        "previous": 100,
+        "current": 95.83,
+        "change": -4.170000000000002,
+        "changePercent": -4.17
+      },
+      "conditional.external.2.reverse.conditionalReadyPct": {
+        "previous": 100,
+        "current": 95.83,
+        "change": -4.170000000000002,
+        "changePercent": -4.17
+      },
+      "conditional.external.2.reverse.settleMs": {
+        "previous": 43.7,
+        "current": 107.6,
+        "change": 63.89999999999999,
+        "changePercent": 146.22
+      },
+      "conditional.external.2.jump.fps": {
+        "previous": 59.88,
+        "current": 59.52,
+        "change": -0.35999999999999943,
+        "changePercent": -0.6
+      },
+      "conditional.external.2.jump.p95FrameMs": {
+        "previous": 16.7,
+        "current": 16.8,
+        "change": 0.10000000000000142,
+        "changePercent": 0.6
+      },
+      "conditional.external.2.jump.p99FrameMs": {
+        "previous": 16.7,
+        "current": 16.8,
+        "change": 0.10000000000000142,
+        "changePercent": 0.6
+      },
+      "conditional.external.2.jump.settleMs": {
+        "previous": 144,
+        "current": 194.1,
+        "change": 50.099999999999994,
+        "changePercent": 34.79
+      }
+    }
+  },
+  "finished": "2026-11-27T14:38:18.945Z"
+}

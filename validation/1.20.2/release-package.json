@@ -1,0 +1,15 @@
+{
+    "version":  "1.20.2",
+    "result":  "PASS",
+    "packagedFilesVerified":  101,
+    "packer":  "upx 5.3.1 --best --lzma",
+    "exeBytes":  10046464,
+    "exeSHA256":  "82f1a5f220f54d949b28950c80d4dafc29c99c74684d762fa2630fc0f005999e",
+    "zipSHA256":  "12fe5ec8ce98e4ca91cbcb99238dedb14722fe8ffe207ff9aeee89f873e7dbe3",
+    "checks":  [
+                   "ZIP CRC",
+                   "every file equals the release directory",
+                   "EXE SHA-256 and PE header",
+                   "version"
+               ]
+}

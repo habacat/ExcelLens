@@ -1,0 +1,20 @@
+{
+    "version":  "1.20.2",
+    "result":  "PASS",
+    "publicCommit":  "9d7706fc9a8691e1153508a6003eaee487810c05",
+    "windowsPackageFiles":  101,
+    "sourcePackageFiles":  3699,
+    "packer":  "upx 5.3.1 --best --lzma",
+    "sha256":  {
+                   "ExcelLens_1.20.2_Windows_x64_Full.zip":  "12fe5ec8ce98e4ca91cbcb99238dedb14722fe8ffe207ff9aeee89f873e7dbe3",
+                   "ExcelLens_1.20.2_Source_Full.zip":  "837ce8c282016e176aba7b49d4a6745c0e70eb4d7e6897753b935d28e4626260",
+                   "ExcelLens_1.20.2_Performance.json":  "c4c121f74a09f04db5d0d2c0152bfc566219dbe15715c85a3f1a207b802f6922"
+               },
+    "exeSHA256":  "82f1a5f220f54d949b28950c80d4dafc29c99c74684d762fa2630fc0f005999e",
+    "exeBytes":  10046464,
+    "executableVersion":  "ExcelLens 1.20.2",
+    "upxIntegrity":  "PASS",
+    "cgo":  false,
+    "sourceArchiveOfflineRebuildIdentical":  true,
+    "nodeModulesPresentDuringOfflineRebuild":  false
+}
