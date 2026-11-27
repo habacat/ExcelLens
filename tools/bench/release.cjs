@@ -39,7 +39,7 @@ const ledgerRows=smoke?1000:1000000,editRows=smoke?1001:100000,scrollSeconds=smo
 const gitInfo=args=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 const checkout=fs.existsSync(path.join(root,'.git'));
 const report={schema:2,profile:only?'diagnostic':smoke?'smoke':'release',version:config.version(),
-  checkoutHead:checkout?gitInfo(['rev-parse','HEAD']):null,modifiedBuildInputs:checkout?Boolean(gitInfo(['status','--porcelain','--','internal','vendor','tools/bench','tools/uiprobe','tools/qa','go.mod','go.sum'])):null,
+  checkoutHead:checkout?gitInfo(['rev-parse','HEAD']):null,modifiedBuildInputs:checkout?Boolean(gitInfo(['status','--porcelain','--','internal','vendor','tools/bench','tools/frontend','tools/uiprobe','tools/qa','go.mod','go.sum','package.json','package-lock.json','tsconfig.json','tsconfig.app.json','eslint.config.mjs'])):null,
   started:new Date().toISOString(),host:{platform:process.platform,os:os.release(),cpu:os.cpus()[0].model,logicalCPUs:os.cpus().length,ramBytes:os.totalmem(),node:process.version,go:execFileSync(go,['version'],{encoding:'utf8'}).trim()},samples:[],readings:[],cleanup:[],result:'RUNNING'};
 function save(){fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output+'.tmp',JSON.stringify(report,null,2)+'\n');fs.renameSync(output+'.tmp',output);}
 const elapsed=t=>Math.round((performance.now()-t)*100)/100;

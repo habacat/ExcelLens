@@ -504,11 +504,11 @@ func TestArchiveRejectsUnauthorizedParametersAndStaticAssets(t *testing.T) {
 	if rawArchiveCall(app, "POST", "/api/archive/open", `{"path":"C:\\unselected.zip"}`).Code != 404 {
 		t.Fatal("client-selected local path accepted")
 	}
-	req := httptest.NewRequest(http.MethodGet, "/assets/archives.js", nil)
+	req := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
 	req = localTestConnection(req)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, req)
-	if response.Code != 200 || !strings.Contains(response.Body.String(), "ExcelLensArchives") {
+	if response.Code != 200 || !strings.Contains(response.Body.String(), "/api/archive/open") {
 		t.Fatal("archive UI not bundled")
 	}
 	for _, extension := range []string{".zip", ".tar", ".gz", ".tgz", ".7z", ".bz2", ".xz"} {

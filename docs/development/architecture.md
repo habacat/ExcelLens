@@ -42,9 +42,10 @@ internal/searchservice      跨表搜索调度、源行扫描次序与检查点�
 internal/searchresults      磁盘命中记录、有界分页、筛选与流式 CSV
 internal/taskmanager       进程内并发槽位准入、原子引用计数快照租约、资源固定集、字节预算与已退出任务历史淘汰
 internal/server            HTTP、会话、任务及业务装配
-internal/ui                嵌入的 HTML/CSS/JS 与格式配置注入
+internal/ui                TypeScript 前端源码（src/）、确定性打包产物（web/dist/）及嵌入 HTML/CSS/SVG 与格式配置注入
 internal/tray, shellmenu    Windows 用户入口
 internal/buildinfo         唯一应用版本
+tools/frontend             前端 TypeScript 构建、分层 DAG 校验与单元测试入口
 tools/project              统一检查、格式化及生成命令
 tools/qa                   专项回归、可选性能和私有样本检查
 ```
@@ -283,7 +284,7 @@ F06的`server/record.go`消费已有可见行视图ID，复用`selectionSnapshot
 
 `go run ./tools/project check` 是本地、CI 和发布共用入口。`go.mod` 拥有工具链版本，`internal/buildinfo/version.go` 拥有应用版本，`tools/release-files.json` 拥有发布文档列表；禁止在脚本里再维护重复列表。
 
-发布文件写入暂存目录，完整验证后原子替换；失败不破坏旧发布。单元测试、HTTP 集成、可选真实样本和桌面人工验收分开记录。当前 `app.js` 与 `server` 仍较大；后续根据实际变更按职责提取，不能用一次目录整理宣称全部架构问题已消失。
+发布文件写入暂存目录，完整验证后原子替换；失败不破坏旧发布。单元测试、HTTP 集成、可选真实样本和桌面人工验收分开记录。前端已全面迁移至严格 TypeScript（5 层单向 DAG、`internal/ui/src/` 139 个生产模块与 94 个直接导入测试，零内部全局命名空间，经 `esbuild` 确定性打包为 `internal/ui/web/dist/{app,storage-recovery}.js` 嵌入单 EXE，详情见 [前端 TypeScript 架构与工程规范](frontend-typescript.md)）。后端 `server` 仍较大，后续根据实际变更按职责提取，不能用一次目录整理宣称全部架构问题已消失。
 
 Windows 图标和应用清单由 `tools/icon` 生成同一个 COFF 资源，模板位于 `cmd/excellens/app.manifest`。模板版本由 `buildinfo` 注入，声明 PerMonitorV2（回退 PerMonitor）和 Windows Common Controls v6；托盘菜单与关于窗口继续调用系统原生控件。`build.ps1` 在 UPX 后通过同一工具读取 EXE 资源树，核对 Windows 实际加载的清单，避免只修改模板而遗漏打包资源。
 

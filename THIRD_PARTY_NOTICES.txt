@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ============================================================
-github.com/ClickHouse/ch-go v0.75.0
+github.com/ClickHouse/ch-go v0.76.0
 ============================================================
 
 --- LICENSE ---
@@ -1831,7 +1831,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-github.com/jackc/puddle/v2 v2.2.3
+github.com/jackc/puddle/v2 v2.2.4
 ============================================================
 
 --- LICENSE ---
@@ -2930,7 +2930,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ============================================================
-go.etcd.io/bbolt v1.4.3
+go.etcd.io/bbolt v1.5.0
 ============================================================
 
 --- LICENSE ---
@@ -3907,7 +3907,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ============================================================
-golang.org/x/net v0.62.0
+golang.org/x/net v0.63.0
 ============================================================
 
 --- LICENSE ---

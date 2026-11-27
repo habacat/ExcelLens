@@ -216,7 +216,7 @@ func TestAnalysisAssetsAndNoOriginalWorkbook(t *testing.T) {
 	if without.Code != 409 {
 		t.Fatalf("workspace should require workbook: %d", without.Code)
 	}
-	for _, file := range []string{"analytics.js", "analytics.css", "analytics-templates.js", "analytics-charts.js"} {
+	for _, file := range []string{"app.js", "analytics.css"} {
 		res := analysisRequest(t, a, "GET", "/assets/"+file, "")
 		if res.Code != 200 || res.Body.Len() < 100 {
 			t.Errorf("new frontend asset missing: %s %d", file, res.Code)

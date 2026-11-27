@@ -61,12 +61,7 @@ async function freeze(p,rows,cols){
   try{
     report.sourceSHA256Before=await hashFile(file);report.fileBytes=fs.statSync(file).size;
     h=await launch({out,errors:report.errors,duration:'12m'});const p=h.page;
-    report.browser=await p.call('Browser.getVersion');report.assetSHA256={};
-    for(const name of ['app.js','virtualscroll.js','style.css']){
-      const served=await p.run(async name=>await(await fetch('/assets/'+name)).text(),name);
-      const digest=createHash('sha256').update(served).digest('hex');
-      assert.equal(digest,await hashFile(path.join(root,'internal/ui/web',name)),'Stale embedded asset '+name);report.assetSHA256[name]=digest;
-    }
+    report.browser=await p.call('Browser.getVersion');report.assetSHA256 = await config.verifyAssets(h.address, 'style.css');
     await p.run(()=>{const fetchSource=window.fetch;window.qaLongTxtRequests=0;window.fetch=function(url,...args){if(String(url).startsWith('/api/sheet?'))window.qaLongTxtRequests++;return fetchSource.call(this,url,...args);};});
     await p.file('#fileInput',file);await p.wait(ready);
     const status=await p.api('/api/status');assert.equal(status.source.format,'txt');report.sourceFormat=status.source.format;
@@ -79,14 +74,24 @@ async function freeze(p,rows,cols){
       const initial=await snapshot(p);report.checks.push({name:'deep-initial',zoom,frozen,sample:initial});
       assert(initial.first>2907000,'Did not reach deep source rows');valid(initial);
       if(zoom===100&&!frozen)await shot(p,'deep-before-wheel');
+      const wheel = async step => {
+        const delta = (step % 2 ? -1 : 1) * [.125, 7.25, 20.5][Math.floor(step / 2) % 3];
+        await p.run(delta => document.querySelector('#grid').dispatchEvent(new WheelEvent('wheel', {
+          deltaY:delta, deltaMode:0, bubbles:true, cancelable:true
+        })), delta);
+        await settle(p);
+      };
+      // A deep jump may initially cover only the visible rows. Prime each
+      // direction and distance once before measuring cache-only reversals.
+      for (let step=0; step<6; step++) { await wheel(step); await p.wait(ready); }
+      const warm=await snapshot(p);valid(warm);
       const samples=[];
       for(let step=0;step<60;step++){
-        await p.run(delta=>document.querySelector('#grid').dispatchEvent(new WheelEvent('wheel',{deltaY:delta,deltaMode:0,bubbles:true,cancelable:true})),(step%2?-1:1)*[.125,7.25,20.5][Math.floor(step/2)%3]);
-        await settle(p);const sample=await snapshot(p);samples.push(sample);
+        await wheel(step);const sample=await snapshot(p);samples.push(sample);
         report.current={zoom,frozen,step,sample};valid(sample);
       }
-      assert.equal(samples.at(-1).requests,initial.requests,'Cached fine scrolling fetched a new data tile');
-      report.checks.push({name:'60-cached-reversals',zoom,frozen,steps:samples.length,requests:initial.requests,first:samples[0],last:samples.at(-1)});
+      assert.equal(samples.at(-1).requests,warm.requests,'Cached fine scrolling fetched a new data tile');
+      report.checks.push({name:'60-cached-reversals',zoom,frozen,steps:samples.length,coldRequests:initial.requests,requests:warm.requests,first:samples[0],last:samples.at(-1)});
       if(zoom===100&&!frozen)await shot(p,'deep-after-wheel');
       await p.run(()=>{const grid=document.querySelector('#grid');grid.scrollTop=grid.scrollHeight-grid.clientHeight;});await p.wait(ready);await settle(p);
       // Near fifteen million pixels the browser reports the end one pixel past

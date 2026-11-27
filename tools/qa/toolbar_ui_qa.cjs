@@ -74,9 +74,9 @@ const measure = () => h.page.run(() => {
     // This suite exercises the optional tabbed layout, including its overflow.
     await p.run(() => document.getElementById('openBtn').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,cancelable:true})));
     await p.click('#toolbarLayoutToggle');
-    await p.wait('window.ExcelLensRibbon.ribbon === true');
+    await p.wait('document.documentElement.dataset.ribbonLayout === "true"');
     await p.run(() => {
-      localStorage.removeItem('ExcelLens.ribbonCollapsed'); window.ExcelLensRibbon.setCollapsed(false); window.ExcelLensRibbon.select('home');
+      localStorage.removeItem('ExcelLens.ribbonCollapsed'); if(document.querySelector('.appbar').hasAttribute('data-ribbon-collapsed'))document.getElementById('ribbonCollapseBtn').click(); document.getElementById('ribbonTabHome').click();
       const fetch = window.fetch.bind(window); window.__toolbarReads = 0;
       window.fetch = (url, ...args) => { if (/\/api\/(?:index\/start|analysis\/start|row-view\/start|profile)/.test(String(url))) window.__toolbarReads++; return fetch(url, ...args); };
     });
@@ -131,17 +131,17 @@ const measure = () => h.page.run(() => {
     await p.wait('document.getElementById("ribbonMoreMenu").hidden');
     await settled();
     const idleLayouts = await p.run(async () => {
-      const bar = window.ExcelLensRibbon, fit = bar.fit;
-      let count = 0;
-      bar.fit = function () { count++; return fit.call(this); };
+      let mutations = 0;
+      const observer = new MutationObserver(entries => { mutations += entries.length; });
+      observer.observe(document.querySelector('.appbar'), {subtree:true, attributes:true, attributeFilter:['data-toolbar-overflow']});
       try {
         for (let frame = 0; frame < 12; frame++) await new Promise(requestAnimationFrame);
-        return count;
-      } finally { bar.fit = fit; }
+        return mutations;
+      } finally { observer.disconnect(); }
     });
     assert.equal(idleLayouts, 0, 'An idle overflow layout must settle');
     await p.click('#ribbonTabHome');
-    report.checks.push('The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon queues no more layouts over 12 frames');
+    report.checks.push('The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon keeps its overflow state stable over 12 frames');
 
     await resize(1600, 1000, 1); await p.run(() => { document.querySelector('.appbar').style.width = '620px'; }); await settled(); await settled();
     assert(await p.evaluate('[...document.querySelectorAll(".appbar .app-actions button")].filter(n=>n.getBoundingClientRect().width).every(n=>n.getBoundingClientRect().right<=620.5)'));
@@ -149,12 +149,12 @@ const measure = () => h.page.run(() => {
     report.checks.push('Resizing the bar itself, independent of the window, recomputes overflow');
 
     const tabs = await p.run(() => {
-      const ribbon = window.ExcelLensRibbon, out = {};
+      const out = {};
       for (const tab of document.querySelectorAll('.ribbon-tabs button')) {
         tab.click();
         out[tab.dataset.ribbonTab] = {selected: tab.getAttribute('aria-selected'), shown: [...document.querySelectorAll('.ribbon-panel')].filter(n => !n.hidden).map(n => n.dataset.ribbonPanel)};
       }
-      ribbon.select('home');
+      document.getElementById('ribbonTabHome').click();
       return out;
     });
     for (const [name, state] of Object.entries(tabs)) { assert.equal(state.selected, 'true'); assert.deepEqual(state.shown, [name]); }
@@ -165,20 +165,20 @@ const measure = () => h.page.run(() => {
       controls: [...document.querySelectorAll('.app-actions .ribbon-panel button[id]')].map(n => n.id),
       commands: [...document.querySelectorAll('#commandList .command-entry')].map(n => ({button: n.dataset.commandButton, disabled: n.disabled}))
     }));
-    for (const id of coverage.controls.filter(id => id !== 'copyMenuBtn')) assert(coverage.commands.some(n => n.button === id), 'Command search is missing ' + id);
+    for (const id of coverage.controls.filter(id => id !== 'copyMenuBtn')) assert(coverage.commands.some(n => n.button === (id === 'openBtn' ? 'openLocalMenuBtn' : id)), 'Command search is missing ' + id);
     assert(coverage.commands.find(n => n.button === 'imagesBtn').disabled, 'A command without source support stays disabled');
     await p.run(() => document.getElementById('commandDialog').close());
     for (const [button, dialog] of [['reconcileOpenBtn', 'reconcileDialog'], ['relationsOpenBtn', 'relationsDialog'], ['namedViewOpenBtn', 'namedViewDialog'], ['rowsBtn', 'rowsDialog'], ['freezeBtn', 'freezeDialog'], ['recordCardOpenBtn', 'recordCardDialog'], ['cellDetailBtn', 'detailDialog'], ['taskRecoveryOpenBtn', 'taskRecoveryDialog']]) {
       await command(button); await p.wait(`document.getElementById('${dialog}')?.open`); await p.run(id => document.getElementById(id).close(), dialog);
     }
-    await p.run(() => window.ExcelLensRibbon.select('home'));
+    await p.run(() => document.getElementById('ribbonTabHome').click());
     await command('columnsBtn'); await settled();
     const anchored = await p.run(() => {
       const menu = document.getElementById('columnsMenu').getBoundingClientRect(), button = document.getElementById('columnsBtn').getBoundingClientRect();
-      return {open: !document.getElementById('columnsMenu').hidden, tab: window.ExcelLensRibbon.current, gap: menu.top - button.bottom, offset: Math.abs(menu.left - button.left)};
+      return {open: !document.getElementById('columnsMenu').hidden, tab: document.querySelector('.ribbon-tabs [aria-selected="true"]').dataset.ribbonTab, gap: menu.top - button.bottom, offset: Math.abs(menu.left - button.left)};
     });
     assert(anchored.open && anchored.tab === 'view' && anchored.gap >= 0 && anchored.gap <= 12 && anchored.offset <= 4, 'The column menu opens under its own button: ' + JSON.stringify(anchored));
-    await p.run(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true})); window.ExcelLensRibbon.select('home'); });
+    await p.run(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true})); document.getElementById('ribbonTabHome').click(); });
     report.checks.push('Every tab command is registered in command search; eight open their dialogs; a command on another tab brings its tab forward and anchors its menu to the button');
 
     const open = await p.evaluate('document.querySelector(".grid-region").getBoundingClientRect().height');
@@ -202,7 +202,7 @@ const measure = () => h.page.run(() => {
     report.checks.push('A column menu opened from command search while folded is anchored to its visible button; Escape closes it and restores focus');
     await key('F1', 'F1', 112, 2); await settled();
     assert.equal(await p.evaluate('localStorage.getItem("ExcelLens.ribbonCollapsed")'), '0');
-    await p.run(() => window.ExcelLensRibbon.select('home'));
+    await p.run(() => document.getElementById('ribbonTabHome').click());
     report.checks.push('Ctrl+F1 folds the bar, a tab opens it over the sheet for one command, and the choice is remembered');
 
     await palette();
@@ -232,8 +232,8 @@ const measure = () => h.page.run(() => {
     report.checks.push('Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet');
 
     report.sourceUnchanged = hash(source) === before; assert(report.sourceUnchanged);
-    report.sourceSHA256 = before; report.assets = {};
-    for (const name of ['toolbar.js', 'overlays.js', 'style.css', 'app.js', 'index.html']) report.assets[name] = hash(path.join(root, 'internal/ui/web', name));
+    report.sourceSHA256 = before; report.assets = await config.verifyAssets(h.address, 'style.css');
+    report.assets['index.html'] = hash(path.join(root, 'internal/ui/web/index.html'));
     assert.deepEqual(report.errors, []);
     report.result = 'PASS';
   } catch (error) {

@@ -1,6 +1,6 @@
 # 维护与验证
 
-开发环境使用 `go.mod` 指定的 Go 工具链、Node.js 22+ 和 Git。CI 使用 Node.js 26 LTS 验证前端。Windows 发布另需 UPX。
+开发环境使用 `go.mod` 指定的 Go 工具链、Node.js 22.18+（22.x）或 24+（含 `npm ci` 安装前端开发依赖）和 Git。CI 使用 Node.js 26 LTS 验证前端。Windows 发布另需 UPX。**发布后的单 EXE 运行时不依赖 Node.js 或 npm。**
 
 ## 持续改进接续
 
@@ -18,9 +18,9 @@ go run ./tools/project check
 go run ./tools/project check -report validation/1.8.3/check.json
 ```
 
-`check` 依次校验工具链与版本、Go 格式、包依赖边界、文档链接、发布清单、离线 vendor 依赖、完整 Go 测试、`go vet`、JavaScript 语法与自动回归、生成的函数目录。失败返回非零退出码，发布构建复用同一入口。它不会访问网络、更新依赖或改写代码。
+`check` 依次校验工具链与版本、Go 格式、包依赖边界、文档链接、发布清单、离线 vendor 依赖、完整 Go 测试、`go vet`、前端 TypeScript 严格类型检查 / ESLint / 五层架构校验 / 确定性构建校验与全部单元测试（`npm run check:ui`）、工具脚本语法及生成的函数目录。失败返回非零退出码，发布构建复用同一入口。它不会访问网络、更新依赖或改写代码。修改 `internal/ui/src/` 后需运行 `npm run build:ui` 同步更新 `internal/ui/web/dist/` 产物，详规范见 [前端 TypeScript 架构](docs/development/frontend-typescript.md)。
 
-`go.mod` 的 `ignore` 指令将根目录的 `artifacts/`、`fortest/`、`release/`、`validation/` 排除在 Go 包发现范围之外。这些目录可以在测试和构建期间存放工作簿、浏览器配置和发行件。真实样本测试通过显式文件路径读取输入。
+`go.mod` 的 `ignore` 指令将根目录的 `artifacts/`、`fortest/`、`node_modules/`、`release/`、`validation/` 排除在 Go 包发现范围之外。这些目录可以在测试和构建期间存放工作簿、前端开发依赖、浏览器配置和发行件。真实样本测试通过显式文件路径读取输入。
 
 `fmt` 只格式化 `cmd/`、`internal/`、`tools/` 的 Go 文件。修改计算函数目录或依赖后运行：
 
@@ -48,7 +48,7 @@ Windows竞态检查出现初始化分配失败、错误87，或需要指定MinGW
 
 1. 修改 `internal/buildinfo/version.go` 后执行 `go run ./tools/icon`，一并提交重建的 Windows 资源。同步 README 当前标题，在 `docs/releases/<版本>.md` 记录变更及验证；历史报告保留原版本。
 2. 执行 `build.ps1` 或 `upgrade-build.ps1`。构建脚本从唯一版本源、`go.mod` 和发布清单读取配置；先通过全部检查，再构建、检查 PE、UPX 压缩与校验、逐文件核对 ZIP。
-正式构建会通过隔离服务与无头 Chromium 运行合成基准。开发机需安装 Python 3、Node.js 22+ 及 Chrome，测试工具可通过 `QA_PYTHON`、`QA_CHROME` 指定。用户安装的程序继续独立运行。完整测量含短时滚动和 100 轮回收，规则及复现方法见[发行基准](docs/development/reading-benchmarks.md)。
+正式构建会通过隔离服务与无头 Chromium 运行合成基准。开发机需安装 Python 3、Node.js 22.18+（22.x）或 24+ 及 Chrome，测试工具可通过 `QA_PYTHON`、`QA_CHROME` 指定。用户安装的程序继续独立运行。完整测量含短时滚动和 100 轮回收，规则及复现方法见[发行基准](docs/development/reading-benchmarks.md)。
 
 3. 候选核验使用 `build.ps1 -StageOnly`。完整检查结果写入 `validation/<版本>/private/candidate-check.json`，同版本正式发行的检查收据继续对应正式源码。PE、UPX 和 ZIP 核验通过后，完整候选包位于 `artifacts/<版本>-verified-*`。普通构建全部成功后才原子替换 `release/`。正在运行旧版时会保留已验证包，用户退出托盘后可继续发布。
 4. 不自动提交、推送或公开发布。源码交付需与指定 Git 提交一致；工作树未提交时不能宣称源码包等于 HEAD。

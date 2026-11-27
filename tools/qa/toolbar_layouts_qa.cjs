@@ -99,14 +99,14 @@ async function main() {
     assert.deepEqual(await p.evaluate('window.__copied'),['='+formula,'160.25']);
     report.checks.push('Icon hit targets, hover names, native font selection and separate formula/value clipboard commands work');
     await pointer(p,'#openBtn','right'); await p.wait('!toolbarLayoutMenu.hidden');
-    await pointer(p,'#toolbarLayoutToggle'); await p.wait('window.ExcelLensRibbon.ribbon === true');
+    await pointer(p,'#toolbarLayoutToggle'); await p.wait('document.documentElement.dataset.ribbonLayout==="true"');
     const tabbedTop=await p.evaluate('document.querySelector(".appbar").getBoundingClientRect().height');
     assert(tabbedTop>report.widths[0].top+30); report.tabbedHeight=tabbedTop;
     await pointer(p,'#ribbonTabFormula');
     assert(await p.evaluate('document.querySelector("#ribbonFormula #tracePrecedentsBtn").getClientRects().length>0'));
     await p.run(()=>{window.__oldLayoutPage=true;});
-    await p.call('Page.reload'); await p.wait('!window.__oldLayoutPage && '+ready+' && window.ExcelLensRibbon?.ribbon');
-    h.tray('classic'); await p.wait('window.ExcelLensRibbon?.ribbon === false');
+    await p.call('Page.reload'); await p.wait('!window.__oldLayoutPage && '+ready+' && document.documentElement.dataset.ribbonLayout==="true"');
+    h.tray('classic'); await p.wait('document.documentElement.dataset.ribbonLayout==="false"');
     await p.run(()=>{
       window.__toolbarNodes=['openBtn','fontSelect','tracePrecedentsBtn','copyValueBtn'].map(id=>document.getElementById(id));
       window.__layoutJobs=[];const original=window.fetch;
@@ -117,8 +117,8 @@ async function main() {
     await pointer(p,'[data-command-button="columnsBtn"]'); await p.wait('!columnsMenu.hidden');
     await p.call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
     await p.wait('columnsMenu.hidden');
-    await pointer(p,'#openBtn','right'); await pointer(p,'#toolbarLayoutToggle'); await p.wait('window.ExcelLensRibbon.ribbon');
-    h.tray('classic'); await p.wait('window.ExcelLensRibbon.ribbon === false');
+    await pointer(p,'#openBtn','right'); await pointer(p,'#toolbarLayoutToggle'); await p.wait('document.documentElement.dataset.ribbonLayout==="true"');
+    h.tray('classic'); await p.wait('document.documentElement.dataset.ribbonLayout==="false"');
     assert(await p.evaluate('window.__toolbarNodes.every(n=>document.querySelectorAll("#"+n.id).length===1 && document.getElementById(n.id)===n)'));
     assert.deepEqual(await p.evaluate('window.__layoutJobs'),[]);
     report.checks.push('Header context menu and tray callbacks both switch the same persisted preference; control identity, command search and workbook binding survive the switch without new source jobs');
@@ -129,16 +129,16 @@ async function main() {
       const field=document.getElementById('editGridFormula');
       field.focus(); field.value='尚未确认'; field.dispatchEvent(new InputEvent('input',{bubbles:true}));
     });
-    h.tray('ribbon'); await p.wait('window.ExcelLensRibbon.ribbon');
+    h.tray('ribbon'); await p.wait('document.documentElement.dataset.ribbonLayout==="true"');
     assert(await p.evaluate('document.activeElement===editGridFormula && editGridFormula.value==="尚未确认"'));
     await p.call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
     await p.click('#editGridExit'); await p.wait('!document.body.classList.contains("editing-copy")');
-    h.tray('classic'); await p.wait('!window.ExcelLensRibbon.ribbon');
+    h.tray('classic'); await p.wait('document.documentElement.dataset.ribbonLayout==="false"');
     report.checks.push('A tray layout change keeps an in-progress edit and the active formula field');
     const {targetId}=await p.call('Target.createTarget',{url:h.address});
     const second=await h.connect((await h.tabs()).find(tab=>tab.id===targetId));
     await second.call('Emulation.setDeviceMetricsOverride',{width:1600,height:840,deviceScaleFactor:1,mobile:false});
-    await second.wait('document.readyState==="complete" && window.ExcelLensRibbon?.ribbon===false');
+    await second.wait('document.readyState==="complete" && document.documentElement.dataset.ribbonLayout==="false"');
     await second.file('#fileInput',source); await second.wait(ready);
     await second.call('Page.bringToFront');
     await second.wait('!editCopyOpen.disabled && editCopyOpen.getClientRects().length>0'); await settle(second);

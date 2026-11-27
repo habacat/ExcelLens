@@ -54,7 +54,7 @@ function verify(value,expected,sourceRows){
 }
 (async()=>{try{
   h=await launch({out,errors:report.errors,duration:'12m'});const p=h.page;await p.call('DOM.enable');await p.call('CSS.enable');
-  report.assetSHA256={};for(const name of ['app.js','cellview.js','freeze.js','richtext.js','conditional.js','merges.js','geometry.js','style.css','printing-model.js','printing-render.js','printing.js','printing.css']){const served=await p.run(async name=>await(await fetch('/assets/'+name)).text(),name),sha=createHash('sha256').update(served).digest('hex');assert.equal(sha,hash(path.join(root,'internal','ui','web',name)),name);report.assetSHA256[name]=sha;}
+  report.assetSHA256 = await config.verifyAssets(h.address, 'style.css', 'printing.css');
   await p.run(()=>{window.__presentationCalls=[];const original=window.fetch;window.fetch=function(input,options){window.__presentationCalls.push(new URL(typeof input==='string'?input:input.url,location.href).pathname);return original(input,options);};});
   await open(p,files[0]);const original=await source(p,'呈现');await freeze(p,2,2);
   // D4 is serial 45292 in built-in format 14. Measure its expected regional

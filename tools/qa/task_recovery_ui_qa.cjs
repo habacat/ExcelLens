@@ -67,13 +67,10 @@ async function exportReady(p){await p.wait('document.querySelector("#exportDialo
 try{
   h=await launch({out,errors:report.errors,duration:'12m'});const p=h.page;await p.evaluate('window.ExcelLensWorkbookReady');
   if(assetsOnly){
-    report.assets=[];
-    for(const name of ['task-recovery-model.js','task-recovery.js','task-recovery.css','app.js','export.js','autofilter.js','formats.js','display-format.js']){
-      const response=await fetch(new URL('/assets/'+name,h.address));assert(response.ok);const served=Buffer.from(await response.arrayBuffer()),sha=digest(served);assert.equal(sha,digest(fs.readFileSync(path.join(root,'internal/ui/web',name))));report.assets.push({path:'internal/ui/web/'+name,sha256:sha});
-    }
+    report.assets = Object.entries(await config.verifyAssets(h.address, 'task-recovery.css')).map(([name, sha256]) => ({name, sha256}));
     const text=await(await fetch(h.address)).text(),configuration=JSON.parse(text.match(/<script id="fileFormats" type="application\/json">([^<]+)<\/script>/)[1]);
     const limits=fs.readFileSync(path.join(root,'internal/formats/checkpoint.go'),'utf8');assert.equal(configuration.taskRecovery.tasks,Number(limits.match(/CheckpointTasks\s+=\s+(\d+)/)[1]));assert.equal((await p.api('/api/status')).version,config.version());assert.deepEqual(report.errors,[]);
-    report.checks.push('eight served production assets match current disk SHA256; bootstrap version and injected checkpoint capacity match their single Go sources');report.result='PASS';return;
+    report.checks.push('served production assets match current disk SHA256; bootstrap version and injected checkpoint capacity match their single Go sources');report.result='PASS';return;
   }
   await monitor(p);
   await p.wait('performance.getEntriesByType("resource").some(entry=>new URL(entry.name).pathname==="/api/tasks")');

@@ -51,11 +51,7 @@ async function run(p){const previous=await p.evaluate('window.ExcelLensAnalytics
 async function save(p,title){await p.click('#analysisSaveReport');await p.wait('!!document.querySelector(".ask-dialog[open] input")');await p.run(title=>document.querySelector('.ask-dialog[open] input').value=title,title);await p.click('.ask-dialog[open] [data-yes]');for(let i=0;i<80;i++){const ws=await p.api('/api/analysis/workspace'),item=ws.reports.find(r=>r.name===title);if(item)return item;await pause(50);}throw Error('Saved report did not appear');}
 (async()=>{try{
   h=await launch({out,errors:report.errors,duration:'18m'});const p=h.page;
-  report.assetSHA256={};
-  for(const name of ['analysis-clusters.js','analysis-clusters.css','analytics.js','analysis-jobs.js','app.js']){
-    const served=await p.run(async name=>await(await fetch('/assets/'+name)).text(),name),digest=createHash('sha256').update(served).digest('hex');
-    assert.equal(digest,hash(path.join(root,'internal/ui/web',name)));report.assetSHA256[name]=digest;
-  }
+  report.assetSHA256 = await config.verifyAssets(h.address, 'analysis-clusters.css');
   await p.file('#fileInput',file);await p.wait(gridReady);
   await p.run(()=>{window.qaClusters={starts:[],confirmed:[],held:[],hold:false,failPage:false,alerts:[]};window.alert=s=>window.qaClusters.alerts.push(s);const original=fetch.bind(window);window.fetch=async(url,options)=>{
     const route=String(url),q=window.qaClusters;

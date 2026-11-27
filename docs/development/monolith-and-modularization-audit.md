@@ -15,26 +15,26 @@
 
 ## 一、前端巨石文件与高密度模块
 
-### P0 — 三大单体的第一阶段治理进展
+> **2026-11-27 全面 TypeScript 迁移完成**：全部旧版 `internal/ui/web/*.js`（125 文件）及 `*.test.cjs`（84 文件）已一次性迁移至严格类型检查的 `internal/ui/src/`（139 个生产 TS 模块 + 94 个直接导入 TS 测试文件），并按五层单向 DAG（`contracts -> core -> grid -> {editing, features, analysis} -> app`）彻底拆解 `app.js` 与 `analytics.js` 巨石文件、消除内部 `window.ExcelLens*` 全局命名空间与源码切片测试，经由 `esbuild` 确定性打包为 `internal/ui/web/dist/{app,storage-recovery}.js`。详见 [前端 TypeScript 架构与工程规范](frontend-typescript.md)。
 
-| 文件 | 拆分前 | 拆分后 | 状态与实际拆解结果 |
+### P0 — 原三大单体的演进与 TypeScript 彻底拆解结果
+
+| 原文件 | 拆分前 | TypeScript 迁移后 | 状态与实际拆解结果 |
 | --- | --- | --- | --- |
-| [`internal/ui/web/app.js`](../../internal/ui/web/app.js) | **4,947 行** / 278.3 KB（含 585 行 `bindEvents`） | **3,802 行** / 219.2 KB（净减 **1,145 行**） | **已完成首批 4 个正交控制器抽出**：[`grid-clipboard.js`](../../internal/ui/web/grid-clipboard.js)（317 行，剪贴板/取证/限定地址）、[`grid-context-menu.js`](../../internal/ui/web/grid-context-menu.js)（281 行，弹窗/提示/缩放/全屏/右键菜单）、[`grid-workbook-io.js`](../../internal/ui/web/grid-workbook-io.js)（376 行，工作簿打开/上传/取消与工作表标签选择器）、[`grid-interactions.js`](../../internal/ui/web/grid-interactions.js)（893 行，选区拖拽、键盘导航、`Alt` 功能区键序，并将原 585 行 `bindEvents` 分解为 4 个职责清晰的分组绑定方法）。`app.js` 保留为组合根与虚拟滚动内核（`gridSteps` 及 15 个既有切片测试锚点完好保留，后续按需再拆）。 |
-| [`internal/ui/web/index.html`](../../internal/ui/web/index.html) | **1,533 行** / 163.6 KB（3 个数据库弹窗夹在 `<script>` 段中间） | **1,539 行** / 163.9 KB | **已修复 DOM 结构腐化并加测试守门**：将 `#databaseDialog`、`#databaseSnapshotsDialog`、`#dbSnapshotEvidence` 移回顶部 `<dialog>` 区域，按依赖顺序注册新增的 6 个控制器脚本；在 [`internal/ui/assets_test.go`](../../internal/ui/assets_test.go) 新增 `TestExtractedModulesLoadBeforeBootstrapAndDialogsPrecedeScripts` 强制约束所有 `<dialog>` 位于业务脚本之前且加载次序正确。非首屏弹窗按需挂载留作后续演进项。 |
-| [`internal/ui/web/analytics.js`](../../internal/ui/web/analytics.js) | **1,249 行** / 110.4 KB（90 B/行） | **837 行** / 81.4 KB（净减 **412 行**） | **已完成核心子域三拆**：抽出 [`analytics-dashboard.js`](../../internal/ui/web/analytics-dashboard.js)（286 行，仪表盘卡片懒加载/拖拽重排与模板匹配引擎）和 [`analytics-sheets.js`](../../internal/ui/web/analytics-sheets.js)（739 行，可编辑工作表网格、串行保存队列、草稿重试、撤销重做栈与分页）；并将 [`analysis-drafts.test.cjs`](../../internal/ui/web/analysis-drafts.test.cjs) 从 4 处源码字符串切片升级为直接模块单测，新增 [`analytics-dashboard.test.cjs`](../../internal/ui/web/analytics-dashboard.test.cjs)。 |
+| `internal/ui/web/app.js` | **4,947 行** / 278.3 KB（含 585 行 `bindEvents`） | [`app/main.ts`](../../internal/ui/src/app/main.ts) + [`grid/state.ts`](../../internal/ui/src/grid/state.ts) + [`grid/viewport-pipeline.ts`](../../internal/ui/src/grid/viewport-pipeline.ts) + [`grid/sheet-controller.ts`](../../internal/ui/src/grid/sheet-controller.ts) + [`grid/navigation.ts`](../../internal/ui/src/grid/navigation.ts) + [`grid/grid-clipboard.ts`](../../internal/ui/src/grid/grid-clipboard.ts) / [`grid-context-menu.ts`](../../internal/ui/src/grid/grid-context-menu.ts) / [`grid-workbook-io.ts`](../../internal/ui/src/grid/grid-workbook-io.ts) / [`grid-interactions.ts`](../../internal/ui/src/grid/grid-interactions.ts) | **已完成全面模块化拆解**：组合根、工作簿状态、视口流水线、工作表/筛选控制器、导航、剪贴板、上下文菜单、工作簿 IO、网格交互均独立为严格类型模块；旧版 15 个源码切片测试全部升级为直接导入 TS 模块的单元测试。 |
+| [`internal/ui/web/index.html`](../../internal/ui/web/index.html) | **1,533 行** / 163.6 KB（125 个串行 `<script>` 标签，3 个弹窗夹在脚本段中间） | **1,424 行**（单 `<script src="/assets/app.js">` 入口） | **已完成结构收口与守门**：所有 `<dialog>` 位于业务脚本之前，125 个手排 `<script>` 标签收敛为单一版本化包入口；[`internal/ui/assets_test.go`](../../internal/ui/assets_test.go) 校验单一哈希脚本入口与 `<dialog>` 次序。 |
+| `internal/ui/web/analytics.js` | **1,249 行** / 110.4 KB（90 B/行） | [`analysis/workspace.ts`](../../internal/ui/src/analysis/workspace.ts) + [`analysis/pivot-view.ts`](../../internal/ui/src/analysis/pivot-view.ts) + [`analysis/dashboard.ts`](../../internal/ui/src/analysis/dashboard.ts) + [`analysis/sheets.ts`](../../internal/ui/src/analysis/sheets.ts) | **已完成四域拆解**：分析工作区编排、透视与图表/下钻视图、仪表盘与模板引擎、可编辑分析表独立成模块，旧版字符串切片测试全部替换为直接导入 TS 单测（如 [`drafts.test.ts`](../../internal/ui/src/analysis/drafts.test.ts)、[`dashboard.test.ts`](../../internal/ui/src/analysis/dashboard.test.ts)）。 |
 
-> **测试夹具解耦进展**：已完成 [`analysis-drafts.test.cjs`](../../internal/ui/web/analysis-drafts.test.cjs) 与 [`notifications.test.cjs`](../../internal/ui/web/notifications.test.cjs) 的去切片化升级，新增 [`analytics-dashboard.test.cjs`](../../internal/ui/web/analytics-dashboard.test.cjs) 与 [`grid-controls.test.cjs`](../../internal/ui/web/grid-controls.test.cjs)，扩展 [`calculator.test.cjs`](../../internal/ui/web/calculator.test.cjs) 与 [`internal/server/server_test.go`](../../internal/server/server_test.go) 覆盖新增模块链路。其余 14 个依赖 `app.js`/`analytics.js` 内部辅助函数的存量切片测试全部保持稳定通过，后续再随对应子域迁移。
+### P1 — 暂缓/按需演进的前端模块
 
-### P1 — 暂缓/不建议盲拆的前端模块
-
-| 文件 | 规模 | 字节密度 | 处置策略 |
-| --- | --- | --- | --- |
-| [`internal/ui/web/style.css`](../../internal/ui/web/style.css) | 812 行 / 61.0 KB | 77 B/行 | **明确暂不拆分**：该单文件被 [`virtualscroll.test.cjs`](../../internal/ui/web/virtualscroll.test.cjs) 及 10+ 历史 `tools/qa/*.cjs` 夹具直接读取内联，盲拆收益低且测试破坏面广，保持现状。 |
-| [`internal/ui/web/edit-copy.js`](../../internal/ui/web/edit-copy.js) | 656 行 / 36.7 KB | 57 B/行 | **P1 后续演进**：41 个方法集中在单一类（副本会话管理与单格/批量变更提交），待后续改动编辑副本链路时再分层拆分。 |
-| [`internal/ui/web/search-panel.js`](../../internal/ui/web/search-panel.js) | 583 行 / 27.8 KB | 49 B/行 | **P1 后续演进**：高级 DSL 面板构建器与结果分页/导出可在后续搜索面板改版时拆离。 |
-| [`internal/ui/web/edit-grid.js`](../../internal/ui/web/edit-grid.js) | 553 行 / 28.1 KB | 52 B/行 | **P1 后续演进**：内联编辑器浮层与修订投影逻辑后续按需拆分。 |
-| [`internal/ui/web/dialogs.css`](../../internal/ui/web/dialogs.css) | 401 行 / 35.0 KB | 89 B/行 | **规则收敛**：不再往本文件堆叠新弹窗样式，后续新增弹窗延续 `online-database.css` 的独立文件约定。 |
-| [`internal/ui/web/reconcile.js`](../../internal/ui/web/reconcile.js) / [`relations.js`](../../internal/ui/web/relations.js) / [`calculator.js`](../../internal/ui/web/calculator.js) / [`printing.js`](../../internal/ui/web/printing.js) / [`analytics.css`](../../internal/ui/web/analytics.css) | 173–390 行 / 25–35 KB | **92–162 B/行** | **高密度排版警示**：非逻辑过度膨胀，主要问题为单行多语句压缩排版；在后续触及对应功能时逐步恢复正常分行，不做纯格式化大规模无关 Diff。 |
+| 文件 | 规模 / 位置 | 处置策略 |
+| --- | --- | --- |
+| [`internal/ui/web/style.css`](../../internal/ui/web/style.css) | 812 行 / 61.0 KB | **明确暂不拆分**：被多个单测与 QA 夹具直接引用，盲拆收益低，保持现状。 |
+| [`internal/ui/src/editing/edit-copy.ts`](../../internal/ui/src/editing/edit-copy.ts) | 编辑副本控制器 | **P1 后续演进**：已迁至严格 TypeScript，待后续改动编辑副本链路时再按会话/提交分层拆分。 |
+| [`internal/ui/src/features/search-panel.ts`](../../internal/ui/src/features/search-panel.ts) | 高级搜索面板 | **P1 后续演进**：已迁至严格 TypeScript，DSL 面板构建器与结果分页可在后续改版时拆离。 |
+| [`internal/ui/src/editing/edit-grid.ts`](../../internal/ui/src/editing/edit-grid.ts) | 编辑网格内联浮层 | **P1 后续演进**：已迁至严格 TypeScript，内联编辑器浮层与修订投影逻辑后续按需拆分。 |
+| [`internal/ui/web/dialogs.css`](../../internal/ui/web/dialogs.css) | 401 行 / 35.0 KB | **规则收敛**：不再往本文件堆叠新弹窗样式，后续新增弹窗延续 `online-database.css` 的独立文件约定。 |
+| [`reconcile.ts`](../../internal/ui/src/features/reconcile.ts) / [`relations.ts`](../../internal/ui/src/features/relations.ts) / [`calculator.ts`](../../internal/ui/src/features/calculator.ts) / [`printing.ts`](../../internal/ui/src/features/printing.ts) | 已恢复标准多行 TypeScript 排版 | **高密度排版已治理**：迁移 TypeScript 时已全部恢复清晰的多行结构与严格类型签名。 |
 
 ---
 
@@ -73,7 +73,7 @@
 
 ## 三、巨型单函数热点（≥ 240 行，后续按触达时机治理）
 
-原前端最长单函数 `app.js:bindEvents`（585 行）已在本轮拆分为 [`grid-interactions.js`](../../internal/ui/web/grid-interactions.js) 中的 4 个分组绑定方法。以下热点属于稳定的“大 `switch` 派发”或“单阶段状态机”，暂无缺陷驱动，保留作后续修改触及对应文件时的重构清单：
+原前端最长单函数 `app.js:bindEvents`（585 行）已拆分为 [`grid-interactions.ts`](../../internal/ui/src/grid/grid-interactions.ts) 中的 4 个分组绑定方法，原 `app.js:gridSteps`（324 行）已随 TypeScript 迁移拆入 [`viewport-pipeline.ts`](../../internal/ui/src/grid/viewport-pipeline.ts) 与 [`sheet-controller.ts`](../../internal/ui/src/grid/sheet-controller.ts)。以下热点属于稳定的“大 `switch` 派发”或“单阶段状态机”，暂无缺陷驱动，保留作后续修改触及对应文件时的重构清单：
 
 | 行数 | 位置 | 函数名 | 成因与后续建议 |
 | --- | --- | --- | --- |
@@ -82,7 +82,6 @@
 | **355** | [`internal/workbook/xls_html_document.go`](../../internal/workbook/xls_html_document.go) | `readStyledHTMLTables` | HTML 表格词法状态、合并占位与行发出内联在单循环中。 |
 | **354** | [`internal/editfile/xlsx_sheet.go`](../../internal/editfile/xlsx_sheet.go) | `scanSheet` | XML 令牌循环内同时处理行列、样式继承、共享/数组公式和范围追踪。 |
 | **325** | [`internal/printing/settings.go`](../../internal/printing/settings.go) | `resolve` | 打印区域、分页符、缩放与纸张默认值的多层覆盖规则。 |
-| **324** | [`internal/ui/web/app.js`](../../internal/ui/web/app.js) | `gridSteps` | 虚拟网格核心协程，与 15 个切片单测强相关，需先迁移虚拟滚动测试再拆。 |
 | **322** | [`internal/workbook/scanner.go`](../../internal/workbook/scanner.go) | `scanWorksheetWithSharedHint` | 字节流扫描工作表行偏移、维度、合并与共享公式提示。 |
 | **307** | [`internal/calculator/functions.go`](../../internal/calculator/functions.go) | `scalarFunction` | 标量函数大 `switch` 派发（同类还有 `functions_dates.go:dateFunction`、`functions_math.go:mathFunction`、`functions_text.go:textFunction`）。 |
 | **294** | [`internal/editfile/structure_xml.go`](../../internal/editfile/structure_xml.go) | `editPart` | 行列增删改对公式/合并/表格/验证/筛选等 XML 区域的统一重写循环。 |

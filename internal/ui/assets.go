@@ -17,7 +17,7 @@ import (
 
 // Files embeds the self-contained local browser interface.
 //
-//go:embed web/*.html web/*.js web/*.css web/*.svg
+//go:embed web/*.html web/dist/*.js web/*.css web/*.svg
 var Files embed.FS
 
 // Index injects the same registry used by native entry points. JSON is emitted
@@ -130,14 +130,27 @@ func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, erro
 // The index names the exact bytes it uses. Unversioned URLs (including CSS
 // image references and local clients) revalidate on each use.
 var assetCatalog = sync.OnceValues(func() (map[string]string, *strings.Replacer) {
-	entries, _ := Files.ReadDir("web")
-	tags := make(map[string]string, len(entries))
+	tags := make(map[string]string)
 	var urls []string
-	for _, entry := range entries {
-		name := entry.Name()
-		switch path.Ext(name) {
-		case ".js", ".css", ".svg":
-			data, err := Files.ReadFile("web/" + name)
+	register := func(dir string, allowed ...string) {
+		entries, _ := Files.ReadDir(dir)
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			ext := path.Ext(name)
+			match := false
+			for _, want := range allowed {
+				if ext == want {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+			data, err := Files.ReadFile(dir + "/" + name)
 			if err != nil {
 				continue
 			}
@@ -148,6 +161,8 @@ var assetCatalog = sync.OnceValues(func() (map[string]string, *strings.Replacer)
 			urls = append(urls, url+`"`, url+"?v="+hash+`"`)
 		}
 	}
+	register("web", ".css", ".svg")
+	register("web/dist", ".js")
 	return tags, strings.NewReplacer(urls...)
 })
 
@@ -165,17 +180,21 @@ func ReadAssetWithETag(name string) ([]byte, string, string, error) {
 		return nil, "", "", fs.ErrNotExist
 	}
 	var contentType string
+	var filePath string
 	switch path.Ext(name) {
 	case ".js":
 		contentType = "text/javascript; charset=utf-8"
+		filePath = "web/dist/" + name
 	case ".css":
 		contentType = "text/css; charset=utf-8"
+		filePath = "web/" + name
 	case ".svg":
 		contentType = "image/svg+xml"
+		filePath = "web/" + name
 	default:
 		return nil, "", "", fs.ErrNotExist
 	}
-	data, err := Files.ReadFile("web/" + name)
+	data, err := Files.ReadFile(filePath)
 	if err != nil {
 		return nil, "", "", err
 	}

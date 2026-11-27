@@ -5,6 +5,7 @@ go 1.27.4
 ignore (
 	./artifacts
 	./fortest
+	./node_modules
 	./release
 	./validation
 )
@@ -19,16 +20,16 @@ require (
 	github.com/nwaples/rardecode/v2 v2.4.6
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/ulikunitz/xz v0.5.17
-	go.etcd.io/bbolt v1.4.3
+	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.59.0
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.org/x/sys v0.50.0
 	golang.org/x/text v0.44.0
 )
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/ClickHouse/ch-go v0.75.0 // indirect
+	github.com/ClickHouse/ch-go v0.76.0 // indirect
 	github.com/andybalholm/brotli v1.3.0 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
@@ -41,7 +42,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/puddle/v2 v2.2.3 // indirect
+	github.com/jackc/puddle/v2 v2.2.4 // indirect
 	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/paulmach/orb v0.14.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.34 // indirect

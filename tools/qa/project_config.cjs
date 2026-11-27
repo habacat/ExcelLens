@@ -2,6 +2,7 @@
 // No private data, browser state, or second format registry is read here.
 const fs = require('node:fs');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
 const {execFileSync} = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 
@@ -25,10 +26,19 @@ exports.index = () => {
     cwd: root, encoding: 'utf8', windowsHide: true,
     env: {...process.env, GOTOOLCHAIN:'local', GOPROXY:'off', GOSUMDB:'off', GOFLAGS:'-mod=vendor', CGO_ENABLED:'0'}
   });
-  const page = renderedPage.replace(/(\/assets\/[\w.-]+)\?v=[a-f0-9]{64}(?=")/g, '$1');
-  const formats = fs.readFileSync(path.join(root, 'internal/ui/web/formats.js'), 'utf8');
-  // Legacy about:blank harnesses strip external script tags before installing
-  // their API fixtures. This tiny independent adapter can run immediately.
-  const display=fs.readFileSync(path.join(root,'internal/ui/web/display-format.js'),'utf8');
-  return page.replace('<script src="/assets/formats.js"></script>', '<script>' + formats + '</script>').replace('<script src="/assets/display-format.js"></script>','<script>'+display+'</script>');
+  return renderedPage.replace(/(\/assets\/[\w.-]+)\?v=[a-f0-9]{64}(?=")/g, '$1');
+};
+
+exports.verifyAssets = async (address, ...styles) => {
+  const digests = {};
+  for (const name of ['app.js', ...styles]) {
+    const response = await fetch(new URL('/assets/' + name, address));
+    if (!response.ok) throw Error('Missing embedded asset: ' + name);
+    const actual = createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex');
+    const local = path.join(root, 'internal/ui/web', name === 'app.js' ? 'dist' : '', name);
+    const expected = createHash('sha256').update(fs.readFileSync(local)).digest('hex');
+    if (actual !== expected) throw Error('Stale embedded asset: ' + name);
+    digests[name] = actual;
+  }
+  return digests;
 };

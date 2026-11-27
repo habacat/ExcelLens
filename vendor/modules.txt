@@ -2,7 +2,7 @@
 ## explicit; go 1.24.0
 filippo.io/edwards25519
 filippo.io/edwards25519/field
-# github.com/ClickHouse/ch-go v0.75.0
+# github.com/ClickHouse/ch-go v0.76.0
 ## explicit; go 1.26.0
 github.com/ClickHouse/ch-go/compress
 github.com/ClickHouse/ch-go/proto
@@ -93,7 +93,7 @@ github.com/jackc/pgx/v5/pgproto3
 github.com/jackc/pgx/v5/pgtype
 github.com/jackc/pgx/v5/pgxpool
 github.com/jackc/pgx/v5/stdlib
-# github.com/jackc/puddle/v2 v2.2.3
+# github.com/jackc/puddle/v2 v2.2.4
 ## explicit; go 1.19
 github.com/jackc/puddle/v2
 github.com/jackc/puddle/v2/internal/genstack
@@ -179,8 +179,8 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# go.etcd.io/bbolt v1.4.3
-## explicit; go 1.23
+# go.etcd.io/bbolt v1.5.0
+## explicit; go 1.25.0
 go.etcd.io/bbolt
 go.etcd.io/bbolt/errors
 go.etcd.io/bbolt/internal/common
@@ -209,7 +209,7 @@ golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/md4
-# golang.org/x/net v0.62.0
+# golang.org/x/net v0.63.0
 ## explicit; go 1.26.0
 golang.org/x/net/idna
 # golang.org/x/sync v0.25.0

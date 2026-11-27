@@ -11,15 +11,15 @@ import (
 )
 
 func TestEmbeddedProductionAssetsAndDeniedPaths(t *testing.T) {
-	for _, name := range []string{"cellview.js", "style.css", "icon.svg", "home.css", "home-texture.svg", "home-opening-texture.svg"} {
-		data, mime, err := ReadAsset(name)
-		if err != nil || len(data) == 0 || mime == "" {
-			t.Fatal(name, mime, err)
+	for _, name := range []string{"app.js", "storage-recovery.js", "style.css", "icon.svg", "home.css", "home-texture.svg", "home-opening-texture.svg"} {
+		data, mime, etag, err := ReadAssetWithETag(name)
+		if err != nil || len(data) == 0 || mime == "" || etag == "" {
+			t.Fatal(name, mime, etag, err)
 		}
 	}
-	for _, name := range []string{"", "../web/app.js", "web/app.js", `web\app.js`, "index.html", "calculator.test.cjs"} {
+	for _, name := range []string{"", "../web/dist/app.js", "web/dist/app.js", "dist/app.js", `web\dist\app.js`, "index.html", "calculator.test.cjs", "cellview.js"} {
 		if data, _, err := ReadAsset(name); err == nil || len(data) > 0 {
-			t.Fatal("unsafe path served", name)
+			t.Fatal("unsafe or removed path served", name)
 		}
 	}
 	entries, err := Files.ReadDir("web")
@@ -27,9 +27,17 @@ func TestEmbeddedProductionAssetsAndDeniedPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		if strings.HasSuffix(entry.Name(), ".test.cjs") {
-			t.Fatal("test scripts included in runtime assets")
+		name := entry.Name()
+		if strings.HasSuffix(name, ".js") || strings.HasSuffix(name, ".cjs") {
+			t.Fatalf("legacy script file remained in embedded web root: %s", name)
 		}
+	}
+	distEntries, err := Files.ReadDir("web/dist")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(distEntries) != 2 {
+		t.Fatalf("expected exactly 2 compiled bundles in web/dist, got %d", len(distEntries))
 	}
 }
 
@@ -90,72 +98,40 @@ func TestIndexUsesNativeFormatRegistry(t *testing.T) {
 	}
 }
 
-func TestQuickSelectionControllerLoadsBeforeAppBootstrap(t *testing.T) {
-	page, err := Index("token")
-	if err != nil {
-		t.Fatal(err)
-	}
-	model := strings.Index(string(page), `src="/assets/selection-quick-model.js?v=`)
-	controller := strings.Index(string(page), `src="/assets/selection-quick.js?v=`)
-	app := strings.Index(string(page), `src="/assets/app.js?v=`)
-	if model < 0 || controller <= model || app <= controller {
-		t.Fatal("quick selection constructor must exist when app initializes")
-	}
-}
-
-func TestChartExportModulesLoadBeforeAnalytics(t *testing.T) {
-	page, err := Index("token")
-	if err != nil {
-		t.Fatal(err)
-	}
-	previous := strings.Index(string(page), `src="/assets/analysis-results.js?v=`)
-	for _, name := range []string{"chart-export-model.js", "chart-export-surface.js", "chart-export.js", "analytics.js"} {
-		at := strings.Index(string(page), `src="/assets/`+name+`?v=`)
-		if previous < 0 || at <= previous {
-			t.Fatal("image export module load order", name)
-		}
-		if _, _, err := ReadAsset(name); err != nil {
-			t.Fatal(name, err)
-		}
-		previous = at
-	}
-}
-
-func TestExtractedModulesLoadBeforeBootstrapAndDialogsPrecedeScripts(t *testing.T) {
+func TestIndexLoadsSingleVersionedBundleAfterDialogs(t *testing.T) {
 	pageBytes, err := Index("token")
 	if err != nil {
 		t.Fatal(err)
 	}
 	page := string(pageBytes)
-	appAt := strings.Index(page, `src="/assets/app.js?v=`)
-	if appAt < 0 {
-		t.Fatal("missing app.js")
+	scripts := regexp.MustCompile(`<script src="/assets/([^"]+)">`).FindAllStringSubmatch(page, -1)
+	if len(scripts) != 1 {
+		t.Fatalf("expected exactly 1 asset script tag, got %d: %v", len(scripts), scripts)
 	}
-	for _, name := range []string{"grid-clipboard.js", "grid-context-menu.js", "grid-workbook-io.js", "grid-interactions.js"} {
-		at := strings.Index(page, `src="/assets/`+name+`?v=`)
-		if at < 0 || at >= appAt {
-			t.Fatalf("%s must load before app.js", name)
-		}
-		if _, _, err := ReadAsset(name); err != nil {
-			t.Fatal(name, err)
-		}
-	}
-	analyticsAt := strings.Index(page, `src="/assets/analytics.js?v=`)
-	if analyticsAt < 0 {
-		t.Fatal("missing analytics.js")
-	}
-	for _, name := range []string{"analytics-dashboard.js", "analytics-sheets.js"} {
-		at := strings.Index(page, `src="/assets/`+name+`?v=`)
-		if at < 0 || at >= analyticsAt {
-			t.Fatalf("%s must load before analytics.js", name)
-		}
-		if _, _, err := ReadAsset(name); err != nil {
-			t.Fatal(name, err)
-		}
+	if !regexp.MustCompile(`^app\.js\?v=[a-f0-9]{64}$`).MatchString(scripts[0][1]) {
+		t.Fatalf("unexpected bundle script src: %s", scripts[0][1])
 	}
 	firstScript := strings.Index(page, `<script src="/assets/`)
 	lastDialog := strings.LastIndex(page, `<dialog `)
 	if firstScript < 0 || lastDialog >= firstScript {
 		t.Fatalf("all <dialog> elements must precede asset <script> tags (lastDialog=%d, firstScript=%d)", lastDialog, firstScript)
+	}
+}
+
+func TestRecoveryIndexLoadsSingleVersionedBundle(t *testing.T) {
+	pageBytes, err := RecoveryIndex("recovery-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(pageBytes)
+	if !strings.Contains(page, `content="recovery-token"`) {
+		t.Fatal("recovery token was not injected")
+	}
+	scripts := regexp.MustCompile(`<script src="/assets/([^"]+)">`).FindAllStringSubmatch(page, -1)
+	if len(scripts) != 1 {
+		t.Fatalf("expected exactly 1 recovery asset script tag, got %d: %v", len(scripts), scripts)
+	}
+	if !regexp.MustCompile(`^storage-recovery\.js\?v=[a-f0-9]{64}$`).MatchString(scripts[0][1]) {
+		t.Fatalf("unexpected recovery bundle script src: %s", scripts[0][1])
 	}
 }

@@ -16,6 +16,7 @@
   "docs/CHANGELOG.md",
   "docs/README.md",
   "docs/development/architecture.md",
+  "docs/development/frontend-typescript.md",
   "docs/development/monolith-and-modularization-audit.md",
   "docs/development/xlsb-compatibility.md",
   "docs/development/reading-benchmarks.md",

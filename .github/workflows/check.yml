@@ -28,6 +28,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26.13.1'
+      - run: npm ci
       - run: go run ./tools/project check
       - if: runner.os == 'Linux'
         run: go test -race -count=1 ./...

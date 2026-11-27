@@ -66,7 +66,7 @@ func TestHTMLDocumentArchiveHTTPLayoutFilterAndRecent(t *testing.T) {
 	if result == nil || !reflect.DeepEqual(slices.Collect(result.Rows.Iter()), []int{0, 1, 2, 4}) {
 		t.Fatal("source filter coordinates shifted", result)
 	}
-	featureCall(t, app, "GET", "/assets/merges.js", "")
+	featureCall(t, app, "GET", "/assets/app.js", "")
 	recents := readRecents()
 	if len(recents.Items) != 1 {
 		t.Fatal(recents)

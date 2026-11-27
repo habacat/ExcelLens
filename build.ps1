@@ -122,7 +122,7 @@ try {
     if ($TaggedRelease) {
         # The icon generator has run. Include its tracked Windows resource,
         # embedded assets and untracked inputs in the build provenance check.
-        $inputs = @('cmd','internal','vendor','tools','go.mod','go.sum','build.ps1')
+        $inputs = @('cmd','internal','vendor','tools','go.mod','go.sum','build.ps1','package.json','package-lock.json','tsconfig.json','tsconfig.app.json','eslint.config.mjs')
         & git diff --quiet $taggedCommit -- @inputs
         Assert-Succeeded "Check tracked build inputs against $releaseTag"
         $extras = @(& git ls-files --others --exclude-standard -- @inputs)

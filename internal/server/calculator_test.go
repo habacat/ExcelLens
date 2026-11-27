@@ -96,7 +96,7 @@ func TestCalculatorAssetsAreEmbeddedAndServedWithoutWorkbook(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close()
-	for _, name := range []string{"calculator-model.js", "calculator.js", "calculator.css", "cellview.js"} {
+	for _, name := range []string{"app.js", "calculator.css"} {
 		res := featureCall(t, a, "GET", "/assets/"+name, "")
 		if res.Body.Len() < 500 {
 			t.Fatal("asset missing", name)

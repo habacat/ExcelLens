@@ -60,7 +60,8 @@ async function overlap(kind,label){
   await overlap('cell','second-colored-active');
   report.checks.push('Frozen rows and changing the active colored tab preserve menu hit testing; tabs remain clickable after dismissal');
   report.sourceUnchanged=digest(source)===sourceBefore;assert(report.sourceUnchanged);report.sourceSHA256=sourceBefore;
-  report.assets={};for(const name of ['index.html','style.css','app.js'])report.assets[name]=digest(path.join(root,'internal/ui/web',name));
+  report.assets = await config.verifyAssets(h.address, 'style.css');
+    report.assets['index.html'] = digest(path.join(root, 'internal/ui/web/index.html'));
   assert.deepEqual(report.errors,[]);report.result='PASS';
 }catch(error){report.errors.push(error.stack||String(error));if(h)try{await shot('failure');}catch{}}
 finally{if(h)await h.close();fs.writeFileSync(path.join(base,`context-menu-layering-${phase}.json`),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({result:report.result,phase,checks:report.checks,cases:report.cases,errors:report.errors},null,2));if(report.result!=='PASS')process.exitCode=1;}})();

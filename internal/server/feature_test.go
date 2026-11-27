@@ -237,8 +237,7 @@ func TestFreezeUIAndSearchResultsAreAvailableAsStaticAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	assets := map[string][]string{
-		"/assets/freeze.js":   {"class FrozenPanes", "followScroll", "fetchPart"},
-		"/assets/app.js":      {"searchSession", "searchCache", "goSearchResult", "openFreezeDialog", "applyFreeze", "copySelection", "stepSearch", "recordVisit"},
+		"/assets/app.js":      {"/api/search/", "/api/sheet?", "freezeDialog", "searchDialog", "ExcelLensSession", "ExcelLensPerformance"},
 		"/assets/style.css":   {".freeze-top", ".freeze-left", ".grid-cell.range-cell"},
 		"/assets/dialogs.css": {".search-dialog[open]"},
 	}

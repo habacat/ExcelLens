@@ -1,0 +1,26 @@
+{
+  "name": "excellens-frontend",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.18.0 || >=24.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.app.json --noEmit",
+    "lint": "eslint internal/ui/src --max-warnings=0",
+    "arch:check": "node tools/frontend/check-arch.mjs",
+    "build:ui": "node tools/frontend/build.mjs",
+    "build:ui:check": "node tools/frontend/build.mjs --check",
+    "test:ui": "node tools/frontend/run-tests.mjs",
+    "check:ui": "node tools/frontend/check.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.11",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0"
+  }
+}

@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -132,7 +131,7 @@ func run(args []string) error {
 		{"offline vendored dependency resolution", func() error { return quietCommand(goExe, env, "list", "-deps", "./...") }},
 		{"Go tests", func() error { return command(goExe, env, "test", "-count=1", "./...") }},
 		{"Go vet", func() error { return command(goExe, env, "vet", "./...") }},
-		{"JavaScript syntax and regression tests", func() error { return checkJS(files, env) }},
+		{"Frontend TypeScript typecheck, lint, architecture, bundle and tests", func() error { return checkFrontend(files, env) }},
 		{"generated function catalog", func() error {
 			cmd := exec.Command(goExe, "run", "./tools/formulacatalog")
 			cmd.Env = env
@@ -351,35 +350,29 @@ func checkReleaseFiles() error {
 	return nil
 }
 
-func checkJS(files, env []string) error {
+func checkFrontend(files, env []string) error {
 	node, err := exec.LookPath("node")
 	if err != nil {
-		return errors.New("Node.js 22+ is required for development checks; the released app does not need Node")
+		return errors.New("Node.js 22.18 (22.x) or 24+ is required for development checks; the released app does not need Node")
 	}
-	version, err := exec.Command(node, "--version").Output()
-	if err != nil {
+	if err := command(node, env, filepath.Join("tools", "frontend", "check.mjs")); err != nil {
 		return err
 	}
-	major, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(string(version)), "v"), ".")
-	n, err := strconv.Atoi(major)
-	if err != nil || n < 22 {
-		return fmt.Errorf("Node.js 22+ required, found %s", strings.TrimSpace(string(version)))
-	}
-	var tests []string
+	var legacyTests []string
 	for _, name := range files {
 		ext := filepath.Ext(name)
-		if ext != ".js" && ext != ".cjs" {
+		if ext != ".js" && ext != ".cjs" && ext != ".mjs" {
 			continue
 		}
 		if err := quietCommand(node, env, "--check", name); err != nil {
 			return err
 		}
 		if strings.HasSuffix(name, ".test.cjs") || strings.HasSuffix(name, "_test.cjs") {
-			tests = append(tests, name)
+			legacyTests = append(legacyTests, name)
 		}
 	}
-	if len(tests) == 0 {
-		return errors.New("no JavaScript regression tests found")
+	if len(legacyTests) > 0 {
+		return command(node, env, append([]string{"--test", "--test-reporter=spec"}, legacyTests...)...)
 	}
-	return command(node, env, append([]string{"--test", "--test-reporter=spec"}, tests...)...)
+	return nil
 }

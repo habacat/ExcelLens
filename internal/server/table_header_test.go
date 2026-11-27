@@ -98,7 +98,5 @@ func TestTXTTableHeaderStatusManualHeaderAndFilterCoordinates(t *testing.T) {
 	if err != nil || sha256.Sum256(bytes) != sha256.Sum256(original) {
 		t.Fatal("source modified", err)
 	}
-	for _, asset := range []string{"virtualscroll.js", "tableheaders.js"} {
-		featureCall(t, a, "GET", "/assets/"+asset, "")
-	}
+	featureCall(t, a, "GET", "/assets/app.js", "")
 }

@@ -35,6 +35,8 @@
 | [user/transpose.md](user/transpose.md) | 连续选区的转置阅读、原值/公式状态和原格定位 |
 | [user/comparison-snapshots.md](user/comparison-snapshots.md) | 完成分析的精确快照、小趋势和分类比较 |
 | [user/functions.md](user/functions.md) | 从引擎生成的函数清单 |
+| [development/frontend-typescript.md](development/frontend-typescript.md) | 前端 TypeScript 五层架构、类型契约、构建与测试规范 |
+| [releases/1.20.0.md](releases/1.20.0.md) | 前端 TypeScript 迁移与交互回归 |
 | [development/architecture.md](development/architecture.md) | 包职责、依赖规则和格式接入方式 |
 | [development/xlsb-compatibility.md](development/xlsb-compatibility.md) | BIFF12 解析、网格呈现边界及原生同源样本复现 |
 | [development/reading-benchmarks.md](development/reading-benchmarks.md) | 当前版阅读用时、测试环境及复现方法 |

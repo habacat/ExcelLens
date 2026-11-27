@@ -38,9 +38,7 @@ async function run(p){const old=await p.evaluate('window.quickQA.pages.length');
 async function shot(p,name){await p.wait('[...document.querySelectorAll("dialog[open]")].every(n=>getComputedStyle(n).opacity==="1")');const output=path.join(out,name+'.png');await p.shot(output);report.screenshots.push(path.relative(root,output).split(path.sep).join('/'));}
 (async()=>{try{
   h=await launch({out,errors:report.errors,duration:'15m'});const p=h.page;
-  report.assetSHA256={};for(const name of ['selection-quick-model.js','selection-quick.js','selection-quick.css','app.js','formats.js']){
-    const served=await p.run(async name=>await(await fetch('/assets/'+name)).text(),name),value=createHash('sha256').update(served).digest('hex');assert.equal(value,hash(path.join(root,'internal/ui/web',name)));report.assetSHA256[name]=value;
-  }
+  report.assetSHA256 = await config.verifyAssets(h.address, 'selection-quick.css');
   await p.run(()=>{window.quickQA={requests:[],pages:[],held:[],hold:false,fail:false,alerts:[]};window.alert=s=>window.quickQA.alerts.push(s);const fetchOriginal=window.fetch.bind(window);window.fetch=async(url,init)=>{
     if(String(url)!=='/api/selection/quick')return fetchOriginal(url,init);
     const q=window.quickQA;q.requests.push(JSON.parse(init.body));const response=await fetchOriginal(url,init);if(!response.ok)return response;
