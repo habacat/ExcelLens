@@ -1,0 +1,19 @@
+{
+  "version": "1.20.1",
+  "result": "PASS",
+  "publicCommit": "91019cf0cd600258f931ba359797c9a23c252157",
+  "windowsPackageFiles": 101,
+  "sourcePackageFiles": 3691,
+  "sha256": {
+    "ExcelLens_1.20.1_Windows_x64_Full.zip": "57bebe783432685994bb484d6d40c89a279e75147642af06a0730523463f3cc8",
+    "ExcelLens_1.20.1_Source_Full.zip": "2022d1788ddf603b579cfe2af26c601de6d55a473e5a48909a4e40338d9a7f8b",
+    "ExcelLens_1.20.1_Performance.json": "70f96978e21f0b2b04e9de5499a93d6314d21013c0cc0a8a3cf1b14eef47148f"
+  },
+  "exeSHA256": "155ce647aa93fb4209d96d8ea31ee1423cb0be8094ea37e894c913224d4fa686",
+  "exeBytes": 10048512,
+  "executableVersion": "ExcelLens 1.20.1",
+  "upxIntegrity": "PASS",
+  "cgo": false,
+  "sourceArchiveOfflineRebuildIdentical": true,
+  "nodeModulesPresentDuringOfflineRebuild": false
+}
