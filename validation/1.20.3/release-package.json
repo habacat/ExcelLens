@@ -1,0 +1,14 @@
+{
+  "version": "1.20.3",
+  "result": "PASS",
+  "packagedFilesVerified": 121,
+  "exeBytes": 10048512,
+  "exeSHA256": "5fdf7ccae61223cadb738187a7b20e01e4fa6726ea301bfe9c1a3655ac9f3252",
+  "zipSHA256": "d76c63c26c92f8c27a992d1a5307039935d6252fcacb0947b0e9864fba24ae84",
+  "checks": [
+    "ZIP CRC",
+    "every file equals the release directory",
+    "EXE SHA-256 and PE header",
+    "version"
+  ]
+}

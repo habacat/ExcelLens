@@ -1,0 +1,129 @@
+{
+  "rows": 1000000,
+  "seconds": 25,
+  "scope": "Follow-up on ordinary scrolling. Reused the release readingCases implementation, with a single shared CSV and a fresh isolated service/browser per run. Interleaved execution.",
+  "pairs": [
+    {
+      "order": [
+        "prior",
+        "candidate"
+      ],
+      "prior": {
+        "durationMs": 25031.9,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 1312,
+        "fps": 52.413120857785465,
+        "p95FrameMs": 33.399999999999636,
+        "noCoverageFrames": 0,
+        "emptyFrames": 0
+      },
+      "candidate": {
+        "durationMs": 25035.89999998808,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 900,
+        "fps": 35.948378129023865,
+        "p95FrameMs": 50.10000000000218,
+        "noCoverageFrames": 3,
+        "emptyFrames": 0
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "prior"
+      ],
+      "candidate": {
+        "durationMs": 25009.59999999404,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 951,
+        "fps": 38.02539824708219,
+        "p95FrameMs": 50.099999999999454,
+        "noCoverageFrames": 12,
+        "emptyFrames": 0
+      },
+      "prior": {
+        "durationMs": 25013.80000000298,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 1026,
+        "fps": 41.0173584181483,
+        "p95FrameMs": 50.099999999998545,
+        "noCoverageFrames": 0,
+        "emptyFrames": 0
+      }
+    },
+    {
+      "order": [
+        "prior",
+        "candidate"
+      ],
+      "prior": {
+        "durationMs": 25033.39999999702,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 920,
+        "fps": 36.75090079654021,
+        "p95FrameMs": 50.099999999999454,
+        "noCoverageFrames": 2,
+        "emptyFrames": 0
+      },
+      "candidate": {
+        "durationMs": 25016.30000000298,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 1037,
+        "fps": 41.45297266181955,
+        "p95FrameMs": 50.100000000000364,
+        "noCoverageFrames": 12,
+        "emptyFrames": 0
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "prior"
+      ],
+      "candidate": {
+        "durationMs": 25010.3,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 987,
+        "fps": 39.463740938733245,
+        "p95FrameMs": 50.099999999998545,
+        "noCoverageFrames": 0,
+        "emptyFrames": 0
+      },
+      "prior": {
+        "durationMs": 25001.80000000298,
+        "logicalVelocityPxPerSec": 900,
+        "virtualScrollScale": 1.6667394044661008,
+        "frames": 805,
+        "fps": 32.19768176690894,
+        "p95FrameMs": 51.400000000001455,
+        "noCoverageFrames": 10,
+        "emptyFrames": 0
+      }
+    }
+  ],
+  "sampleSHA256": "b7f66b5d52ebe5bace6d6a0600720835d562b798cd6c854ebf2e1203883fa735",
+  "browser": "Chrome/158.0.8127.88",
+  "medians": {
+    "prior": {
+      "fps": 38.88412960734425,
+      "p95FrameMs": 50.099999999999,
+      "emptyFrames": 0,
+      "noCoverageFrames": 12
+    },
+    "candidate": {
+      "fps": 38.744569592907716,
+      "p95FrameMs": 50.09999999999991,
+      "emptyFrames": 0,
+      "noCoverageFrames": 27
+    }
+  },
+  "cleanup": [],
+  "result": "PASS"
+}
