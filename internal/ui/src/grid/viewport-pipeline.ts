@@ -22,6 +22,7 @@ import { usedBorderWidth } from './grid-borders.ts';
 import type { Pictures } from './images.ts';
 import type { MergedCells } from './merges.ts';
 import { MultiSelection, type SelectionHighlight } from './multi-selection.ts';
+import { hyperlinkVisitKey } from './navigation.ts';
 import {
   paintCrosshairTails,
   paintRangeFrames as paintRangeFrameBoxes,
@@ -296,6 +297,8 @@ export class ViewportPipeline {
       fontStack,
       merge: (row: number, col: number) => this.activeMerge(row, col),
       richLimits: deps.fileFormats.richText,
+      isHyperlinkVisited: (ref: string) =>
+        Boolean(deps.S.sheet && deps.S.visitedHyperlinks.has(hyperlinkVisitKey(deps.S.sheet, ref))),
       numericPadding: (node: HTMLElement) =>
         node.classList.contains('auto-filter-header')
           ? 32
@@ -1403,7 +1406,7 @@ export class ViewportPipeline {
       (data.viewId ?? '') !== request.viewId ||
       (data.filterId ?? '') !== request.filterId
     ) {
-      throw new Error('工作表视口已变化，请重新读取');
+      throw new Error('工作表显示区域已变化，请重新读取');
     }
     if (!withConditional) {
       if (S.showStyles) return undefined;
@@ -2258,7 +2261,6 @@ export class ViewportPipeline {
         const rowHead = document.createElement('div');
         rowHead.className = 'row-head';
         rowHead.textContent = String(rowNumber);
-        rowHead.title = `${rowNumber} · 拖动下边缘调整行高`;
         const grip = document.createElement('span');
         grip.className = 'row-resize-grip';
         this.sizing.bindResizeGrip(grip, 'row', rowNumber);
@@ -2382,6 +2384,7 @@ export class ViewportPipeline {
           !redecorate &&
           !cellData?.richText &&
           !cellData?.conditional &&
+          !cellData?.hyperlink &&
           cell._xlRowPresentationNotice === (rowData?.presentationNotice ?? '') &&
           cell._xlRowStyle === (rowData?.style ?? 0) &&
           cell._xlModel === (cellData ?? null) &&

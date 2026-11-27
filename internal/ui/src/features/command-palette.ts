@@ -184,7 +184,7 @@ export class CommandPalette {
       for (const sheet of this.sheets()) {
         if (sheet.name.toLocaleLowerCase().includes(query)) {
           this.visible.push({
-            name: `打开 Sheet：${sheet.name}`,
+            name: `打开工作表：${sheet.name}`,
             run: () => this.selectSheet(sheet.name),
           });
         }

@@ -282,14 +282,14 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     const rangeLabel = requireEl('exportRangeLabel');
     rangeLabel.textContent =
       activeScope === 'all'
-        ? `${this.s.sheets.length} 个 Sheet`
+        ? `${this.s.sheets.length} 个工作表`
         : activeScope === 'filtered'
           ? `已筛选：${filteredRows.toLocaleString()} 行`
           : activeScope === 'visible'
             ? `${sheet} · 当前可见行`
             : activeScope === 'selection'
               ? `${sheet} · ${range.start}:${range.end}`
-              : `${sheet} · ${this.s.dimension || '已使用区域'}`;
+              : `${sheet} · ${this.s.dimension || '已用区域'}`;
 
     const styleOK = (fmt === 'xlsx' || fmt === 'html') && this.sourceCapabilities().styled;
     stylesEl.disabled = !styleOK;
@@ -306,27 +306,25 @@ export class ExportCenter implements ExportCenterClipboardBridge {
 
     let advisory = '';
     if (activeScope === 'all') {
-      advisory = '导出整本工作簿时，尚未建立索引的 Sheet 会先建立索引；大表可能产生较大的文件。';
+      advisory = '导出整本工作簿会为尚未索引的工作表建立索引，大表可能生成较大文件。';
     } else if (activeScope === 'filtered') {
-      advisory = '导出全部筛选匹配行，包含手动隐藏的行，保持排序。';
+      advisory = '导出全部筛选匹配行（含手动隐藏的行），保持当前排序。';
     } else if (activeScope === 'visible') {
-      advisory = '导出当前可见行，包含可见的冻结标题，保持排序。';
-    } else if (activeScope === 'selection') {
-      advisory = '选区按左上角开始重新排布，不会改变原始工作簿。';
+      advisory = '导出当前可见行（含可见的冻结标题），保持当前排序。';
     }
     if (formulaUnsafe) {
-      advisory += ' 为避免公式引用错位，该范围的 XLSX 只允许导出缓存值。';
+      advisory += ' 为避免公式引用错位，该范围的 XLSX 仅支持导出缓存值。';
     }
     if (fmt === 'html') {
-      advisory += ' HTML 包含单元格颜色等基础样式，限制15万格；完整格式建议使用 XLSX。';
+      advisory += ' HTML 仅包含基础样式且上限为 15 万格；如需完整格式请选择 XLSX。';
     }
     if (fmt === 'jsonl') {
-      advisory += ' JSONL 每行保留来源行号、单元格地址、公式、缓存值及类型，适合程序审计。';
+      advisory += ' 每行输出一条 JSON 记录，包含行号、地址、公式、缓存值与类型。';
     }
     if (modeEl.value === 'formula' && fmt === 'xlsx') {
-      advisory += ' 仅导出指定 Sheet 时，跨表引用可能指向未导出的 Sheet；如需保留依赖，请选择整个工作簿。';
+      advisory += ' 仅导出单个工作表时，跨表公式可能失效；如需保留跨表引用请选择整个工作簿。';
     }
-    requireEl('exportAdvisory').textContent = this.generated ? '' : advisory;
+    requireEl('exportAdvisory').textContent = this.generated ? '' : advisory.trim();
 
     const locked = this.running || this.busy;
     for (const id of CONTROL_IDS) {

@@ -7,6 +7,7 @@ import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireDialog, requireEl } from '../core/dom.ts';
 import type { FrozenPanes } from './freeze.ts';
 import type { Pictures } from './images.ts';
+import { hyperlinkVisitKey, type HyperlinkOrigin } from './navigation.ts';
 import type { ColumnSelectionSpan, WorkbookState } from './state.ts';
 
 export interface SizeContextTarget {
@@ -76,7 +77,10 @@ export interface GridContextMenuActions {
   readonly copyCellEvidence: () => Promise<boolean> | undefined;
   readonly openCopySpecial: () => void;
   readonly filterSelectedValue: () => Promise<void> | void;
-  readonly followCellHyperlink: (link: CellHyperlink | null | undefined) => Promise<void>;
+  readonly followCellHyperlink: (
+    link: CellHyperlink | null | undefined,
+    origin?: HyperlinkOrigin | null,
+  ) => Promise<void>;
   readonly openSearch: (mode?: string | null, query?: string | null) => void;
   readonly tracePrecedents: () => Promise<void> | void;
   readonly openInspector: (mode?: string) => void;
@@ -139,8 +143,10 @@ export class GridControls {
       return;
     }
     const ref = cellEl.dataset.ref ?? '';
-    if (ref !== this.hoverRef || tooltip.hidden) {
-      this.hoverRef = ref;
+    const visited = Boolean(S.sheet && ref && S.visitedHyperlinks.has(hyperlinkVisitKey(S.sheet, ref)));
+    const hoverKey = `${ref}|${visited ? '1' : '0'}`;
+    if (hoverKey !== this.hoverRef || tooltip.hidden) {
+      this.hoverRef = hoverKey;
       const cell: Partial<CellData> =
         S.cellMap.get(ref) ?? S.frozenCellMap.get(ref) ?? { ref, display: '', raw: '' };
       const value = cell.display ?? '';
@@ -152,7 +158,7 @@ export class GridControls {
       if (cell.hyperlink) {
         const hint = document.createElement('span');
         hint.className = 'tooltip-formula tooltip-hyperlink';
-        hint.textContent = `跳转至：${linkDescription(cell.hyperlink)}`;
+        hint.textContent = `跳转至：${linkDescription(cell.hyperlink)}${visited ? '（已访问）' : ''}`;
         content.push(hint);
       }
       if (cell.raw !== undefined && cell.raw !== '' && cell.raw !== value) {
@@ -412,9 +418,11 @@ export class GridControls {
       this.hideCellMenu();
     });
     requireButton('menuOpenHyperlink').addEventListener('click', () => {
-      const link = S.selected?.hyperlink;
+      const selected = S.selected;
+      const link = selected?.hyperlink;
+      const origin = selected ? { sheet: selected.sheet, ref: selected.ref } : null;
       this.hideCellMenu();
-      actions.followCellHyperlink(link).catch((error: unknown) => {
+      actions.followCellHyperlink(link, origin).catch((error: unknown) => {
         this.d.toast(errorMessage(error), 'error');
       });
     });

@@ -48,8 +48,12 @@
 .edit-grid-list-button:not([hidden]) { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; }
 .edit-grid-list-button .icon { width: 13px; height: 13px; }
 .edit-grid-list-button:hover, .edit-grid-list-button[aria-expanded="true"] { color: var(--accent); background: var(--active); }
-.edit-grid-list { z-index: 24; padding: 3px; font: inherit; overflow: auto; box-shadow:var(--shadow-pop); }
-.edit-grid-list option { padding: 3px 6px; }
+.edit-grid-list {
+  z-index: 24; padding: 4px; border-radius: var(--r-3); background: var(--surface);
+  font: inherit; overflow: auto; box-shadow: var(--shadow-pop);
+}
+.edit-grid-list option { padding: 4px 8px; border-radius: var(--r-1); color: var(--ink); cursor: pointer; }
+.edit-grid-list option:checked { background: var(--active); color: var(--accent-strong); font-weight: 600; }
 .editing-copy .grid-region .grid-cell.cut-source::before {
   content:""; position:absolute; inset:0; z-index:7; pointer-events:none;
   border-style:dashed; border-width:var(--cut-edges); border-color:var(--selection-color,#2467a3);

@@ -1,0 +1,91 @@
+{
+  "version": "1.20.2",
+  "result": "PASS",
+  "method": "Isolated Go service and headless Chromium with synthetic workbooks. Each receipt identifies its own run and assets.",
+  "cases": [
+    {
+      "scenario": "ui-controls-hyperlinks-usability-browser",
+      "result": "PASS",
+      "receiptSHA256": "0980b5c66201cb83f57bd86c7b279014b08927a99f699ce77f628c3e9d84887e",
+      "sourceUnchanged": true,
+      "checks": [
+        "calculator removes the redundant compat blurb",
+        "status-bar zoom percentage button resets zoom to 100%",
+        "external and cross-sheet internal hyperlinks switch to visited color in both light and dark reading themes and retain visited state across sheet round-trips",
+        "classic top-right font picker opens a unified base-select themed popover with active highlight on selection",
+        "dialog select, file input and disclosure controls render with unified theme tokens"
+      ]
+    },
+    {
+      "scenario": "toolbar-layouts-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "8cd2da7090920724bcb9c8c5d64b112882802df11cd21ba33b05cf28dabc339f",
+      "sourceUnchanged": true,
+      "checks": [
+        "Classic is the default; desktop, narrow and breakpoint widths preserve one top row, working font and search controls, hit targets and formula space",
+        "Icon hit targets, hover names, native font selection and separate formula/value clipboard commands work",
+        "Header context menu and tray callbacks both switch the same persisted preference; control identity, command search and workbook binding survive the switch without new source jobs",
+        "A tray layout change keeps an in-progress edit and the active formula field",
+        "Clear all caches returns both tabs to home, empties disk cache, preserves source bytes, and reopens the workbook with its leading-zero ID"
+      ]
+    },
+    {
+      "scenario": "toolbar-ribbon-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "9fb393d911bb9d62b3c7fd1b108a60bf3d7e4bbedb6a3bdf3e7d1b755cbad2b3",
+      "sourceUnchanged": true,
+      "checks": [
+        "Eight widths and four pixel ratios: core commands, tabs, command search, workbook name and formula controls fit and receive pointer input without new source tasks",
+        "At 760 px 3 commands fold into the overflow menu and still run",
+        "The 320 px overflow font picker updates the grid and retains the selection; an idle ribbon keeps its overflow state stable over 12 frames",
+        "Resizing the bar itself, independent of the window, recomputes overflow",
+        "Each of the five tabs shows exactly its own panel",
+        "Every tab command is registered in command search; eight open their dialogs; a command on another tab brings its tab forward and anchors its menu to the button",
+        "A column menu opened from command search while folded is anchored to its visible button; Escape closes it and restores focus",
+        "Ctrl+F1 folds the bar, a tab opens it over the sheet for one command, and the choice is remembered",
+        "Compact worksheet tabs page through 80 sheets, with a theme-aware divider between adjacent names",
+        "Keyboard browsing beyond the first sixty entries selects and opens the eightieth worksheet"
+      ]
+    },
+    {
+      "scenario": "cell-explanation-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "8e02b82fa503ba7fbf69ef9f10c16d8cf1b8f86fcea9d2b50fd01370e47e7375",
+      "sourceUnchanged": true,
+      "checks": [
+        "no explanation reads while loading/selecting; explicit toolbar and F2 preserve exact source numbers, native text/identifiers, formula cached/missing/unavailable/error/empty-string states and sparse outside-used blank",
+        "actual successful filter and sort appear in details; 420px light/dark layouts fit without horizontal overflow and resizing performs no source/explanation requests",
+        "actual failed request retries successfully; native Escape cancels a held read, immediate reopen rejects its late numeric reply; equal-content different-path upload closes old details and rejects stale responses",
+        "real CSV imported accounting amount and leading-zero identifier, and real CFB/BIFF8 numeric source use the same detail controller and exact qualification"
+      ]
+    },
+    {
+      "scenario": "clipboard-special-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "0c83805fbb628f6e8570e8a7dbb7331d864643a6d97e546733b151453882c69b",
+      "sourceUnchanged": true,
+      "checks": [
+        "real source controls and system clipboard support TSV with literal HTML text, escaped Markdown and versioned JSON; hidden duplicate headers, huge decimals, leading-zero IDs, formulas and source rows/types survive without writing the source",
+        "missing caches refuse value copying, unavailable shared expressions refuse formula copying while JSON retains their true state; cancelled delayed source responses cannot overwrite a newer copy preview",
+        "real sort and row-hide controls copy only the visible visual order, while an explicitly requested hidden source header remains separate",
+        "preview performs no writes; transposition/skip-empty/header removal save in exactly one atomic batch and undo/redo together; structured JSON pastes exact raw strings, identifiers and multiline text into the independent analysis table",
+        "formula-mode structured paste stores the exact formula as literal text, then undoes to its previous cached value; the readonly source remains unchanged",
+        "JSON numeric primitives are refused; stale revision saves preserve the newer page and retain the complete paste input until explicit target reload; a failed save leaves durable source data intact and the draft can be explicitly retried"
+      ]
+    },
+    {
+      "scenario": "printing-ui-browser",
+      "result": "PASS",
+      "receiptSHA256": "3fd2b36e89b518fc5872a2531579b20b175609a5e4e1f0fe9101afa057d75baf",
+      "sourceUnchanged": true,
+      "checks": [
+        "real main and frozen grids share numeric width markers; double-click auto-fit reads the complete source display and restores the exact amount without changing raw source/type",
+        "seven served asset hashes match current source; opening/indexing perform no print IO; narrow numeric cells use width markers with exact raw/formatted value retained, leading-zero text/rich spans/missing formula cache/hidden exclusion/covered-corner merge perimeter survive; source header definitions remain safe text; screen zoom causes no data/index query",
+        "actual page navigation reaches a later 3000pt-row slice with full source dimensions and negative physical offset, preserving repeated title and real source page numbers",
+        "desktop, 420px and dark layouts keep footer/page controls accessible and paper inside fit viewport; paper and source fills retain original colors",
+        "explicit custom paper/margins/range/fit apply together; failed first-page refresh preserves the accepted paper; cancellation followed by immediate retry cleans a deliberately delayed start without replacing the newer preview",
+        "same-content uploads retain distinct path identity; empty source has no invented A1 page, a hidden merged anchor does not move its text, native BIFF8 uses the same preview and CSV respects the shared capability registry"
+      ]
+    }
+  ]
+}

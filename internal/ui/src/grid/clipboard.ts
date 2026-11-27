@@ -383,7 +383,7 @@ export function validateClipboardChanges<T extends PasteCellChange>(changes: rea
   let bytes = REQUEST_RESERVE;
   for (const change of changes) {
     bytes += changeBytes(change);
-    if (bytes > REQUEST_LIMIT) throw new Error('编辑请求超过2 MiB，请分批粘贴');
+    if (bytes > REQUEST_LIMIT) throw new Error('编辑请求超过 2 MB，请分批粘贴');
   }
   return changes;
 }
@@ -419,7 +419,7 @@ export function parseClipboardTSV(
   } = options;
   const text = rawText ?? '';
   if (text.length > maxTextLength || utf8Length(text) > maxTextLength) {
-    throw new Error('剪贴板内容超过2 MiB，请分批粘贴');
+    throw new Error('剪贴板内容超过 2 MB，请分批粘贴');
   }
   const rows: string[][] = [];
   let row: string[] = [];

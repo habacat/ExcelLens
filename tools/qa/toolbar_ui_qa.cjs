@@ -208,7 +208,7 @@ const measure = () => h.page.run(() => {
     await palette();
     await p.run(() => { const input = document.getElementById('commandSearch'); input.value = '工具测试'; input.dispatchEvent(new Event('input', {bubbles: true})); });
     for (let i = 0; i < 79; i++) await key('ArrowDown', 'ArrowDown', 40);
-    assert.equal(await p.evaluate('document.querySelector("#commandList .active").textContent'), '打开 Sheet：工具测试80');
+    assert.equal(await p.evaluate('document.querySelector("#commandList .active").textContent'), '打开工作表：工具测试80');
     await key('Enter', 'Enter', 13); await p.wait(ready + '&&document.querySelector(".sheet-tab.active").textContent==="工具测试80"');
     await p.wait('sheetTabs.scrollLeft>0 && !sheetPrevBtn.disabled');
     const previous = await p.evaluate('sheetTabs.scrollLeft');

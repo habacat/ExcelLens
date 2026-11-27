@@ -16,6 +16,7 @@ import type { WorkbookIO } from './grid-workbook-io.ts';
 import type { HighlightMode } from './highlight-mode.ts';
 import type { MergedCells } from './merges.ts';
 import { MultiSelection } from './multi-selection.ts';
+import type { HyperlinkOrigin } from './navigation.ts';
 import type { ReadingMode } from './reading-mode.ts';
 import type { GridCellElement, ViewportRequest, WorkbookState } from './state.ts';
 import type { SourcePointHit, TileCache } from './viewport-cache.ts';
@@ -136,7 +137,10 @@ export interface GridInteractionsDeps {
   ) => Promise<void>;
   readonly jumpDataEdge: (direction: 'up' | 'down' | 'left' | 'right', extend?: boolean) => Promise<void>;
   readonly goHistory: (delta: number) => Promise<void>;
-  readonly followCellHyperlink: (link: CellHyperlink | null | undefined) => Promise<void>;
+  readonly followCellHyperlink: (
+    link: CellHyperlink | null | undefined,
+    origin?: HyperlinkOrigin | null,
+  ) => Promise<void>;
   readonly showWelcome: () => void;
   readonly showCellDetail: () => void;
   readonly openCommandPalette: () => void;
@@ -663,8 +667,9 @@ export class GridInteractions {
       return;
     }
     if (ctrl && !alt && !shift && key === 'enter' && gridFocused && !editing && S.selected?.hyperlink) {
-      const link = S.selected.hyperlink;
-      take(() => followCellHyperlink(link));
+      const selected = S.selected;
+      const link = selected.hyperlink;
+      take(() => followCellHyperlink(link, { sheet: selected.sheet, ref: selected.ref }));
       return;
     }
     if (ctrl && !alt && !shift && key === 'o' && !editing) {
@@ -1168,6 +1173,7 @@ export class GridInteractions {
     });
     document.addEventListener('fullscreenchange', () => controls.updateFullscreenButton());
     requireEl('zoomOutBtn').addEventListener('click', () => controls.setZoom(S.zoom - 5));
+    requireEl('zoomValue').addEventListener('click', () => controls.setZoom(100));
     requireEl('zoomInBtn').addEventListener('click', () => controls.setZoom(S.zoom + 5));
     requireEl('retryIndexBtn').addEventListener('click', () => {
       if (S.sheet) void selectSheet(S.sheet);
@@ -1293,9 +1299,11 @@ export class GridInteractions {
         !event.altKey &&
         dataCell.hyperlink
       ) {
-        followCellHyperlink(dataCell.hyperlink).catch((error: unknown) => {
-          toast(errorMessage(error), 'error');
-        });
+        followCellHyperlink(dataCell.hyperlink, { sheet: S.sheet ?? '', ref: parsed.ref }).catch(
+          (error: unknown) => {
+            toast(errorMessage(error), 'error');
+          },
+        );
       }
       if (!calculating) grid.focus({ preventScroll: true });
       requireEl('cellTooltip').hidden = true;
@@ -1341,9 +1349,11 @@ export class GridInteractions {
         !event.altKey &&
         dataCell.hyperlink
       ) {
-        followCellHyperlink(dataCell.hyperlink).catch((error: unknown) => {
-          toast(errorMessage(error), 'error');
-        });
+        followCellHyperlink(dataCell.hyperlink, { sheet: S.sheet ?? '', ref: parsed.ref }).catch(
+          (error: unknown) => {
+            toast(errorMessage(error), 'error');
+          },
+        );
       }
       if (!calculating) grid.focus({ preventScroll: true });
     });

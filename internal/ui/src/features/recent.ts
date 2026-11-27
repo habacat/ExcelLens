@@ -209,7 +209,7 @@ export class RecentWorkbooks {
       btn.append(fileIcon, content, side);
       btn.setAttribute('role', 'button');
       btn.tabIndex = 0;
-      btn.title = item.available ? '点击直接打开' : '文件不在原位置，请重新选择文件';
+      btn.title = item.available ? '' : '文件不在原位置，请重新选择文件';
       frag.appendChild(btn);
     }
     if (!matching.length) {

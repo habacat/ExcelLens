@@ -1325,8 +1325,8 @@ export class AnalysisWorkspace {
       const closeBtn = document.createElement('button');
       closeBtn.type = 'button';
       closeBtn.textContent = '×';
-      closeBtn.title = '收起字段画像';
-      closeBtn.setAttribute('aria-label', '收起字段画像');
+      closeBtn.title = '收起字段统计';
+      closeBtn.setAttribute('aria-label', '收起字段统计');
       closeBtn.onclick = (): void => {
         controller.abort();
         host.hidden = true;
@@ -1817,7 +1817,7 @@ export class AnalysisWorkspace {
       this.state.loadedSheet = data.id;
       this.state.sheetPage = 0;
       void this.setTab('sheets');
-      this.toast('新工作表已保存，可编辑且不会修改源 Excel', 'success');
+      this.toast('已生成编辑工作表', 'success');
     } catch (e: unknown) {
       this.toast(
         getHttpStatus(e) === 404 ? '结果任务已过期，请重新运行分析后保存' : errorMessage(e),
@@ -1840,7 +1840,7 @@ export class AnalysisWorkspace {
     const columnSelected = groupOnly ? this.state.drillColumnSelected : undefined;
     const book = this.state.fingerprint;
     const pathBook = this.state.book;
-    const initial = `${groupOnly ? '下钻明细 ' : '清洗明细 '}${new Date().toLocaleDateString('zh-CN')}`;
+    const initial = `${groupOnly ? '来源明细 ' : '清洗明细 '}${new Date().toLocaleDateString('zh-CN')}`;
     const name = await this.askText('提取可编辑明细', initial, '最多10,000行，保留源行号');
     if (!name || !this.state.opened || book !== this.state.fingerprint || pathBook !== this.state.book) {
       return;

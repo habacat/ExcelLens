@@ -11,7 +11,7 @@ import type { ApiClient } from '../core/transport.ts';
 import type { FrozenPanes } from './freeze.ts';
 import type { MergedCells } from './merges.ts';
 import { MultiSelection, type SelectionHighlight } from './multi-selection.ts';
-import type { ViewportRequest, WorkbookState } from './state.ts';
+import type { GridCellElement, ViewportRequest, WorkbookState } from './state.ts';
 import {
   decodeCellResponse,
   decodeFilterLocateResponse,
@@ -104,6 +104,15 @@ export interface GridNavigationDeps {
   ) => Promise<boolean | undefined>;
   readonly getFrozenPanes: () => FrozenPanes;
   readonly panels: NavigationPanels;
+}
+
+export interface HyperlinkOrigin {
+  readonly sheet: string;
+  readonly ref: string;
+}
+
+export function hyperlinkVisitKey(sheet: string, ref: string): string {
+  return `${sheet}\0${ref}`;
 }
 
 export function linkDescription(link: CellHyperlink | null | undefined): string {
@@ -279,15 +288,54 @@ export class GridNavigation {
     }
   }
 
-  async followCellHyperlink(link: CellHyperlink | null | undefined): Promise<void> {
+  markHyperlinkVisited(origin: HyperlinkOrigin | null | undefined): void {
+    const { S } = this.d;
+    const sheet = origin?.sheet || S.sheet || '';
+    const ref = origin?.ref || '';
+    if (!sheet || !ref) return;
+    S.visitedHyperlinks.add(hyperlinkVisitKey(sheet, ref));
+    const apply = (node: GridCellElement | null | undefined): void => {
+      if (!node?.classList.contains('hyperlink-cell')) return;
+      node.classList.add('hyperlink-visited');
+      node._xlHyperlinkVisited = true;
+    };
+    if (sheet === S.sheet) {
+      for (const row of S.renderedRows.values()) {
+        for (const cell of row._xlCells?.values() ?? []) {
+          if (cell.dataset.ref === ref) apply(cell);
+        }
+      }
+      for (const node of document.querySelectorAll('.pinned-cell.hyperlink-cell')) {
+        if (node instanceof HTMLElement && node.dataset.ref === ref) {
+          apply(node as GridCellElement);
+        }
+      }
+    }
+    const cached = S.sheetViews.get(sheet);
+    if (cached) {
+      for (const row of cached.rows.values()) {
+        for (const cell of row._xlCells?.values() ?? []) {
+          if (cell.dataset.ref === ref) apply(cell);
+        }
+      }
+    }
+  }
+
+  async followCellHyperlink(
+    link: CellHyperlink | null | undefined,
+    origin?: HyperlinkOrigin | null,
+  ): Promise<void> {
     const { S, parseRef, toast } = this.d;
     if (!link) return;
+    const source: HyperlinkOrigin | null =
+      origin ?? (S.selected ? { sheet: S.selected.sheet, ref: S.selected.ref } : null);
     if (link.kind === 'internal') {
       const target = S.sheets.find((item) => item.name === link.sheet);
       if (!target || !parseRef(link.ref) || !link.ref) {
         toast('跳转目标已失效', 'error');
         return;
       }
+      this.markHyperlinkVisited(source);
       await this.navigateToCell(target.name, link.ref);
     } else {
       try {
@@ -299,6 +347,7 @@ export class GridNavigation {
           throw new Error('unsupported');
         }
         window.open(target.href, '_blank', 'noopener,noreferrer');
+        this.markHyperlinkVisited(source);
       } catch {
         toast('不支持该超链接协议', 'warning');
       }

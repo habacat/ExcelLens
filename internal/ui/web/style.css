@@ -38,6 +38,7 @@
   --ok-soft: #e7f5ec;
   --ok-line: #bcdfca;
   --ref: #1c5c96;
+  --hyperlink-visited: #7b3f8c;
   --mark: #d98a1e;
   --mark-soft: color-mix(in srgb, var(--mark) 20%, transparent);
   --scroll-thumb: color-mix(in srgb, var(--muted) 42%, var(--surface));
@@ -211,6 +212,137 @@ dialog :is(.icon-button, .mini-button.icon-mini, .search-tool-button) { width: v
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b8884' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 9.5 5.5 5.5 5.5-5.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 8px center; background-size: 12px;
 }
+:where(select) option, :where(select) optgroup { background-color: var(--surface); color: var(--ink); }
+@supports (appearance: base-select) {
+  select:not([size]):not([multiple]) {
+    appearance: base-select;
+    align-items: center;
+    gap: 6px;
+    padding-inline-end: 8px;
+    background-image: none;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  select:not([size]):not([multiple])::picker-icon {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin-inline-start: auto;
+    border-right: 1.6px solid var(--muted);
+    border-bottom: 1.6px solid var(--muted);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform var(--motion-fast, 110ms) ease;
+  }
+  select:not([size]):not([multiple]):open::picker-icon { transform: translateY(1.5px) rotate(-135deg); }
+  select:not([size]):not([multiple])::picker(select) {
+    appearance: base-select;
+    box-sizing: border-box;
+    min-inline-size: max(anchor-size(width), 148px);
+    max-inline-size: min(360px, calc(100vw - 16px));
+    max-block-size: min(320px, 50dvh);
+    margin-block: 4px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-pop);
+    font: var(--fs-3)/1.45 var(--font-ui);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+  select:not([size]):not([multiple]) option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: var(--r-1);
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--fs-3);
+    line-height: 1.35;
+    cursor: pointer;
+  }
+  select:not([size]):not([multiple]) option::checkmark {
+    content: "✓";
+    flex: none;
+    width: 14px;
+    color: var(--accent);
+    font-size: var(--fs-2);
+    font-weight: 700;
+    text-align: center;
+  }
+  select:not([size]):not([multiple]) option:not(:checked)::checkmark { visibility: hidden; }
+  select:not([size]):not([multiple]) option:is(:hover, :focus-visible) {
+    background: var(--active);
+    color: var(--accent-strong);
+    outline: none;
+  }
+  select:not([size]):not([multiple]) option:checked {
+    background: var(--active);
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  select:not([size]):not([multiple]) option:disabled { color: var(--faint); cursor: default; }
+  select:not([size]):not([multiple]) optgroup {
+    padding: 4px 0 2px;
+    color: var(--muted);
+    font-size: var(--fs-2);
+    font-weight: 600;
+  }
+  select:not([size]):not([multiple]) optgroup legend {
+    padding: 3px 10px 4px;
+    color: var(--muted);
+    font-size: var(--fs-1);
+    font-weight: 600;
+  }
+}
+/* Unified native file, progress, search-clear, date and disclosure controls. */
+:where(dialog) input[type="file"] {
+  min-width: 0; max-width: 100%; padding: 4px 8px;
+  border: 1px solid var(--line); border-radius: var(--r-2);
+  background: var(--surface); color: var(--muted); font-size: var(--fs-2); line-height: 1.4; cursor: pointer;
+}
+:where(dialog) input[type="file"]:hover { border-color: var(--line-strong); }
+:where(dialog) input[type="file"]::file-selector-button {
+  height: var(--ctl-s); margin: 0 8px 0 0; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-1);
+  background: var(--inset); color: var(--ink); font: var(--fs-2) var(--font-ui); cursor: pointer;
+}
+:where(dialog) input[type="file"]::file-selector-button:hover { border-color: var(--line-strong); background: var(--hover); }
+progress {
+  appearance: none; overflow: hidden; height: 5px; border: 0; border-radius: 4px;
+  background: var(--line-soft); color: var(--accent);
+}
+progress::-webkit-progress-bar { border-radius: 4px; background: var(--line-soft); }
+progress::-webkit-progress-value { border-radius: 4px; background: var(--accent); transition: width .12s linear; }
+progress::-moz-progress-bar { border-radius: 4px; background: var(--accent); }
+input[type="search"]::-webkit-search-cancel-button {
+  appearance: none; width: 14px; height: 14px; margin-left: 4px; border-radius: 50%; cursor: pointer;
+  background-color: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath stroke='%23000' stroke-width='1.8' stroke-linecap='round' d='M4.5 4.5l7 7m0-7l-7 7'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+input[type="search"]::-webkit-search-cancel-button:hover { background-color: var(--ink); }
+input:is([type="date"], [type="datetime-local"])::-webkit-calendar-picker-indicator {
+  padding: 2px; border-radius: var(--r-1); opacity: .72; cursor: pointer;
+}
+input:is([type="date"], [type="datetime-local"])::-webkit-calendar-picker-indicator:hover { opacity: 1; background: var(--hover); }
+:where(dialog) details > summary {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 2px; border-radius: var(--r-1);
+  list-style: none; cursor: pointer; user-select: none;
+}
+:where(dialog) details > summary::-webkit-details-marker { display: none; }
+:where(dialog) details > summary::before {
+  content: ""; flex: none; width: 6px; height: 6px; margin-inline: 3px 1px;
+  border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg); transition: transform var(--motion-fast, 110ms) ease;
+}
+:where(dialog) details[open] > summary::before { transform: translateY(-1px) rotate(45deg); }
+:where(dialog) details > summary:hover { background: var(--hover); }
 .field-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; margin-bottom: 10px; }
 .field-row label { color: var(--muted); font-size: var(--fs-2); }
 .task-progress-choice { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-2); white-space: nowrap; cursor: pointer; }
@@ -441,9 +573,20 @@ body.editing-copy .brand-area { flex: 1 1 auto; max-width: none; margin-right: 0
 .classic-after kbd, #copyMenu .icon { display: none; }
 .classic-after .ribbon-field { position: relative; border-radius: var(--r-2); }
 .classic-after .ribbon-field:hover { background: var(--hover); color: var(--ink); }
+.classic-after .ribbon-field.is-active { background: var(--active); color: var(--accent-strong); }
 .classic-after .ribbon-field:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* The native picker covers the font icon and keeps its popup and keyboard controls. */
 .classic-after .font-picker { position: absolute; inset: 0; width: 100%; opacity: 0; }
+@supports (appearance: base-select) {
+  .classic-after .ribbon-field:has(.font-picker:open) { background: var(--active); color: var(--accent-strong); }
+  .classic-after .font-picker {
+    height: 100%; min-width: 0; padding: 0; border-color: transparent; background: transparent;
+    color: transparent; font-size: 0; box-shadow: none; opacity: 1; caret-color: transparent;
+  }
+  .classic-after .font-picker:is(:hover, :focus, :open) { border-color: transparent; background: transparent; box-shadow: none; }
+  .classic-after .font-picker::picker-icon { display: none; }
+  .classic-after .font-picker::picker(select) { min-inline-size: 168px; color: var(--ink); font-size: var(--fs-3); }
+}
 body.editing-copy .titlebar > .classic-actions { display: none; }
 :root[data-ribbon-layout="false"] body.editing-copy .brand-area { max-width: none; }
 @container app-tools (max-width: 900px) {
@@ -586,7 +729,11 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 :is(.zoom-button, .reading-mode-button) .icon { width: 14px; height: 14px; }
 :is(.zoom-button, .reading-mode-button):is(:hover, :focus-visible) { background: var(--hover); color: var(--ink); }
 .reading-mode-button.is-active { background: var(--active); color: var(--accent-strong); }
-.zoom-value { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+.zoom-value {
+  min-width: 40px; height: 20px; padding: 0 4px; border: 0; border-radius: var(--r-1);
+  background: transparent; color: inherit; text-align: center; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.zoom-value:is(:hover, :focus-visible) { background: var(--hover); color: var(--ink); }
 @media (max-width: 1080px) { .freeze-status { display: none; } }
 @media (max-width: 700px) { .crosshair-toggle span, .quick-stats { display: none; } }
 
@@ -777,8 +924,10 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .worksheet-picture.picture-load-failed { background: var(--inset); outline: 1px dashed var(--line-strong); }
 .worksheet-picture.picture-load-failed::after { content: '无法预览'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--muted); }
 /* Source workbook links without DOM <a> navigation or layout changes. */
-.grid-region .grid-cell.hyperlink-cell { cursor: pointer; text-decoration: underline; text-decoration-thickness: .6px; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, currentColor 62%, transparent); }
+.grid-region .grid-cell.hyperlink-cell { cursor: pointer; color: var(--xl-color, var(--ref)); text-decoration: underline; text-decoration-thickness: .6px; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, currentColor 62%, transparent); }
 .grid-region .grid-cell.hyperlink-cell:hover { text-decoration-color: currentColor; }
+.grid-region .grid-cell.hyperlink-cell.hyperlink-visited:not(.formula-view-cell),
+.grid-region .grid-cell.hyperlink-cell.hyperlink-visited:not(.formula-view-cell) .cell-rich-text > span { color: var(--hyperlink-visited); --rich-ink: var(--hyperlink-visited); }
 .grid-region .grid-cell.rich-text-cell { text-decoration: none; }
 .cell-rich-text { display: inline-block; flex: none; max-width: none; white-space: inherit; line-height: inherit; }
 .grid-cell.rich-text-notice, .grid-cell.cell-presentation-notice { text-decoration: underline dotted var(--mark); text-underline-offset: 3px; }

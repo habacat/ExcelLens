@@ -134,7 +134,7 @@ export class Pictures {
     const countEl = btn.querySelector('.image-count');
     if (countEl) countEl.textContent = String(this.items.length);
     btn.setAttribute('aria-pressed', String(this.enabled));
-    btn.title = `工作表共有 ${this.items.length} 张图片；单击此按钮显示或隐藏图片`;
+    btn.title = `图片（${this.items.length} 张）`;
     this.schedule();
   }
 

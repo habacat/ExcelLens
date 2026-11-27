@@ -445,9 +445,7 @@ export class FormulaInspector {
       const label = this.expanded ? '收起公式栏' : '展开公式栏';
       this.expandButton.setAttribute('aria-expanded', String(this.expanded));
       this.expandButton.setAttribute('aria-label', label);
-      this.expandButton.title = this.expanded
-        ? '收起公式栏（单行显示）'
-        : '展开公式栏（长公式换行显示）';
+      this.expandButton.title = label;
     }
     this.el.scrollTop = 0;
     this.el.scrollLeft = 0;

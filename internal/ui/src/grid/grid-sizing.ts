@@ -108,10 +108,7 @@ export class GridSizing {
 
   bindResizeGrip(grip: HTMLElement, kind: 'row' | 'col', index: number): void {
     const { S, colName, toast } = this.d;
-    grip.title =
-      kind === 'row'
-        ? `拖动调整第 ${index} 行高度；双击按内容自动适应`
-        : `拖动调整 ${colName(index)} 列宽度；双击抽样全部数据自动适应`;
+    grip.title = kind === 'row' ? `调整第 ${index} 行高度` : `调整 ${colName(index)} 列宽度`;
     grip.addEventListener('pointerdown', (event: PointerEvent) => {
       if (event.button !== 0) return;
       if (kind === 'row' && S.filtered) {

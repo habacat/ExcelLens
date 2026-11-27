@@ -32,9 +32,9 @@ const FILTER_OPERATIONS: readonly (readonly [AnalysisFilterOp, string])[] = Obje
   ['startswith', '开头是'] as const,
   ['endswith', '结尾是'] as const,
   ['gt', '大于'] as const,
-  ['gte', '不小于'] as const,
+  ['gte', '大于等于'] as const,
   ['lt', '小于'] as const,
-  ['lte', '不大于'] as const,
+  ['lte', '小于等于'] as const,
   ['between', '在区间内'] as const,
   ['in', '多值匹配'] as const,
   ['blank', '为空'] as const,
@@ -308,8 +308,8 @@ export class QueryEditor {
           const info = document.createElement('button');
           info.type = 'button';
           info.className = 'analysis-field-info-btn';
-          info.title = '查看字段画像与常见值';
-          info.setAttribute('aria-label', `查看字段画像：${field.name}`);
+          info.title = '查看字段统计与常见值';
+          info.setAttribute('aria-label', `查看字段统计：${field.name}`);
           info.innerHTML = icon('info', 'icon icon-small');
           info.onclick = (): void => {
             void this.loadFieldProfile(sourceField);

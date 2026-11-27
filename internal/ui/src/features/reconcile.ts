@@ -1028,7 +1028,7 @@ export class Reconcile {
       if (kind === 'fields' && pair.mode === 'number') {
         const tolInput = row.querySelector('.reconcile-tolerance');
         const text = tolInput instanceof HTMLInputElement ? tolInput.value.trim() : '';
-        if (text && !decimalTolerance(text)) throw new Error('金额容差须填写非负十进制数');
+        if (text && !decimalTolerance(text)) throw new Error('金额容差须填写非负数字');
         if (text) pair.tolerance = text;
       }
       return pair;

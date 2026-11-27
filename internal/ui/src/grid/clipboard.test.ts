@@ -191,7 +191,7 @@ test('malformed or excessive clipboard data is refused before building any edits
   assert.throws(() => parseClipboardTSV('a\tb', { maxCols: 1 }), /1列/);
   assert.throws(() => parseClipboardTSV('a\nb\nc', { maxRows: 2 }), /2行/);
   assert.throws(() => parseClipboardTSV('a\tb\nc\td', { maxCells: 3 }), /3个单元格/);
-  assert.throws(() => parseClipboardTSV('a'.repeat(2 * 1024 * 1024 + 1)), /2 MiB/);
+  assert.throws(() => parseClipboardTSV('a'.repeat(2 * 1024 * 1024 + 1)), /2 MB/);
 });
 
 test('4000 Unicode characters fit a cell regardless of UTF-8 bytes or UTF-16 pairs', () => {
@@ -211,11 +211,11 @@ test('4000 Unicode characters fit a cell regardless of UTF-8 bytes or UTF-16 pai
 test('paste is atomic under UTF-8 and JSON request budgets; explicit retries may form bounded batches', () => {
   const unicode = Array<string>(180).fill('文'.repeat(4000)).join('\n');
   assert.ok(unicode.length < 2 * 1024 * 1024);
-  assert.throws(() => parseClipboardTSV(unicode), /2 MiB/);
+  assert.throws(() => parseClipboardTSV(unicode), /2 MB/);
   const escaped = Array<string>(90).fill('\u0001'.repeat(4000)).join('\n');
   assert.throws(
     () => pasteChangesFromTSV(escaped, { startRow: 0, startCol: 0, columns: 1 }),
-    /请求超过2 MiB/,
+    /请求超过 2 MB/,
   );
   const changes = Array.from({ length: 200 }, (_, row) => ({
     row,

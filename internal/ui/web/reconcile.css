@@ -13,7 +13,8 @@
 .reconcile-mapping-title{padding:12px 0 6px}.reconcile-mapping-title button{margin-left:auto}
 .reconcile-mappings{display:flex;flex-direction:column;gap:5px}.reconcile-mapping{display:grid;grid-template-columns:minmax(110px,1fr) minmax(110px,1fr) 148px auto auto 28px;gap:7px;align-items:center}
 .reconcile-mapping input.field-control{min-width:0;width:100%}.reconcile-mapping label{display:flex;gap:4px;align-items:center;white-space:nowrap;font-size:var(--fs-2)}.reconcile-mapping input[type=checkbox]{width:12px;height:12px}
-.reconcile-mapping button{grid-column:-2;border:1px solid var(--line);background:transparent;color:inherit;min-height:29px;border-radius:var(--r-1)}
+.reconcile-mapping button{grid-column:-2;border:0;background:transparent;color:var(--faint);min-height:29px;border-radius:var(--r-2);font-size:16px;line-height:1;cursor:pointer}
+.reconcile-mapping button:hover{background:var(--danger-soft);color:var(--danger)}
 .reconcile-run-tools{padding:13px 0}.reconcile-run-tools>label,.reconcile-result-heading>label{display:flex;gap:5px;align-items:center;font-size:var(--fs-2)}
 .reconcile-progress{border-left:3px solid var(--accent);padding:8px 10px;background:var(--active);margin:2px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .reconcile-progress.is-error{border-left-color:var(--danger)}

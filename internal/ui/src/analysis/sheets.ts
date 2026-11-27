@@ -253,7 +253,7 @@ export class AnalysisSheetsController {
       state.sheetPage = 0;
       await refreshWorkspace();
       void setTab('sheets');
-      toast('已新建工作表，所有改动独立保存', 'success');
+      toast('已新建工作表', 'success');
     } catch (err: unknown) {
       toast(errorMessage(err), 'error');
     }
@@ -550,7 +550,7 @@ export class AnalysisSheetsController {
         const th = document.createElement('th');
         const input = document.createElement('input');
         input.value = name;
-        input.title = '编辑列名，失焦后保存';
+        input.title = '点击编辑列名，完成后自动保存';
         input.addEventListener('change', () => {
           const cols = [...data.columns];
           const trimmed = input.value.trim();

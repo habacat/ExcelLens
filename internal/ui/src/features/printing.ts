@@ -82,8 +82,8 @@ function isAbortError(error: unknown): boolean {
 const ORIGIN_LABELS: Readonly<Record<string, string>> = {
   source: '源设置',
   'preview-override': '本次覆盖',
-  'preview-default': '预览缺省',
-  'schema-default': '格式缺省',
+  'preview-default': '预览默认',
+  'schema-default': '格式默认',
   'indexed-data-range': '源数据范围',
   'office-compatible-source': '源手工分页',
 };
@@ -266,17 +266,17 @@ export class Printing {
     d.setAttribute('aria-labelledby', 'printPreviewTitle');
     d.innerHTML = `<div class="dialog-head"><div id="printPreviewTitle" class="dialog-title">分页预览</div><button id="printPreviewClose" class="dialog-close" type="button" aria-label="关闭分页预览">×</button></div>
         <p id="printPreviewSource" class="print-source"></p><div class="print-main"><details id="printSettings" class="print-settings" open><summary>页面设置</summary><form id="printSettingsForm">
-        <label>纸张<select id="printPaper" class="field-control"><option value="source">按源设置</option><option value="a4">A4</option><option value="a3">A3</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="custom">自定义尺寸</option></select></label>
+        <label>纸张<select id="printPaper" class="field-control"><option value="source">按原表设置</option><option value="a4">A4</option><option value="a3">A3</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="custom">自定义尺寸</option></select></label>
         <div id="printCustomPaper" class="print-pair" hidden><label>宽（mm）<input id="printPaperWidth" class="field-control" value="210" inputmode="decimal"></label><label>高（mm）<input id="printPaperHeight" class="field-control" value="297" inputmode="decimal"></label></div>
-        <label>方向<select id="printOrientation" class="field-control"><option value="">按源设置</option><option value="portrait">纵向</option><option value="landscape">横向</option></select></label>
-        <label>打印缩放<select id="printScaleMode" class="field-control"><option value="source">按源设置</option><option value="percent">指定比例</option><option value="fit">适配页数</option></select></label>
+        <label>方向<select id="printOrientation" class="field-control"><option value="">按原表设置</option><option value="portrait">纵向</option><option value="landscape">横向</option></select></label>
+        <label>打印缩放<select id="printScaleMode" class="field-control"><option value="source">按原表设置</option><option value="percent">指定比例</option><option value="fit">适配页数</option></select></label>
         <label id="printPercentRow" hidden>比例（%）<input id="printPercent" class="field-control" value="100" inputmode="decimal"></label>
         <div id="printFitRow" class="print-pair" hidden><label>横向页数<input id="printFitWidth" class="field-control" value="1" inputmode="numeric"></label><label>纵向页数<input id="printFitHeight" class="field-control" value="0" inputmode="numeric"></label><small>0 表示该方向不限。</small></div>
         <label>打印区域<input id="printArea" class="field-control" placeholder="A1:H50, J1:L50（留空按原表）" autocomplete="off"></label>
-        <details class="print-advanced"><summary>更多页面设置</summary><label>重复行<input id="printRepeatRows" class="field-control" placeholder="留空按源，如 1:2"></label><label class="print-toggle"><input id="printClearRepeatRows" type="checkbox">不重复行</label><label>重复列<input id="printRepeatColumns" class="field-control" placeholder="留空按源，如 A:B"></label><label class="print-toggle"><input id="printClearRepeatColumns" type="checkbox">不重复列</label>
-        <label>页边距<select id="printMarginMode" class="field-control"><option value="source">按源设置</option><option value="custom">自定义（mm）</option></select></label><div id="printMargins" class="print-pair" hidden></div>
-        <label>页序<select id="printPageOrder" class="field-control"><option value="">按源设置</option><option value="downThenOver">先向下，后向右</option><option value="overThenDown">先向右，后向下</option></select></label><label>起始页码<input id="printFirstPage" class="field-control" placeholder="留空按源" inputmode="numeric"></label>
-        <div class="print-pair"><label>缺省行高（磅）<input id="printRowHeight" class="field-control" placeholder="留空按源" inputmode="decimal"></label><label>缺省列宽（磅）<input id="printColumnWidth" class="field-control" placeholder="留空按源" inputmode="decimal"></label></div><label class="print-toggle"><input id="printIgnoreBreaks" type="checkbox">忽略源手工分页</label></details>
+        <details class="print-advanced"><summary>更多页面设置</summary><label>重复行<input id="printRepeatRows" class="field-control" placeholder="留空按原表，如 1:2"></label><label class="print-toggle"><input id="printClearRepeatRows" type="checkbox">不重复行</label><label>重复列<input id="printRepeatColumns" class="field-control" placeholder="留空按原表，如 A:B"></label><label class="print-toggle"><input id="printClearRepeatColumns" type="checkbox">不重复列</label>
+        <label>页边距<select id="printMarginMode" class="field-control"><option value="source">按原表设置</option><option value="custom">自定义（mm）</option></select></label><div id="printMargins" class="print-pair" hidden></div>
+        <label>页序<select id="printPageOrder" class="field-control"><option value="">按原表设置</option><option value="downThenOver">先向下，后向右</option><option value="overThenDown">先向右，后向下</option></select></label><label>起始页码<input id="printFirstPage" class="field-control" placeholder="留空按原表" inputmode="numeric"></label>
+        <div class="print-pair"><label>默认行高（磅）<input id="printRowHeight" class="field-control" placeholder="留空按原表" inputmode="decimal"></label><label>默认列宽（磅）<input id="printColumnWidth" class="field-control" placeholder="留空按原表" inputmode="decimal"></label></div><label class="print-toggle"><input id="printIgnoreBreaks" type="checkbox">忽略原表手工分页</label></details>
         <label class="print-toggle"><input id="printUseDefaults" type="checkbox" checked>补足缺失的页面设置</label><button id="printPreviewUpdate" class="primary-button" type="button">更新预览</button><p id="printPendingNote" class="print-pending" hidden>设置已更改，点击更新预览。</p></form></details>
         <section class="print-view"><div class="print-page-tools"><button id="printPreviewPrev" class="mini-button" type="button" aria-label="上一页">上一页</button><label class="print-page-number">第<input id="printPreviewPage" class="field-control" type="number" min="1" value="1" aria-label="预览页序">页<span id="printPreviewCount">/ 0</span></label><button id="printPreviewNext" class="mini-button" type="button" aria-label="下一页">下一页</button><label class="print-screen-zoom">屏幕缩放<select id="printScreenZoom" class="field-control"><option value="fit">适合页面</option><option value="width">适合宽度</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div><p id="printEffective" class="print-effective"></p><div id="printPreviewCanvas" class="print-canvas" tabindex="0" aria-label="纸张预览，PageUp和PageDown翻页"><div id="printPaperWrap" class="print-paper-wrap"></div><p id="printPreviewEmpty" class="print-empty">正在准备预览…</p></div><p id="printPageCaption" class="print-caption"></p></section></div>
         <details id="printSourceDetails" class="print-source-details"><summary>页面详情</summary><ul id="printWarnings"></ul><div id="printRawSettings"></div></details><div class="print-footer"><select id="printOutputMode" class="field-control" aria-label="底稿页段"><option value="current">当前页</option><option value="range">指定页段</option><option value="sheet">本表全部页</option><option value="book">整本可见表</option></select><input id="printOutputRange" class="field-control" placeholder="1-3,5" aria-label="底稿页段范围" hidden><button id="printOutput" class="mini-button" type="button">导出打印底稿</button><p id="printPreviewStatus" role="status"></p><button id="printPreviewCancel" class="mini-button" type="button" hidden>取消</button></div>`;
@@ -705,7 +705,7 @@ export class Printing {
             const rendered = this.renderer.build(summary, page);
             const notes = [...summary.summary.notices, ...(summary.sourceNotices ?? [])];
             if (!summary.sourceComplete || summary.summary.approximate) {
-              notes.push('部分页面设置采用缺省或近似值。');
+              notes.push('部分页面设置采用默认值或近似值。');
             }
             if (
               Object.values(summary.sourceProperties.headerFooter ?? {}).some(

@@ -329,7 +329,7 @@ export class AnalysisPivotView {
         ? '百分比'
         : metric.aggregate === 'count' || metric.aggregate === 'distinct'
           ? '个'
-          : '源指标原单位（未换算）',
+          : '原始单位',
       current,
       notify: toast,
     });
@@ -392,13 +392,6 @@ export class AnalysisPivotView {
     if (result.truncated) alerts.push('仅显示排名前 N 项，合计仍为全量结果');
     const cmpScope = comparisonScope(q);
     if (cmpScope) alerts.push(cmpScope);
-    if (
-      result.rows.some((row) =>
-        row.values.some((c) => /^[+-]?\d{16,}(?:\.|$)/.test(c.exact)),
-      )
-    ) {
-      alerts.push('图表按屏幕像素近似绘制；透视表及导出保留精确数值');
-    }
     setText('analysisChartSummary', alerts.join('；') || '点击图表或透视数值查看来源记录');
     setText(
       'analysisTableSummary',
@@ -834,7 +827,7 @@ export class AnalysisPivotView {
       if (current() && isDrawerVisible() && !isAbortError(err)) {
         const msg = errorMessage(err);
         setText('analysisDrillInfo', msg);
-        toast(`下钻失败：${msg}`, 'error');
+        toast(`读取明细失败：${msg}`, 'error');
       }
     }
   }

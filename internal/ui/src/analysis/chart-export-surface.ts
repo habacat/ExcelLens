@@ -400,7 +400,7 @@ export function chartExportDescriptions(payload: ChartExportPayload): readonly s
   const c = payload.chart;
   const d = c.drawing;
   const flags: string[] = [];
-  if (d.resultTruncated) flags.push('结果已按Top-N截取，未显示分类不在附件行中');
+  if (d.resultTruncated) flags.push('结果已按前 N 项截取，未显示分类不在附件行中');
   if (d.firstTreeLevel) flags.push('层级透视首层，未导出展开后代');
   if (d.positiveOnly) {
     flags.push(

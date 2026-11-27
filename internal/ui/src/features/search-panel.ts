@@ -240,7 +240,7 @@ export class SearchPanel {
     select.replaceChildren();
     const all = document.createElement('option');
     all.value = '';
-    all.textContent = '全部 Sheet';
+    all.textContent = '全部工作表';
     select.append(all);
     for (const sheet of this.s.sheets) {
       if (!names.has(sheet.name)) continue;

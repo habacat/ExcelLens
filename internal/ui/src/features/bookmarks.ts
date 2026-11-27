@@ -170,8 +170,8 @@ export class Bookmarks {
     }
     const statusText =
       (items.length
-        ? `${start + 1}–${Math.min(start + 50, items.length)} / ${items.length} 条传统批注`
-        : '本表没有传统批注') + (this.noteThreaded ? '，另含线程批注' : '');
+        ? `${start + 1}–${Math.min(start + 50, items.length)} / ${items.length} 条批注`
+        : '本表没有批注') + (this.noteThreaded ? '，另含对话式批注' : '');
     requireEl('sourceNotesStatus').textContent = statusText;
     requireButton('sourceNotesPrev').hidden = this.notePage <= 0;
     requireButton('sourceNotesNext').hidden = start + 50 >= items.length;
@@ -222,7 +222,7 @@ export class Bookmarks {
     this.items = data.items ? [...data.items] : [];
     this.loadedBook = book;
     this.keys = new Set(this.items.map((x) => `${x.sheet}!${x.ref}`));
-    requireButton('bookmarkOpenBtn').title = `审计标记（${this.items.length}） · 不写入源文件`;
+    requireButton('bookmarkOpenBtn').title = `标记（${this.items.length}）`;
     this.onChange();
     this.render();
     return true;
@@ -244,7 +244,7 @@ export class Bookmarks {
       return this.accept(response, book);
     } catch (e: unknown) {
       if (!ctrl.signal.aborted && ticket === this.request && book === this.s.workbookKey) {
-        this.toast(`读取审计标记失败：${errorMessage(e)}`, 'error');
+        this.toast(`读取标记失败：${errorMessage(e)}`, 'error');
       }
       return false;
     } finally {
@@ -352,7 +352,7 @@ export class Bookmarks {
         request.ref === this.s.selected?.ref &&
         this.refreshCurrent(note, request.tag);
       this.toast(
-        draftPending ? '已保存先前备注；当前修改尚未保存' : '已保存本机审计标记',
+        draftPending ? '已保存先前备注；当前修改尚未保存' : '已保存标记',
         draftPending ? 'warning' : 'success',
       );
     } catch (err: unknown) {
@@ -478,7 +478,7 @@ export class Bookmarks {
       frag.append(empty);
     }
     list.replaceChildren(frag);
-    requireEl('bookmarkCount').textContent = `已保存 ${this.items.length} 个标记 · 数据仅在本机`;
+    requireEl('bookmarkCount').textContent = `已保存 ${this.items.length} 个标记`;
   }
 
   exportCSV(): void {

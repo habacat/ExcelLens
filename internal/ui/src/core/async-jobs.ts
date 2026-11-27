@@ -223,7 +223,7 @@ export class AsyncJobs<
           throw new Error(status.error || `${this.label}已取消`);
         }
       }
-      throw new Error(`${this.label}任务轮询超时，请缩小范围`);
+      throw new Error(`${this.label}等待超时，请缩小范围后重试`);
     } catch (error: unknown) {
       if (!this.current(task)) throw makeAbortError(this.label);
       throw error;

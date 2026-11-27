@@ -359,9 +359,6 @@ export class PrintingRenderer {
       const numericOverflow =
         !item.hiddenAnchor &&
         presenter.fitNumber(node, cell, Math.min(box.width, box.innerWidth), 6 * scale);
-      if (numericOverflow) {
-        warnings.add('数值宽度不足时显示#提示，悬停可核对完整显示值，源值不变');
-      }
       if (
         !numericOverflow &&
         !item.merge &&

@@ -295,5 +295,5 @@ test('JSON numeric primitives are refused, not rounded; malformed types, overlon
     /4000/,
   );
   const escaped = JSON.stringify(Array.from({ length: 90 }, () => ['\u0001'.repeat(4000)]));
-  assert.throws(() => buildPastePlan(escaped, { ...target, columns: 1 }), /2 MiB/);
+  assert.throws(() => buildPastePlan(escaped, { ...target, columns: 1 }), /2 MB/);
 });

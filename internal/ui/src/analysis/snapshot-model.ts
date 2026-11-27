@@ -38,9 +38,9 @@ const FILTER_OP_LABELS: Readonly<Record<string, string>> = {
   blank: '为空',
   notblank: '不为空',
   gt: '大于',
-  gte: '不小于',
+  gte: '大于等于',
   lt: '小于',
-  lte: '不大于',
+  lte: '小于等于',
   between: '介于',
   in: '属于',
 };

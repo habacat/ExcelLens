@@ -313,7 +313,7 @@ export class DatabaseSnapshots {
       } else {
         parts.push('旧版快照', this.fmtBytes(item.bytes));
       }
-      if (item.legacyKey) parts.push('旧版固化副本');
+      if (item.legacyKey) parts.push('旧版已保存快照');
       if (this.due(item)) parts.push('待复核');
       details.textContent = item.error || parts.join(' · ');
       identity.append(name, details);

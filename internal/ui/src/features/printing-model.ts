@@ -229,7 +229,7 @@ function parseDecimal(text: string, label: string, positive = true): string {
     Number(value) < 0 ||
     (positive && Number(value) === 0)
   ) {
-    throw new Error(`${label}请输入${positive ? '正数' : '不小于零的数'}`);
+    throw new Error(`${label}请输入${positive ? '正数' : '大于等于 0 的数'}`);
   }
   return value;
 }
@@ -350,8 +350,8 @@ export function buildPrintOptions(
     }
   }
 
-  if (input.rowHeight.trim()) out.missingRowHeight = parseDecimal(input.rowHeight, '缺省行高');
-  if (input.columnWidth.trim()) out.missingColumnWidth = parseDecimal(input.columnWidth, '缺省列宽');
+  if (input.rowHeight.trim()) out.missingRowHeight = parseDecimal(input.rowHeight, '默认行高');
+  if (input.columnWidth.trim()) out.missingColumnWidth = parseDecimal(input.columnWidth, '默认列宽');
   if (input.ignoreBreaks) out.ignoreManualBreaks = true;
   if (JSON.stringify(out).length > limits.requestBytes) throw new Error('页面设置超出本次容量');
   return out;

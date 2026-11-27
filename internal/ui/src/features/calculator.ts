@@ -627,7 +627,7 @@ export class Calculator {
       button.type = 'button';
       button.className = 'calculator-convert';
       button.textContent = suggestion.label;
-      button.title = `${suggestion.preview}；点击在本行公式中明确转换，原数据保持不变`;
+      button.title = `${suggestion.preview}（点击在本行公式中转换）`;
       button.onclick = (event: MouseEvent): void => {
         event.preventDefault();
         event.stopPropagation();

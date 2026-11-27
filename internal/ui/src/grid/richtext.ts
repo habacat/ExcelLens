@@ -270,7 +270,7 @@ export function paintRichText(
   const info = presentationInfo(cell, options, base);
   if (!info) return false;
   const notice =
-    options.allowed === false ? '富文本样式超过当前视口容量，原文完整保留' : info.notice;
+    options.allowed === false ? '富文本样式超过当前显示区域容量，原文完整保留' : info.notice;
   if (notice) {
     node.classList.add('rich-text-notice');
     node.title = notice;

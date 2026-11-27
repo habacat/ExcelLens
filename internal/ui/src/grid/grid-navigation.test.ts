@@ -11,7 +11,7 @@ import {
   ViewportPipeline,
 } from '../test-helpers/grid-fixture.ts';
 import { MergedCells, type MergedCellElement } from './merges.ts';
-import { revealCellOffset } from './navigation.ts';
+import { hyperlinkVisitKey, revealCellOffset } from './navigation.ts';
 import {
   createInitialWorkbookState,
   type GridCellElement,
@@ -592,5 +592,56 @@ test('range selection extends header active marks, cell crosshair bands, merged 
     );
   } finally {
     dom.restore();
+  }
+});
+
+test('following valid internal and external hyperlinks marks origin cells visited while invalid targets do not', async () => {
+  const h = setupNavHarness();
+  const opened: string[] = [];
+  const origOpen = Object.getOwnPropertyDescriptor(window, 'open');
+  try {
+    h.S.sheets = [{ name: '账表' }, { name: '汇总' }];
+    const row = document.createElement('div') as GridRowElement;
+    const cellA6 = document.createElement('div') as GridCellElement;
+    cellA6.className = 'grid-cell hyperlink-cell';
+    cellA6.dataset.ref = 'A6';
+    row._xlCells = new Map([[1, cellA6]]);
+    h.S.renderedRows.set(6, row);
+    window.open = (url?: string | URL) => {
+      opened.push(String(url ?? ''));
+      return null;
+    };
+
+    await h.nav.followCellHyperlink(
+      { kind: 'external', url: 'javascript:alert(1)' },
+      { sheet: '账表', ref: 'A6' },
+    );
+    assert.equal(h.S.visitedHyperlinks.size, 0);
+    assert.equal(cellA6.classList.contains('hyperlink-visited'), false);
+
+    await h.nav.followCellHyperlink(
+      { kind: 'internal', sheet: '不存在的工作表', ref: 'A1' },
+      { sheet: '账表', ref: 'A6' },
+    );
+    assert.equal(h.S.visitedHyperlinks.size, 0);
+
+    await h.nav.followCellHyperlink(
+      { kind: 'external', url: 'https://example.com/report' },
+      { sheet: '账表', ref: 'A6' },
+    );
+    assert.deepEqual(opened, ['https://example.com/report']);
+    assert.equal(h.S.visitedHyperlinks.has(hyperlinkVisitKey('账表', 'A6')), true);
+    assert.equal(cellA6.classList.contains('hyperlink-visited'), true);
+    assert.equal(cellA6._xlHyperlinkVisited, true);
+
+    await h.nav.followCellHyperlink(
+      { kind: 'internal', sheet: '账表', ref: 'B6' },
+      { sheet: '账表', ref: 'C4' },
+    );
+    assert.equal(h.S.visitedHyperlinks.has(hyperlinkVisitKey('账表', 'C4')), true);
+  } finally {
+    if (origOpen) Object.defineProperty(window, 'open', origOpen);
+    else Reflect.deleteProperty(window, 'open');
+    h.restore();
   }
 });

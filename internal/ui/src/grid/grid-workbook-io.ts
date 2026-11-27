@@ -302,6 +302,7 @@ export class WorkbookIO {
       if (!data.opened) {
         if (data.archive) panels.archiveCenter?.present(data.archive);
         S.opened = false;
+        S.visitedHyperlinks.clear();
         this.d.cancelConditionalStats?.(false, false);
         panels.catalogueCenter?.resetBook?.();
         panels.dataRulesCenter?.resetBook?.();
@@ -333,7 +334,10 @@ export class WorkbookIO {
       S.fileSize = data.fileSize ?? 0;
       S.source = data.source ?? { format: 'xlsx' };
       const nextKey = data.workbookKey ?? '';
-      if (S.workbookKey !== nextKey) panels.bookmarkCenter?.resetBook();
+      if (S.workbookKey !== nextKey) {
+        S.visitedHyperlinks.clear();
+        panels.bookmarkCenter?.resetBook();
+      }
       S.workbookKey = nextKey;
       panels.calculator?.bookChanged();
       panels.analytics?.bookChanged(S.workbookKey, S.book);
@@ -538,6 +542,7 @@ export class WorkbookIO {
     S.historyIndex = -1;
     S.filtersBySheet.clear();
     S.positionsBySheet.clear();
+    S.visitedHyperlinks.clear();
     S.sheetViews.clear();
     S.sheetViewsBytes = 0;
     S.filterTotalsBySheet.clear();

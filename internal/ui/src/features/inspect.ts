@@ -151,9 +151,7 @@ export class SelectionInspector {
     requireEl('inspectScopeWrap').hidden = duplicates;
     requireEl('inspectColumnWrap').hidden = !duplicates;
     requireEl('inspectSkipHeaderWrap').hidden = !duplicates;
-    requireEl('inspectHint').textContent = duplicates
-      ? '按原始值判重：数字不看显示格式，文本不分大小写，空值不参与。'
-      : '';
+    requireEl('inspectHint').textContent = '';
   }
 
   options(): InspectRequestOptions {
@@ -281,7 +279,7 @@ export class SelectionInspector {
         res.mode === 'duplicates' ? `${res.duplicateGroups || 0} 组重复 · ` : '';
       const truncSummary = res.truncated ? ` · 仅列出前 ${this.matches.length} 条` : '';
       requireEl('inspectProgress').textContent =
-        `${opt.start}:${opt.end} · 共 ${(res.matched || 0).toLocaleString()} 格 · ${dupSummary}${res.durationMs || 0} ms${truncSummary}`;
+        `${opt.start}:${opt.end} · 共 ${(res.matched || 0).toLocaleString()} 格 · ${dupSummary}${res.durationMs || 0} 毫秒${truncSummary}`;
       requireEl('inspectResultList').replaceChildren();
       this.appendMore();
       this.onChange();

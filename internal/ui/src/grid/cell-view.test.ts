@@ -709,7 +709,7 @@ test('viewport span budget falls back truthfully without truncating text and can
     h.presenter.paint(node, b, {});
     assert.equal(node._xlRichNode, null);
     assert.equal(node.textContent, b.raw);
-    assert.match(node.title, /视口容量/);
+    assert.match(node.title, /显示区域容量/);
     assert.equal(h.presenter.allowed(a), true);
     h.presenter.prepare([{ number: 2, cells: [b] }]);
     assert.equal(h.presenter.needsPaint(node, b), true);
@@ -879,6 +879,57 @@ test('the actual main and frozen cell factories share text, styles, filters and 
       main.style.getPropertyValue('--xl-fill'),
       pinned.style.getPropertyValue('--xl-fill'),
     );
+  } finally {
+    dom.restore();
+  }
+});
+
+test('CellPresenter paints, detects, and clears visited hyperlink class on repaint and cell reuse', () => {
+  const dom = installDom({ fromIndexHtml: true });
+  try {
+    const visited = new Set<string>();
+    const presenter = new CellPresenter({
+      state: {
+        showStyles: true,
+        showFormulas: false,
+        fontOverride: '',
+        styles: [{}],
+        autoFilter: null,
+        indexReady: true,
+      },
+      applyStyle: () => undefined,
+      colName: (c) => String.fromCharCode(64 + c),
+      scale: () => 1,
+      fontStack: (name) => name,
+      isHyperlinkVisited: (ref) => visited.has(ref),
+    });
+    const linkCell = makeCell({
+      ref: 'A2',
+      raw: '查看明细',
+      display: '查看明细',
+      hyperlink: { kind: 'external', url: 'https://example.com' },
+    });
+    const node = document.createElement('div') as GridCellElement;
+    node.className = 'grid-cell';
+    node.dataset.row = '2';
+    node.dataset.col = '1';
+    node.dataset.ref = 'A2';
+
+    presenter.paint(node, linkCell, {});
+    assert.equal(node.classList.contains('hyperlink-cell'), true);
+    assert.equal(node.classList.contains('hyperlink-visited'), false);
+    assert.equal(presenter.needsPaint(node, linkCell, {}), false);
+
+    visited.add('A2');
+    assert.equal(presenter.needsPaint(node, linkCell, {}), true);
+    presenter.paint(node, linkCell, {});
+    assert.equal(node.classList.contains('hyperlink-visited'), true);
+    assert.equal(presenter.needsPaint(node, linkCell, {}), false);
+
+    const plainCell = makeCell({ ref: 'A2', raw: '普通文本', display: '普通文本' });
+    presenter.paint(node, plainCell, {});
+    assert.equal(node.classList.contains('hyperlink-cell'), false);
+    assert.equal(node.classList.contains('hyperlink-visited'), false);
   } finally {
     dom.restore();
   }

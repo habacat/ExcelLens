@@ -492,7 +492,7 @@ export class EditCopy {
       ).then(decodeWhatIfResult);
       el('TrialStatus').textContent =
         `${result.status} · ${result.iterations} 次计算` +
-        `${result.residual !== undefined ? ` · 残差 ${result.residual}` : ''} · 修订 ${doc.revision}`;
+        `${result.residual !== undefined ? ` · 误差 ${result.residual}` : ''} · 修订 ${doc.revision}`;
       const table = document.createElement('table');
       const tr = table.insertRow();
       const hasSecond = Boolean(secondText);
@@ -857,7 +857,7 @@ export class EditCopy {
     kindSelect.hidden = Boolean(this.data?.encoding);
     el('TextHint').hidden = !this.escaped;
     let stateText =
-      kind === 'missing' ? '源格缺失' : kind === 'blank' ? '空字段' : kind === 'error' ? '错误值' : '';
+      kind === 'missing' ? '原单元格为空' : kind === 'blank' ? '空字段' : kind === 'error' ? '错误值' : '';
     if (kind === 'formula') {
       if (cell.formulaState === 'pending') stateText = '待重算';
       else if (cell.formulaState === 'cycle') stateText = '循环引用';
@@ -881,7 +881,7 @@ export class EditCopy {
     baseDetails.hidden = equalsValue(cell.base, cell.value);
     baseDetails.open = false;
     el('BaseText').textContent =
-      cell.base.raw || (cell.base.kind === 'missing' ? '源格缺失' : '空白');
+      cell.base.raw || (cell.base.kind === 'missing' ? '原单元格为空' : '空白');
     this.setRule(cell);
     this.controls();
   }

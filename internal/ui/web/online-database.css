@@ -84,7 +84,7 @@
 .snapshot-facts { display: grid; grid-template-columns: minmax(6em, max-content) minmax(0,1fr); gap: 5px 14px; margin: 10px 0 16px; }
 .snapshot-facts dt, .snapshot-column-wrap th { color: var(--muted); }
 .snapshot-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
-.snapshot-table-select select { padding: 5px; }
+.snapshot-table-select select { padding-inline: 9px; }
 .snapshot-column-wrap { overflow: auto; }
 .snapshot-column-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
 .snapshot-column-wrap caption { text-align: left; font-weight: 600; padding-bottom: 4px; }

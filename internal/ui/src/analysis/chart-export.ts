@@ -124,7 +124,7 @@ export class ChartExportController {
     dialog.setAttribute('aria-labelledby', 'chartExportTitle');
     // Static template only. Captured source labels below use textContent.
     dialog.innerHTML = `<div class="chart-export-head"><h3 id="chartExportTitle">导出图片</h3><button id="chartExportClose" type="button" class="mini-button" aria-label="关闭图表导出">关闭</button></div>
-      <form id="chartExportForm"><fieldset id="chartExportOptions"><label>格式<select id="chartExportType" class="field-control"></select></label><label>宽度（px）<input id="chartExportWidth" class="field-control" type="number" step="1"></label><label>高度（px）<input id="chartExportHeight" class="field-control" type="number" step="1"></label><label>PNG倍率<select id="chartExportScale" class="field-control"></select></label><label>背景<select id="chartExportBackground" class="field-control"><option value="captured">当前配色</option><option value="white">白底</option></select></label></fieldset>
+      <form id="chartExportForm"><fieldset id="chartExportOptions"><label>格式<select id="chartExportType" class="field-control"></select></label><label>宽度（像素）<input id="chartExportWidth" class="field-control" type="number" step="1"></label><label>高度（像素）<input id="chartExportHeight" class="field-control" type="number" step="1"></label><label>PNG 倍率<select id="chartExportScale" class="field-control"></select></label><label>背景<select id="chartExportBackground" class="field-control"><option value="captured">当前配色</option><option value="white">白底</option></select></label></fieldset>
       <div class="chart-export-actions"><button id="chartExportBuild" class="mini-button" type="submit">生成图片</button><button id="chartExportCancel" class="mini-button" type="button" hidden>取消</button></div></form>
       <p id="chartExportStatus" class="chart-export-status" role="status" aria-live="polite"></p><div id="chartExportResult" class="chart-export-result" hidden><p id="chartExportPackageInfo"></p><div class="chart-export-actions"><a id="chartExportImageDownload" class="mini-button">下载图片</a><a id="chartExportDownload" class="mini-button" download="ExcelLens-Chart.zip">下载ZIP</a></div><div class="chart-export-preview"><img id="chartExportPreview" alt="待导出图表预览"></div></div>`;
     document.body.append(dialog);
@@ -353,7 +353,7 @@ export class ChartExportController {
         throw chartExportCapacityError();
       }
       const descFn = this.overrides?.descriptions ?? chartExportDescriptions;
-      const text = `ExcelLens 图表导出包\n\n${payload.chart.title}\n来源：${payload.chart.source}\n指标：${payload.chart.metric}\n单位：${payload.chart.unit}\n\n${descFn(payload).join('\n')}\n\nchart.${spec.type}：可嵌入报告的图片。\nexact-data.json：版本1；保留源身份/查询/字段、完整已接受结果、原始和派生精确字符串、缺值/错误状态、图形选择索引及显示/输出设置。不要把近似绘图值替代此文件中的exact。\nJSON数值字符串与前导零编号保持原样，分数不转换为浮点。\nREADME.txt：范围及说明。\n\n本包不重新查询源表；Top-N、首层或选区限制仍存在。SVG使用系统字体，不携带外部资源；图片长标签可能截短或以替代符呈现控制字符，JSON保留完整原文。\n`;
+      const text = `ExcelLens 图表导出包\n\n${payload.chart.title}\n来源：${payload.chart.source}\n指标：${payload.chart.metric}\n单位：${payload.chart.unit}\n\n${descFn(payload).join('\n')}\n\nchart.${spec.type}：可嵌入报告的图片。\nexact-data.json：版本1；保留源身份/查询/字段、完整已接受结果、原始和派生精确字符串、缺值/错误状态、图形选择索引及显示/输出设置。不要把近似绘图值替代此文件中的exact。\nJSON数值字符串与前导零编号保持原样，分数不转换为浮点。\nREADME.txt：范围及说明。\n\n本包不重新查询源表；前 N 项、首层或选区限制仍存在。SVG 使用系统字体，不携带外部资源；图片长标签可能截短或以替代符呈现控制字符，JSON 保留完整原文。\n`;
       const encoder = new TextEncoder();
       const bytes = new Uint8Array(await image.arrayBuffer());
       await checkpoint();

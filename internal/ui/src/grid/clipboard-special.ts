@@ -362,7 +362,7 @@ export function buildPastePlan(
   } = options;
   const text = rawText ?? '';
   if (text.length > 2 * 1024 * 1024 || utf8Length(text) > 2 * 1024 * 1024) {
-    throw new Error('剪贴板内容超过2 MiB，请分批粘贴');
+    throw new Error('剪贴板内容超过 2 MB，请分批粘贴');
   }
   let rows =
     format === 'tsv'

@@ -51,7 +51,7 @@ function isExactNumber(value: unknown): value is string {
 }
 
 function fail(): never {
-  throw new Error('数据洞察结果与当前来源或范围不符，请重试');
+  throw new Error('统计结果与当前来源或范围不符，请重试');
 }
 
 function sameOptionalValue(a: unknown, b: unknown): boolean {

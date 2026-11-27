@@ -344,7 +344,7 @@ export class AnalysisClusters {
     this.status(
       this.snapshot
         ? '保留上次成功结果；可调整规则重新检查'
-        : '选择比较规则，再点击“检查”。原始列不变。',
+        : '选择比较规则后点击“检查”。',
     );
     this.controls();
     if (!this.dialog.open) this.dialog.showModal();
@@ -622,7 +622,7 @@ export class AnalysisClusters {
         count.textContent =
           `文本 · ${value.count.toLocaleString()} 次` +
           (value.formulaCount ? ` · 其中公式缓存 ${value.formulaCount} 次` : '');
-        count.title = `源读取类型：${value.type}`;
+        count.title = `数据类型：${value.type}`;
         meta.append(count);
         const colIdx = detail.column || Number(this.snapshot?.field.id.slice(1));
         for (const [sample, row] of value.rows.entries()) {

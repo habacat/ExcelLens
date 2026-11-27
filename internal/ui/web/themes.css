@@ -97,6 +97,7 @@
   --grid-band: color-mix(in srgb, var(--surface) 55%, var(--paper));
   --cell-ink: var(--ink);
   --cell-formula-ink: var(--accent);
+  --hyperlink-visited: #e5a0dc;
   --range-grid-line: color-mix(in srgb, var(--line-soft) 84%, #fff);
   --crosshair-row-fill: color-mix(in srgb, var(--crosshair-color) 18%, transparent);
   --crosshair-column-fill: color-mix(in srgb, var(--crosshair-color) 23%, transparent);
@@ -124,6 +125,14 @@
   background-image: linear-gradient(var(--selection-night-fill, #9acbff1f), var(--selection-night-fill, #9acbff1f)) !important;
   color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink));
 }
+:root[data-reading-tone="dark"] .grid-region .grid-cell.hyperlink-cell:not(.hyperlink-visited):not(.formula-view-cell) {
+  color: var(--ref);
+}
+:root[data-reading-tone="dark"] .grid-region .grid-cell.hyperlink-cell.hyperlink-visited:not(.formula-view-cell),
+:root[data-reading-tone="dark"] .grid-region .grid-cell.hyperlink-cell.hyperlink-visited:not(.formula-view-cell) .cell-rich-text > span {
+  color: var(--hyperlink-visited);
+  --rich-ink: var(--hyperlink-visited);
+}
 
 /* The crosshair is independent from explicit cell and range selection. Its
  * state lives in CSS, so frozen and cached cells update without a repaint. */
@@ -143,7 +152,7 @@
 :root .grid-region :is(.grid-row.active-row .grid-cell, .pinned-cell.crosshair-row):not(:is(.merged-cell, .selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-row-fill), var(--crosshair-row-fill)); }
 :root .grid-region .grid-cell.active-column:not(:is(.merged-cell, .selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-column-fill), var(--crosshair-column-fill)); }
 :root .grid-region :is(.grid-row.active-row .grid-cell.active-column, .pinned-cell.crosshair-row.active-column):not(:is(.merged-cell, .selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { background-image: linear-gradient(var(--crosshair-both-fill), var(--crosshair-both-fill)); }
-:root[data-reading-tone="dark"][data-crosshair-enabled="true"] .grid-region :is(.grid-row.active-row .grid-cell, .pinned-cell.crosshair-row, .grid-cell.active-column):not(:is(.merged-cell, .selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match)) { color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink)); }
+:root[data-reading-tone="dark"][data-crosshair-enabled="true"] .grid-region :is(.grid-row.active-row .grid-cell, .pinned-cell.crosshair-row, .grid-cell.active-column):not(:is(.merged-cell, .selected, .range-cell, .precedent, .formula-referenced, .column-range-cell, .search-match, .hyperlink-cell)) { color: color-mix(in srgb, var(--xl-color, var(--ink)) 8%, var(--ink)); }
 
 /* A rectangle shares one perimeter. The active cell keeps its worksheet fill. */
 :root .grid-region .grid-cell.selected { outline-color: var(--selection-color); background-image: linear-gradient(var(--selection-active-fill), var(--selection-active-fill)) !important; }

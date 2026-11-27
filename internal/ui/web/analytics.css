@@ -114,6 +114,10 @@
 .analysis-export-control { display: flex; align-items: center; gap: 4px; }
 .analysis-export-control select { width: 78px; }
 .analysis-chart-select { height: var(--ctl-m); padding: 0 24px 0 8px; border: 1px solid var(--line); border-radius: var(--r-2); background-color: var(--surface); color: var(--ink); font-size: var(--fs-2); }
+@supports (appearance: base-select) {
+  .analysis-metric-row select { padding: 0 6px; }
+  .analysis-chart-select { padding: 0 8px; }
+}
 .analysis-metrics, .analysis-dashboard-grid, .analysis-template-grid { display: grid; grid-template-columns: repeat(var(--analysis-card-fit, auto-fit), minmax(min(100%, var(--analysis-card-min)), 1fr)); gap: clamp(8px, .75vw, 12px); }
 .analysis-metrics { --analysis-card-min: 180px; margin: 0 0 14px; }
 .analysis-metric { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); }

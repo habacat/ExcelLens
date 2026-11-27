@@ -81,7 +81,7 @@ export function buildEditValue(
     kind === 'number' &&
     !/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$/.test(nextRaw)
   ) {
-    throw new Error('输入有效的十进制数值');
+    throw new Error('请输入有效数值');
   }
   if (kind === 'formula') {
     nextRaw = nextRaw.trim();
@@ -163,7 +163,7 @@ function parseExactDecimal(text: string): ExactDecimal {
   const frac = hit?.[3] ?? '';
   const exp = hit?.[4] ?? '';
   if (!hit || (!whole && !frac) || text.length > 80) {
-    throw new Error('起始值和步长必须是十进制数');
+    throw new Error('起始值和步长必须是有效数字');
   }
   const scale = frac.length - Number(exp || 0);
   if (!Number.isSafeInteger(scale) || Math.abs(scale) > 40) {

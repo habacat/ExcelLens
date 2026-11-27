@@ -124,13 +124,13 @@ export class DatabaseEvidence {
       : [['连接来源', '旧版未记录']];
     rows.push(
       ['采集开始', formatWhen(e.taken)],
-      [e.legacyKey ? '固化时间' : '采集完成', formatWhen(e.finishedAt)],
+      [e.legacyKey ? '保存时间' : '采集完成', formatWhen(e.finishedAt)],
       ['一致性', e.consistency === 'per-table' ? '各表独立采集' : '旧版未记录'],
       ['清单 SHA-256', result.key],
       ['核验通过', formatWhen(result.verifiedAt)],
     );
     if (e.legacyKey) {
-      rows.push(['旧版清单 SHA-256', e.legacyKey], ['摘要范围', '从固化时起可核验']);
+      rows.push(['旧版清单 SHA-256', e.legacyKey], ['摘要范围', '从保存快照起可核验']);
     }
     requireEl('dbEvidenceOrigin').replaceChildren(...Array.from(renderFacts(rows).children));
     this.table.replaceChildren(

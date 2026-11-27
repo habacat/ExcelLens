@@ -271,7 +271,7 @@ export class AnalysisDashboardController {
 
       const info = document.createElement('span');
       info.className = 'analysis-card-loading';
-      info.textContent = '接近视口时加载';
+      info.textContent = '滚动到可见区域时加载';
       const plot = card.querySelector('.analysis-dashboard-plot');
       plot?.append(info);
 

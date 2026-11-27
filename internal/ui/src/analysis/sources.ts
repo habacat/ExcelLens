@@ -62,7 +62,7 @@ const MODE_LABELS: Readonly<Record<string, string>> = {
   full: '完整源表',
   filtered: '完整筛选结果',
   visible: '当前可见行',
-  selection: '画面选区',
+  selection: '当前选区',
 };
 
 function cloneValue<T>(value: T): T {

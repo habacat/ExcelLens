@@ -141,6 +141,7 @@ export interface PresenterOptions {
   readonly merge?: (row: number, col: number) => MergeRange | null;
   readonly richLimits?: RichTextLimits | null;
   readonly numericPadding?: (node: HTMLElement) => number;
+  readonly isHyperlinkVisited?: (ref: string) => boolean;
 }
 
 interface PaintStateCache {
@@ -239,6 +240,15 @@ export class CellPresenter {
     return p.key;
   }
 
+  private hyperlinkVisited(node: GridCellElement, cell: CellData | null | undefined): boolean {
+    if (!cell?.hyperlink || !this.o.isHyperlinkVisited) return false;
+    const ref =
+      cell.ref ||
+      node.dataset.ref ||
+      `${this.o.colName(Number(node.dataset.col))}${Number(node.dataset.row)}`;
+    return Boolean(ref && this.o.isHyperlinkVisited(ref));
+  }
+
   needsPaint(
     node: GridCellElement,
     cell: CellData | null | undefined,
@@ -247,7 +257,8 @@ export class CellPresenter {
     return (
       node._xlPaintKey !== this.paintKey() ||
       node._xlRichAllowed !== this.allowed(cell) ||
-      node._xlRowPresentationNotice !== (row?.presentationNotice ?? '')
+      node._xlRowPresentationNotice !== (row?.presentationNotice ?? '') ||
+      Boolean(node._xlHyperlinkVisited) !== this.hyperlinkVisited(node, cell)
     );
   }
 
@@ -321,6 +332,7 @@ export class CellPresenter {
       node._xlModel = cell ?? null;
       node._xlRichAllowed = true;
       node._xlRowPresentationNotice = '';
+      node._xlHyperlinkVisited = false;
       node.textContent = this.value(cell);
       return node;
     }
@@ -372,16 +384,22 @@ export class CellPresenter {
       node.classList.remove(
         'formula-cell',
         'hyperlink-cell',
+        'hyperlink-visited',
         'formula-view-cell',
         'auto-filter-header',
       );
     }
+    const visited = this.hyperlinkVisited(node, cell);
+    node._xlHyperlinkVisited = visited;
     node.textContent = this.value(cell);
     if (cell) {
       const styled = cell.style == null && row?.style ? { ...cell, style: row.style } : cell;
       this.o.applyStyle(node, styled);
       if (cell.hasFormula) node.classList.add('formula-cell');
-      if (cell.hyperlink) node.classList.add('hyperlink-cell');
+      if (cell.hyperlink) {
+        node.classList.add('hyperlink-cell');
+        if (visited) node.classList.add('hyperlink-visited');
+      }
       if (s.showFormulas && cell.hasFormula) node.classList.add('formula-view-cell');
     } else if (row?.style) {
       this.o.applyStyle(node, { style: row.style });
@@ -699,10 +717,23 @@ const CELL_TYPE_LABELS = new Map<string, string>([
   ['n', '数值'],
 ]);
 
+const ODS_TYPE_LABELS = new Map<string, string>([
+  ['float', '数值'],
+  ['currency', '货币'],
+  ['percentage', '百分比'],
+  ['date', '日期'],
+  ['time', '时间'],
+  ['boolean', '布尔'],
+  ['string', '文本'],
+]);
+
 export function cellSourceTypeLabel(cell: CellData): string {
   if (cell.cacheMissing) return '公式无保存结果';
   if (cell.presentationOnly) return '源为空白';
-  if (cell.sourceType) return `ODS · ${cell.sourceType}${cell.currency ? ` ${cell.currency}` : ''}`;
+  if (cell.sourceType) {
+    const label = ODS_TYPE_LABELS.get(cell.sourceType) ?? cell.sourceType;
+    return `ODS · ${label}${cell.currency ? ` ${cell.currency}` : ''}`;
+  }
   if (cell.raw === '' && !cell.hasFormula) return '空白';
   if (cell.type) return CELL_TYPE_LABELS.get(cell.type) ?? `源类型 ${cell.type}`;
   return '数值';

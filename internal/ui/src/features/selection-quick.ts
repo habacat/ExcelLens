@@ -693,7 +693,7 @@ export class SelectionQuick {
         key === 'difference'
           ? `差额 ${this.colName(page.minuend)} − ${this.colName(page.subtrahend)} · 分段平均`
           : `源列 ${this.colName(Number(key))} · 分段平均`,
-      unit: '源指标原单位（未换算）',
+      unit: '原始单位',
       current,
       notify: this.toast,
     });

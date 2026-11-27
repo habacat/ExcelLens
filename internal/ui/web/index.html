@@ -140,7 +140,7 @@
         <button id="openBtn" data-toolbar-priority="0" class="tool-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="workbookOpenMenu" data-menu="workbookOpenMenu"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-open"/></svg>打开<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
         <button id="archiveBtn" data-toolbar-priority="2" class="tool-button" type="button" hidden title="压缩包里的其他文件"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>压缩包</button>
         <button id="exportOpenBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled title="导出（Ctrl+Shift+E）"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-export"/></svg>导出</button>
-        <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden title="在副本里修改，原文件不变"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg><span id="editCopyOpenLabel">编辑副本</span></button>
+        <button id="editCopyOpen" data-toolbar-priority="1" class="tool-button" type="button" hidden title="编辑副本"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg><span id="editCopyOpenLabel">编辑副本</span></button>
         <span class="ribbon-sep" aria-hidden="true"></span>
         <button id="copyMenuBtn" data-toolbar-priority="2" class="tool-button" type="button" disabled aria-haspopup="menu" aria-expanded="false" aria-controls="copyMenu" data-menu="copyMenu" title="复制"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg>复制<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
         <span class="ribbon-sep" aria-hidden="true"></span>
@@ -178,25 +178,25 @@
         <button id="columnsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-haspopup="menu" aria-expanded="false" aria-controls="columnsMenu" data-menu="columnsMenu" title="显示或隐藏列"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-columns"/></svg>列<svg class="icon caret" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
         <button id="rowsBtn" data-toolbar-priority="0" class="tool-button" type="button" disabled aria-haspopup="dialog" title="行显隐和分组"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rows"/></svg>行与大纲</button>
         <span class="ribbon-sep" aria-hidden="true"></span>
-        <button id="formatBtn" data-toolbar-priority="0" class="tool-button format-active" type="button" disabled aria-pressed="true" title="显示原工作簿的字体、颜色和边框"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-format"/></svg>原格式</button>
+        <button id="formatBtn" data-toolbar-priority="0" class="tool-button format-active" type="button" disabled aria-pressed="true" title="切换原格式"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-format"/></svg>原格式</button>
         <button id="imagesBtn" data-toolbar-priority="1" class="tool-button picture-button" type="button" aria-pressed="true" hidden title="显示或隐藏图片"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg>图片</button>
         <label class="ribbon-field" data-toolbar-priority="2" title="显示字体"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-font"/></svg>
           <select id="fontSelect" class="toolbar-field toolbar-select font-picker" aria-label="显示字体">
             <option value="">原表字体</option>
-            <option value="宋体">宋体</option>
-            <option value="新宋体">新宋体</option>
-            <option value="楷体">楷体</option>
-            <option value="仿宋">仿宋</option>
-            <option value="微软雅黑">微软雅黑</option>
-            <option value="等线">等线</option>
-            <option value="黑体">黑体</option>
-            <option value="华文宋体">华文宋体</option>
-            <option value="华文楷体">华文楷体</option>
-            <option value="华文仿宋">华文仿宋</option>
-            <option value="隶书">隶书</option>
-            <option value="Arial">Arial</option>
-            <option value="Calibri">Calibri</option>
-            <option value="Consolas">Consolas</option>
+            <option value="宋体" style="font-family: 'SimSun', '宋体', serif">宋体</option>
+            <option value="新宋体" style="font-family: 'NSimSun', '新宋体', 'SimSun', serif">新宋体</option>
+            <option value="楷体" style="font-family: 'KaiTi', '楷体', serif">楷体</option>
+            <option value="仿宋" style="font-family: 'FangSong', '仿宋', serif">仿宋</option>
+            <option value="微软雅黑" style="font-family: 'Microsoft YaHei', '微软雅黑', sans-serif">微软雅黑</option>
+            <option value="等线" style="font-family: 'DengXian', '等线', sans-serif">等线</option>
+            <option value="黑体" style="font-family: 'SimHei', '黑体', sans-serif">黑体</option>
+            <option value="华文宋体" style="font-family: 'STSong', '华文宋体', 'SimSun', serif">华文宋体</option>
+            <option value="华文楷体" style="font-family: 'STKaiti', '华文楷体', 'KaiTi', serif">华文楷体</option>
+            <option value="华文仿宋" style="font-family: 'STFangsong', '华文仿宋', 'FangSong', serif">华文仿宋</option>
+            <option value="隶书" style="font-family: 'LiSu', '隶书', serif">隶书</option>
+            <option value="Arial" style="font-family: Arial, sans-serif">Arial</option>
+            <option value="Calibri" style="font-family: Calibri, Carlito, sans-serif">Calibri</option>
+            <option value="Consolas" style="font-family: Consolas, monospace">Consolas</option>
           </select>
         </label>
         <span class="ribbon-sep" aria-hidden="true"></span>
@@ -453,7 +453,7 @@
         <button id="calculatorDock" class="calculator-dock" type="button" hidden>计算</button>
         <div class="zoom-controls" role="group" aria-label="缩放">
           <button id="zoomOutBtn" class="zoom-button" type="button" title="缩小" aria-label="缩小"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-minus"/></svg></button>
-          <span id="zoomValue" class="zoom-value">100%</span>
+          <button id="zoomValue" class="zoom-value" type="button" title="重置为 100%" aria-label="重置缩放为 100%">100%</button>
           <button id="zoomInBtn" class="zoom-button" type="button" title="放大" aria-label="放大"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
         </div>
       </div>
@@ -501,7 +501,6 @@
       <span id="calculatorSaveStatus" class="calculator-save-status" role="status" aria-live="polite"></span><button id="calculatorRecovery" class="calculator-notes-toggle" type="button">恢复</button><button id="calculatorNotes" class="calculator-notes-toggle" type="button" aria-pressed="false" title="备注列">备注</button><button id="calculatorMinimize" class="calculator-icon" type="button" title="收起" aria-label="收起"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-minus"/></svg></button>
       <button id="calculatorClose" class="calculator-icon" type="button" title="关闭" aria-label="关闭"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
     </div>
-    <details class="calculator-compat"><summary>计算口径</summary><p>原生表格的文本金额不计入范围汇总。外部台账可计入合规文本金额。整行、整列取已用区域，财务迭代可能有尾差，≈ 表示近似值。</p></details>
     <div id="calculatorScroll" class="calculator-scroll" role="grid" aria-label="计算"><div class="calculator-columns" role="row"><span></span><span role="columnheader">公式</span><span role="columnheader">结果</span><span class="calculator-note-head" role="columnheader">备注</span></div><div id="calculatorRows" class="calculator-rows" role="rowgroup"></div></div>
   </aside>
 
@@ -693,7 +692,7 @@
       </div>
       <details class="reconcile-batches"><summary>跨批次异常跟踪</summary><div class="reconcile-fields-actions"><label>基线核查包 <input id="batchBaseline" type="file" accept=".zip"></label><label>当期核查包 <input id="batchCurrent" type="file" accept=".zip"></label><button id="batchCompare" class="mini-button" type="button">比较异常明细</button></div></details>
       <div class="reconcile-fields-actions"><select id="versionScope" class="field-control" aria-label="版本比较范围"><option value="all">整本同名工作表</option><option value="pair">所选两张工作表</option><option value="keyed">所选两表按业务主键对齐</option></select><button id="versionCompare" type="button" class="mini-button">比较工作簿版本</button></div>
-      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><button id="reconcileImport" type="button" class="mini-button" disabled>载入核查记录</button><input id="reconcileRecordFile" type="file" accept=".json" hidden><span class="reconcile-muted">表头行填 0 表示没有表头；编辑表按已保存的内容核对。</span></div>
+      <div class="reconcile-fields-actions"><button id="reconcileLoadFields" class="mini-button" type="button">读取字段</button><button id="reconcileMatchFields" class="mini-button" type="button" disabled>按同名字段填入</button><button id="reconcileImport" type="button" class="mini-button" disabled>载入核查记录</button><input id="reconcileRecordFile" type="file" accept=".json" hidden><span class="reconcile-muted">表头行填 0 表示无表头。</span></div>
       <datalist id="reconcileLeftOptions"></datalist><datalist id="reconcileRightOptions"></datalist>
       <div class="reconcile-mapping-title"><strong>主键</strong><span class="reconcile-muted">最多 4 组</span><button id="reconcileAddKey" type="button" class="mini-button">添加主键</button></div><div id="reconcileKeys" class="reconcile-mappings"></div>
       <div class="reconcile-mapping-title"><strong>比较字段</strong><span class="reconcile-muted">最多 8 组</span><button id="reconcileAddField" type="button" class="mini-button">添加字段</button></div><div id="reconcileFields" class="reconcile-mappings"></div>
@@ -706,7 +705,7 @@
   <dialog id="multiSortDialog" class="float-dialog multi-sort-dialog" aria-label="排序">
     <form method="dialog" class="dialog-head"><div class="dialog-title">排序</div><button class="dialog-close" value="cancel" aria-label="关闭">×</button></form>
     <div class="dialog-body">
-      <label class="sort-header-row">表头行 <input id="sortHeaderRow" class="field-control" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1" title="表头行不参与排序"></label>
+      <label class="sort-header-row">表头行 <input id="sortHeaderRow" class="field-control" type="number" min="0" max="__MAX_SOURCE_ROWS__" value="1"></label>
       <div id="sortLevels" class="sort-levels"></div>
       <button id="sortAddLevel" type="button" class="mini-button"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>添加条件</button>
       <div class="dialog-actions"><button type="button" id="sortReset" class="mini-button">恢复原始顺序</button><label class="task-progress-choice" title="中断后可从“任务恢复”继续"><input id="sortRecoverable" type="checkbox">保留进度</label><span class="status-spacer"></span><button type="button" id="sortApply" class="primary-button compact">应用排序</button></div>
@@ -847,7 +846,7 @@
       <div id="storageHistoryIssue" hidden><span id="storageHistoryReason"></span> <button class="mini-button" data-storage="repair-history" type="button">重建传输历史</button></div>
       <details id="storageHistory"><summary>传输记录</summary><div id="storageJobs"></div></details>
       <details id="storageSources"><summary>重定位来源文件</summary>
-        <select id="storageSource" class="field-control" aria-label="原来源"></select>
+        <select id="storageSource" class="field-control" aria-label="原文件"></select>
         <input id="storageCandidate" class="field-control" placeholder="新文件完整路径" aria-label="新文件完整路径">
         <button id="storageRelocate" type="button" class="mini-button">核验并定位</button>
         <div id="storageMoves" class="storage-paths"></div>
@@ -942,7 +941,7 @@
         <details id="editCopyTrial" class="edit-copy-trial"><summary>目标求解与敏感性试算</summary>
           <div class="edit-trial-fields"><label>方式<select id="editCopyTrialMode"><option value="seek">目标求解</option><option value="table">敏感性试算</option></select></label>
           <label>输入格<input id="editCopyTrialInput" placeholder="如 A1"></label><label>目标公式格<input id="editCopyTrialTarget" placeholder="如 结果!B2"></label>
-          <label data-seek>目标值<input id="editCopyTrialGoal" inputmode="decimal"></label><label data-seek>输入下界<input id="editCopyTrialLower" inputmode="decimal"></label><label data-seek>输入上界<input id="editCopyTrialUpper" inputmode="decimal"></label><label data-seek>允许残差<input id="editCopyTrialTolerance" value="0.000001" inputmode="decimal"></label>
+          <label data-seek>目标值<input id="editCopyTrialGoal" inputmode="decimal"></label><label data-seek>输入下界<input id="editCopyTrialLower" inputmode="decimal"></label><label data-seek>输入上界<input id="editCopyTrialUpper" inputmode="decimal"></label><label data-seek>允许误差<input id="editCopyTrialTolerance" value="0.000001" inputmode="decimal"></label>
           <label data-trials hidden>输入值<textarea id="editCopyTrialValues" placeholder="每行一个数"></textarea></label><label data-trials hidden>第二输入格（可选）<input id="editCopyTrialSecond" placeholder="如 A2"></label><label data-trials hidden>第二组值<textarea id="editCopyTrialSecondValues" placeholder="每行一个数"></textarea></label></div>
           <button id="editCopyTrialRun" class="mini-button" type="button">运行试算</button><p id="editCopyTrialStatus" role="status"></p><div id="editCopyTrialOutput" class="edit-trial-result"></div></details>
         <div id="editCopyCellPanel" hidden>
@@ -1126,7 +1125,7 @@
   <dialog id="copySpecialDialog" class="clipboard-dialog" aria-labelledby="copySpecialTitle">
     <form id="copySpecialForm">
       <div class="clipboard-head"><div><h3 id="copySpecialTitle">选择性复制</h3><p id="copySpecialSource"></p></div><button id="copySpecialClose" type="button" class="mini-button">关闭</button></div>
-      <div class="clipboard-options"><label>格式<select id="copySpecialFormat" class="field-control"><option value="tsv">文字表格 · TSV</option><option value="markdown">Markdown表格</option><option value="json">JSON · 源值、类型及坐标</option></select></label><label>内容<select id="copySpecialMode" class="field-control"><option value="display">显示值</option><option value="raw">原始值</option><option value="formula">公式文字，其余保留原值</option></select></label></div>
+      <div class="clipboard-options"><label>格式<select id="copySpecialFormat" class="field-control"><option value="tsv">制表符文本（TSV）</option><option value="markdown">Markdown 表格</option><option value="json">JSON（含源值、类型及坐标）</option></select></label><label>内容<select id="copySpecialMode" class="field-control"><option value="display">显示值</option><option value="raw">原始值</option><option value="formula">公式文本，其余保留原值</option></select></label></div>
       <div class="clipboard-header-option"><label><input id="copySpecialHeader" type="checkbox">附带表头</label><label for="copySpecialHeaderRow">源表头行</label><input id="copySpecialHeaderRow" class="field-control" type="number" min="1" value="1" disabled></div>
       <label class="clipboard-label" for="copySpecialPreview">复制预览</label><textarea id="copySpecialPreview" class="clipboard-text" rows="10" readonly spellcheck="false"></textarea>
       <p id="copySpecialStatus" class="clipboard-status" role="status" aria-live="polite"></p>
@@ -1137,9 +1136,9 @@
     <form id="pasteSpecialForm">
       <div class="clipboard-head"><div><h3 id="pasteSpecialTitle">选择性粘贴</h3><p id="pasteSpecialTarget"></p></div><button id="pasteSpecialClose" type="button" class="mini-button">关闭</button></div>
       <fieldset id="pasteSpecialFields">
-        <div class="clipboard-options"><label>输入格式<select id="pasteSpecialFormat" class="field-control"><option value="tsv">文字表格 · TSV</option><option value="json">JSON · 文字数组或ExcelLens选区</option></select></label><label>JSON内容<select id="pasteSpecialMode" class="field-control" disabled><option value="raw">原始值</option><option value="display">显示值</option><option value="formula">公式文字，不执行</option></select></label></div>
-        <div class="clipboard-checks"><label><input id="pasteSpecialTranspose" type="checkbox">转置行列</label><label><input id="pasteSpecialSkipBlank" type="checkbox">跳过空白</label><label><input id="pasteSpecialSkipFirst" type="checkbox">跳过首行（表头）</label><label><input id="pasteSpecialHeader" type="checkbox" disabled>包含JSON表头</label></div>
-        <div class="clipboard-input-label"><label for="pasteSpecialText">待粘贴文字</label><button id="pasteSpecialRead" type="button" class="mini-button">读取剪贴板</button></div><textarea id="pasteSpecialText" class="clipboard-text" rows="6" maxlength="2097152" placeholder="在此按Ctrl+V粘贴；不会立即写入编辑表" spellcheck="false"></textarea>
+        <div class="clipboard-options"><label>输入格式<select id="pasteSpecialFormat" class="field-control"><option value="tsv">制表符文本（TSV）</option><option value="json">JSON（文本数组或 ExcelLens 选区）</option></select></label><label>JSON 内容<select id="pasteSpecialMode" class="field-control" disabled><option value="raw">原始值</option><option value="display">显示值</option><option value="formula">公式文本（不计算）</option></select></label></div>
+        <div class="clipboard-checks"><label><input id="pasteSpecialTranspose" type="checkbox">转置行列</label><label><input id="pasteSpecialSkipBlank" type="checkbox">跳过空白</label><label><input id="pasteSpecialSkipFirst" type="checkbox">跳过首行（表头）</label><label><input id="pasteSpecialHeader" type="checkbox" disabled>包含 JSON 表头</label></div>
+        <div class="clipboard-input-label"><label for="pasteSpecialText">待粘贴内容</label><button id="pasteSpecialRead" type="button" class="mini-button">读取剪贴板</button></div><textarea id="pasteSpecialText" class="clipboard-text" rows="6" maxlength="2097152" placeholder="在此按 Ctrl+V 粘贴" spellcheck="false"></textarea>
         <div class="clipboard-table-wrap"><table id="pasteSpecialPreview" aria-label="粘贴预览"></table></div>
         <button id="pasteSpecialReload" type="button" class="mini-button">重新读取目标</button>
       </fieldset>
@@ -1208,7 +1207,7 @@
           <label class="analysis-label" for="analysisSourceSelect">数据来源</label>
           <select id="analysisSourceSelect" class="analysis-control"></select>
           <label id="analysisScopeLabel" class="analysis-label" for="analysisSourceScope">分析范围</label>
-          <div id="analysisScopeControls" class="analysis-source-range"><select id="analysisSourceScope" class="analysis-control"><option value="full">完整源表</option><option value="filtered">完整筛选结果</option><option value="visible">当前可见行</option><option value="selection">画面选区</option></select><button id="analysisSourceRefresh" class="analysis-quiet-button" type="button" title="按工作簿当前的筛选和选区重新取范围">重新捕获</button></div>
+          <div id="analysisScopeControls" class="analysis-source-range"><select id="analysisSourceScope" class="analysis-control"><option value="full">完整源表</option><option value="filtered">完整筛选结果</option><option value="visible">当前可见行</option><option value="selection">当前选区</option></select><button id="analysisSourceRefresh" class="analysis-quiet-button" type="button" title="按工作簿当前的筛选和选区重新取范围">重新捕获</button></div>
           <div class="analysis-source-state"><div id="analysisScopeInfo" class="analysis-caption" role="status" aria-live="polite"></div><button id="analysisSourceCancel" class="analysis-quiet-button" type="button" hidden>取消</button></div>
           <div class="analysis-row-inline"><label id="analysisHeaderLabel" class="analysis-short-label" for="analysisHeaderRow">表头行 <input id="analysisHeaderRow" type="number" min="1" max="__MAX_SOURCE_ROWS__" value="1" class="analysis-control"></label><button id="analysisLoadFields" type="button" class="analysis-quiet-button button-with-icon">更新字段 <svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></button></div>
           <div id="analysisSourceInfo" class="analysis-caption"></div>
@@ -1256,8 +1255,8 @@
         </section>
       </main>
     </div>
-    <aside id="analysisDrill" class="analysis-drill" role="dialog" aria-label="源数据下钻" hidden>
-      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">明细下钻</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="连同原始行号存到编辑表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div></div>
+    <aside id="analysisDrill" class="analysis-drill" role="dialog" aria-label="来源明细" hidden>
+      <div class="analysis-drill-head"><div><h3 id="analysisDrillTitle">来源明细</h3><span id="analysisDrillInfo"></span></div><div class="analysis-drill-actions"><button id="analysisDrillSave" type="button" class="analysis-outline-button" title="连同原始行号存到编辑表">保存这组明细</button><button id="analysisDrillClose" type="button" aria-label="关闭"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div></div>
       <div id="analysisDrillTable" class="analysis-drill-table"></div><div id="analysisDrillPaging" class="analysis-pagination"></div>
     </aside>
     <div id="analysisToast" class="analysis-toast" role="status" hidden></div>
@@ -1284,7 +1283,7 @@
   </dialog>
   <dialog id="analysisClustersDialog" class="analysis-clusters-dialog" aria-labelledby="analysisClustersTitle">
     <div class="analysis-clusters-head"><h3 id="analysisClustersTitle">疑似重复</h3><button id="analysisClustersClose" type="button" class="analysis-outline-button">关闭</button></div>
-    <div class="analysis-clusters-tools"><fieldset id="analysisClustersOptions" aria-label="候选比较规则"><label><input id="analysisClustersCase" type="checkbox">忽略大小写</label><label title="比较全角ASCII字母、数字、符号及全角空格；不转换假名等其他文字"><input id="analysisClustersWidth" type="checkbox">忽略英数符号全半角</label><label>空白<select id="analysisClustersSpace" class="analysis-control"><option value="">保留原样</option><option value="trim">去除首尾</option><option value="collapse">整理连续空白</option><option value="remove">忽略全部空白</option></select></label><label><input id="analysisClustersPunctuation" type="checkbox">忽略标点</label></fieldset><button id="analysisClustersRun" type="button" class="analysis-primary-button">检查</button><button id="analysisClustersCancel" type="button" class="analysis-outline-button" hidden>取消检查</button></div>
+    <div class="analysis-clusters-tools"><fieldset id="analysisClustersOptions" aria-label="候选比较规则"><label><input id="analysisClustersCase" type="checkbox">忽略大小写</label><label title="忽略全角与半角字母、数字、符号及空格的差异"><input id="analysisClustersWidth" type="checkbox">忽略全角与半角差异</label><label>空白<select id="analysisClustersSpace" class="analysis-control"><option value="">保留原样</option><option value="trim">去除首尾</option><option value="collapse">整理连续空白</option><option value="remove">忽略全部空白</option></select></label><label><input id="analysisClustersPunctuation" type="checkbox">忽略标点</label></fieldset><button id="analysisClustersRun" type="button" class="analysis-primary-button">检查</button><button id="analysisClustersCancel" type="button" class="analysis-outline-button" hidden>取消检查</button></div>
     <p class="analysis-clusters-note">原始文本 · 未应用分析条件</p>
     <p id="analysisClustersSummary" class="analysis-clusters-note"></p>
     <div class="analysis-clusters-main"><section class="analysis-clusters-master" aria-label="候选组"><div id="analysisClustersGroups" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClustersPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClustersPage">尚未检查</span><button id="analysisClustersNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section><section class="analysis-clusters-detail" aria-label="候选原文"><h4 id="analysisClusterDetailTitle">选择候选组查看原文</h4><div id="analysisClusterDetailKey" class="analysis-clusters-key"></div><div id="analysisClusterVariants" class="analysis-clusters-list"></div><div class="analysis-clusters-pager"><button id="analysisClusterVariantsPrev" type="button" class="analysis-quiet-button" disabled>上一页</button><span id="analysisClusterVariantsPage">源位置为有限样例</span><button id="analysisClusterVariantsNext" type="button" class="analysis-quiet-button" disabled>下一页</button></div></section></div>
@@ -1302,7 +1301,7 @@
           <div class="database-options">
             <label>数据库类型<select name="engine" required></select></label>
             <label id="databaseProtocolField" hidden>连接方式<select name="protocol" disabled></select></label>
-            <label>传输安全<select name="tls"><option value="verify">TLS（验证证书）</option><option value="plain">普通连接（无 TLS）</option></select></label>
+            <label>传输安全<select name="tls"><option value="verify">加密连接（TLS，验证证书）</option><option value="plain">非加密连接（不使用 TLS）</option></select></label>
           </div>
           <div class="database-address">
             <label>主机名或 IP<input name="host" required autofocus maxlength="768" spellcheck="false" autocapitalize="none" placeholder="db.example.com"></label>
@@ -1315,7 +1314,7 @@
             <summary>架构和证书</summary>
             <div class="database-advanced-fields">
               <label>架构筛选<input name="schema" maxlength="512" spellcheck="false" placeholder="留空显示可读架构"></label>
-              <label id="databaseCertificateField">自定义 CA（PEM）<input type="file" id="databaseCertificate" accept=".pem,.crt,.cer"></label>
+              <label id="databaseCertificateField">自定义根证书（.pem / .crt）<input type="file" id="databaseCertificate" accept=".pem,.crt,.cer"></label>
             </div>
           </details>
         </fieldset>

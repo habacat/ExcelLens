@@ -77,7 +77,13 @@ export class GridAppearance {
     this.d.S.fontOverride = font;
     const picker = requireSelect('fontSelect');
     picker.value = font;
-    picker.title = `显示字体（${picker.selectedOptions[0]?.text || font}）`;
+    const label = `显示字体（${picker.selectedOptions[0]?.text || font}）`;
+    picker.title = label;
+    const field = picker.closest('.ribbon-field');
+    if (field instanceof HTMLElement) {
+      field.classList.toggle('is-active', Boolean(font));
+      field.title = label;
+    }
   }
 
   async changeDisplayFont(font: string): Promise<void> {

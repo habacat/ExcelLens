@@ -486,7 +486,7 @@ export class CellExplanation {
         : displayText !== ''
           ? displayText
           : cell.hasFormula
-            ? '（空字符串）'
+            ? '（空文本）'
             : '（空白）',
     );
     add('原始值', cell.raw === '' ? '（空白）' : cell.raw);

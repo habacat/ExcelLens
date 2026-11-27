@@ -31,15 +31,15 @@ body.home-view { min-width: 0; }
 .home-data-menu summary::-webkit-details-marker { display: none; }
 .home-data-actions {
   position: absolute; right: 0; top: calc(100% + 5px); z-index: 4; min-width: 158px;
-  display: grid; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-2);
-  background: var(--surface); box-shadow: 0 5px 16px rgb(var(--shadow-rgb) / .14);
+  display: grid; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-3);
+  background: var(--surface); box-shadow: var(--shadow-pop);
 }
 .home-data-actions [role=button] {
-  padding: 8px 12px; border: 0; border-radius: var(--r-1); color: var(--ink);
+  min-height: 28px; padding: 6px 10px; border: 0; border-radius: var(--r-1); color: var(--ink);
   text-align: left; background: transparent; font: inherit; cursor: pointer; user-select: text;
 }
-.home-data-actions [role=button]:hover, .home-data-actions [role=button]:focus-visible { background: var(--inset); }
-.home-data-menu :focus-visible { outline: 2px solid var(--muted); outline-offset: -2px; }
+.home-data-actions [role=button]:hover, .home-data-actions [role=button]:focus-visible { background: var(--active); color: var(--accent-strong); outline: none; }
+.home-data-menu :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .landing-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(340px, 1fr) minmax(360px, 1.1fr); }
 
 /* Opening pane */

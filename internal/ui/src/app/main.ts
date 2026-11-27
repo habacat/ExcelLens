@@ -1969,7 +1969,11 @@ function bootstrap(): void {
       name: '打开所选单元格的超链接',
       shortcut: 'Ctrl+Enter',
       tags: '打开所选单元格超链接 跳转 工作表 网页',
-      run: () => nav.followCellHyperlink(S.selected?.hyperlink),
+      run: () =>
+        nav.followCellHyperlink(
+          S.selected?.hyperlink,
+          S.selected ? { sheet: S.selected.sheet, ref: S.selected.ref } : null,
+        ),
     },
     {
       name: '全部工作表',
@@ -2093,7 +2097,7 @@ function bootstrap(): void {
       nav.moveSelection(rowDelta, colDelta, extend, keepAnchor),
     jumpDataEdge: (direction, extend) => nav.jumpDataEdge(direction, extend),
     goHistory: (delta) => nav.goHistory(delta),
-    followCellHyperlink: (link) => nav.followCellHyperlink(link),
+    followCellHyperlink: (link, origin) => nav.followCellHyperlink(link, origin),
     showWelcome,
     showCellDetail: () => {
       void cellExplanation.open();

@@ -70,6 +70,7 @@ export interface GridCellElement
   _xlNextCol?: number;
   _xlRangeColor?: string;
   _xlInRange?: boolean;
+  _xlHyperlinkVisited?: boolean;
 }
 
 export interface GridRowElement extends HTMLDivElement {
@@ -362,6 +363,7 @@ export interface WorkbookState {
   multiRanges: SelectionArea[];
   rangeAnchor: CellPoint | null;
   rangeFrameRaf: number;
+  visitedHyperlinks: Set<string>;
   linkErrorSheet: string;
   gridNavigation: object | null;
   columnWidths: Record<string, number>;
@@ -487,6 +489,7 @@ export function createInitialWorkbookState(maxRow: number, maxCol: number): Work
     multiRanges: [],
     rangeAnchor: null,
     rangeFrameRaf: 0,
+    visitedHyperlinks: new Set(),
     linkErrorSheet: '',
     gridNavigation: null,
     columnWidths: {},

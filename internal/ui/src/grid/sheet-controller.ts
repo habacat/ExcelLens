@@ -1229,7 +1229,7 @@ export class SheetController {
     }
     const largeStatus = requireEl('largeDataStatus');
     largeStatus.hidden = !S.largeData;
-    largeStatus.title = `关闭纵向 Ctrl+方向键扫描；查重区域最多${fileFormats.largeDataRows.toLocaleString('zh-CN')}行。筛选与排序共用${(fileFormats.queryTempBytes / 1024 ** 3).toLocaleString('zh-CN')} GiB临时空间，超出时不发布新结果。`;
+    largeStatus.title = `大表模式已启用：关闭纵向 Ctrl+方向键全列扫描，查重最多 ${fileFormats.largeDataRows.toLocaleString('zh-CN')} 行；筛选与排序共用 ${(fileFormats.queryTempBytes / 1024 ** 3).toLocaleString('zh-CN')} GB 临时空间。`;
     const enabled = Boolean(S.autoFilter);
     const button = requireButton('filterOpenBtn');
     button.classList.toggle('format-active', enabled);
