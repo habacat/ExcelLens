@@ -1,0 +1,38 @@
+{
+  "version": "1.21.0",
+  "os": "windows",
+  "go": "go1.27.4",
+  "result": "PASS",
+  "steps": [
+    {
+      "name": "project metadata, documentation and package boundaries",
+      "result": "PASS",
+      "durationMs": 5503
+    },
+    {
+      "name": "offline vendored dependency resolution",
+      "result": "PASS",
+      "durationMs": 7450
+    },
+    {
+      "name": "Go tests",
+      "result": "PASS",
+      "durationMs": 179415
+    },
+    {
+      "name": "Go vet",
+      "result": "PASS",
+      "durationMs": 10051
+    },
+    {
+      "name": "Frontend TypeScript typecheck, lint, architecture, bundle and tests",
+      "result": "PASS",
+      "durationMs": 208644
+    },
+    {
+      "name": "generated function catalog",
+      "result": "PASS",
+      "durationMs": 505
+    }
+  ]
+}

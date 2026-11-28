@@ -2,7 +2,11 @@
 
 ## 接续入口
 
-1.21.0 更新六种界面语言、托盘语言设置和粗边框交点。回归覆盖 11 次语言切换、9 条高级搜索示例、44 个交点、24 组共边及 6 组分页预览。自动验证收据随源码提供，桌面人工验收及 Office/WPS 实机对照未执行。[版本说明](../releases/1.21.0.md) · [工作流验证](../../validation/1.21.0/workflow-verification.json)
+1.21.0 已于 2026-11-28 公开发布，源码标签指向 `2cae14a`。本版更新六种界面语言、托盘语言设置和粗边框交点。回归覆盖 11 次语言检查、9 条高级搜索示例、44 个交点、24 组共边及 6 组分页预览。桌面人工验收、Office/WPS 实机对照及逐条母语审校未执行。[发行页](https://github.com/habacat/ExcelLens/releases/tag/v1.21.0) · [版本说明](../releases/1.21.0.md) · [工作流验证](../../validation/1.21.0/workflow-verification.json)
+
+标签标准门禁及主线和标签的 Windows、Ubuntu CI 均通过，Ubuntu 的全仓竞态通过。加入发行收据后的本机标准检查同样通过。Windows 包 122 项，标签源码包 3778 个 Git 文件。从源码 ZIP 在空 Go 缓存、禁用依赖网络、无 node_modules 条件下重建，UPX 压缩后与发布 EXE 逐字节一致。四件公开附件均经匿名下载，完整文件的字节数及 SHA-256 与 GitHub 记录和本地交付一致。两个 ZIP 使用 HTTP 分段下载并重组。[发布矩阵](../../validation/1.21.0/performance-baseline.json) · [离线复建](../../validation/1.21.0/local-release.json) · [公开下载核验](../../validation/1.21.0/github-release.json)
+
+100 万行 CSV 四对 25 秒同机滚动复核，中位数 34.39 → 34.36 FPS，空白帧均为 0。可见数据未覆盖帧合计 49 → 94，其中新版本第一轮占 79 帧。正式矩阵的单次滚动读数为 28.37 FPS，空白帧为 0。后续按新的实表反馈或滚动覆盖采样接续。[滚动配对](../../validation/1.21.0/scroll-followup.json)
 
 ## 1.20.3 历史记录
 

@@ -1,0 +1,26 @@
+{
+  "version": "1.21.0",
+  "result": "PASS",
+  "publicCommit": "2cae14a76da22e7858689599d1955613d2ebc7f8",
+  "windowsPackageFiles": 122,
+  "sourcePackageFiles": 3778,
+  "toolchain": "go1.27.4 windows/amd64",
+  "packer": "upx 5.3.1 --best --lzma",
+  "sha256": {
+    "ExcelLens_1.21.0_Windows_x64_Full.zip": "52e8bc6b7115662a6cdb0260724fcb4d0c9853d99ae9cb78c06258e40d5935fa",
+    "ExcelLens_1.21.0_Source_Full.zip": "7bce42d3f4675fafa8238a7820e15b6ca5fe1d888f196c27420cc2df8dc5a365",
+    "ExcelLens_1.21.0_Performance.json": "306b3b582bbca1d6d88b3dc72a24ded307663915f61fdb1c7783e389543bcc40",
+    "ExcelLens_1.21.0_SHA256SUMS.txt": "0cea15ec4988f8264dfac6467f44e5cdbf4cee6712d25bcb35d0498fd923f9a8"
+  },
+  "exeSHA256": "d033d85eae5a5b6717a7e9a7e9f1cf6ce00bf37908515e9609500bcf723cd1fd",
+  "unpackedExeBytes": 57783296,
+  "exeBytes": 11945984,
+  "executableVersion": "ExcelLens 1.21.0",
+  "upxIntegrity": "PASS",
+  "PEManifest": "PerMonitorV2",
+  "cgo": false,
+  "sourceArchiveOfflineRebuildIdentical": true,
+  "nodeModulesPresentDuringOfflineRebuild": false,
+  "emptyModuleAndBuildCachesAtStart": true,
+  "resourceRebuildIdentical": true
+}
