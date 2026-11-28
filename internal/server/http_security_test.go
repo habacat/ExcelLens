@@ -11,12 +11,16 @@ import (
 )
 
 // Recorder requests do not have the local socket metadata that net/http
-// supplies on real connections.
+// supplies on real connections. The fixture's default language also keeps
+// response assertions independent of the host display language.
 func localTestConnection(r *http.Request) *http.Request {
 	addr := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 32123}
 	r = r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, addr))
 	r.RemoteAddr = "127.0.0.1:54321"
 	r.Host = addr.String()
+	if r.Header.Get("Accept-Language") == "" {
+		r.Header.Set("Accept-Language", "zh-Hans")
+	}
 	return r
 }
 
