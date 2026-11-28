@@ -14,6 +14,7 @@ import (
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -84,13 +85,13 @@ func mergeStatIntervals(items []statColInterval) []statColInterval {
 // row indexes for filtered/sorted views. Only actual filtered rows may be read.
 func makeStatRows(req selectionStatRequest, idx *workbook.SheetIndex, filter *FilterResult, views ...*sheetRowView) (map[int][]statColInterval, int64, error) {
 	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != req.ViewID) {
-		return nil, 0, errors.New("选区的可见行视图已失效，请重新选择")
+		return nil, 0, i18n.Error("service.selectionStats.visibleRowViewSelectionInvalid")
 	}
 	if len(req.Ranges) == 0 || len(req.Ranges) > maxSelectionRects {
-		return nil, 0, errors.New("选区数量必须在1至256之间")
+		return nil, 0, i18n.Error("service.selectionStats.numberSelectionsMustBeBetween")
 	}
 	if req.ExcludeThroughRow < 0 || req.ExcludeThroughRow > 30 {
-		return nil, 0, errors.New("冻结行参数无效")
+		return nil, 0, i18n.Error("service.selectionStats.frozenRowParametersInvalid")
 	}
 	view, err := newSelectionRowView(idx, filter, req.ExcludeThroughRow, views...)
 	if err != nil {
@@ -102,7 +103,7 @@ func makeStatRows(req selectionStatRequest, idx *workbook.SheetIndex, filter *Fi
 		c1, r1, e1 := workbook.ParseCellRef(sel.Start)
 		c2, r2, e2 := workbook.ParseCellRef(sel.End)
 		if e1 != nil || e2 != nil {
-			return nil, 0, errors.New("选区地址无效")
+			return nil, 0, i18n.Error("service.selectionStats.selectedConstituencyAddressInvalid")
 		}
 		if c1 > c2 {
 			c1, c2 = c2, c1
@@ -111,7 +112,7 @@ func makeStatRows(req selectionStatRequest, idx *workbook.SheetIndex, filter *Fi
 		numbers, err := view.rows(r1, r2, sel.VisualStart, sel.VisualEnd, int((maxQuickStatCells-budget)/width))
 		if err != nil {
 			if errors.Is(err, errSelectionLimit) {
-				return nil, 0, errors.New("选区超过40万格，请缩小选区后查看即时统计")
+				return nil, 0, i18n.Error("service.selectionStats.selectionAreaExceedsCellsReduce")
 			}
 			return nil, 0, err
 		}
@@ -199,17 +200,17 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		writeError(w, 400, "选区统计参数无效")
+		writeMessage(w, 400, "service.selectionStats.selectionStatisticsParametersInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "请先打开工作簿")
+		writeMessage(w, 409, "service.selectionStats.openWorkbookFirst")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "找不到指定工作表")
+		writeMessage(w, 404, "service.selectionStats.unableFindSpecifiedWorksheet")
 		return
 	}
 	release, err := a.lockQueryRead(r.Context())
@@ -218,12 +219,12 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 	}
 	defer release()
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换")
+		writeMessage(w, 409, "service.selectionStats.workbookSwitched")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先打开并索引工作表")
+		writeMessage(w, 409, "service.selectionStats.openIndexWorksheetFirst")
 		return
 	}
 	var filter *FilterResult
@@ -231,7 +232,7 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		filter = a.filterSnapshot(req.FilterID)
 		defer filter.close()
 		if filter == nil || filter.SheetPath != meta.Path {
-			writeError(w, 409, "筛选结果已失效")
+			writeMessage(w, 409, "service.filter.expired")
 			return
 		}
 	}
@@ -240,14 +241,14 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		var err error
 		visible, err = a.rowViewSnapshot(req.ViewID, wb, idx, meta.Path, req.FilterID)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer visible.close()
 	}
 	selected, total, err := makeStatRows(req, idx, filter, visible)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	res := selectionStatResult{Total: total, Ranges: len(req.Ranges), Filtered: req.FilterID != "", Sum: "0", Average: "0"}
@@ -346,7 +347,7 @@ func (a *App) handleSelectionStats(w http.ResponseWriter, r *http.Request) {
 		})
 		if readErr != nil {
 			if !errors.Is(readErr, context.Canceled) {
-				writeError(w, 500, "读取选区失败："+readErr.Error())
+				writeMessage(w, 500, "service.selectionStats.readingSelectionFailed", i18n.Args{"detail": readErr})
 			}
 			return
 		}

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"maps"
 	"math"
@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+
+	"excellens/internal/i18n"
 )
 
 // Each stage is on its target volume. The durable decision and the ordered list
@@ -37,11 +39,11 @@ func (r Roots) units(files map[string]fileRecord) ([]restoreUnit, error) {
 	for name, rec := range files {
 		digest, err := hex.DecodeString(rec.SHA256)
 		if !r.backupPart(name) || err != nil || len(digest) != 32 || rec.Bytes < 0 || rec.Bytes == math.MaxInt64 {
-			return nil, fmt.Errorf("备份含无效记录：%s", name)
+			return nil, i18n.Error("diagnostic.localstore.restoreJournal.backupContainsInvalidRecords", i18n.Args{"name": name})
 		}
 		parts := strings.Split(name, "/")
 		if len(parts) < 3 && parts[1] != "recent.json" {
-			return nil, errors.New("备份文件位置无效")
+			return nil, i18n.Error("diagnostic.localstore.restoreJournal.invalidBackupFileLocation")
 		}
 		key := strings.Join(parts[:min(3, len(parts))], "/")
 		groups[key] = append(groups[key], name)
@@ -57,7 +59,7 @@ func (r Roots) units(files map[string]fileRecord) ([]restoreUnit, error) {
 			target = strings.ToLower(target)
 		}
 		if physical[target] {
-			return nil, fmt.Errorf("重复迁入目标：%s", key)
+			return nil, i18n.Error("diagnostic.localstore.restoreJournal.repeatedImportTarget", i18n.Args{"key": key})
 		}
 		physical[target] = true
 		result = append(result, restoreUnit{key, base, filepath.FromSlash(rel), groups[key]})
@@ -74,7 +76,7 @@ func (r Roots) savePlan(p restorePlan) error {
 		return err
 	}
 	if len(data) > manifestLimit {
-		return errors.New("恢复事务超过容量")
+		return i18n.Error("diagnostic.localstore.restoreJournal.recoveryTransactionsExceedCapacity")
 	}
 	return replaceDurable(r.Config, journalName, data)
 }
@@ -136,21 +138,21 @@ func (r Roots) RecoverWith(ctx context.Context, options TransferOptions) error {
 	}
 	id, err := hex.DecodeString(p.ID)
 	if err != nil || len(id) != 16 {
-		return errors.New("恢复事务标识无效")
+		return i18n.Error("diagnostic.localstore.restoreJournal.recoveryTransactionIdentifierInvalid")
 	}
 	switch p.Phase {
 	case "prepare", "cleanup":
 		return r.cleanupRestore(p)
 	case "commit":
 		if len(p.Files) == 0 {
-			return errors.New("恢复事务缺少数据单元")
+			return i18n.Error("diagnostic.localstore.restoreJournal.recoveryTransactionsLackDataUnits")
 		}
 		if err := options.enterCommit(ctx); err != nil {
 			return err
 		}
 		return r.publishPlan(context.WithoutCancel(ctx), p, true)
 	default:
-		return errors.New("恢复事务状态无效")
+		return i18n.Error("diagnostic.localstore.restoreJournal.recoveryTransactionStateInvalid")
 	}
 }
 func (r Roots) publishPlan(ctx context.Context, p restorePlan, replay bool) error {
@@ -170,22 +172,22 @@ func (r Roots) publishPlan(ctx context.Context, p restorePlan, replay bool) erro
 		return err
 	}
 	if err == nil && (json.Unmarshal(progress, &next) != nil || next < 0 || next > len(units)) {
-		return errors.New("恢复事务游标无效")
+		return i18n.Error("diagnostic.localstore.restoreJournal.recoveryTransactionCursorInvalid")
 	}
 	var total int64
 	if replay {
 		for _, rec := range p.Files {
 			if rec.Bytes > math.MaxInt64-total {
-				return errors.New("恢复事务字节总数无效")
+				return i18n.Error("diagnostic.localstore.restoreJournal.invalidTotalNumberRecoveryTransactions")
 			}
 			total += rec.Bytes
 		}
 	}
-	phase(ctx, "提交恢复事务", total, len(units))
+	phase(ctx, "stage.task.submitRecoveryTransaction", total, len(units))
 	for i, u := range units {
 		if i >= next || replay {
 			if err := r.installUnit(ctx, p, u, replay, i < next); err != nil {
-				return fmt.Errorf("恢复事务等待继续（%s）：%w", u.key, err)
+				return i18n.Wrap("diagnostic.localstore.restoreJournal.recoveryProcessWaitingContinue", err, i18n.Args{"key": u.key})
 			}
 		}
 		if i >= next {
@@ -218,7 +220,7 @@ func (r Roots) installUnit(ctx context.Context, p restorePlan, u restoreUnit, re
 				return err
 			}
 			if rec != p.Files[name] {
-				return errors.New("数据与事务清单不符")
+				return i18n.Error("diagnostic.localstore.restoreJournal.dataDoesNotMatchTransaction")
 			}
 		}
 		return nil
@@ -232,7 +234,7 @@ func (r Roots) installUnit(ctx context.Context, p restorePlan, u restoreUnit, re
 		return err
 	}
 	if acknowledged {
-		return errors.New("已确认迁入的数据缺失")
+		return i18n.Error("diagnostic.localstore.restoreJournal.confirmedDataImportFailed")
 	}
 	stage := r.stage(p.ID, u.base)
 	if replay {

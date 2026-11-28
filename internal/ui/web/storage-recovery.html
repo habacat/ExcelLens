@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="app-token" content="__APP_TOKEN__"><title>本地数据 · ExcelLens</title><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/dialogs.css"></head>
-<body><main class="storage-recovery"><h1>本地数据恢复</h1><p>恢复完成后自动打开首页。</p>
+<html lang="{{.Locale}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="app-token" content="__APP_TOKEN__"><title>{{.T `html.storageRecovery.localDataExcellens`}}</title><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/dialogs.css"></head>
+<body><main class="storage-recovery"><h1>{{.T `html.storageRecovery.localDataRecovery`}}</h1><p>{{.T `html.storageRecovery.homeScreenOpensAfterRecovery`}}</p>
 <p id="recoveryReason" class="inline-error" role="alert" hidden></p><pre class="storage-paths" id="recoveryDirectories"></pre>
-<details id="recoveryUsage"><summary>本地数据占用</summary><div id="recoveryGroups"></div></details>
-<button type="button" class="primary-button" id="recoveryRetry" disabled>继续恢复</button><p role="status" id="recoveryProgress"></p></main>
+<details id="recoveryUsage"><summary>{{.T `html.storageRecovery.localStorageUsage`}}</summary><div id="recoveryGroups"></div></details>
+<button type="button" class="primary-button" id="recoveryRetry" disabled>{{.T `html.storageRecovery.resumeRecovery`}}</button><p role="status" id="recoveryProgress"></p></main>
+<script id="languageMessages" type="application/json">__LANGUAGE_MESSAGES__</script>
 <script src="/assets/storage-recovery.js"></script></body></html>

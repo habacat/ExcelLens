@@ -2,7 +2,7 @@ package localstore
 
 import (
 	"errors"
-	"fmt"
+
 	"io"
 	"io/fs"
 	"os"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"excellens/internal/filelock"
+	"excellens/internal/i18n"
 )
 
 const stagePayload = "payload"
@@ -91,7 +92,7 @@ func (layout stageLayout) create(parent, pattern string) (string, func() error, 
 
 func (layout stageLayout) inspect(parent *os.Root, name string, clean bool) (string, error) {
 	if !layout.pattern.MatchString(name) {
-		return "", errors.New("暂存目录名称无效")
+		return "", i18n.Error("diagnostic.localstore.backupStage.invalidTemporaryStorageDirectoryName")
 	}
 	st, err := parent.Lstat(name)
 	if err != nil || !st.IsDir() {
@@ -132,7 +133,7 @@ func (layout stageLayout) inspect(parent *os.Root, name string, clean bool) (str
 	}
 	for _, e := range entries {
 		if e.Name() != stagePayload && e.Name() != layout.marker {
-			return "", errors.New("暂存目录含其他文件，请先核对")
+			return "", i18n.Error("diagnostic.localstore.backupStage.temporaryDirectoryContainsOtherFiles")
 		}
 	}
 	if err := stage.RemoveAll(stagePayload); err != nil {
@@ -152,7 +153,7 @@ func (layout stageLayout) inspect(parent *os.Root, name string, clean bool) (str
 		return "", err
 	}
 	if !os.SameFile(st, current) {
-		return "", errors.New("暂存目录已更换")
+		return "", i18n.Error("diagnostic.localstore.backupStage.savedDirectoryChanged")
 	}
 	return "removed", parent.Remove(name)
 }
@@ -201,7 +202,7 @@ func (r Roots) CleanBackupStage(folder, name string) error {
 		return err
 	}
 	if state != "removed" {
-		return fmt.Errorf("暂存目录仍在使用或缺少所有权标记：%s", name)
+		return i18n.Error("diagnostic.localstore.backupStage.tempDirectoryStillUseOr", i18n.Args{"name": name})
 	}
 	return nil
 }

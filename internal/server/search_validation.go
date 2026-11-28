@@ -12,18 +12,18 @@ func (a *App) handleSearchValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.currentWorkbook() == nil {
-		writeError(w, http.StatusConflict, "请先打开原始工作簿")
+		writeMessage(w, http.StatusConflict, "service.searchValidation.openOriginalWorkbookFirst")
 		return
 	}
 	var req struct {
 		Query string `json:"query"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&req); err != nil {
-		writeError(w, 400, "查询语句无效")
+		writeMessage(w, 400, "service.searchValidation.invalidQueryStatement")
 		return
 	}
 	if _, err := searchdsl.Parse(req.Query); err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"valid": true})

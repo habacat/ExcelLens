@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 	"excellens/internal/workbook"
 )
@@ -47,7 +48,7 @@ func createDatabaseSnapshotFixture(t *testing.T) *workbook.Workbook {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, group := range roots.Inventory(ctx) {
+	for _, group := range roots.Inventory(ctx, i18n.Default) {
 		if group.Name == "数据库快照" && (group.Files != 0 || group.Error != "") {
 			t.Fatalf("incomplete snapshot counted as evidence: %#v", group)
 		}

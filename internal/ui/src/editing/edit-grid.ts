@@ -3,6 +3,7 @@
  * projection cache for edited/calculated/generated/affected cells, keyboard
  * & mouse orchestration, queued actions, fill handle, and validation dropdown.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   ActivityHandle,
   ApiClient,
@@ -532,7 +533,7 @@ export class SheetEditor {
 
   async sync(changes?: readonly EditChange[], signal?: AbortSignal): Promise<void> {
     const data = this.owner.data;
-    if (!data) throw new Error('文件或修订已切换，请刷新修订');
+    if (!data) throw new Error(localize('ui.editGrid.fileOrRevisionSwitchedRefresh'));
     const doc = data.document;
     const book = this.book;
     const cells = changes?.map(({ sheet, row, col }) => ({ sheet, row, col }));
@@ -549,7 +550,7 @@ export class SheetEditor {
       current.binding !== doc.binding ||
       current.revision !== doc.revision
     ) {
-      throw new Error('文件或修订已切换，请刷新修订');
+      throw new Error(localize('ui.editGrid.fileOrRevisionSwitchedRefresh'));
     }
     const patches = this.patches ?? new Map<string, Map<string, CellData>>();
     this.patches = patches;
@@ -627,7 +628,7 @@ export class SheetEditor {
         return {
           ...patched,
           raw: '',
-          display: area.pivot ? '待刷新' : '待重算',
+          display: area.pivot ? localize('ui.editGrid.beUpdated') : localize('ui.common.beRecalculatedLater'),
           richText: undefined,
           valueColor: '',
           conditional: undefined,
@@ -638,7 +639,7 @@ export class SheetEditor {
       return {
         ...patched,
         raw: '',
-        display: '待重算',
+        display: localize('ui.common.beRecalculatedLater'),
         cacheMissing: true,
         richText: undefined,
         valueColor: '',
@@ -674,7 +675,7 @@ export class SheetEditor {
     return (
       this.shape?.readOnly ||
       (doc
-        ? `修订 ${doc.revision} · ${doc.changed} 格修改${doc.structuresChanged ? ` · ${doc.structuresChanged} 项结构操作` : ''}`
+        ? localize('ui.editGrid.revisingStructure', { revision: doc.revision, changed: doc.changed, detail: doc.structuresChanged ? ` ${localize('ui.editGrid.itemStructureOperation', { structuresChanged: doc.structuresChanged })}` : '' })
         : '')
     );
   }
@@ -722,7 +723,7 @@ export class SheetEditor {
     const cell = this.selected;
     const raw = textOf(cell);
     (byId('editGridMoreLabel') ?? requireButton('editGridMore')).textContent =
-      this.owner.tools.pivotAt(cell) ? '透视布局' : '更多编辑';
+      this.owner.tools.pivotAt(cell) ? localize('ui.editGrid.pivotLayout') : localize('ui.editGrid.moreEditors');
     this.formula.value = encodeEditText(raw, raw.includes('\r'));
     this.input.value = '';
     requireSelect('editGridKind').value = 'auto';
@@ -804,7 +805,7 @@ export class SheetEditor {
     const doc = this.owner.data?.document;
     try {
       if (!this.active || !cell || !this.view.ready() || this.stale || this.owner.pending || !doc) {
-        throw new Error('请先核对当前修订');
+        throw new Error(localize('ui.editGrid.checkCurrentRevisionsFirst'));
       }
       if (this.ranges.copied?.cut) this.ranges.cancelCut();
       const address = parseEditTarget(cell.ref, shape);
@@ -843,7 +844,7 @@ export class SheetEditor {
           if (this.draft !== d) return false;
           if (source.readOnly || (this.owner.data?.encoding && source.value.kind === 'missing')) {
             this.cancelDraft();
-            this.status(source.readOnly || '该记录缺少此列', true);
+            this.status(source.readOnly || localize('ui.editGrid.thisRecordLacksThisColumn'), true);
             return false;
           }
           const unchanged = !replace && d.text === d.initial;
@@ -869,7 +870,7 @@ export class SheetEditor {
           }
           return false;
         });
-      if (escaped) this.status('格内回车显示为 \\r，反斜线显示为 \\\\');
+      if (escaped) this.status(localize('ui.editGrid.carriageReturnWithinCellDisplayed'));
       return true;
     } catch (error: unknown) {
       this.status(errorMessage(error), true);
@@ -999,7 +1000,7 @@ export class SheetEditor {
     if (this.moving || this.owner.pending || !this.owner.data) return;
     const d = this.draft;
     const kind = requireSelect('editGridKind').value;
-    await this.owner.run('正在刷新修订…', async (signal) => {
+    await this.owner.run(localize('ui.editGrid.refreshingRevisions'), async (signal) => {
       if (!this.owner.data) return;
       const nextData = await this.owner.post(
         'state',
@@ -1021,7 +1022,7 @@ export class SheetEditor {
           this.input.value = d.text;
           this.formula.value = d.text;
           requireSelect('editGridKind').value = kind;
-          this.status('已刷新修订，请核对输入后按 Enter');
+          this.status(localize('ui.editGrid.revisionsHaveRefreshedCheckInput'));
         }
       } else {
         this.selection();
@@ -1043,10 +1044,10 @@ export class SheetEditor {
 
   async copyForCut(): Promise<void> {
     if (this.owner.data?.encoding) {
-      this.status('整块剪切需要 Excel 工作簿副本', true);
+      this.status(localize('ui.editGrid.copyExcelWorkbookRequiredFull'), true);
       return;
     }
-    if (await this.view.copy(false, true)) this.status('选择粘贴位置，Esc 取消剪切');
+    if (await this.view.copy(false, true)) this.status(localize('ui.editGrid.selectPasteLocationEscCancel'));
   }
 
   applySelectionEntry(): Promise<boolean> {
@@ -1066,7 +1067,7 @@ export class SheetEditor {
         return saved;
       },
       false,
-      '正在填充选区',
+      localize('ui.common.selectionBeingFilled'),
     );
   }
 
@@ -1091,7 +1092,7 @@ export class SheetEditor {
         return ok;
       },
       true,
-      '正在粘贴选区',
+      localize('ui.editGrid.pastingSelectedArea'),
     );
   }
 
@@ -1230,7 +1231,7 @@ export class SheetEditor {
       void this.act(
         () => this.ranges.fill(lower === 'd' ? 'fill-down' : 'fill-right'),
         true,
-        '正在填充选区',
+        localize('ui.common.selectionBeingFilled'),
       );
       return;
     }
@@ -1263,7 +1264,7 @@ export class SheetEditor {
     }
     if (key === 'Delete') {
       take();
-      void this.act(() => this.ranges.clear(), true, '正在清除选区');
+      void this.act(() => this.ranges.clear(), true, localize('ui.editGrid.selectingAreaProgress'));
       return;
     }
     if (key === 'Backspace') {

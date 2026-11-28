@@ -14,6 +14,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -66,7 +67,7 @@ type profileReport struct {
 	Distribution    *analysis.NumericDistribution `json:"distribution,omitempty"`
 }
 
-var errProfileCapacity = errors.New("选区内容超过数据洞察容量，请缩小范围或使用流式导出")
+var errProfileCapacity = i18n.Error("service.profile.selectedContentExceedsDataInsight")
 
 // Explicit inspection retains exact original types and one immutable source
 // scope. Distribution adds external sorting only when the caller requests it.
@@ -79,49 +80,49 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.ProfileRequestBytes))
 	var req profileRequest
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.ExcludeThroughRow < 0 || req.ExcludeThroughRow > 30 || req.IncludeDistribution && (req.WorkbookKey == "" || req.Book == "" || req.BindingViewID == "") || req.BindingFilterID != "" && req.BindingViewID == "" {
-		writeError(w, 400, "分析参数无效，请重新选择范围")
+		writeMessage(w, 400, "service.profile.analysisParametersInvalidReselectRange")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "请先打开工作簿")
+		writeMessage(w, 409, "service.profile.openWorkbookFirst")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint || req.Book != "" && req.Book != sourceBookID(wb) {
-		writeError(w, 409, "分析来源已切换，请重新打开数据洞察")
+		writeMessage(w, 409, "service.profile.analysisSourceSwitchedReopenData")
 		return
 	}
 	releaseCapture := a.lockCacheRead()
 	defer releaseCapture()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "找不到工作表")
+		writeMessage(w, 404, "service.profile.unableFindWorksheet")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先打开并索引该工作表")
+		writeMessage(w, 409, "service.profile.openIndexThisWorksheetFirst")
 		return
 	}
 	first, row1, e1 := workbook.ParseCellRef(req.Start)
 	last, row2, e2 := workbook.ParseCellRef(req.End)
 	if e1 != nil || e2 != nil {
-		writeError(w, 400, "请先选择有效的单元格区域")
+		writeMessage(w, 400, "service.profile.selectValidCellRange")
 		return
 	}
 	first, last = min(first, last), max(first, last)
 	if first > idx.MaxCol {
-		writeError(w, 400, "选区超出工作表有效列范围")
+		writeMessage(w, 400, "service.profile.selectionExceedsValidColumnRange")
 		return
 	}
 	last = min(last, idx.MaxCol)
 	if req.ViewID != "" && req.BindingViewID != "" && req.ViewID != req.BindingViewID {
-		writeError(w, 409, "选区视图已变化，请重新选择")
+		writeMessage(w, 409, "service.profile.selectionViewChangedReselect")
 		return
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
@@ -129,7 +130,7 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 	if req.BindingViewID != "" {
 		binding, err = a.selectionSnapshot(wb, idx, meta.Path, req.BindingFilterID, req.BindingViewID)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer binding.close()
@@ -150,7 +151,7 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		a.mu.RUnlock()
 		if !valid {
-			return errors.New("分析来源或视图已变化，请重新选择")
+			return i18n.Error("service.profile.analysisSourceOrViewChanged")
 		}
 		return wb.CheckSourceUnchanged()
 	}
@@ -162,17 +163,17 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 	defer releaseQuery()
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
 	rows, count, err := profileSelectionRows(idx, snapshot, row1, row2, req.analysisSelectionCoordinates)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	if int64(count)*int64(last-first+1) > formats.ProfileCells {
-		writeError(w, 400, "当前选区超过400万个单元格，请缩小范围后分析")
+		writeMessage(w, 400, "service.profile.currentSelectionCoversMoreThan")
 		return
 	}
 	result, err := readProfile(r.Context(), wb, idx, req, rows, count, first, last)
@@ -193,7 +194,7 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	if changed := current(); changed != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, changed.Error())
+			writeFailure(w, 409, changed)
 		}
 		return
 	}
@@ -202,7 +203,7 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errProfileCapacity) {
 			status = 413
 		}
-		writeError(w, status, "数据分析失败："+err.Error())
+		writeMessage(w, status, "service.profile.dataAnalysisFailed", i18n.Args{"detail": err})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -216,10 +217,10 @@ func (a *App) handleProfile(w http.ResponseWriter, r *http.Request) {
 func profileSelectionRows(idx *workbook.SheetIndex, snapshot selectionSnapshot, row1, row2 int, coords analysisSelectionCoordinates) (iter.Seq[workbook.SourceRowReference], int, error) {
 	visual := coords.ViewID != "" || coords.VisualStart != 0 || coords.VisualEnd != 0 || coords.ExcludeThroughRow != 0
 	if visual && snapshot.filter == nil && snapshot.visible == nil {
-		return nil, 0, errors.New("可视选区缺少有效筛选结果，请重新选择")
+		return nil, 0, i18n.Error("service.profile.visibleSelectionLacksValidFiltering")
 	}
 	if coords.ViewID != "" && (snapshot.visible == nil || snapshot.visible.data.id != coords.ViewID) {
-		return nil, 0, errors.New("可见行视图已失效")
+		return nil, 0, i18n.Error("service.profile.visibleRowViewsHaveBecome")
 	}
 	if visual || snapshot.filter == nil {
 		view, err := newSelectionRowView(idx, snapshot.filter, coords.ExcludeThroughRow, snapshot.visible)
@@ -237,7 +238,7 @@ func profileSelectionRows(idx *workbook.SheetIndex, snapshot selectionSnapshot, 
 	}
 	lo, hi := min(row1, row2), max(row1, row2)
 	if lo < 1 || hi > workbook.MaxRowsForIndex(idx) || snapshot.filter.Rows.SourceRows() != idx.RowCount() {
-		return nil, 0, errors.New("分析范围或筛选来源无效")
+		return nil, 0, i18n.Error("service.profile.analysisRangeOrFilterSource")
 	}
 	set := snapshot.filter.Rows.Set()
 	start, end := set.LowerBound(idx.FindRowOffset(lo)), set.LowerBound(idx.FindRowOffset(hi+1))
@@ -358,7 +359,7 @@ func readProfile(ctx context.Context, wb *workbook.Workbook, idx *workbook.Sheet
 			}
 			value, ok := new(big.Rat).SetString(record.Key)
 			if !ok {
-				return errors.New("精确排序结果无效")
+				return i18n.Error("service.profile.ineffectivePreciseSortingResults")
 			}
 			return distribution.AddSorted(value)
 		}, nil)

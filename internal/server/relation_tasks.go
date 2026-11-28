@@ -3,13 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
@@ -87,21 +88,21 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var req relationStartRequest
 	if decodeRelationRequest(w, r, &req) != nil || req.Mode != "prepare" && req.Mode != "preview" || req.Mode == "prepare" && (req.Left == nil || req.Right == nil || req.Query == nil || req.ParentID != "") || req.Mode == "preview" && (req.ParentID == "" || req.Left != nil || req.Right != nil || req.Query != nil) {
-		writeError(w, 400, "关联任务参数无效")
+		writeMessage(w, 400, "service.relationTasks.associatedTaskParametersInvalid")
 		return
 	}
 	if req.OutputMode == "" {
 		req.OutputMode = "left"
 	}
 	if _, err := (reconcile.RelationCounts{}).Rows(req.OutputMode); err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	primary := a.currentWorkbook()
 	if primary == nil || req.WorkbookKey != primary.Fingerprint || req.Book != sourceBookID(primary) {
-		writeError(w, 409, "工作簿已切换，请重新选择关联来源")
+		writeMessage(w, 409, "service.relationTasks.workbookSwitchedSelectAssociatedSource")
 		return
 	}
 	var inputs *relationInputs
@@ -120,11 +121,11 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 		source, err = a.borrowRelationTask(req.ParentID, primary)
 	}
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &relationTask{ID: randomID(), Mode: req.Mode, OutputMode: req.OutputMode, ParentID: req.ParentID, Primary: primary, Created: time.Now(), Status: "queued", Stage: "等待关联任务", ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	job := &relationTask{ID: randomID(), Mode: req.Mode, OutputMode: req.OutputMode, ParentID: req.ParentID, Primary: primary, Created: time.Now(), Status: "queued", Stage: "stage.task.waitingForAssociatedTask", ctx: ctx, cancel: cancel, done: make(chan struct{})}
 	if job.ParentID == "" {
 		job.ParentID = job.ID
 	}
@@ -132,7 +133,7 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 	if a.wb != primary || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.relationTasks.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	active, keep := 0, req.KeepID
@@ -155,7 +156,7 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 	if active >= formats.RelationActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "已有关联任务，请等待完成或取消后重试")
+		writeMessage(w, 429, "service.relationTasks.associatedTasksHaveIdentifiedWait")
 		return
 	}
 	retired := a.pruneRelationTasksLocked(keep, formats.RelationTaskHistory-1)
@@ -165,7 +166,7 @@ func (a *App) handleRelationStart(w http.ResponseWriter, r *http.Request) {
 			resource.close()
 		}
 		cancel()
-		writeError(w, 429, "正在回收关联任务，请稍后重试")
+		writeMessage(w, 429, "service.relationTasks.associatedTasksBeingReclaimedTry")
 		return
 	}
 	a.relationJobs[job.ID] = job
@@ -184,15 +185,15 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 	defer func() {
 		a.mu.Lock()
 		if job.ctx.Err() != nil || job.discarded || a.wb != job.Primary || a.relationJobs[job.ID] != job {
-			job.Status, job.Stage, job.Error = "cancelled", "已取消", ""
+			job.Status, job.Stage, job.Error = "cancelled", "stage.task.cancelled", ""
 		} else if err != nil {
-			job.Status, job.Stage, job.Error = "error", "关联失败", err.Error()
+			job.Status, job.Stage, job.Error = "error", "stage.task.associationFailed", err.Error()
 		} else if source == nil || result == nil {
-			job.Status, job.Stage, job.Error = "error", "关联失败", "未取得完整关联结果"
+			job.Status, job.Stage, job.Error = "error", "stage.task.associationFailed", "未取得完整关联结果"
 		} else {
 			job.Source, source = source, nil
 			job.Result, result = result, nil
-			job.Status, job.Stage = "done", "关联完成"
+			job.Status, job.Stage = "done", "stage.task.associationCompleted"
 			job.Done, job.Total = 1, 1
 		}
 		a.mu.Unlock()
@@ -211,7 +212,7 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 	a.mu.Lock()
 	current := a.wb == job.Primary && a.relationJobs[job.ID] == job && !job.discarded && job.ctx.Err() == nil
 	if current {
-		job.Status, job.Stage = "running", "准备关联来源"
+		job.Status, job.Stage = "running", "stage.task.prepareSourceAssociation"
 	}
 	a.mu.Unlock()
 	if !current {
@@ -241,7 +242,7 @@ func (a *App) runRelationTask(job *relationTask, inputs *relationInputs, source 
 		return
 	}
 	if len(encoded) > formats.RelationResultBytes {
-		err = errors.New("关联预览超过显示容量，请减少结果字段")
+		err = i18n.Error("service.relationTasks.associatedPreviewsExceedDisplayCapacity")
 		return
 	}
 	var release func()
@@ -315,7 +316,7 @@ func (a *App) borrowRelationTask(id string, primary *workbook.Workbook) (*relati
 	defer a.mu.RUnlock()
 	job := a.relationJobs[id]
 	if job == nil || job.Status != "done" || job.Source == nil || job.ctx.Err() != nil || job.discarded || job.Primary != primary || a.wb != primary {
-		return nil, errors.New("关联预检尚未完成或已失效，请重新运行")
+		return nil, i18n.Error("service.relationTasks.associatedPreVerificationTasksIncomplete")
 	}
 	return job.Source.Retain(nil)
 }
@@ -329,10 +330,10 @@ func (a *App) handleRelationStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.relationJobs[r.URL.Query().Get("id")]
 	if job == nil || job.discarded || a.wb != job.Primary {
 		a.mu.RUnlock()
-		writeError(w, 404, "关联任务已失效")
+		writeMessage(w, 404, "service.relationTasks.associatedTasksHaveBecomeInvalid")
 		return
 	}
-	out := map[string]any{"jobId": job.ID, "mode": job.Mode, "outputMode": job.OutputMode, "parentId": job.ParentID, "status": job.Status, "stage": job.Stage, "error": job.Error, "done": fmt.Sprint(job.Done), "total": fmt.Sprint(job.Total), "workbookKey": job.Primary.Fingerprint, "book": sourceBookID(job.Primary)}
+	out := map[string]any{"jobId": job.ID, "mode": job.Mode, "outputMode": job.OutputMode, "parentId": job.ParentID, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "error": job.Error, "done": fmt.Sprint(job.Done), "total": fmt.Sprint(job.Total), "workbookKey": job.Primary.Fingerprint, "book": sourceBookID(job.Primary)}
 	a.mu.RUnlock()
 	writeJSON(w, out)
 }
@@ -372,7 +373,7 @@ func (a *App) handleRelationResult(w http.ResponseWriter, r *http.Request) {
 	select {
 	case a.querySem <- struct{}{}:
 	case <-r.Context().Done():
-		writeError(w, 408, "关联结果读取已取消")
+		writeMessage(w, 408, "service.relationTasks.associatedResultReadingCancelled")
 		return
 	}
 	a.cacheMu.RLock()
@@ -387,13 +388,13 @@ func (a *App) handleRelationResult(w http.ResponseWriter, r *http.Request) {
 	job := a.relationJobs[r.URL.Query().Get("id")]
 	if job == nil || job.Status != "done" || job.Source == nil || job.Result == nil || job.discarded || job.ctx.Err() != nil || a.wb != job.Primary {
 		a.mu.RUnlock()
-		writeError(w, 404, "关联结果已失效")
+		writeMessage(w, 404, "service.relationTasks.associatedResultsHaveBecomeInvalid")
 		return
 	}
 	source, err := job.Source.Retain(nil)
 	if err != nil {
 		a.mu.RUnlock()
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	result, err := job.Result.Retain(nil)
@@ -401,16 +402,16 @@ func (a *App) handleRelationResult(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 	defer source.Close()
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer result.Close()
 	if err := primary.CheckSourceUnchanged(); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if err := source.Value().plan.Check(r.Context()); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	// The independently retained JSON owns every response byte. A slow client

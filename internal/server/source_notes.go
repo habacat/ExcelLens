@@ -12,27 +12,27 @@ func (a *App) handleSourceNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	release, err := a.lockQueryRead(r.Context())
 	if err != nil {
-		writeError(w, 408, err.Error())
+		writeFailure(w, 408, err)
 		return
 	}
 	defer release()
 	wb := a.currentWorkbook()
 	if wb == nil || r.URL.Query().Get("book") != sourceBookID(wb) {
-		writeError(w, 409, "批注来源已切换")
+		writeMessage(w, 409, "service.sourceNotes.annotationSourceSwitched")
 		return
 	}
 	if source, ok := formats.Lookup(wb.Format); !ok || !source.NoteMetadata {
-		writeError(w, 422, "此来源没有可读取的工作簿批注")
+		writeMessage(w, 422, "service.sourceNotes.thisSourceNoReadableWorkbook")
 		return
 	}
 	meta, found := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !found {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.sourceNotes.worksheetDoesNotExist")
 		return
 	}
 	notes, threaded, err := wb.SheetNotes(r.Context(), meta)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]any{"items": notes, "threaded": threaded, "sheet": meta.Name})

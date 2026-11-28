@@ -3,11 +3,12 @@
 package localstore
 
 import (
-	"errors"
 	"io/fs"
 	"os"
+
+	"excellens/internal/i18n"
 )
 
 func allocatedSize(_ *os.Root, _ string, _ fs.FileInfo) (int64, error) {
-	return 0, errors.New("此平台无法读取文件分配空间")
+	return 0, i18n.Error("diagnostic.localstore.sizeOther.thisPlatformCannotReadFile")
 }

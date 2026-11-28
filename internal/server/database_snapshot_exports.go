@@ -6,7 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"os"
 	"path/filepath"
@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 // Reconciliation and relation writers put both immutable input fingerprints in
@@ -22,15 +23,15 @@ func csvSnapshotReference(in io.Reader, key string) (bool, error) {
 	reader := csv.NewReader(io.LimitReader(in, formats.ReconcileRecordBytes+1))
 	header, err := reader.Read()
 	if err != nil {
-		return false, fmt.Errorf("无法读取结果列：%w", err)
+		return false, i18n.Wrap("service.databaseSnapshotExports.unableReadResultColumns", err)
 	}
 	left, right := slices.Index(header, "左来源指纹"), slices.Index(header, "右来源指纹")
 	if left < 0 || right < 0 {
-		return false, errors.New("对账或关联结果缺少来源指纹列")
+		return false, i18n.Error("service.databaseSnapshotExports.reconciliationOrCorrelationResultsLack")
 	}
 	record, err := reader.Read()
 	if reader.InputOffset() > formats.ReconcileRecordBytes {
-		return false, errors.New("导出结果的首条来源记录超出读取上限")
+		return false, i18n.Error("service.databaseSnapshotExports.firstSourceRecordExportResult")
 	}
 	if errors.Is(err, io.EOF) {
 		return false, nil
@@ -66,7 +67,7 @@ func exportedSnapshotReference(path, key string) (bool, error) {
 		switch {
 		case part.Name == "核查记录.json" || part.Name == "_ExcelLens_manifest.json":
 			if part.UncompressedSize64 > formats.ReconcileRecordBytes {
-				return false, errors.New("导出来源清单超限")
+				return false, i18n.Error("service.databaseSnapshotExports.exceededLimitExportedSourceList")
 			}
 			f, err := part.Open()
 			if err != nil {
@@ -75,7 +76,7 @@ func exportedSnapshotReference(path, key string) (bool, error) {
 			data, err := io.ReadAll(io.LimitReader(f, formats.ReconcileRecordBytes+1))
 			f.Close()
 			if err != nil || len(data) > formats.ReconcileRecordBytes {
-				return false, errors.New("无法读取导出来源清单")
+				return false, i18n.Error("service.databaseSnapshotExports.unableReadExportedList")
 			}
 			if part.Name == "核查记录.json" {
 				hasReconcileRecord = true
@@ -84,11 +85,11 @@ func exportedSnapshotReference(path, key string) (bool, error) {
 					return false, err
 				}
 				if record.Kind != "ExcelLens.Reconcile" || record.Version != 1 {
-					return false, errors.New("无法识别核查记录版本")
+					return false, i18n.Error("service.databaseSnapshotExports.unableRecognizeVersionVerificationRecord")
 				}
 				for _, input := range record.Inputs {
 					if input.Fingerprint == "" {
-						return false, errors.New("核查记录缺少来源指纹")
+						return false, i18n.Error("service.databaseSnapshotExports.verifyingRecordsMissingSourceFingerprints")
 					}
 					if input.Fingerprint == key || input.FileSHA256 == key {
 						found = true
@@ -102,7 +103,7 @@ func exportedSnapshotReference(path, key string) (bool, error) {
 					return false, err
 				}
 				if record.Fingerprint == "" {
-					return false, errors.New("导出清单缺少来源指纹")
+					return false, i18n.Error("service.databaseSnapshotExports.exportListMissingSourceFingerprint")
 				}
 				found = found || record.Fingerprint == key
 			}
@@ -121,7 +122,7 @@ func exportedSnapshotReference(path, key string) (bool, error) {
 		}
 	}
 	if (reconcileFile && !hasReconcileRecord) || (relation && !hasRelationRows) {
-		return false, errors.New("导出包缺少来源记录")
+		return false, i18n.Error("service.databaseSnapshotExports.exportPackageLacksSourceRecords")
 	}
 	return found, nil
 }
@@ -144,7 +145,7 @@ func snapshotExportReferences(ctx context.Context, key string) ([]string, error)
 		}
 		found, err := exportedSnapshotReference(filepath.Join(ExportDir(), e.Name()), key)
 		if err != nil {
-			return nil, fmt.Errorf("导出文件 %s：%w", e.Name(), err)
+			return nil, i18n.Wrap("service.databaseSnapshotExports.exportFile", err, i18n.Args{"name": e.Name()})
 		}
 		if found {
 			refs = append(refs, "导出文件「"+e.Name()+"」")

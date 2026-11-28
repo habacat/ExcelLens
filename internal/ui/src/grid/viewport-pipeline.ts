@@ -4,6 +4,7 @@
  * fetching/projection/scheduling, canvas fallback tiles, incremental DOM
  * rendering, range frames, selection highlighting, and initial preview.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import { GridAppearance } from './grid-appearance.ts';
 import type { ApiClient, MergeRange, SelectionArea, ToastTone } from '../contracts/common.ts';
 import type { CellData, RowData, SheetViewportResponse, VisualStyle } from '../contracts/workbook.ts';
@@ -480,7 +481,7 @@ export class ViewportPipeline {
     const rowsLayer = requireEl('rowsLayer');
     rowsLayer.style.top = `${this.headerHeight()}px`;
     rowsLayer.style.width = `${width}px`;
-    requireEl('gridStatus').textContent = `${S.sheet ?? ''} · 已用区域 ${S.dimension}`;
+    requireEl('gridStatus').textContent = localize('ui.viewportPipeline.usedAread2284fe', { detail: S.sheet ?? '', dimension: S.dimension });
     this.syncFreezeScrollGutters();
     panels.pictures?.schedule();
   }
@@ -932,7 +933,7 @@ export class ViewportPipeline {
       S.viewportActivity?.end();
       S.viewportActivity = null;
     } else {
-      S.viewportActivity ??= beginActivity('正在读取可见区域', { slot: 'viewportActivitySlot' });
+      S.viewportActivity ??= beginActivity(localize('ui.viewportPipeline.readingVisibleAreas'), { slot: 'viewportActivitySlot' });
     }
     const pos = req.position;
     const vw = pos?.w ?? 0;
@@ -1406,7 +1407,7 @@ export class ViewportPipeline {
       (data.viewId ?? '') !== request.viewId ||
       (data.filterId ?? '') !== request.filterId
     ) {
-      throw new Error('工作表显示区域已变化，请重新读取');
+      throw new Error(localize('ui.viewportPipeline.worksheetDisplayAreaChangedReload'));
     }
     if (!withConditional) {
       if (S.showStyles) return undefined;
@@ -1543,7 +1544,7 @@ export class ViewportPipeline {
       this.updateCanvasSize();
       this.renderInitialPreview();
       finishSheetSwitch(epoch);
-      requireEl('gridStatus').textContent = `${name} · 首屏预览（完整索引建立中）`;
+      requireEl('gridStatus').textContent = localize('ui.viewportPipeline.firstScreenPreviewCompleteIndex', { name });
     } catch {
       // Full indexing remains the authoritative validation path.
     }
@@ -1669,7 +1670,7 @@ export class ViewportPipeline {
         el.classList.toggle('formula-view-cell', Boolean(S.showFormulas && data?.hasFormula));
       }
     }
-    toast(S.showFormulas ? '显示公式' : '显示数值');
+    toast(S.showFormulas ? localize('ui.viewportPipeline.displayFormula') : localize('ui.viewportPipeline.displayValue'));
   }
 
   private updateGridCellGeometry(cell: GridCellElement, layout: GridColumnLayout): void {
@@ -2069,7 +2070,7 @@ export class ViewportPipeline {
     this.cellPresenter.prepare(data.rows);
     if (data.hyperlinkError && S.linkErrorSheet !== S.sheet) {
       S.linkErrorSheet = S.sheet ?? '';
-      toast('工作表超链接元数据读取失败', 'error');
+      toast(localize('ui.viewportPipeline.failureReadWorksheetHyperlinkMetadata'), 'error');
     }
     const hh = this.headerHeight();
     const canvas = requireEl('gridCanvas');
@@ -2077,7 +2078,9 @@ export class ViewportPipeline {
     const width = this.rowHeadWidth + this.colTotal(S.maxCol);
     const height = hh + this.sheetHeight(rowExtent);
     const grid = requireEl('grid');
-    const pinnedHeight = S.filtered ? this.sourceRowTop(getFrozenPanes().effective().rows + 1) : 0;
+    const frozen = getFrozenPanes();
+    const pinned = request.position?.pinned ?? frozen.effective();
+    const pinnedHeight = S.filtered ? this.sourceRowTop(pinned.rows + 1) : 0;
     const measured = sliced ? request.position : null;
     const canvasWidth = `${Math.max(width, measured?.w ?? grid.clientWidth)}px`;
     const canvasHeight = `${measured?.h ? virtualScroll.configure(height, measured.h) : this.physicalCanvasHeight(height, grid)}px`;
@@ -2391,7 +2394,8 @@ export class ViewportPipeline {
           (mergeFree ||
             (!this.activeMerge(rowNumber, col) &&
               !this.activeMerge(rowNumber, nextCol ?? col + 1) &&
-              !this.activeMerge(belowRow?.number ?? rowNumber + 1, col)))
+              !this.activeMerge(belowRow?.number ?? rowNumber + 1, col) &&
+              !this.activeMerge(belowRow?.number ?? rowNumber + 1, nextCol ?? col + 1)))
         ) {
           const interior =
             layoutIndex > 0 &&
@@ -2431,6 +2435,7 @@ export class ViewportPipeline {
           !cellData.cacheMissing &&
           !byColumn[nextCol]?.conditional &&
           !belowColumns[col]?.conditional &&
+          !belowColumns[nextCol]?.conditional &&
           !rowData?.presentationNotice &&
           !S.showFormulas &&
           !panels.editCopy?.grid.active &&
@@ -2445,6 +2450,7 @@ export class ViewportPipeline {
               cellData.hasFormula,
               byColumn[nextCol]?.style ?? rowData?.style ?? 0,
               belowColumns[col]?.style ?? belowRow.style ?? 0,
+              belowColumns[nextCol]?.style ?? belowRow.style ?? 0,
               this.rowTop(visual) === 0,
               outerLeft,
             ].join('|');
@@ -2486,6 +2492,7 @@ export class ViewportPipeline {
             belowRow,
             {
               nextCol,
+              belowRightCell: nextCol ? belowColumns[nextCol] : null,
               mergeFree,
               columns: visibleColumns,
               firstRow: firstVisual,
@@ -2497,14 +2504,12 @@ export class ViewportPipeline {
             },
           );
         }
-        if (layoutIndex === 0 && col === 1) {
-          const border = this.appearance.visualForBorder(cellData, rowData).borderLeft ?? '';
-          if (row._xlHeaderSeam !== border) {
-            row._xlHeaderSeam = border;
-            if (headChild instanceof HTMLElement) {
-              if (border) headChild.style.borderRight = border;
-              else headChild.style.removeProperty('border-right');
-            }
+        if (layoutIndex === 0 && headChild instanceof HTMLElement &&
+            (!pinned.cols || !frozen.paintLeftRowHeader(headChild, visual, rowNumber))) {
+          if (col === 1) {
+            this.appearance.paintRowHeaderBorder(headChild, cellData, rowData, belowColumns[1], belowRow);
+          } else if (headChild.classList.contains('row-head-bordered')) {
+            this.appearance.paintRowHeaderBorder(headChild);
           }
         }
         if (!mergeFree || cell._xlMerge || cell._xlCovered) {
@@ -2643,8 +2648,8 @@ export class ViewportPipeline {
     gridEmpty.hidden = hasVisibleRows;
     if (!hasVisibleRows) {
       gridEmpty.textContent = S.filtered
-        ? '没有可见的筛选记录；可在「行与大纲」中显示全部'
-        : '没有可见行；可在「行与大纲」中显示全部';
+        ? localize('ui.viewportPipeline.thereNoVisibleFilterRecords')
+        : localize('ui.viewportPipeline.thereNoVisibleRowsAll');
     }
     this.updateGridStatus(data);
     panels.editCopy?.grid.schedulePosition();
@@ -2727,15 +2732,15 @@ export class ViewportPipeline {
     const { S } = this.d;
     const sheet = S.sheet ?? '';
     if (S.previewOnly) {
-      requireEl('gridStatus').textContent = `${sheet} · 首屏预览（完整索引建立中）`;
+      requireEl('gridStatus').textContent = localize('ui.viewportPipeline.firstScreenPreviewCompleteIndex7822e2f', { sheet });
       return;
     }
     const total = S.filtered ? data.totalRows : S.maxRow;
-    const filterText = S.filtered ? ` · 筛选后 ${total.toLocaleString()} 行` : '';
+    const filterText = S.filtered ? ` ${localize('ui.viewportPipeline.rowsAfterFilteringMarked', { total: total.toLocaleString(interfaceLocale()) })}` : '';
     const tableText = isTableHeader(S.autoFilter)
-      ? ` · 表头 第 ${S.autoFilter.row} 行${S.autoFilter.detected ? '（自动）' : ''}`
+      ? ` ${localize('ui.viewportPipeline.headerRow', { row: S.autoFilter.row, detail: S.autoFilter.detected ? localize('ui.viewportPipeline.automatic') : '' })}`
       : '';
-    const label = `${sheet} · 已用区域 ${S.dimension}${filterText}${tableText}`;
+    const label = localize('ui.viewportPipeline.usedArea', { sheet, dimension: S.dimension, filterText, tableText });
     const gridStatus = requireEl('gridStatus');
     if (gridStatus.textContent !== label) gridStatus.textContent = label;
     requireEl('filterStatus').hidden = !S.filtered;

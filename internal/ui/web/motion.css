@@ -83,7 +83,8 @@
     .analysis-quiet-button,.command-entry,.command-field,.sheet-tab,.ribbon-tabs button,.recent-action,.recent-item,.activity-cancel,
     .calculator-icon,.calculator-notes-toggle,.analysis-nav button,.result-item,.history-item,.inspect-hit,.sheet-picker-item,
     .archive-member,.bookmark-visit,.auto-filter-item,.freeze-option,.analysis-template-card,.analysis-dashboard-card,
-    .analysis-field-chip,.analysis-field-info-btn,.analysis-category-list button,.analysis-sheet-list button) {
+    .analysis-field-chip,.analysis-field-info-btn,.analysis-category-list button,.analysis-sheet-list button,
+    .source-integrity-close,.source-integrity-badge) {
   transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease),
     translate var(--motion-fast) var(--motion-ease);

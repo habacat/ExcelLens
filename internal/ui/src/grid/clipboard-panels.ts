@@ -1,6 +1,7 @@
 /**
  * Copy-Special and Paste-Special dialog controllers.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ToastFn } from '../contracts/common.ts';
 import type { ClipboardLimits } from '../contracts/formats.ts';
 import type { ClipboardPayload } from '../contracts/workbook.ts';
@@ -124,7 +125,7 @@ export class CopySpecialController {
     headerRowInput.value = String(this.snapshot.headerRow);
     headerRowInput.max = String(this.snapshot.maxRow);
     requireEl('copySpecialLimits').textContent =
-      `最多 ${this.limits.rows} 行、${this.limits.columns} 列、${this.limits.cells.toLocaleString()} 格（含表头）`;
+      localize('ui.clipboardPanels.upRowsColumnsCellsIncluding', { rows: this.limits.rows, columns: this.limits.columns, cells: this.limits.cells.toLocaleString(interfaceLocale()) });
     this.dialog.showModal();
     void this.load();
   }
@@ -144,17 +145,17 @@ export class CopySpecialController {
     const headerRow = included ? Number(headerRowInput.value) : 0;
     headerRowInput.disabled = !included;
     if (included && (!Number.isSafeInteger(headerRow) || headerRow < 1 || headerRow > this.snapshot.maxRow)) {
-      setStatus('copySpecialStatus', '请提供有效的源表头行', true);
+      setStatus('copySpecialStatus', localize('ui.clipboardPanels.provideValidSourceHeaderRow'), true);
       return;
     }
-    setStatus('copySpecialStatus', '正在读取选区…');
+    setStatus('copySpecialStatus', localize('ui.clipboardPanels.readingSelection'));
     try {
       const payload = await this.snapshot.read(
         { headerRow, richText: false, conditional: this.snapshot.styled },
         controller.signal,
       );
       if (serial !== this.serial || !this.dialog.open) return;
-      if (!this.snapshot.current()) throw new Error('来源或选区已变化，请关闭后重新选择');
+      if (!this.snapshot.current()) throw new Error(localize('ui.common.sourceOrElectoralDistrictChanged'));
       this.payload = payload;
       this.render();
     } catch (error: unknown) {
@@ -173,13 +174,13 @@ export class CopySpecialController {
     this.result = null;
     requireButton('copySpecialWrite').disabled = true;
     try {
-      if (!this.snapshot.current()) throw new Error('来源或选区已变化，请关闭后重新选择');
+      if (!this.snapshot.current()) throw new Error(localize('ui.common.sourceOrElectoralDistrictChanged'));
       const result = buildSpecialSelection(this.payload, this.options(), this.limits);
       this.result = result;
       requireTextArea('copySpecialPreview').value = result.text.slice(0, 10000);
       const notes = [
-        `${result.rows} 行数据 · ${result.columns} 列`,
-        result.text.length > 10000 ? '预览仅显示前10,000字符；复制包含完整内容' : '',
+        localize('ui.clipboardPanels.rowDataColumn', { rows: result.rows, columns: result.columns }),
+        result.text.length > 10000 ? localize('ui.clipboardPanels.previewOnlyShowsFirstCharacters') : '',
         ...result.notices,
       ].filter(Boolean);
       setStatus('copySpecialStatus', notes.join('；'));
@@ -196,7 +197,7 @@ export class CopySpecialController {
 
   async write(): Promise<void> {
     if (!this.result || !this.snapshot?.current()) {
-      setStatus('copySpecialStatus', '来源或选区已变化，请关闭后重新选择', true);
+      setStatus('copySpecialStatus', localize('ui.common.sourceOrElectoralDistrictChanged'), true);
       return;
     }
     const serial = this.serial;
@@ -205,7 +206,7 @@ export class CopySpecialController {
       const copied = await this.copy(this.result);
       if (serial !== this.serial || !this.dialog.open) return;
       if (copied !== false) this.dialog.close();
-      else setStatus('copySpecialStatus', '复制未完成，可重试或手动选择预览文字', true);
+      else setStatus('copySpecialStatus', localize('ui.clipboardPanels.copyNotCompletedTryAgain'), true);
     } catch (error: unknown) {
       if (serial === this.serial) setStatus('copySpecialStatus', errorMessage(error), true);
     } finally {
@@ -341,11 +342,11 @@ export class PasteSpecialController {
     requireInput('pasteSpecialSkipFirst').disabled = isJson;
     try {
       if (!this.context.current()) {
-        throw new Error('目标表、位置或版本已变化，请重新读取目标或关闭后重选');
+        throw new Error(localize('ui.clipboardPanels.targetTableLocationOrVersion'));
       }
       const text = requireTextArea('pasteSpecialText').value;
       if (!text) {
-        setStatus('pasteSpecialStatus', '粘贴文字到上方文本框，或点击“读取剪贴板”。');
+        setStatus('pasteSpecialStatus', localize('ui.clipboardPanels.pasteTextIntoUpperText'));
         return;
       }
       const plan = buildPastePlan(text, this.options());
@@ -365,9 +366,9 @@ export class PasteSpecialController {
       requireEl('pasteSpecialPreview').append(body);
       setStatus(
         'pasteSpecialStatus',
-        `${plan.rows} 行 × ${plan.columns} 列 · 将写入 ${plan.changes.length.toLocaleString()} 格` +
-          (plan.skipped ? ` · 跳过 ${plan.skipped} 个空白` : '') +
-          '；预览最多6行、8列',
+        localize('ui.clipboardPanels.rowColumnWillWriteCell', { rows: plan.rows, columns: plan.columns, count: plan.changes.length.toLocaleString(interfaceLocale()) }) +
+          (plan.skipped ? ` ${localize('ui.clipboardPanels.skippingBlankItems', { skipped: plan.skipped })}` : '') +
+          localize('ui.clipboardPanels.previewUpRowsColumns'),
       );
       requireButton('pasteSpecialApply').disabled = !plan.changes.length;
     } catch (error: unknown) {
@@ -380,7 +381,7 @@ export class PasteSpecialController {
     const intent = ++this.textIntent;
     try {
       if (typeof navigator.clipboard.readText !== 'function') {
-        throw new Error('浏览器不支持读取剪贴板，请在文本框中按Ctrl+V');
+        throw new Error(localize('ui.clipboardPanels.browserDoesNotSupportClipboard'));
       }
       const text = await navigator.clipboard.readText();
       if (serial !== this.serial || intent !== this.textIntent || !this.dialog.open) return;
@@ -390,7 +391,7 @@ export class PasteSpecialController {
       if (serial === this.serial && intent === this.textIntent) {
         setStatus(
           'pasteSpecialStatus',
-          `读取失败：${errorMessage(error)}；也可在文本框中按Ctrl+V`,
+          localize('ui.clipboardPanels.readingFailedCanAlsoPaste', { detail: errorMessage(error) }),
           true,
         );
       }
@@ -424,12 +425,12 @@ export class PasteSpecialController {
     if (fieldsEl instanceof HTMLFieldSetElement) fieldsEl.disabled = true;
     requireButton('pasteSpecialClose').disabled = true;
     requireButton('pasteSpecialApply').disabled = true;
-    setStatus('pasteSpecialStatus', '正在整批保存…');
+    setStatus('pasteSpecialStatus', localize('ui.clipboardPanels.savingEntireBatches'));
     try {
       await this.commit(context, changes);
       if (serial === this.serial) {
         this.dialog.close();
-        this.toast(`已粘贴 ${changes.length.toLocaleString()} 格，可整批撤销`, 'success');
+        this.toast(localize('ui.clipboardPanels.pastedCellsCanBeUndone', { count: changes.length.toLocaleString(interfaceLocale()) }), 'success');
       }
     } catch (error: unknown) {
       if (serial === this.serial) setStatus('pasteSpecialStatus', errorMessage(error), true);

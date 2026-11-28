@@ -1,6 +1,7 @@
 /**
  * Multi-table append composition modal controller.
  */
+import { interfaceLocale, t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type {
   CompositionDefinition,
   CompositionDefinitionStore,
@@ -153,7 +154,7 @@ export class CompositionPanel {
   private catalog: CompositionDefinitionStore = { version: 1, revision: 0, items: [] };
   public serial = 0;
   private page = 0;
-  private name = '联合来源';
+  private name = localize('ui.common.jointSources');
   public savedID = '';
   public identityKey = '';
   public busy = false;
@@ -178,13 +179,13 @@ export class CompositionPanel {
     this.dialog.id = 'compositionDialog';
     this.dialog.className = 'float-dialog composition-dialog';
     this.dialog.setAttribute('aria-labelledby', 'compositionTitle');
-    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="compositionTitle" class="dialog-title">多表追加</div><button class="dialog-close" aria-label="关闭多表追加" value="cancel">×</button></form>
-      <div class="composition-body"><fieldset id="compositionControls"><div class="composition-library"><label for="compositionSaved">已保存</label><select id="compositionSaved" class="field-control"></select><button id="compositionRefresh" type="button" class="mini-button">刷新</button><button id="compositionDelete" type="button" class="mini-button">删除</button></div>
-      <div class="composition-toolbar"><label class="composition-name"><span>名称</span><input id="compositionName" class="field-control" value="联合来源"></label><button id="compositionUpload" class="mini-button" type="button">添加文件</button><input id="compositionFile" type="file" hidden><button id="compositionAddSource" class="mini-button" type="button">添加来源</button><button id="compositionReadAll" class="mini-button" type="button">读取字段</button></div>
-      <div id="compositionSources" class="composition-sources"></div><div class="composition-mapping-tools"><strong>字段对齐</strong><span id="compositionFieldCount"></span><button id="compositionAddField" class="mini-button" type="button">添加字段</button><button id="compositionMissing" class="mini-button" type="button">未匹配设为空列</button></div>
+    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="compositionTitle" class="dialog-title">${localizeHTML('ui.composition.addingMultipleTables')}</div><button class="dialog-close" aria-label="${localizeHTML('ui.composition.disableMultiTableAddition')}" value="cancel">×</button></form>
+      <div class="composition-body"><fieldset id="compositionControls"><div class="composition-library"><label for="compositionSaved">${localizeHTML('ui.composition.saved')}</label><select id="compositionSaved" class="field-control"></select><button id="compositionRefresh" type="button" class="mini-button">${localizeHTML('ui.composition.refresh')}</button><button id="compositionDelete" type="button" class="mini-button">${localizeHTML('ui.composition.delete')}</button></div>
+      <div class="composition-toolbar"><label class="composition-name"><span>${localizeHTML('ui.composition.name')}</span><input id="compositionName" class="field-control"></label><button id="compositionUpload" class="mini-button" type="button">${localizeHTML('ui.composition.addFile')}</button><input id="compositionFile" type="file" hidden><button id="compositionAddSource" class="mini-button" type="button">${localizeHTML('ui.composition.addSource')}</button><button id="compositionReadAll" class="mini-button" type="button">${localizeHTML('ui.composition.readingFields')}</button></div>
+      <div id="compositionSources" class="composition-sources"></div><div class="composition-mapping-tools"><strong>${localizeHTML('ui.composition.fieldAlignment')}</strong><span id="compositionFieldCount"></span><button id="compositionAddField" class="mini-button" type="button">${localizeHTML('ui.composition.addFields')}</button><button id="compositionMissing" class="mini-button" type="button">${localizeHTML('ui.composition.unmatchedColumnsSetEmpty')}</button></div>
       <div class="composition-scroll"><table id="compositionMapping" class="composition-table"></table></div><div id="compositionFieldPaging" class="composition-paging"></div>
-      <section id="compositionPreviewSection" hidden><div class="composition-mapping-tools"><strong>预览</strong><span id="compositionPreviewCount"></span></div><div class="composition-scroll composition-preview"><table id="compositionPreview" class="composition-table"></table></div></section></fieldset></div>
-      <div class="composition-footer"><div id="compositionStatus" role="status" aria-live="polite"></div><div class="composition-actions"><button id="compositionCancel" type="button" class="mini-button" hidden>取消任务</button><button id="compositionPrepare" class="mini-button" type="button">预览</button><button id="compositionSave" class="mini-button" type="button" disabled>保存定义</button><button id="compositionUse" class="primary-button compact" type="button" disabled>用于分析</button></div></div>`;
+      <section id="compositionPreviewSection" hidden><div class="composition-mapping-tools"><strong>${localizeHTML('ui.composition.preview')}</strong><span id="compositionPreviewCount"></span></div><div class="composition-scroll composition-preview"><table id="compositionPreview" class="composition-table"></table></div></section></fieldset></div>
+      <div class="composition-footer"><div id="compositionStatus" role="status" aria-live="polite"></div><div class="composition-actions"><button id="compositionCancel" type="button" class="mini-button" hidden>${localizeHTML('ui.composition.cancelTask')}</button><button id="compositionPrepare" class="mini-button" type="button">${localizeHTML('ui.composition.preview')}</button><button id="compositionSave" class="mini-button" type="button" disabled>${localizeHTML('ui.composition.saveDefinition')}</button><button id="compositionUse" class="primary-button compact" type="button" disabled>${localizeHTML('ui.composition.analysis')}</button></div></div>`;
     document.body.append(this.dialog);
 
     this.fieldPicker = new FieldPicker({
@@ -314,7 +315,7 @@ export class CompositionPanel {
     this.busy = false;
     this.dropPreview();
     if (this.picker.open) this.picker.close();
-    if (pending && this.cancellable && this.dialog.open) this.message('已取消');
+    if (pending && this.cancellable && this.dialog.open) this.message(localize('ui.common.canceled'));
     this.controls();
   }
 
@@ -333,7 +334,7 @@ export class CompositionPanel {
     if (this.identityKey !== this.identity()) {
       this.reset();
       this.identityKey = this.identity();
-      this.name = '联合来源';
+      this.name = localize('ui.common.jointSources');
     }
     if (!this.dialog.open) {
       this.cancel();
@@ -373,7 +374,7 @@ export class CompositionPanel {
     this.catalog = catalog;
     if (this.savedID && !catalog.items.some((item) => item.id === this.savedID)) {
       this.savedID = '';
-      this.message('原定义已移除，可另存');
+      this.message(localize('ui.composition.originalDefinitionRemovedCanBe'));
     }
     this.renderLibrary();
     this.renderSources();
@@ -437,7 +438,7 @@ export class CompositionPanel {
 
   renderLibrary(): void {
     const select = requireSelect('compositionSaved');
-    select.replaceChildren(new Option('新建联合来源', ''));
+    select.replaceChildren(new Option(localize('ui.composition.createNewCombinedSources'), ''));
     for (const item of this.catalog.items) {
       select.append(new Option(item.definition.name, item.id));
     }
@@ -462,10 +463,10 @@ export class CompositionPanel {
       const heading = document.createElement('div');
       heading.className = 'composition-source-head';
       const title = document.createElement('strong');
-      title.textContent = `来源 ${index + 1}`;
+      title.textContent = localize('ui.composition.source', { index: index + 1 });
       heading.append(
         title,
-        makeButton('移除', () => {
+        makeButton(localize('ui.common.remove'), () => {
           this.inputs.splice(index, 1);
           for (const row of this.rows) row.columns.splice(index, 1);
           this.changed();
@@ -476,17 +477,17 @@ export class CompositionPanel {
 
       const book = document.createElement('select');
       book.className = 'field-control';
-      book.setAttribute('aria-label', `来源 ${index + 1} 文件`);
+      book.setAttribute('aria-label', localize('ui.composition.sourceFile', { index: index + 1 }));
       for (const choice of this.books) book.append(new Option(choice.name, choice.id));
       if (!this.books.some((choice) => choice.id === input.book)) {
-        book.append(new Option('来源未打开', input.book));
+        book.append(new Option(localize('ui.composition.sourceNotOpened'), input.book));
       }
       book.value = input.book;
 
       const sheet = document.createElement('select');
       sheet.className = 'field-control';
-      sheet.setAttribute('aria-label', `来源 ${index + 1} 工作表`);
-      sheet.append(new Option('选择工作表', ''));
+      sheet.setAttribute('aria-label', localize('ui.composition.sourceWorksheets', { index: index + 1 }));
+      sheet.append(new Option(localize('ui.composition.selectWorksheet'), ''));
       const metadata = this.books.find((choice) => choice.id === input.book);
       for (const item of metadata?.sheets ?? []) {
         sheet.append(new Option(item.name, `wb:${item.name}`));
@@ -529,7 +530,7 @@ export class CompositionPanel {
       const footer = document.createElement('div');
       footer.className = 'composition-source-settings';
       const headerLabel = document.createElement('label');
-      headerLabel.textContent = '表头行';
+      headerLabel.textContent = localize('ui.composition.headerRow');
       const header = document.createElement('input');
       header.type = 'number';
       header.className = 'field-control';
@@ -537,7 +538,7 @@ export class CompositionPanel {
       if (maxHeaderRow) header.max = maxHeaderRow;
       header.value = String(input.headerRow);
       header.disabled = input.source.startsWith('scratch:');
-      header.setAttribute('aria-label', `来源 ${index + 1} 表头行`);
+      header.setAttribute('aria-label', localize('ui.composition.sourceHeaderRow', { index: index + 1 }));
       header.onchange = (): void => {
         input.headerRow = Number(header.value);
         invalidate();
@@ -547,12 +548,12 @@ export class CompositionPanel {
 
       const scope = document.createElement('select');
       scope.className = 'field-control';
-      scope.setAttribute('aria-label', `来源 ${index + 1} 范围`);
-      scope.append(new Option('完整源表', 'full'));
-      if (input.scope) scope.append(new Option('保存的范围', 'saved'));
+      scope.setAttribute('aria-label', localize('ui.composition.sourceRange', { index: index + 1 }));
+      scope.append(new Option(localize('ui.common.completeSourceTable'), 'full'));
+      if (input.scope) scope.append(new Option(localize('ui.composition.savedRange'), 'saved'));
       const c = this.context();
       if (c.sourceScope && c.book === input.book && c.source === input.source) {
-        scope.append(new Option('当前分析范围', 'current'));
+        scope.append(new Option(localize('ui.composition.currentAnalysisRange'), 'current'));
       }
       scope.value = input.scope ? 'saved' : 'full';
       scope.disabled = input.source.startsWith('scratch:');
@@ -570,16 +571,16 @@ export class CompositionPanel {
 
       const info = document.createElement('span');
       info.className = 'composition-source-state';
-      info.textContent = input.info ? `${input.info.rows.toLocaleString()} 条记录` : '未读取字段';
+      info.textContent = input.info ? localize('ui.composition.thereRecords', { rows: input.info.rows.toLocaleString(interfaceLocale()) }) : localize('ui.composition.unreadFields');
       section.append(
         info,
-        makeButton('读取字段', () => {
+        makeButton(localize('ui.composition.readingFields'), () => {
           void this.action((current) => this.read(index, current));
         }),
       );
       if (metadata?.attached) {
         section.append(
-          makeButton('移除文件', () => {
+          makeButton(localize('ui.composition.removeFiles'), () => {
             void this.action(async (current) => {
               await this.post('/api/reconcile/source/remove', { book: input.book });
               if (current()) {
@@ -597,7 +598,7 @@ export class CompositionPanel {
   async read(index: number, current: () => boolean): Promise<void> {
     const input = this.inputs[index];
     if (!input) return;
-    this.message(`正在读取来源 ${index + 1}…`);
+    this.message(localize('ui.composition.readingSource', { index: index + 1 }));
     let result: (CompositionTaskResult & { readonly id: string }) | undefined;
     try {
       const keepId = this.context().keepId;
@@ -619,7 +620,7 @@ export class CompositionPanel {
         input.expectedRef &&
         JSON.stringify(input.expectedRef) !== JSON.stringify(result.info.ref)
       ) {
-        throw new Error('来源已变化，请重新选择后读取字段');
+        throw new Error(localize('ui.composition.sourceChangedReselectFieldBefore'));
       }
       input.info = result.info;
       input.headerRow = result.info.ref.headerRow;
@@ -655,7 +656,7 @@ export class CompositionPanel {
       this.render();
       this.message(
         fields.length > this.limits.columns
-          ? `已选前${this.limits.columns}个字段；可移除后添加其他字段`
+          ? localize('ui.composition.firstFieldsHaveSelectedOther', { columns: this.limits.columns })
           : '',
       );
     } finally {
@@ -667,11 +668,11 @@ export class CompositionPanel {
     const table = requireEl('compositionMapping');
     table.replaceChildren();
     requireEl('compositionFieldCount').textContent = this.rows.length
-      ? `共 ${this.rows.length} 个`
+      ? localize('ui.composition.totalItems', { count: this.rows.length })
       : '';
     const head = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    for (const text of ['结果字段', ...this.inputs.map((_, i) => `来源 ${i + 1}`), '']) {
+    for (const text of [localize('ui.composition.resultField'), ...this.inputs.map((_, i) => localize('ui.composition.source38e0655', { i: i + 1 })), '']) {
       const th = document.createElement('th');
       th.textContent = text;
       headerRow.append(th);
@@ -692,7 +693,7 @@ export class CompositionPanel {
       const name = document.createElement('input');
       name.className = 'field-control';
       name.value = row.name;
-      name.setAttribute('aria-label', `结果字段 ${at + 1}`);
+      name.setAttribute('aria-label', localize('ui.composition.resultFields', { at: at + 1 }));
       name.oninput = (): void => {
         row.name = name.value;
         this.changed();
@@ -712,20 +713,20 @@ export class CompositionPanel {
         const column = row.columns[index];
         const field = input.info?.fields?.find((f) => f.column === column);
         const pick = makeButton(
-          column === 0 ? '空列' : field && column ? `${labelColumn(column)} ${field.name}` : '选择字段',
+          column === 0 ? localize('ui.composition.emptyColumns') : field && column ? `${labelColumn(column)} ${field.name}` : localize('ui.common.selectFields'),
           () => this.pick(index, at),
           'composition-field-button',
         );
         pick.classList.toggle('is-missing', column == null);
         pick.disabled = !input.info;
-        pick.setAttribute('aria-label', `结果字段 ${at + 1} 来源 ${index + 1}`);
+        pick.setAttribute('aria-label', localize('ui.composition.resultFieldSource', { at: at + 1, index: index + 1 }));
         cell.append(pick);
         tr.append(cell);
       });
 
       const remove = document.createElement('td');
       remove.append(
-        makeButton('移除', () => {
+        makeButton(localize('ui.common.remove'), () => {
           this.rows.splice(at, 1);
           this.changed();
           this.renderMapping();
@@ -757,8 +758,8 @@ export class CompositionPanel {
   ): void {
     host.replaceChildren();
     if (count <= size) return;
-    const previous = makeButton('上一页', () => change(page - 1));
-    const next = makeButton('下一页', () => change(page + 1));
+    const previous = makeButton(localize('ui.common.previousPage'), () => change(page - 1));
+    const next = makeButton(localize('ui.common.nextPage'), () => change(page + 1));
     previous.disabled = page === 0;
     next.disabled = (page + 1) * size >= count;
     const info = document.createElement('span');
@@ -808,7 +809,7 @@ export class CompositionPanel {
     const error = validateComposition(this.name, this.rows, this.inputs, this.limits);
     if (error) throw new Error(error);
     this.dropPreview();
-    this.message('正在准备联合来源…');
+    this.message(localize('ui.composition.preparingCombinedSources'));
     const keepId = this.context().keepId;
     const data = await this.tasks.run(decodeCompositionTaskResult,
       {
@@ -824,17 +825,17 @@ export class CompositionPanel {
     }
     this.preview = data;
     this.renderPreview(data);
-    this.message(data.previewTruncated ? `仅预览前${data.preview?.length ?? 0}条` : '');
+    this.message(data.previewTruncated ? localize('ui.composition.onlyFirstRowsPreviewed', { detail: data.preview?.length ?? 0 }) : '');
   }
 
   renderPreview(data: CompositionTaskResult): void {
     requireEl('compositionPreviewSection').hidden = false;
-    requireEl('compositionPreviewCount').textContent = `${data.rows.toLocaleString()} 条记录`;
+    requireEl('compositionPreviewCount').textContent = localize('ui.composition.thereRecords', { rows: data.rows.toLocaleString(interfaceLocale()) });
     const table = requireEl('compositionPreview');
     table.replaceChildren();
     const head = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['来源', '原行号', ...(data.definition?.fields ?? [])]) {
+    for (const label of [localize('ui.common.source'), localize('ui.composition.originalLineNumber'), ...(data.definition?.fields ?? [])]) {
       const th = document.createElement('th');
       th.textContent = label;
       hr.append(th);
@@ -848,7 +849,7 @@ export class CompositionPanel {
       const texts: readonly string[] = [
         String(row.input + 1),
         String(row.row),
-        ...row.cells.map((cell) => (!cell.exists ? '' : cell.cacheMissing ? '缺少缓存' : cell.display)),
+        ...row.cells.map((cell) => (!cell.exists ? '' : cell.cacheMissing ? localize('ui.composition.lackCache') : cell.display)),
       ];
       for (const text of texts) {
         const td = document.createElement('td');
@@ -875,7 +876,7 @@ export class CompositionPanel {
     this.savedID = response.id;
     this.catalog = { ...this.catalog, revision: response.revision };
     await this.refresh(current);
-    if (current()) this.message('已保存');
+    if (current()) this.message(localize('ui.common.saved'));
   }
 
   async removeSaved(current: () => boolean): Promise<void> {
@@ -891,7 +892,7 @@ export class CompositionPanel {
     if (!current()) return;
     this.savedID = '';
     await this.refresh(current);
-    if (current()) this.message('已删除定义');
+    if (current()) this.message(localize('ui.composition.definitionDeleted'));
   }
 
   async loadSaved(id: string, current: () => boolean): Promise<void> {
@@ -900,7 +901,7 @@ export class CompositionPanel {
       this.dropPreview();
       this.rows = [];
       this.inputs = [];
-      this.name = '联合来源';
+      this.name = localize('ui.common.jointSources');
       this.addSource(this.context().book);
       this.addSource();
       this.render();

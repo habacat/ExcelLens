@@ -9,17 +9,17 @@ func (a *App) handleTableHeader(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "尚未打开数据文件")
+		writeMessage(w, 409, "service.tableHeader.dataFileNotOpenedYet")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.tableHeader.worksheetDoesNotExist")
 		return
 	}
 	header, err := wb.ReadTextTableHeader(r.Context(), meta, parseIntDefault(r.URL.Query().Get("row"), 0))
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, header)

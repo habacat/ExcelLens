@@ -2,6 +2,7 @@
  * Strict validation for bounded profile responses, preserving exact numeric
  * representations without converting financial values to floating point.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   DistributionBin,
   DistributionQuantile,
@@ -51,7 +52,7 @@ function isExactNumber(value: unknown): value is string {
 }
 
 function fail(): never {
-  throw new Error('统计结果与当前来源或范围不符，请重试');
+  throw new Error(localize('ui.profileModel.statisticalResultsDoNotMatch'));
 }
 
 function sameOptionalValue(a: unknown, b: unknown): boolean {

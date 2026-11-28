@@ -1,6 +1,7 @@
 /**
  * Online database connection, schema catalogue selection, and streaming snapshot import dialog.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import type { DBConfig, DBEngine, DBImportProgress } from '../contracts/features.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -199,12 +200,12 @@ export class DatabasePanel {
     const oracle = engine.id === 'oracle';
     const dbInput = this.inputField('database');
     dbInput.required = oracle;
-    dbInput.placeholder = engine.id === 'postgres' ? 'postgres' : oracle ? '' : '可选';
+    dbInput.placeholder = engine.id === 'postgres' ? 'postgres' : oracle ? '' : localize('ui.onlineDatabase.rightSide');
     requireEl('databaseNameLabel').textContent = oracle
       ? protocol.id === 'sid'
         ? 'SID'
-        : '服务名'
-      : '数据库';
+        : localize('ui.onlineDatabase.serviceName')
+      : localize('ui.onlineDatabase.database');
     requireInput('databaseCertificate').disabled = !tls;
     requireEl('databaseCertificateField').hidden = !tls;
   }
@@ -216,12 +217,12 @@ export class DatabasePanel {
     this.connector = controller;
     this.busy = true;
     this.controls();
-    this.feedback('正在连接并读取目录');
+    this.feedback(localize('ui.onlineDatabase.connectingReadingDirectory'));
     try {
       let ca = '';
       const cert = requireInput('databaseCertificate').files?.[0];
       if (tlsValue === 'verify' && cert) {
-        if (cert.size > this.options.certificateBytes) throw new Error('CA 证书超过 64 KB');
+        if (cert.size > this.options.certificateBytes) throw new Error(localize('ui.onlineDatabase.caCertificateExceedsKb'));
         ca = await cert.text();
       }
       const cfg: DBConfig = {
@@ -288,11 +289,11 @@ export class DatabasePanel {
       const check = document.createElement('input');
       check.type = 'checkbox';
       check.checked = this.selected.has(table);
-      check.setAttribute('aria-label', `选择 ${table.key}`);
+      check.setAttribute('aria-label', localize('ui.onlineDatabase.select', { key: table.key }));
       check.addEventListener('change', () => {
         if (check.checked && this.selected.size >= tablesLimit) {
           check.checked = false;
-          this.feedback(`一次最多打开 ${tablesLimit} 张表`, true);
+          this.feedback(localize('ui.onlineDatabase.upTablesCanBeOpened', { tablesLimit }), true);
           return;
         }
         if (check.checked) this.selected.add(table);
@@ -310,7 +311,7 @@ export class DatabasePanel {
         check.focus();
         check.click();
       });
-      for (const text of [table.schema, table.kind === 'view' ? '视图' : '表']) {
+      for (const text of [table.schema, table.kind === 'view' ? localize('ui.onlineDatabase.view') : localize('ui.onlineDatabase.table')]) {
         const cell = row.insertCell();
         cell.textContent = text;
         cell.title = text;
@@ -322,8 +323,8 @@ export class DatabasePanel {
     const emptyEl = requireEl('databaseTableEmpty');
     emptyEl.hidden = matches.length > 0;
     emptyEl.textContent = this.tables.length
-      ? '没有匹配的表或视图'
-      : '当前账户下没有可读的表或视图';
+      ? localize('ui.onlineDatabase.noMatchingTablesOrViews')
+      : localize('ui.onlineDatabase.thereNoReadableTablesOr');
     requireEl('databasePaging').hidden = last === 0;
     requireEl('databasePage').textContent = `${this.page + 1} / ${last + 1}`;
     requireButton('databasePrev').disabled = this.page === 0;
@@ -339,7 +340,7 @@ export class DatabasePanel {
 
   private catalogueNotice(): string {
     return this.truncated
-      ? `目录只显示前 ${this.tables.length.toLocaleString()} 项。可返回连接指定架构。`
+      ? localize('ui.onlineDatabase.directoryOnlyShowsFirstItems', { count: this.tables.length.toLocaleString(interfaceLocale()) })
       : '';
   }
 
@@ -365,10 +366,10 @@ export class DatabasePanel {
     importBtn.disabled = this.busy || this.selected.size === 0;
 
     const counts: string[] = [];
-    if (tables) counts.push(`${this.matchCount.toLocaleString()} 个表或视图`);
-    if (this.selected.size) counts.push(`已选 ${this.selected.size} 张表`);
+    if (tables) counts.push(localize('ui.onlineDatabase.tablesOrViews', { matchCount: this.matchCount.toLocaleString(interfaceLocale()) }));
+    if (this.selected.size) counts.push(localize('ui.onlineDatabase.selectedTable', { size: this.selected.size }));
     requireEl('databaseSelection').textContent = counts.join('，');
-    requireButton('databaseCancel').textContent = this.busy ? '取消读取' : '取消';
+    requireButton('databaseCancel').textContent = this.busy ? localize('ui.onlineDatabase.cancelReading') : localize('ui.common.cancel');
     const progress = requireProgress('databaseProgress');
     progress.hidden = !this.busy;
     if (!this.busy) progress.removeAttribute('value');
@@ -394,7 +395,7 @@ export class DatabasePanel {
     this.busy = true;
     this.cancelRequested = false;
     this.controls();
-    this.feedback('正在连接数据库');
+    this.feedback(localize('ui.onlineDatabase.connectingDatabase'));
     try {
       const tables = Array.from(this.selected, ({ schema, name }) => ({ schema, name }));
       let status = await this.post('/api/database/import', {
@@ -410,11 +411,11 @@ export class DatabasePanel {
           return;
         }
         if (status.status === 'cancelled') {
-          this.feedback('已取消读取');
+          this.feedback(localize('ui.onlineDatabase.readCanceled'));
           return;
         }
         if (status.status === 'error') {
-          throw new Error(status.error || '数据库读取失败');
+          throw new Error(status.error || localize('ui.onlineDatabase.databaseReadingFailed'));
         }
         if (status.status === 'reading') {
           const progress = requireProgress('databaseProgress');
@@ -422,11 +423,11 @@ export class DatabasePanel {
           progress.value = status.table - 1;
           if (!this.isCancelRequested()) {
             this.feedback(
-              `正在读取 ${status.name ?? ''}　${status.table}/${status.tables}　${status.rows.toLocaleString()} 行`,
+              localize('ui.onlineDatabase.readingRow', { detail: status.name ?? '', table: status.table, tables: status.tables, rows: status.rows.toLocaleString(interfaceLocale()) }),
             );
           }
         } else if (status.status === 'opening') {
-          this.feedback('正在打开工作表');
+          this.feedback(localize('ui.onlineDatabase.workingSheetBeingOpened'));
         }
         await delay(300);
         status = await this.api(
@@ -449,7 +450,7 @@ export class DatabasePanel {
     if (!this.job) return;
     try {
       const status = await this.post('/api/database/cancel', { id: this.job }).then(decodeDatabaseCancelResponse);
-      this.feedback(status.status === 'opening' ? '正在打开工作表' : '正在取消');
+      this.feedback(status.status === 'opening' ? localize('ui.onlineDatabase.workingSheetBeingOpened') : localize('ui.onlineDatabase.canceling'));
     } catch (error: unknown) {
       this.cancelRequested = false;
       this.feedback(errorMessage(error), true);

@@ -1,15 +1,15 @@
 package server
 
 import (
-	"errors"
 	"iter"
 	"runtime"
 	"sort"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
-var errSelectionLimit = errors.New("选区超过当前操作限额，请缩小选区")
+var errSelectionLimit = i18n.Error("service.selectionRows.selectionExceedsCurrentOperationLimit")
 
 // Dialogs can analyze either a captured visual selection or a manually typed
 // source range. Keep this distinction explicit; a sorted view's endpoints
@@ -23,11 +23,11 @@ type analysisSelectionCoordinates struct {
 
 func analysisSelectionRows(idx *workbook.SheetIndex, filter *FilterResult, row1, row2 int, coords analysisSelectionCoordinates, limit int, views ...*sheetRowView) ([]int, error) {
 	if coords.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != coords.ViewID) {
-		return nil, errors.New("分析选区的可见行视图已失效，请重新选择")
+		return nil, i18n.Error("service.selectionRows.visibleRowViewAnalysisSelection")
 	}
 	visual := coords.ViewID != "" || coords.VisualStart != 0 || coords.VisualEnd != 0 || coords.ExcludeThroughRow != 0
 	if visual && filter == nil && (len(views) == 0 || views[0] == nil) {
-		return nil, errors.New("可视选区缺少有效筛选结果，请重新选择")
+		return nil, i18n.Error("service.selectionRows.visibleSelectionLacksValidFiltering")
 	}
 	if visual {
 		return sourceSelectionRows(idx, filter, row1, row2, coords.VisualStart, coords.VisualEnd, coords.ExcludeThroughRow, limit, views...)
@@ -37,7 +37,7 @@ func analysisSelectionRows(idx *workbook.SheetIndex, filter *FilterResult, row1,
 	}
 	lo, hi := min(row1, row2), max(row1, row2)
 	if filter.Rows.SourceRows() != idx.RowCount() {
-		return nil, errors.New("筛选来源已变化，请重新筛选")
+		return nil, i18n.Error("service.selectionRows.filterSourceChangedFilterAgain")
 	}
 	set := filter.Rows.Set()
 	start, end := set.LowerBound(idx.FindRowOffset(lo)), set.LowerBound(idx.FindRowOffset(hi+1))
@@ -49,12 +49,12 @@ func analysisSelectionRows(idx *workbook.SheetIndex, filter *FilterResult, row1,
 	for i := start; i < end; i++ {
 		pos := set.At(i)
 		if pos < 0 || pos >= idx.RowCount() {
-			return nil, errors.New("筛选结果已失效，请重新筛选")
+			return nil, i18n.Error("service.filter.expired")
 		}
 		number := idx.RowAt(pos).Number
 		at, found := filter.Rows.Position(pos)
 		if !found || number < lo || number > hi {
-			return nil, errors.New("筛选结果已失效，请重新筛选")
+			return nil, i18n.Error("service.filter.expired")
 		}
 		selected = append(selected, selectedRow{visual: at, number: number})
 	}
@@ -89,7 +89,7 @@ type selectionRowOrder interface {
 func newSelectionRowView(idx *workbook.SheetIndex, filter *FilterResult, through int, views ...*sheetRowView) (selectionRowView, error) {
 	v := selectionRowView{idx: idx, filter: filter, through: through}
 	if idx == nil || through < 0 || through > 30 || len(views) > 1 {
-		return v, errors.New("冻结行参数无效")
+		return v, i18n.Error("service.selectionRows.frozenRowParametersInvalid")
 	}
 	if filter != nil {
 		v.order, v.sorted = filter.Rows, filter.Sorted
@@ -97,7 +97,7 @@ func newSelectionRowView(idx *workbook.SheetIndex, filter *FilterResult, through
 	if len(views) == 1 && views[0] != nil {
 		v.visible = views[0]
 		if v.visible.isClosed() || v.visible.data.idx != idx || filter != nil && filter.ID != v.visible.data.filterID {
-			return v, errors.New("可见行视图的来源已变化，请重新选择")
+			return v, i18n.Error("service.selectionRows.sourceVisibleRowViewChanged")
 		}
 		v.order, v.sorted = nil, v.visible.data.sorted
 		if v.visible.data.projection != nil {
@@ -105,7 +105,7 @@ func newSelectionRowView(idx *workbook.SheetIndex, filter *FilterResult, through
 		}
 	}
 	if v.order != nil && v.order.SourceRows() != idx.RowCount() {
-		return v, errors.New("筛选来源已变化，请重新筛选")
+		return v, i18n.Error("service.selectionRows.filterSourceChangedFilterAgain")
 	}
 	if v.order == nil || through == 0 {
 		return v, nil
@@ -113,11 +113,11 @@ func newSelectionRowView(idx *workbook.SheetIndex, filter *FilterResult, through
 	if v.visible == nil && filter.PinnedPositions != nil {
 		for _, at := range filter.PinnedPositions {
 			if at < 0 || at >= filter.Rows.Len() {
-				return v, errors.New("筛选结果已失效，请重新筛选")
+				return v, i18n.Error("service.filter.expired")
 			}
 			pos := filter.Rows.At(at)
 			if pos < 0 || pos >= idx.RowCount() {
-				return v, errors.New("筛选结果已失效，请重新筛选")
+				return v, i18n.Error("service.filter.expired")
 			}
 			if idx.RowAt(pos).Number <= through {
 				v.holes = append(v.holes, at)
@@ -161,13 +161,13 @@ func (v selectionRowView) underlying(visual int) int {
 func (v selectionRowView) page(offset, limit int) ([]int, error) {
 	defer runtime.KeepAlive(v.visible)
 	if v.order == nil || offset < 0 || offset > v.count() || limit < 0 || limit > 10000 {
-		return nil, errors.New("筛选读取范围无效")
+		return nil, i18n.Error("service.selectionRows.invalidFilteringReadRange")
 	}
 	rows := make([]int, min(limit, v.count()-offset))
 	for i := range rows {
 		pos := v.order.At(v.underlying(offset + i))
 		if pos < 0 || pos >= v.idx.RowCount() {
-			return nil, errors.New("筛选结果已失效，请重新筛选")
+			return nil, i18n.Error("service.filter.expired")
 		}
 		rows[i] = pos
 	}
@@ -237,13 +237,13 @@ func (v selectionRowView) plan(row1, row2, visual1, visual2 int) (selectionRowPl
 	defer runtime.KeepAlive(v.visible)
 	empty := selectionRowPlan{}
 	if row1 < 1 || row2 < 1 || row1 > workbook.MaxRowsForIndex(v.idx) || row2 > workbook.MaxRowsForIndex(v.idx) {
-		return empty, errors.New("选区地址无效")
+		return empty, i18n.Error("service.selectionRows.selectedConstituencyAddressInvalid")
 	}
 	headerLo, headerHi := 0, -1
 	lo, hi := min(row1, row2), max(row1, row2)
 	if v.visible != nil {
 		if !v.visible.data.visibility.Visible(row1) || !v.visible.data.visibility.Visible(row2) {
-			return empty, errors.New("选区端点已隐藏，请重新选择")
+			return empty, i18n.Error("service.selectionRows.selectionEndpointsHiddenReselectThem")
 		}
 		if v.order != nil {
 			for _, endpoint := range [][2]int{{row1, visual1}, {row2, visual2}} {
@@ -252,7 +252,7 @@ func (v selectionRowView) plan(row1, row2, visual1, visual2 int) (selectionRowPl
 				}
 				at := endpoint[1] - 1
 				if at < 0 || at >= v.count() || v.idx.RowAt(v.order.At(v.underlying(at))).Number != endpoint[0] {
-					return empty, errors.New("选区与可见行视图不匹配，请重新选择")
+					return empty, i18n.Error("service.selectionRows.selectionDoesNotMatchVisible")
 				}
 			}
 		}
@@ -270,7 +270,7 @@ func (v selectionRowView) plan(row1, row2, visual1, visual2 int) (selectionRowPl
 			lo, hi = min(visual1, visual2), max(visual1, visual2)
 		}
 		if !(pinned1 && pinned2) && (lo < 1 || hi < lo || hi > v.count()) {
-			return empty, errors.New("筛选视图的选区已失效，请重新选择")
+			return empty, i18n.Error("service.selectionRows.selectionFilterViewBecomeInvalid")
 		}
 	}
 	if v.order == nil {
@@ -309,7 +309,7 @@ func (v selectionRowView) numbersPage(offset, limit int) ([]int, error) {
 	defer runtime.KeepAlive(v.visible)
 	count := v.count()
 	if offset < 0 || offset > count || limit < 0 || limit > 10000 {
-		return nil, errors.New("可见行读取范围无效")
+		return nil, i18n.Error("service.selectionRows.visibleRowReadingRangeInvalid")
 	}
 	if offset == count || limit == 0 {
 		return []int{}, nil

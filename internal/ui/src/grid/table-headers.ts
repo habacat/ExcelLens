@@ -2,6 +2,7 @@
  * TXT/CSV table header presentation model. Source records and row numbers remain
  * intact; the sticky column strip retains field names independently of row tiles.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { AutoFilterState, TextTableHeader } from '../contracts/workbook.ts';
 
 export function isTableHeader(config: AutoFilterState | null | undefined): config is AutoFilterState {
@@ -40,7 +41,7 @@ export function tableHeaderColumnName(
   colName: (col: number) => string,
 ): string {
   if (!isTableHeader(config) || col < config.startCol || col > config.endCol) return '';
-  return config.names?.[col - 1] || `${colName(col)} 列`;
+  return config.names?.[col - 1] || localize('ui.tableHeaders.column', { colName: colName(col) });
 }
 
 export function useStickyTableLabels(
@@ -62,7 +63,7 @@ export function decorateTableHeader(
   const name = tableHeaderColumnName(config, col, colName);
   if (!name || !config) return false;
   head.classList.add('table-column-head');
-  head.title = `${colName(col)} · ${name}（表头第 ${config.row} 行）`;
+  head.title = localize('ui.tableHeaders.headerRow', { colName: colName(col), name, row: config.row });
   const letter = document.createElement('span');
   letter.className = 'table-column-letter';
   letter.textContent = colName(col);
@@ -76,8 +77,8 @@ export function decorateTableHeader(
   arrow.dataset.column = String(col);
   arrow.textContent = '▾';
   arrow.disabled = !ready;
-  arrow.setAttribute('aria-label', `${name}：筛选和排序`);
-  arrow.title = ready ? `${name}：筛选和排序` : '完整索引建立后可筛选和排序';
+  arrow.setAttribute('aria-label', localize('ui.tableHeaders.filteringSorting', { name }));
+  arrow.title = ready ? localize('ui.tableHeaders.filteringSorting', { name }) : localize('ui.tableHeaders.completeIndexCanBeFiltered');
   head.append(letter, label, arrow);
   return true;
 }

@@ -3,6 +3,7 @@
  * exact/tolerance comparison, audit record rebinding, version/batch comparison,
  * and background job resumption.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type {
   ApiClient,
   ApiRequestOptions,
@@ -136,25 +137,25 @@ interface ReconcileBaselineState {
 const SIDES: readonly [ReconcileSide, ReconcileSide] = ['left', 'right'];
 
 const STATUS_LABELS: Readonly<Record<string, string>> = {
-  equal: '一致',
-  within_tolerance: '容差内',
-  different: '差异',
-  left_only: '仅左侧',
-  right_only: '仅右侧',
-  duplicate: '重复主键',
-  review: '需核对',
-  invalid_key: '无效主键',
+  equal: localize('ui.reconcile.consistency'),
+  within_tolerance: localize('ui.reconcile.toleranceWithin'),
+  different: localize('ui.reconcile.differences'),
+  left_only: localize('ui.reconcile.onlyLeftSide'),
+  right_only: localize('ui.reconcile.onlyRightSide'),
+  duplicate: localize('ui.reconcile.duplicatedPrimaryKey'),
+  review: localize('ui.reconcile.needVerify'),
+  invalid_key: localize('ui.reconcile.invalidPrimaryKey'),
 };
 
 const COUNT_LABEL_ENTRIES: readonly (readonly [keyof ReconcileCounts, string])[] = [
-  ['equal', '一致主键'],
-  ['withinTolerance', '容差内主键'],
-  ['different', '差异主键'],
-  ['leftOnly', '仅左侧主键'],
-  ['rightOnly', '仅右侧主键'],
-  ['duplicate', '重复主键'],
-  ['review', '需核对主键'],
-  ['invalidKeys', '无效主键记录'],
+  ['equal', localize('ui.reconcile.consistentPrimaryKey')],
+  ['withinTolerance', localize('ui.reconcile.primaryKeyWithinTolerance')],
+  ['different', localize('ui.reconcile.differentialPrimaryKey')],
+  ['leftOnly', localize('ui.reconcile.onlyLeftPrimaryKey')],
+  ['rightOnly', localize('ui.reconcile.onlyRightSidePrimaryKey')],
+  ['duplicate', localize('ui.reconcile.duplicatedPrimaryKey')],
+  ['review', localize('ui.reconcile.primaryKeyVerificationRequired')],
+  ['invalidKeys', localize('ui.reconcile.invalidPrimaryKeyRecords')],
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -178,12 +179,12 @@ function isAbortError(error: unknown): boolean {
 }
 
 function parseRecordInput(value: unknown): ReconcileRecordInput {
-  if (!isRecord(value)) throw new Error('核查记录的字段、条件或计数无效');
+  if (!isRecord(value)) throw new Error(localize('ui.common.invalidFieldsConditionsOrCounts'));
   if (
     !isSha256(value.stamp) ||
     (value.kind !== 'analysis' && !(value.kind === 'workbook' && isSha256(value.fileSHA256)))
   ) {
-    throw new Error('核查记录的字段、条件或计数无效');
+    throw new Error(localize('ui.common.invalidFieldsConditionsOrCounts'));
   }
   const fieldsRaw = value.fields;
   const fields: ReconcileField[] = [];
@@ -226,7 +227,7 @@ function parseReconcileRecordFile(record: unknown): {
     (record.ruleVersion !== 1 && record.ruleVersion !== 2) ||
     record.scope !== 'all-data-rows'
   ) {
-    throw new Error('核查记录或规则版本不受支持');
+    throw new Error(localize('ui.reconcile.verificationRecordOrRuleVersion'));
   }
   const query = record.query;
   const inputs = record.inputs;
@@ -253,7 +254,7 @@ function parseReconcileRecordFile(record: unknown): {
     (query.includeEqual !== undefined && typeof query.includeEqual !== 'boolean') ||
     typeof detail.protectCSV !== 'boolean'
   ) {
-    throw new Error('核查记录的字段、条件或计数无效');
+    throw new Error(localize('ui.common.invalidFieldsConditionsOrCounts'));
   }
 
   const parsedInputs: [ReconcileRecordInput, ReconcileRecordInput] = [
@@ -266,7 +267,7 @@ function parseReconcileRecordFile(record: unknown): {
     const val = counts[key];
     if (key === 'withinTolerance' && record.ruleVersion === 1 && val === undefined) continue;
     if (typeof val !== 'number' || !Number.isSafeInteger(val) || val < 0) {
-      throw new Error('核查记录的字段、条件或计数无效');
+      throw new Error(localize('ui.common.invalidFieldsConditionsOrCounts'));
     }
     parsedCounts[key] = val;
   }
@@ -318,10 +319,10 @@ export function rebindReconcileRecord(
       typeof rawInput.name !== 'string' ||
       !input.stamp
     ) {
-      throw new Error('核查记录的来源字段无效');
+      throw new Error(localize('ui.reconcile.sourceFieldVerifiedRecordsInvalid'));
     }
     const saved = input.fields.find((field) => field.column === column);
-    if (!saved) throw new Error('核查记录缺少已用字段');
+    if (!saved) throw new Error(localize('ui.reconcile.verifyingRecordsMissingUsedFields'));
     if (
       input.kind === target.kind &&
       input.stamp === target.stamp &&
@@ -338,14 +339,14 @@ export function rebindReconcileRecord(
     const matched = matches[0];
     if (matches.length !== 1 || !matched) {
       throw new Error(
-        `${side ? '右' : '左'}侧「${saved.name}」无法按唯一表头对应，请核对来源和表头`,
+        localize('ui.reconcile.sideCannotBeAssociatedUnique', { detail: side ? localize('ui.common.right') : localize('ui.common.left'), name: saved.name }),
       );
     }
     return matched.column;
   };
 
   const bindPair = (pair: unknown, isField: boolean): ReconcilePair => {
-    if (!isRecord(pair)) throw new Error('核对方式无效');
+    if (!isRecord(pair)) throw new Error(localize('ui.reconcile.verificationMethodInvalid'));
     const mode = pair.mode === undefined ? '' : pair.mode;
     if (
       typeof mode !== 'string' ||
@@ -353,7 +354,7 @@ export function rebindReconcileRecord(
       (pair.trim !== undefined && typeof pair.trim !== 'boolean') ||
       (pair.ignoreCase !== undefined && typeof pair.ignoreCase !== 'boolean')
     ) {
-      throw new Error('核对方式无效');
+      throw new Error(localize('ui.reconcile.verificationMethodInvalid'));
     }
     const mapping: ReconcilePair = {
       left: bindColumn(0, pair.left),
@@ -370,7 +371,7 @@ export function rebindReconcileRecord(
         typeof pair.tolerance !== 'string' ||
         !decimalTolerance(pair.tolerance)
       ) {
-        throw new Error('核查记录包含无效金额容差');
+        throw new Error(localize('ui.reconcile.recordContainsInvalidAmountTolerances'));
       }
       mapping.tolerance = pair.tolerance;
     }
@@ -383,7 +384,7 @@ export function rebindReconcileRecord(
       new Set(mapped.map((pair) => pair.left)).size !== mapped.length ||
       new Set(mapped.map((pair) => pair.right)).size !== mapped.length
     ) {
-      throw new Error('核查记录包含重复映射');
+      throw new Error(localize('ui.reconcile.verifyingRecordsContainsDuplicateMappings'));
     }
     return mapped;
   };
@@ -434,12 +435,12 @@ export function resolveReconcileColumn(
     (field) => field.headerLoaded && !field.truncated && (field.rawName === raw || field.name === raw),
   );
   if (exists && named.some((field) => field.column !== column) && !/^\d+$/.test(raw)) {
-    throw new Error('字段名与列标识有歧义，请输入列序号');
+    throw new Error(localize('ui.reconcile.thereAmbiguityBetweenFieldNames'));
   }
   if (exists) return column;
   const firstNamed = named[0];
   if (named.length === 1 && firstNamed) return firstNamed.column;
-  throw new Error(named.length > 1 ? '字段名重复，请输入列字母或序号' : `字段「${raw}」无效`);
+  throw new Error(named.length > 1 ? localize('ui.reconcile.duplicateFieldNamesEnterColumn') : localize('ui.reconcile.fieldInvalid', { raw }));
 }
 
 export const ReconcileModel = Object.freeze({
@@ -506,10 +507,10 @@ export class Reconcile {
       identity: () => this.s.workbookKey,
       sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
       endpoint: '/api/reconcile',
-      label: '核对',
+      label: localize('ui.reconcile.reconcile'),
       maxPolls: 0,
       resultFromStatus: (status) => {
-        if (!status.result) throw new Error('核对结果缺失，请重试');
+        if (!status.result) throw new Error(localize('ui.reconcile.verificationResultsMissingTryAgain'));
         return {
           ...status.result,
           recordError: status.recordError,
@@ -522,7 +523,7 @@ export class Reconcile {
       },
       onProgress: (status) =>
         this.progress(
-          `${status.stage || '核对中'}${status.total ? `　${(status.done || 0).toLocaleString()} / ${status.total.toLocaleString()} 条` : ''}`,
+          `${status.stage || localize('ui.reconcile.verifying')}${status.total ? `　${localize('ui.reconcile.entries', { done: (status.done || 0).toLocaleString(interfaceLocale()), total: status.total.toLocaleString(interfaceLocale()) })}` : ''}`,
         ),
     });
     this.bind();
@@ -589,7 +590,7 @@ export class Reconcile {
     });
     requireButton('reconcileCancel').addEventListener('click', () => {
       this.jobs.cancelMain();
-      this.progress('已请求取消核对');
+      this.progress(localize('ui.reconcile.requestCancellationVerificationSent'));
     });
     requireInput('reconcileIncludeEqual').addEventListener('change', () => this.changed());
     requireSelect('reconcileResultFilter').addEventListener('change', () => this.renderSamples());
@@ -651,7 +652,7 @@ export class Reconcile {
       this.sides[side] = { serial: 0, info: null, controller: null };
       this.bookSelect(side).replaceChildren();
       this.sheetSelect(side).replaceChildren();
-      this.infoEl(side).textContent = '选择来源后读取字段';
+      this.infoEl(side).textContent = localize('ui.reconcile.selectSourceThenReadFields');
     }
     this.books = [];
     this.primaryBook = '';
@@ -669,7 +670,7 @@ export class Reconcile {
 
   async open(): Promise<void> {
     if (!this.s.opened) {
-      this.toast('请先打开一个数据文件', 'warning');
+      this.toast(localize('ui.reconcile.openDataFileFirst'), 'warning');
       return;
     }
     if (!this.dialog.open) this.dialog.showModal();
@@ -684,7 +685,7 @@ export class Reconcile {
     const controller = new AbortController();
     this.catalogController = controller;
     try {
-      requireEl('reconcileSourceNotice').textContent = '正在读取来源…';
+      requireEl('reconcileSourceNotice').textContent = localize('ui.reconcile.readingSources');
       const data = await this.api(
         `/api/reconcile/sources${focus ? `?book=${encodeURIComponent(focus)}` : ''}`,
         { signal: controller.signal },
@@ -744,7 +745,7 @@ export class Reconcile {
       node.append(new Option(sheet.name, `wb:${sheet.name}`));
     }
     for (const sheet of book?.scratch ?? []) {
-      node.append(new Option(`${sheet.name}（编辑表，已保存）`, `scratch:${sheet.id}`));
+      node.append(new Option(localize('ui.reconcile.tableEditedSaved', { name: sheet.name }), `scratch:${sheet.id}`));
     }
     if ([...node.options].some((option) => option.value === selected)) node.value = selected;
     const scratch = node.value.startsWith('scratch:');
@@ -760,7 +761,7 @@ export class Reconcile {
     this.sides[side].serial++;
     this.sides[side].info = null;
     this.mapped = false;
-    this.infoEl(side).textContent = '字段需重新读取';
+    this.infoEl(side).textContent = localize('ui.reconcile.fieldsNeedBeReadAgain');
     this.changed();
     this.controls();
   }
@@ -787,7 +788,7 @@ export class Reconcile {
       this.sides.left.info === targets[0] &&
       this.sides.right.info === targets[1];
     try {
-      if (file.size > this.recordBytes) throw new Error('核查记录超过容量');
+      if (file.size > this.recordBytes) throw new Error(localize('ui.reconcile.verificationRecordsExceedCapacity'));
       const rawRecord: unknown = JSON.parse(await file.text());
       if (!current()) return;
       const { parsed } = parseReconcileRecordFile(rawRecord);
@@ -800,7 +801,7 @@ export class Reconcile {
       this.mapped = true;
       this.baseline = { record: parsed, targets, query };
       this.changed();
-      this.progress('已载入核查规则，核对字段后点击“开始核对”');
+      this.progress(localize('ui.reconcile.verificationRulesHaveLoadedCheck'));
       this.controls();
     } catch (error: unknown) {
       if (current()) this.progress(errorMessage(error), true);
@@ -811,7 +812,7 @@ export class Reconcile {
     const source = this.sheetSelect(side).value;
     const header = source.startsWith('scratch:') ? 0 : Number(this.headerInput(side).value);
     if (!Number.isInteger(header) || header < 0) {
-      throw new Error('表头行号无效，0表示无表头');
+      throw new Error(localize('ui.reconcile.headerRowNumberInvalidIndicates'));
     }
     const info = this.sides[side].info;
     return {
@@ -839,15 +840,15 @@ export class Reconcile {
     this.controls();
     try {
       const ref = this.ref(side);
-      if (!ref.book || !ref.source) throw new Error('请先选择文件和工作表');
-      this.infoEl(side).textContent = '正在读取字段…';
+      if (!ref.book || !ref.source) throw new Error(localize('ui.reconcile.selectFileWorksheetFirst'));
+      this.infoEl(side).textContent = localize('ui.reconcile.readingFields');
       const info = await this.post('/api/reconcile/fields', ref, {
         signal: controller.signal,
       }).then(decodeReconcileSourceInfo);
       if (epoch !== this.epoch || serial !== this.sides[side].serial) return;
       state.info = info;
       this.infoEl(side).textContent =
-        `${info.total.toLocaleString()} 条数据，${info.fields.length.toLocaleString()} 列${info.notice ? `；${info.notice}` : ''}`;
+        localize('ui.reconcile.dataEntriesColumns', { total: info.total.toLocaleString(interfaceLocale()), count: info.fields.length.toLocaleString(interfaceLocale()), detail: info.notice ? `；${info.notice}` : '' });
       this.options(side, info);
       if (this.ready() && !this.isMapped()) this.suggestMappings();
     } catch (error: unknown) {
@@ -874,7 +875,7 @@ export class Reconcile {
     for (const field of info?.fields.slice(0, 512) ?? []) {
       const option = document.createElement('option');
       option.value = this.colName(field.column);
-      option.label = field.name + (field.truncated ? '（字段名截取）' : '');
+      option.label = field.name + (field.truncated ? localize('ui.reconcile.fieldNameTruncated') : '');
       list.append(option);
     }
   }
@@ -892,15 +893,15 @@ export class Reconcile {
     this.changed();
     this.controls();
     requireEl('reconcileSourceNotice').textContent = pairs.keys.length
-      ? '已按唯一同名字段填入，请核对主键及核对方式。'
-      : '没有可唯一匹配的字段，请输入列字母、序号或字段名。';
+      ? localize('ui.reconcile.fieldsSameUniqueNamesHave')
+      : localize('ui.reconcile.noFieldsThatCanBe');
   }
 
   private addMapping(kind: 'keys' | 'fields', pair: Partial<ReconcilePair> = {}): void {
     const holder = requireEl(kind === 'keys' ? 'reconcileKeys' : 'reconcileFields');
     const limit = kind === 'keys' ? 4 : 8;
     if (holder.children.length >= limit) {
-      this.toast(`最多${limit}组${kind === 'keys' ? '主键' : '比较字段'}`, 'warning');
+      this.toast(localize('ui.reconcile.maximumGroups', { limit, detail: kind === 'keys' ? localize('ui.reconcile.primaryKey') : localize('ui.reconcile.comparisonFields') }), 'warning');
       return;
     }
     const row = document.createElement('div');
@@ -912,9 +913,9 @@ export class Reconcile {
       input.setAttribute('list', side === 'left' ? 'reconcileLeftOptions' : 'reconcileRightOptions');
       input.setAttribute(
         'aria-label',
-        `${side === 'left' ? '左侧' : '右侧'}${kind === 'keys' ? '主键字段' : '比较字段'}`,
+        `${side === 'left' ? localize('ui.reconcile.leftSide') : localize('ui.reconcile.rightSide')}${kind === 'keys' ? localize('ui.reconcile.primaryKeyField') : localize('ui.reconcile.comparisonFields')}`,
       );
-      input.placeholder = side === 'left' ? '左侧列或字段名' : '右侧列或字段名';
+      input.placeholder = side === 'left' ? localize('ui.reconcile.leftColumnOrFieldName') : localize('ui.reconcile.rightSideColumnsOrField');
       const colVal = side === 'left' ? pair.left : pair.right;
       input.value = colVal ? this.colName(colVal) : '';
       input.addEventListener('input', () => this.changed());
@@ -923,19 +924,19 @@ export class Reconcile {
 
     const mode = document.createElement('select');
     mode.className = 'field-control reconcile-mode';
-    mode.setAttribute('aria-label', '核对方式');
+    mode.setAttribute('aria-label', localize('ui.reconcile.verificationMethod'));
     const modeOptions: readonly (readonly [string, string])[] = [
-      ['', '保留源类型'],
-      ['text', '按显示文本'],
-      ['number', '按精确数值'],
+      ['', localize('ui.reconcile.maintainSourceType')],
+      ['text', localize('ui.common.pressDisplayText')],
+      ['number', localize('ui.reconcile.exactValue')],
     ];
     for (const [value, label] of modeOptions) mode.append(new Option(label, value));
     mode.value = pair.mode ?? '';
     row.append(mode);
 
     const flagEntries: readonly (readonly ['trim' | 'ignoreCase', string])[] = [
-      ['trim', '去首尾空格'],
-      ['ignoreCase', '忽略大小写'],
+      ['trim', localize('ui.reconcile.removeLeadingTrailingSpaces')],
+      ['ignoreCase', localize('ui.reconcile.ignoreCase')],
     ];
     for (const [key, label] of flagEntries) {
       const wrap = document.createElement('label');
@@ -959,7 +960,7 @@ export class Reconcile {
       input.placeholder = '0';
       input.value = pair.tolerance ?? '';
       input.addEventListener('input', () => this.changed());
-      threshold.append(document.createTextNode('绝对容差'), input);
+      threshold.append(document.createTextNode(localize('ui.reconcile.absoluteTolerance')), input);
       row.append(threshold);
     }
 
@@ -981,10 +982,10 @@ export class Reconcile {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = '×';
-    remove.title = '移除此组字段';
+    remove.title = localize('ui.reconcile.thisSetFieldsRemoved');
     remove.addEventListener('click', () => {
       if (kind === 'keys' && holder.children.length === 1) {
-        this.toast('至少保留一组主键', 'warning');
+        this.toast(localize('ui.reconcile.atLeastOneSetPrimary'), 'warning');
         return;
       }
       row.remove();
@@ -999,7 +1000,7 @@ export class Reconcile {
   private mappings(kind: 'keys' | 'fields'): ReconcilePair[] {
     const leftInfo = this.sides.left.info;
     const rightInfo = this.sides.right.info;
-    if (!leftInfo || !rightInfo) throw new Error('请先读取两侧字段');
+    if (!leftInfo || !rightInfo) throw new Error(localize('ui.common.readFieldsOnBothSides'));
     const rows = Array.from(requireEl(kind === 'keys' ? 'reconcileKeys' : 'reconcileFields').children);
     const seenLeft = new Set<number>();
     const seenRight = new Set<number>();
@@ -1014,7 +1015,7 @@ export class Reconcile {
       const left = resolveReconcileColumn(leftVal, leftInfo.fields);
       const right = resolveReconcileColumn(rightVal, rightInfo.fields);
       if (seenLeft.has(left) || seenRight.has(right)) {
-        throw new Error('主键或比较字段重复，请移除重复项');
+        throw new Error(localize('ui.reconcile.primaryKeyOrComparisonField'));
       }
       seenLeft.add(left);
       seenRight.add(right);
@@ -1028,7 +1029,7 @@ export class Reconcile {
       if (kind === 'fields' && pair.mode === 'number') {
         const tolInput = row.querySelector('.reconcile-tolerance');
         const text = tolInput instanceof HTMLInputElement ? tolInput.value.trim() : '';
-        if (text && !decimalTolerance(text)) throw new Error('金额容差须填写非负数字');
+        if (text && !decimalTolerance(text)) throw new Error(localize('ui.reconcile.amountToleranceMustBeNon'));
         if (text) pair.tolerance = text;
       }
       return pair;
@@ -1085,7 +1086,7 @@ export class Reconcile {
   }
 
   async run(): Promise<void> {
-    if (this.busy || !this.ready() || !this.canRun('核对')) return;
+    if (this.busy || !this.ready() || !this.canRun(localize('ui.reconcile.reconcile'))) return;
     let request: {
       workbookKey: string;
       primaryBook: string;
@@ -1110,14 +1111,14 @@ export class Reconcile {
           includeEqual: requireInput('reconcileIncludeEqual').checked,
         },
       };
-      if (!request.query.keys.length) throw new Error('请选择主键');
+      if (!request.query.keys.length) throw new Error(localize('ui.reconcile.selectPrimaryKey'));
     } catch (error: unknown) {
       this.toast(errorMessage(error), 'warning');
       return;
     }
 
     const epoch = this.epoch;
-    this.progress('正在开始核对…');
+    this.progress(localize('ui.reconcile.startingVerification'));
     this.changed();
     const base = this.baseline;
     const comparable =
@@ -1139,7 +1140,7 @@ export class Reconcile {
       this.result = completed.result;
       this.configChanged = false;
       requireEl('reconcileResults').hidden = false;
-      this.progress('核对完成');
+      this.progress(localize('ui.reconcile.verificationCompleted'));
       this.renderResult();
       if (previous && previous !== this.job) {
         this.post('/api/reconcile/clear', { id: previous }).catch(() => {
@@ -1165,7 +1166,7 @@ export class Reconcile {
     this.resultBaseline = null;
     this.configChanged = false;
     requireEl('reconcileResults').hidden = false;
-    this.progress('核对完成');
+    this.progress(localize('ui.reconcile.verificationCompleted'));
     this.renderResult();
     this.controls();
   }
@@ -1182,7 +1183,7 @@ export class Reconcile {
       form.append('reconcileSource', '1');
       form.append('workbookKey', this.s.workbookKey);
       form.append('primaryBook', this.primaryBook);
-      requireEl('reconcileSourceNotice').textContent = '正在添加核对文件…';
+      requireEl('reconcileSourceNotice').textContent = localize('ui.reconcile.addingVerificationFile');
       const result = await this.api('/api/open', {
         method: 'POST',
         body: form,
@@ -1194,7 +1195,7 @@ export class Reconcile {
       this.bookSelect('right').value = result.book;
       this.fillSheets('right');
       this.invalidate('right');
-      requireEl('reconcileSourceNotice').textContent = `已添加 ${result.name}，请读取字段。`;
+      requireEl('reconcileSourceNotice').textContent = localize('ui.reconcile.addedReadFields', { name: result.name });
     } catch (error: unknown) {
       if (epoch === this.epoch && !isAbortError(error)) {
         const msg = errorMessage(error);
@@ -1247,8 +1248,8 @@ export class Reconcile {
       this.fillSheets(side, value.sheet);
       this.headerInput(side).value = value.header;
       this.infoEl(side).textContent = value.info
-        ? `${value.info.total.toLocaleString()} 条数据，${value.info.fields.length} 列`
-        : '字段需重新读取';
+        ? localize('ui.reconcile.itemsColumn', { total: value.info.total.toLocaleString(interfaceLocale()), count: value.info.fields.length })
+        : localize('ui.reconcile.fieldsNeedBeReadAgain');
       this.options(side, value.info);
     }
     if (pairs) {
@@ -1268,18 +1269,18 @@ export class Reconcile {
   private renderSource(): void {
     if (!this.result) return;
     const r = this.result;
-    const parts = [`左：${r.left.name} / ${r.left.sheet}　右：${r.right.name} / ${r.right.sheet}`];
+    const parts = [localize('ui.reconcile.leftRight', { name: r.left.name, sheet: r.left.sheet, name2: r.right.name, sheet2: r.right.sheet })];
     if (this.resultBaseline) {
       const base = this.resultBaseline;
-      parts.push(`基线：${base.inputs.map((input) => `${input.name} / ${input.sheet}`).join('、')}`);
+      parts.push(localize('ui.reconcile.baseline', { inputs: base.inputs.map((input) => `${input.name} / ${input.sheet}`).join('、') }));
       if (r.exceptionGroupsSHA256) {
         parts.push(
-          `有效异常主键、分类及组内笔数${r.exceptionGroupsSHA256 === base.exceptionGroupsSHA256 ? '相同' : '有变化'}`,
+          localize('ui.reconcile.validExceptionPrimaryKeysCategories', { detail: r.exceptionGroupsSHA256 === base.exceptionGroupsSHA256 ? localize('ui.reconcile.same') : localize('ui.reconcile.changesOccurred') }),
         );
       }
     }
-    if (r.recordError) parts.push(`核查记录不可用：${r.recordError}`);
-    if (this.configChanged) parts.push('配置已更改，以下仍为上次结果。');
+    if (r.recordError) parts.push(localize('ui.reconcile.verificationRecordsUnavailable', { detail: r.recordError }));
+    if (this.configChanged) parts.push(localize('ui.reconcile.configurationChangedFollowingValuesRemain'));
     requireEl('reconcileResultSource').textContent = parts.join('　');
   }
 
@@ -1300,16 +1301,16 @@ export class Reconcile {
       const value = document.createElement('b');
       span.textContent = label;
       const countVal = counts[key] || 0;
-      value.textContent = countVal.toLocaleString();
+      value.textContent = countVal.toLocaleString(interfaceLocale());
       span.append(value);
       if (this.resultBaseline) {
         const delta = countVal - (this.resultBaseline.counts[key] ?? 0);
-        span.append(document.createTextNode(`（较基线 ${delta > 0 ? '+' : ''}${delta}）`));
+        span.append(document.createTextNode(localize('ui.reconcile.comparedBaseline', { detail: delta > 0 ? '+' : '', delta })));
       }
       holder.append(span);
     }
     requireEl('reconcileSampleNote').textContent =
-      `显示${this.result.samples.length}组样例${this.result.samplesTruncated ? '，完整结果请导出CSV' : ''}；长文本仅截取显示。`;
+      localize('ui.reconcile.displayingSampleGroupLongTexts', { count: this.result.samples.length, detail: this.result.samplesTruncated ? localize('ui.reconcile.exportCompleteResultAsCsv') : '' });
     this.renderSamples();
   }
 
@@ -1322,7 +1323,7 @@ export class Reconcile {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = text;
-    button.title = `定位${side === 'left' ? '左' : '右'}侧 ${this.colName(column)}${row}`;
+    button.title = localize('ui.reconcile.locateSide', { detail: side === 'left' ? localize('ui.common.left') : localize('ui.common.right'), colName: this.colName(column), row });
     button.addEventListener('click', () => {
       void this.goSource(side, row, column);
     });
@@ -1335,7 +1336,7 @@ export class Reconcile {
     table.replaceChildren();
     const head = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const label of ['结果', '主键', '左源行', '右源行', '字段与读取值', '差额 / 说明']) {
+    for (const label of [localize('ui.reconcile.results'), localize('ui.reconcile.primaryKey'), localize('ui.reconcile.leftRow'), localize('ui.reconcile.rightRow'), localize('ui.reconcile.fieldsReadValues'), localize('ui.reconcile.differenceDescription')]) {
       const th = document.createElement('th');
       th.textContent = label;
       hr.append(th);
@@ -1378,12 +1379,12 @@ export class Reconcile {
           cell.append(this.sourceButton(side, row, keyCol, String(row)), document.createTextNode(' '));
         }
         if (count > rows.length) {
-          cell.append(document.createTextNode(`等${count.toLocaleString()}条`));
+          cell.append(document.createTextNode(localize('ui.reconcile.equalItems', { count: count.toLocaleString(interfaceLocale()) })));
         }
       }
 
       if (group.status === 'duplicate') {
-        c4.textContent = `左${group.leftCount}条，右${group.rightCount}条；未自动配对。`;
+        c4.textContent = localize('ui.reconcile.leftRowsRightRowsNot', { leftCount: group.leftCount, rightCount: group.rightCount });
         c5.textContent = group.reason ?? '';
       } else {
         const pairs = query.fields.length ? query.fields : query.keys.slice(0, 1);
@@ -1402,26 +1403,26 @@ export class Reconcile {
             const col = pair[side];
             const value = record.values[String(col)];
             const text = value?.missingCache
-              ? '（公式缺少缓存）'
+              ? localize('ui.reconcile.formulaLacksCache')
               : !value?.exists
-                ? '（缺失单元格）'
+                ? localize('ui.reconcile.missingCells')
                 : value.raw === ''
-                  ? '（空值）'
+                  ? localize('ui.reconcile.nullValue')
                   : value.raw;
             const button = this.sourceButton(
               side,
               record.number,
               col,
-              `${side === 'left' ? '左：' : '右：'}${text}${value?.truncated ? '…' : ''}`,
+              `${side === 'left' ? localize('ui.reconcile.left') : localize('ui.reconcile.right')}${text}${value?.truncated ? '…' : ''}`,
             );
-            button.title += `；读取类型：${value?.type || '隐式/空白'}${value?.typeMissing ? '（源类型未保留）' : ''}`;
+            button.title += localize('ui.reconcile.readingType', { detail: value?.type || localize('ui.reconcile.implicitBlank'), detail2: value?.typeMissing ? localize('ui.reconcile.sourceTypeNotPreserved') : '' });
             div.append(button, document.createElement('br'));
           }
           c4.append(div);
           const comparison = group.comparisons?.[i];
           if (comparison?.delta && comparison.delta !== '0') {
             reasons.push(
-              `${title.textContent}：${comparison.delta}${comparison.withinTolerance ? '（容差内）' : ''}`,
+              `${title.textContent}：${comparison.delta}${comparison.withinTolerance ? localize('ui.reconcile.withinTolerance') : ''}`,
             );
           }
           if (comparison?.reason) reasons.push(comparison.reason);
@@ -1429,7 +1430,7 @@ export class Reconcile {
         c5.textContent = [
           group.reason,
           ...reasons,
-          group.textTruncated ? '样例文字已截取；CSV保留完整读取值。' : '',
+          group.textTruncated ? localize('ui.reconcile.sampleTextTruncatedCsvRetains') : '',
         ]
           .filter(Boolean)
           .join('\n');
@@ -1443,7 +1444,7 @@ export class Reconcile {
       const cell = document.createElement('td');
       cell.colSpan = 6;
       cell.className = 'reconcile-empty';
-      cell.textContent = filter ? '当前样例中没有此类记录。' : '没有需要显示的差异样例。';
+      cell.textContent = filter ? localize('ui.reconcile.thereNoSuchRecordsCurrent') : localize('ui.reconcile.noExamplesDifferencesBeDisplayed');
       row.append(cell);
       body.append(row);
     }
@@ -1481,7 +1482,7 @@ export class Reconcile {
         popup.location.assign(target.url);
         popupHandled = true;
       } else {
-        this.toast('浏览器阻止了新窗口，请允许弹出窗口后重试', 'warning');
+        this.toast(localize('ui.reconcile.browserPreventedNewWindowsAllow'), 'warning');
       }
     } catch (error: unknown) {
       if (epoch === this.epoch) this.toast(errorMessage(error), 'error');
@@ -1508,7 +1509,7 @@ export class Reconcile {
     const before = requireInput('batchBaseline').files?.[0];
     const after = requireInput('batchCurrent').files?.[0];
     if (!before || !after) {
-      this.progress('请选择基线和当期的完整核查包', true);
+      this.progress(localize('ui.reconcile.selectCompleteVerificationPackageIncluding'), true);
       return;
     }
     const files = new FormData();
@@ -1527,13 +1528,13 @@ export class Reconcile {
     const left = { book: this.bookSelect('left').value, source: this.sheetSelect('left').value };
     const right = { book: this.bookSelect('right').value, source: this.sheetSelect('right').value };
     if (!left.book || !right.book) {
-      this.progress('请选择两个来源文件', true);
+      this.progress(localize('ui.reconcile.selectTwoSourceFiles'), true);
       return;
     }
     const scope = requireSelect('versionScope').value;
     const pair = scope === 'pair' || scope === 'keyed';
     if (pair && (!left.source.startsWith('wb:') || !right.source.startsWith('wb:'))) {
-      this.progress('请选择两侧的源工作表', true);
+      this.progress(localize('ui.reconcile.selectSourceWorksheetOnBoth'), true);
       return;
     }
     const request: {
@@ -1558,12 +1559,12 @@ export class Reconcile {
     };
     if (scope === 'keyed') {
       if (!this.ready()) {
-        this.progress('请先读取两侧字段并确认业务主键', true);
+        this.progress(localize('ui.reconcile.readFieldsOnBothSides'), true);
         return;
       }
       try {
         const keys = this.mappings('keys');
-        if (!keys.length) throw new Error('请选择业务主键');
+        if (!keys.length) throw new Error(localize('ui.reconcile.selectBusinessPrimaryKey'));
         request.alignment = { left: this.ref('left'), right: this.ref('right'), keys };
       } catch (error: unknown) {
         this.progress(errorMessage(error), true);
@@ -1572,7 +1573,7 @@ export class Reconcile {
     }
     const label = SIDES.map((side) => this.bookSelect(side).selectedOptions[0]?.textContent ?? '').join(' / ');
     this.dialog.close();
-    await this.onAuditExport?.('/api/reconcile/versions', request, `版本比较 · ${label}`);
+    await this.onAuditExport?.('/api/reconcile/versions', request, localize('ui.reconcile.versionComparison', { label }));
   }
 
   async export(bundle = false): Promise<void> {
@@ -1580,11 +1581,11 @@ export class Reconcile {
     const r = this.result;
     const status = bundle ? requireSelect('reconcileResultFilter').value : '';
     if (status === 'equal' && !r.query.includeEqual) {
-      this.progress('请勾选“包含一致记录”后重新核对', true);
+      this.progress(localize('ui.reconcile.checkIncludeConsistentRecordsRecheck'), true);
       return;
     }
     this.dialog.close();
-    const label = `${r.left.name} / ${r.left.sheet} 与 ${r.right.name} / ${r.right.sheet}（${bundle ? `核查包 · ${STATUS_LABELS[status] ?? '全部类型'}` : '完整核对'}）`;
+    const label = localize('ui.reconcile.exportSourcePair', { name: r.left.name, sheet: r.left.sheet, name2: r.right.name, sheet2: r.right.sheet, detail: bundle ? localize('ui.reconcile.reviewPackage', { detail: STATUS_LABELS[status] ?? localize('ui.reconcile.allTypes') }) : localize('ui.reconcile.finalVerification') });
     await this.onExport?.(
       this.job,
       requireInput('reconcileProtectCSV').checked,

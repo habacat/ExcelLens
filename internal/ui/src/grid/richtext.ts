@@ -2,6 +2,7 @@
  * Validated UTF-16 rich-text span inspection, CSS style synthesis, DOM painting,
  * and HTML export serialization. Source text remains immutable.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { RichTextLimits } from '../contracts/formats.ts';
 import type {
   CellData,
@@ -159,14 +160,14 @@ export function inspectRichText(
   const text = cell?.display ?? cell?.raw ?? '';
   if (!rich) return null;
   const invalid = (message: string): RichTextInfo => ({ text, runs: [], notice: message });
-  if (text !== (cell.raw ?? '')) return invalid('显示值与原文不同，富文本片段未应用');
+  if (text !== (cell.raw ?? '')) return invalid(localize('ui.richtext.displayedValueDiffersFromOriginal'));
   if (!limits || !Number.isSafeInteger(limits.cellRuns) || limits.cellRuns < 1) {
-    return invalid('富文本显示容量不可用，原文保留');
+    return invalid(localize('ui.richtext.richTextDisplayCapacityUnavailable'));
   }
   const runs: readonly RichTextRun[] = rich.runs ?? [];
   const notice = rich.notice ?? '';
   if (runs.length > limits.cellRuns || notice.length > 1024) {
-    return invalid('富文本样式无效或超限，原文保留');
+    return invalid(localize('ui.richtext.richTextStyleInvalidOr'));
   }
   let previous = 0;
   for (const run of runs) {
@@ -177,15 +178,15 @@ export function inspectRichText(
       !isSafeUtf16Boundary(text, run.end) ||
       !isValidFont(run.font)
     ) {
-      return invalid('富文本样式无效，原文保留');
+      return invalid(localize('ui.richtext.richTextStyleInvalidOriginal'));
     }
     previous = run.end;
   }
   if (!notice && previous !== text.length) {
-    return invalid('富文本样式未覆盖原文，原文保留');
+    return invalid(localize('ui.richtext.richTextStyleDoesNot'));
   }
   const extra = runs.some((run) => (run.font.underline ?? '').endsWith('Accounting'))
-    ? '会计下划线按片段下划线显示'
+    ? localize('ui.richtext.accountingUnderlineDisplayedAsSegments')
     : '';
   return { text, runs, notice: [notice, extra].filter(Boolean).join('；') };
 }
@@ -270,7 +271,7 @@ export function paintRichText(
   const info = presentationInfo(cell, options, base);
   if (!info) return false;
   const notice =
-    options.allowed === false ? '富文本样式超过当前显示区域容量，原文完整保留' : info.notice;
+    options.allowed === false ? localize('ui.richtext.richTextStyleExceedsCurrent') : info.notice;
   if (notice) {
     node.classList.add('rich-text-notice');
     node.title = notice;

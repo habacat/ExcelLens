@@ -2,6 +2,7 @@
  * Floating virtualized read-only formula calculator window with grid range
  * picking, function autocomplete, recovery journal, and notes column.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, SessionService, ToastFn } from '../contracts/common.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
 import { requireButton, requireEl } from '../core/dom.ts';
@@ -267,7 +268,7 @@ export class Calculator {
           for (const [key, value] of Object.entries(records)) {
             const index = Number(key) + offset;
             if (!Number.isSafeInteger(index) || index > Number.MAX_SAFE_INTEGER - 2) {
-              throw new Error('追加恢复后的行号超出范围');
+              throw new Error(localize('ui.calculator.appendedRowNumberExceedsRange'));
             }
             result[String(index)] = value;
           }
@@ -276,15 +277,15 @@ export class Calculator {
         onStatus: (status) => {
           const el = requireEl('calculatorSaveStatus');
           el.textContent = status.error
-            ? '恢复未保存'
+            ? localize('ui.calculator.restoreUnsavedData')
             : status.loading
-              ? '读取恢复副本…'
+              ? localize('ui.calculator.readingRecoveryCopy')
               : status.dirty
-                ? '恢复保存中…'
+                ? localize('ui.calculator.restorationProgress')
                 : status.count
-                  ? '已保存'
+                  ? localize('ui.common.saved')
                   : '';
-          el.title = status.error || '公式和备注的恢复副本';
+          el.title = status.error || localize('ui.calculator.recoveryCopiesFormulasRemarks');
           el.classList.toggle('has-error', Boolean(status.error));
         },
       });
@@ -292,8 +293,8 @@ export class Calculator {
       this.model.onChange = (key, data): void => recovery.set(key, data);
       requireButton('calculatorRecovery').addEventListener('click', () =>
         showRecoveryDialog(recovery, {
-          title: '恢复计算表',
-          explanation: '载入的公式等待主动计算。其他副本追加到本页末尾，原副本保留。',
+          title: localize('ui.calculator.resumeCalculationTable'),
+          explanation: localize('ui.calculator.loadedFormulasWaitingBeCalculated'),
         }),
       );
     }
@@ -440,7 +441,7 @@ export class Calculator {
         this.cancelJob(index);
         const row = this.model.ensure(index);
         row.result = null;
-        row.error = '#REF! 工作簿已切换';
+        row.error = localize('ui.calculator.refWorkbookSwitched');
         this.paint(index);
       }
     }
@@ -579,9 +580,9 @@ export class Calculator {
         v.note.dataset.noteRow = String(i);
         v.input.id = `calculatorFormula${i}`;
         v.input.placeholder = i === 0 ? '=' : '';
-        v.input.setAttribute('aria-label', `第${i + 1}行公式`);
-        v.value.setAttribute('aria-label', `第${i + 1}行结果`);
-        v.note.setAttribute('aria-label', `第${i + 1}行备注`);
+        v.input.setAttribute('aria-label', localize('ui.calculator.formulaRow', { i: i + 1 }));
+        v.value.setAttribute('aria-label', localize('ui.calculator.resultsRow', { i: i + 1 }));
+        v.note.setAttribute('aria-label', localize('ui.calculator.notesRow', { i: i + 1 }));
         v.input.setAttribute('aria-expanded', 'false');
         v.tr.setAttribute('aria-rowindex', String(i + 1));
         v.number.textContent = String(i + 1);
@@ -610,9 +611,9 @@ export class Calculator {
     if (!v) return;
     v.value.textContent = row.error
       ? this.errorCode(row.error)
-      : (row.result?.display ?? (this.jobs.has(index) ? '…' : row.restored ? '待计算' : ''));
+      : (row.result?.display ?? (this.jobs.has(index) ? '…' : row.restored ? localize('ui.calculator.pendingCalculation') : ''));
     v.value.title =
-      row.error || row.result?.exact || (row.restored ? '按Enter计算恢复的公式' : '');
+      row.error || row.result?.exact || (row.restored ? localize('ui.calculator.formulasCalculatedPressingEnterRecovery') : '');
     v.value.classList.toggle('is-error', Boolean(row.error));
     v.value.classList.toggle('is-pending', row.restored && !row.result);
     v.value.classList.toggle('is-text', row.result?.kind === 'text');
@@ -627,7 +628,7 @@ export class Calculator {
       button.type = 'button';
       button.className = 'calculator-convert';
       button.textContent = suggestion.label;
-      button.title = `${suggestion.preview}（点击在本行公式中转换）`;
+      button.title = localize('ui.calculator.clickConvertThisRowFormula', { preview: suggestion.preview });
       button.onclick = (event: MouseEvent): void => {
         event.preventDefault();
         event.stopPropagation();
@@ -648,7 +649,7 @@ export class Calculator {
     else if (suggestion.kind === 'datetime') formula = `=DATEVALUE(${body})+TIMEVALUE(${body})`;
     else return;
     if (formula.length > 4096) {
-      this.o.toast('转换后的公式过长，请拆分本行公式', 'warning');
+      this.o.toast(localize('ui.calculator.convertedFormulaTooLongSplit'), 'warning');
       return;
     }
     this.edit(index, formula);
@@ -782,12 +783,12 @@ export class Calculator {
     const current = this.source();
     if (!input) return false;
     if (!this.o.state.indexReady) {
-      row.error = '#REF! 工作表索引尚未完成';
+      row.error = localize('ui.calculator.refWorksheetIndexNotCompleted');
       this.paint(index);
       return true;
     }
     if (row.source?.workbookKey && row.source.workbookKey !== current.workbookKey) {
-      row.error = '#REF! 工作簿已切换';
+      row.error = localize('ui.calculator.refWorkbookSwitched');
       this.paint(index);
       return true;
     }

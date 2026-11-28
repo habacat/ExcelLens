@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -20,19 +21,19 @@ func (a *App) handleFilterLocate(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "工作表不存在")
+		writeMessage(w, http.StatusNotFound, "service.filterHttp.worksheetDoesNotExist")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, http.StatusConflict, "工作表索引不可用")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.worksheetIndexUnavailable")
 		return
 	}
 	var result *FilterResult
@@ -41,7 +42,7 @@ func (a *App) handleFilterLocate(w http.ResponseWriter, r *http.Request) {
 		var err error
 		visible, err = a.rowViewSnapshot(id, wb, idx, meta.Path, r.URL.Query().Get("filterId"))
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer visible.close()
@@ -49,7 +50,7 @@ func (a *App) handleFilterLocate(w http.ResponseWriter, r *http.Request) {
 		result = a.filterSnapshot(r.URL.Query().Get("filterId"))
 		defer result.close()
 		if result == nil || result.SheetPath != meta.Path {
-			writeError(w, http.StatusNotFound, "筛选结果已失效")
+			writeMessage(w, http.StatusNotFound, "service.filter.expired")
 			return
 		}
 	}
@@ -58,14 +59,14 @@ func (a *App) handleFilterLocate(w http.ResponseWriter, r *http.Request) {
 	if visible != nil && r.URL.Query().Has("excludeThroughRow") {
 		value, err := strconv.Atoi(r.URL.Query().Get("excludeThroughRow"))
 		if err != nil || value < 0 || value > 30 {
-			writeError(w, 400, "冻结行参数无效")
+			writeMessage(w, 400, "service.filterHttp.frozenRowParametersInvalid")
 			return
 		}
 		through = value
 	}
 	view, err := newSelectionRowView(idx, result, through, visible)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	at, found := view.locate(row)
@@ -88,18 +89,18 @@ func (a *App) handleFilterDistinct(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到工作表")
+		writeMessage(w, http.StatusNotFound, "service.filterHttp.unableFindWorksheet")
 		return
 	}
 	col := parseIntDefault(r.URL.Query().Get("column"), 0)
 	header := parseIntDefault(r.URL.Query().Get("headerRow"), 0)
 	if col < 1 || col > formats.ExcelColumns || header < 0 || header > formats.ExternalRows {
-		writeError(w, http.StatusBadRequest, "筛选列或表头行无效")
+		writeMessage(w, http.StatusBadRequest, "service.filterHttp.filteringColumnsOrHeaderRows")
 		return
 	}
 	const maxDistinct = 2500
@@ -119,13 +120,13 @@ func (a *App) handleFilterDistinct(w http.ResponseWriter, r *http.Request) {
 	a.cacheMu.RLock()
 	if a.currentWorkbook() != wb {
 		a.cacheMu.RUnlock()
-		writeError(w, http.StatusConflict, "工作簿已切换，请重新读取筛选选项")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.workbookSwitchedReadFilterOptions")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		a.cacheMu.RUnlock()
-		writeError(w, http.StatusConflict, "请先打开工作表")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.openWorksheetFirst")
 		return
 	}
 	items, truncated, err := wb.DistinctColumnValues(idx, col, header, maxDistinct, r.Context().Done())
@@ -134,7 +135,7 @@ func (a *App) handleFilterDistinct(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, context.Canceled) || r.Context().Err() != nil {
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "读取筛选选项失败："+err.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.filterHttp.failedReadFilterOptions", i18n.Args{"detail": err})
 		return
 	}
 	// Never let a previous workbook's scan contaminate the new workbook.
@@ -158,25 +159,25 @@ func (a *App) handleFilterStart(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.FilterRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.filterHttp.requestedContentInvalid")
 		return
 	}
 	if (len(req.Rules) == 0 && req.SortColumn == 0 && len(req.SortKeys) == 0) || len(req.Rules) > 32 {
-		writeError(w, http.StatusBadRequest, "筛选条件必须有有效的过滤项或排序列，最多32项")
+		writeMessage(w, http.StatusBadRequest, "service.filterHttp.filterConditionsMustHaveValid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.noWorkbookOpen")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint || req.Book != "" && req.Book != sourceBookID(wb) {
-		writeError(w, http.StatusConflict, "筛选来源已切换，请重新运行")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.filterSourceSwitchedRunProcess")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.filterHttp.unableFindSpecifiedWorksheet")
 		return
 	}
 	if req.Recoverable {
@@ -187,35 +188,35 @@ func (a *App) handleFilterStart(w http.ResponseWriter, r *http.Request) {
 	if req.Book != "" {
 		if err := wb.CheckSourceUnchanged(); err != nil {
 			a.cacheMu.RUnlock()
-			writeError(w, http.StatusConflict, err.Error())
+			writeFailure(w, http.StatusConflict, err)
 			return
 		}
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	a.cacheMu.RUnlock()
 	if idx == nil {
-		writeError(w, http.StatusConflict, "请先打开工作表，再执行筛选")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.openWorksheetBeforePerformingFiltering")
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &FilterJob{ID: randomID(), Sheet: meta.Name, Status: "queued", Stage: "等待筛选任务", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{})}
+	job := &FilterJob{ID: randomID(), Sheet: meta.Name, Status: "queued", Stage: "stage.task.waitingForFilterTask", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{})}
 	a.mu.Lock()
 	if a.maintenance {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.localCacheBeingMaintainedTry")
 		return
 	}
 	if a.wb != wb {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusConflict, "工作簿已切换，请重新选择工作表")
+		writeMessage(w, http.StatusConflict, "service.filterHttp.workbookSwitchedChooseNewWorksheet")
 		return
 	}
 	if !pruneFilterJobsLocked(a.filterJobs, formats.QueryTaskHistory) {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusTooManyRequests, "正在回收筛选任务，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.filterHttp.screeningTaskBeingRecoveredTry")
 		return
 	}
 	for _, old := range a.filterJobs {
@@ -236,7 +237,7 @@ func (a *App) handleFilterStart(w http.ResponseWriter, r *http.Request) {
 func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *workbook.SheetIndex, rules []workbook.FilterRule, opts workbook.FilterOptions, job *FilterJob) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			failFilterJob(job, fmt.Errorf("筛选过程发生异常：%v", recovered))
+			failFilterJob(job, i18n.Error("service.filterHttp.exceptionOccurredDuringFilteringProcess", i18n.Args{"recovered": recovered}))
 		}
 		if job.checkpoint != nil {
 			if err := job.checkpoint.close(); err != nil {
@@ -249,7 +250,7 @@ func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wor
 	if admissionErr != nil {
 		job.mu.Lock()
 		job.Status = "cancelled"
-		job.Stage = "已取消"
+		job.Stage = "stage.task.cancelled"
 		job.mu.Unlock()
 		return
 	}
@@ -260,7 +261,7 @@ func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wor
 	}
 	job.mu.Lock()
 	job.Status = "running"
-	job.Stage = "正在扫描工作表"
+	job.Stage = "stage.task.scanningTheWorksheet"
 	job.Total = idx.RowCount()
 	job.mu.Unlock()
 	a.cacheMu.RLock()
@@ -272,7 +273,7 @@ func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wor
 		if total > 0 {
 			progress += 14 * float64(done) / float64(total)
 		}
-		if stage == "正在建立行号定位" {
+		if stage == "stage.task.establishingRowNumberPositioning" {
 			progress = 99
 		}
 		job.Progress = max(job.Progress, progress)
@@ -292,7 +293,7 @@ func (a *App) runFilter(wb *workbook.Workbook, meta workbook.SheetMeta, idx *wor
 					job.Progress *= .85
 				}
 			}
-			job.Stage = fmt.Sprintf("筛选中 · %d/%d 行", done, total)
+			job.Stage = "stage.task.filteringInProgress"
 			job.mu.Unlock()
 		})
 	}()
@@ -329,11 +330,11 @@ func (a *App) handleFilterStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.filterJobs[r.URL.Query().Get("id")]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, http.StatusNotFound, "筛选任务不存在或已失效")
+		writeMessage(w, http.StatusNotFound, "service.filterHttp.filteringTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
-	out := map[string]any{"id": job.ID, "sheet": job.Sheet, "status": job.Status, "stage": job.Stage, "progress": job.Progress, "scanned": job.Scanned, "durationMs": time.Since(job.Started).Milliseconds(), "total": job.Total, "error": job.Error, "filterId": job.ResultID}
+	out := map[string]any{"id": job.ID, "sheet": job.Sheet, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "progress": job.Progress, "scanned": job.Scanned, "durationMs": time.Since(job.Started).Milliseconds(), "total": job.Total, "error": job.Error, "filterId": job.ResultID}
 	out["taskId"] = job.TaskID
 	status, resultID := job.Status, job.ResultID
 	job.mu.RUnlock()
@@ -359,7 +360,7 @@ func (a *App) handleFilterCancel(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.filterHttp.requestedContentInvalid")
 		return
 	}
 	a.mu.Lock()
@@ -386,7 +387,7 @@ func (a *App) handleFilterClear(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.filterHttp.requestedContentInvalid")
 		return
 	}
 	a.mu.Lock()

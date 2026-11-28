@@ -2,6 +2,7 @@
  * Persistent task checkpoint validation and action resolution.
  * Metadata only: no source reads or automatic job starts.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { TaskCheckpointInfo } from '../contracts/features.ts';
 
 export type TaskOperationKind = 'search' | 'filter' | 'export' | '';
@@ -35,23 +36,23 @@ export function taskOperation(item: Pick<TaskCheckpointInfo, 'driver'>): TaskOpe
 
 function readRequiredString(raw: Record<string, unknown>, key: string): string {
   const value = raw[key];
-  if (typeof value !== 'string') throw new Error('任务信息不完整，请刷新重试');
+  if (typeof value !== 'string') throw new Error(localize('ui.taskRecoveryModel.taskInformationIncompleteRefreshTry'));
   return value;
 }
 
 function readRequiredBoolean(raw: Record<string, unknown>, key: string): boolean {
   const value = raw[key];
-  if (typeof value !== 'boolean') throw new Error('任务状态无效，请刷新重试');
+  if (typeof value !== 'boolean') throw new Error(localize('ui.taskRecoveryModel.taskStatusInvalidRefreshTry'));
   return value;
 }
 
 export function validateTaskItems(data: unknown, maximum: number): TaskCheckpointInfo[] {
   if (!isRecord(data) || !Array.isArray(data.items) || data.items.length > maximum) {
-    throw new Error('任务列表无效，请刷新重试');
+    throw new Error(localize('ui.common.taskListInvalidTryAgain'));
   }
   const seen = new Set<string>();
   return data.items.map((raw: unknown): TaskCheckpointInfo => {
-    if (!isRecord(raw)) throw new Error('任务列表无效，请刷新重试');
+    if (!isRecord(raw)) throw new Error(localize('ui.common.taskListInvalidTryAgain'));
     const id = raw.id;
     const revision = raw.revision;
     if (
@@ -62,7 +63,7 @@ export function validateTaskItems(data: unknown, maximum: number): TaskCheckpoin
       !/^\d+$/.test(revision) ||
       BigInt(revision) > MAX_UINT64
     ) {
-      throw new Error('任务列表无效，请刷新重试');
+      throw new Error(localize('ui.common.taskListInvalidTryAgain'));
     }
     seen.add(id);
     const driver = readRequiredString(raw, 'driver');
@@ -78,7 +79,7 @@ export function validateTaskItems(data: unknown, maximum: number): TaskCheckpoin
     const busy = readRequiredBoolean(raw, 'busy');
     const complete = readRequiredBoolean(raw, 'complete');
     const backup = readRequiredBoolean(raw, 'backup');
-    if (revision === '0' && !error) throw new Error('任务版本无效，请刷新重试');
+    if (revision === '0' && !error) throw new Error(localize('ui.taskRecoveryModel.taskVersionInvalidRefreshTry'));
     return {
       full: typeof raw.full === 'boolean' ? raw.full : undefined,
       id,
@@ -124,10 +125,10 @@ export function taskRequestPayload(
 
 export function taskLabel(item: Pick<TaskCheckpointInfo, 'driver' | 'mode'>): string {
   const op = taskOperation(item);
-  if (op === 'search') return '搜索';
-  if (op === 'filter') return '筛选 / 排序';
-  if (op === 'export') return `导出 ${item.mode.toUpperCase()}`;
-  return '任务';
+  if (op === 'search') return localize('ui.common.search');
+  if (op === 'filter') return localize('ui.taskRecoveryModel.filterSort');
+  if (op === 'export') return localize('ui.taskRecoveryModel.export', { toUpperCase: item.mode.toUpperCase() });
+  return localize('ui.taskRecoveryModel.task');
 }
 
 export function taskAction(

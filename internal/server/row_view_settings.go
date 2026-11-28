@@ -1,10 +1,10 @@
 package server
 
 import (
-	"errors"
 	"slices"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -28,11 +28,11 @@ func readRowViewSettings(path string, wb *workbook.Workbook) (rowViewSettingsSto
 		return out, err
 	}
 	if out.Version != 1 || out.Fingerprint != wb.Fingerprint || out.Revision < 0 || out.Revision >= maxConfigRevision || out.Sheets == nil || len(out.Sheets) > formats.RowViewSavedSheets {
-		return out, errors.New("行显隐设置版本、来源或容量无效，原文件已保留")
+		return out, i18n.Error("service.rowViewSettings.versionSourceOrCapacityRow")
 	}
 	source, ok := formats.Lookup(wb.Format)
 	if !ok || source.MaxRows < 1 {
-		return out, errors.New("行显隐设置的源格式无效")
+		return out, i18n.Error("service.rowViewSettings.sourceFormatRowVisibilitySettings")
 	}
 	paths := make(map[string]bool, len(wb.Sheets))
 	for _, sheet := range wb.Sheets {
@@ -40,7 +40,7 @@ func readRowViewSettings(path string, wb *workbook.Workbook) (rowViewSettingsSto
 	}
 	for path, settings := range out.Sheets {
 		if !paths[path] {
-			return out, errors.New("行显隐设置包含未知工作表，原文件已保留")
+			return out, i18n.Error("service.rowViewSettings.rowVisibilitySettingsIncludeUnknown")
 		}
 		clean, err := settings.Normalized(source.MaxRows)
 		if err != nil {
@@ -72,18 +72,18 @@ func applyRowViewChange(settings workbook.AxisViewSettings, maximum int, change 
 		return out.WithRange(maximum, change.First, change.Last, change.Hidden)
 	case "depth":
 		if change.Depth == nil {
-			return out, errors.New("请选择大纲展开层级")
+			return out, i18n.Error("service.rowViewSettings.selectOutlineExpansionLevel")
 		}
 		depth := *change.Depth
 		out.Depth, out.Groups = &depth, nil
 	case "group":
 		if change.Group == nil {
-			return out, errors.New("请选择要展开或折叠的大纲组")
+			return out, i18n.Error("service.rowViewSettings.selectOutlineGroupBeExpanded")
 		}
 		out.Groups = slices.DeleteFunc(out.Groups, func(g workbook.AxisOutlineOverride) bool { return g.AxisOutlineKey == change.Group.AxisOutlineKey })
 		out.Groups = append(out.Groups, *change.Group)
 	default:
-		return out, errors.New("行显隐操作无效")
+		return out, i18n.Error("service.rowViewSettings.rowVisibilityOperationInvalid")
 	}
 	return out.Normalized(maximum)
 }

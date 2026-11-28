@@ -1,6 +1,7 @@
 /**
  * Background task and detached-session monitor embedded inside the local storage dialog.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisQueryStatusResponse,
   SourceFilterSpec,
@@ -25,11 +26,11 @@ import {
 } from '../core/http-decoders.generated.ts';
 
 const KIND_NAMES: Readonly<Record<string, string>> = {
-  analysis: '分析',
-  reconcile: '对账',
-  export: '导出',
-  search: '搜索',
-  filter: '筛选',
+  analysis: localize('ui.common.analysis'),
+  reconcile: localize('ui.backgroundTasks.reconcilingAccounts'),
+  export: localize('ui.backgroundTasks.export'),
+  search: localize('ui.common.search'),
+  filter: localize('ui.backgroundTasks.filter'),
 };
 
 function endpoint(kind: string): string {
@@ -87,34 +88,34 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
   const holder = requireEl('storageWork');
 
   async function openResult(item: BackgroundItem): Promise<void> {
-    if (!item.canAttach) throw new Error('任务仍在原标签页中');
+    if (!item.canAttach) throw new Error(localize('ui.backgroundTasks.taskStillOriginalTab'));
     if (item.session !== session.id) {
       const url = new URL(window.location.pathname, window.location.href);
       url.search = new URLSearchParams({ session: item.session, job: item.id }).toString();
       window.open(url.href, '_blank', 'noopener');
       return;
     }
-    if (item.state !== 'done') throw new Error(item.error || item.stage || '任务仍在运行');
+    if (item.state !== 'done') throw new Error(item.error || item.stage || localize('ui.backgroundTasks.taskStillRunning'));
     const statusUrl = `${endpoint(item.kind)}/status?id=${encodeURIComponent(item.id)}`;
     if (item.kind === 'analysis') {
       const status = await api(statusUrl, undefined, decodeAnalysisQueryStatusResponse);
-      if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
+      if (status.status !== 'done') throw new Error(status.error || localize('ui.common.taskNotCompletedYet'));
       requireDialog('storageDialog').close();
       await analysis(item.id, status);
       return;
     }
     if (item.kind === 'reconcile') {
       const status = await api(statusUrl, undefined, decodeReconcileJobStatus);
-      if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
+      if (status.status !== 'done') throw new Error(status.error || localize('ui.common.taskNotCompletedYet'));
       requireDialog('storageDialog').close();
       await reconcile(item.id, status);
       return;
     }
     const status = await api(statusUrl, undefined, decodeBackgroundJobStatusPayload);
-    if (status.status !== 'done') throw new Error(status.error || '任务尚未完成');
+    if (status.status !== 'done') throw new Error(status.error || localize('ui.common.taskNotCompletedYet'));
     requireDialog('storageDialog').close();
     if (item.kind !== 'export' && item.kind !== 'search' && item.kind !== 'filter') {
-      throw new Error('不支持的后台任务类型');
+      throw new Error(localize('ui.backgroundTasks.unsupportedBackgroundTaskTypes'));
     }
     const checkpoint: TaskCheckpointInfo = {
       id: item.id,
@@ -141,7 +142,7 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
       { operation: item.kind, jobId: item.id, filter: status.filter },
       checkpoint,
     );
-    if (!ok) throw new Error('当前视图正在使用，请结束当前操作后再打开结果');
+    if (!ok) throw new Error(localize('ui.backgroundTasks.currentViewUseEndCurrent'));
   }
 
   function addAction(row: HTMLElement, label: string, payload: BackgroundActionPayload): void {
@@ -153,8 +154,8 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
       if (
         payload.action === 'release' &&
         !(await confirmOverlay({
-          title: '释放会话',
-          message: '释放此工作簿的后台结果？已保存的文件仍可使用。',
+          title: localize('ui.backgroundTasks.releaseSession'),
+          message: localize('ui.backgroundTasks.releaseBackgroundResultsThisWorkbook'),
           confirmLabel: label,
         }))
       ) {
@@ -194,7 +195,7 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'mini-button';
-          button.textContent = '查看结果';
+          button.textContent = localize('ui.backgroundTasks.viewResults');
           button.onclick = (): void => {
             openResult(item).catch((error: unknown) => toast(errorMessage(error), 'error'));
           };
@@ -203,10 +204,10 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
         const live = item.state === 'running' || item.state === 'queued';
         if (item.protected && !live) {
           const note = document.createElement('span');
-          note.textContent = '活动页面使用中';
+          note.textContent = localize('ui.backgroundTasks.activePageUse');
           row.append(note);
         } else {
-          addAction(row, live ? '取消任务' : '丢弃结果', {
+          addAction(row, live ? localize('ui.backgroundTasks.cancelTask') : localize('ui.backgroundTasks.discardResults'), {
             action: live ? 'cancel' : 'discard',
             session: item.session,
             kind: item.kind,
@@ -218,10 +219,10 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
       for (const entry of sessionList) {
         const row = document.createElement('div');
         row.append(entry.file);
-        addAction(row, '释放会话', { action: 'release', session: entry.session });
+        addAction(row, localize('ui.backgroundTasks.releaseSession'), { action: 'release', session: entry.session });
         holder.append(row);
       }
-      if (!itemList.length && !sessionList.length) holder.textContent = '没有后台任务';
+      if (!itemList.length && !sessionList.length) holder.textContent = localize('ui.backgroundTasks.noBackgroundTasks');
       timer = setTimeout(() => {
         void refresh();
       }, 1500);
@@ -249,7 +250,7 @@ export function createBackgroundMonitor(options: BackgroundTasksOptions): () => 
             await workbookReady?.();
             const { items } = await api('/api/background', undefined, decodeBackgroundStatusResponse);
             const item = items?.find((x) => x.id === job && x.session === session.id);
-            if (!item) throw new Error('后台结果已到期，请查看已保存的可恢复任务');
+            if (!item) throw new Error(localize('ui.backgroundTasks.backgroundResultsHaveExpiredView'));
             await openResult(item);
           } catch (error: unknown) {
             toast(errorMessage(error), 'error');

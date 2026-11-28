@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 func TestSnapshotStagesRecoverKilledWriterOnly(t *testing.T) {
@@ -62,7 +63,7 @@ func TestSnapshotStagesRecoverKilledWriterOnly(t *testing.T) {
 	if !active {
 		t.Fatal("active writer lost", list)
 	}
-	for _, g := range r.Inventory(t.Context()) {
+	for _, g := range r.Inventory(t.Context(), i18n.Default) {
 		if g.Name == "数据库快照暂存" && (g.Error != "" || g.Bytes < int64(len("unpublished dataunknown"))) {
 			t.Fatal(g)
 		}

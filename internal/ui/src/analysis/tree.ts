@@ -2,6 +2,7 @@
  * Lazy branches own only bounded responses. Runtime job IDs never enter a
  * saved query, and a cancelled late start is cleared by its own job owner.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import { decodeAnalysisTreeStatusResponse } from '../core/http-decoders.generated.ts';
 import type {
   AnalysisCell,
@@ -100,11 +101,11 @@ function isPrefix(a: readonly string[], b: readonly string[]): boolean {
 }
 
 function displayLabel(value: string): string {
-  return value === '' ? '（空白）' : value;
+  return value === '' ? localize('ui.common.empty') : value;
 }
 
 function formatCount(n: number): string {
-  return n.toLocaleString('zh-CN');
+  return n.toLocaleString(interfaceLocale());
 }
 
 function isAbortError(error: unknown): boolean {
@@ -147,7 +148,7 @@ export class AnalysisTree {
       !Number.isSafeInteger(limits.active) ||
       limits.active <= 0
     ) {
-      throw new Error('层级视图配置无效');
+      throw new Error(localize('ui.tree.hierarchicalViewConfigurationInvalid'));
     }
     this.api = options.api;
     this.context = options.context;
@@ -272,7 +273,7 @@ export class AnalysisTree {
       const id = pathKey(path);
       const bytes = 512 + retainedBytes({ path, id }, this.limits.bytes);
       if (!this.fit(bytes, 1, path)) {
-        this.onMessage('展开内容已达到缓存容量，请先收起部分分组');
+        this.onMessage(localize('ui.tree.expandedContentReachedCacheCapacity'));
         return null;
       }
       const parentMap =
@@ -434,7 +435,7 @@ export class AnalysisTree {
       requestIdentity: () => root.bookKey,
       sleep: this.sleep,
       endpoint: '/api/analysis/tree',
-      label: '层级展开',
+      label: localize('ui.tree.expandHierarchy'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
       onProgress: (status) => {
@@ -458,13 +459,13 @@ export class AnalysisTree {
       completedJob = completed.job;
       if (!current() || !completed.current()) return;
       if (!isTreeStatusResponse(completed.result) || !this.validResult(completed.result, node)) {
-        throw new Error('层级结果与当前分组不一致，请重新运行分析');
+        throw new Error(localize('ui.tree.hierarchicalResultsDoNotMatch'));
       }
       const result = completed.result.result;
-      if (!result) throw new Error('层级结果与当前分组不一致，请重新运行分析');
+      if (!result) throw new Error(localize('ui.tree.hierarchicalResultsDoNotMatch'));
       const bytes = node.baseBytes + retainedBytes(result, this.limits.bytes);
       if (bytes > this.limits.bytes || !this.fit(bytes - node.bytes, 0, node.path)) {
-        throw new Error('此分组结果超过缓存容量，请缩小分析范围');
+        throw new Error(localize('ui.tree.thisGroupResultExceedsCache'));
       }
       this.bytes += bytes - node.bytes;
       node.bytes = bytes;
@@ -473,7 +474,7 @@ export class AnalysisTree {
       node.used = ++this.clock;
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
-        let text = errorMessage(error) || '展开失败';
+        let text = errorMessage(error) || localize('ui.tree.expansionFailed');
         if (text.length > 2048) {
           text = `${text.slice(0, 2047).replace(/[\uD800-\uDBFF]$/, '')}…`;
         }
@@ -483,7 +484,7 @@ export class AnalysisTree {
           node.bytes = bytes;
           node.error = text;
         } else {
-          node.error = '展开失败，请缩小范围后重试';
+          node.error = localize('ui.tree.expansionFailedNarrowScopeTry');
         }
         node.phase = 'error';
       }
@@ -578,10 +579,10 @@ export class AnalysisTreeRenderer {
   status(node: AnalysisTreeNode): string {
     if (node.pending) {
       return node.phase === 'queued'
-        ? '等待展开…'
-        : `正在展开${node.total ? ` · ${formatCount(node.progress)} / ${formatCount(node.total)}` : '…'}`;
+        ? localize('ui.tree.waitingExpand')
+        : localize('ui.tree.expanding', { detail: node.total ? ` · ${formatCount(node.progress)} / ${formatCount(node.total)}` : '…' });
     }
-    return node.error ? `展开失败：${node.error}` : '展开已取消';
+    return node.error ? localize('ui.tree.expansionFaileddfedc24', { detail: node.error }) : localize('ui.tree.exportCanceled');
   }
 
   progress(node: AnalysisTreeNode | null): void {
@@ -611,7 +612,7 @@ export class AnalysisTreeRenderer {
 
     table.replaceChildren();
     table.setAttribute('role', 'treegrid');
-    table.setAttribute('aria-label', '层级透视');
+    table.setAttribute('aria-label', localize('ui.tree.hierarchicalPerspective'));
     this.statusNodes.clear();
 
     const q = root.query;
@@ -623,11 +624,11 @@ export class AnalysisTreeRenderer {
     const headers: string[] = [q.rows.map(fieldName).join(' / ')];
     for (const col of columns) {
       for (const metric of metrics) {
-        headers.push(`${col === '' ? '（空白列）' : col} · ${metricName(metric)}`);
+        headers.push(`${col === '' ? localize('ui.tree.blankColumn') : col} · ${metricName(metric)}`);
       }
     }
     for (const metric of metrics) {
-      headers.push(`${columns.length ? '小计 · ' : ''}${metricName(metric)}`);
+      headers.push(`${columns.length ? `${localize('ui.tree.subtotal')} ` : ''}${metricName(metric)}`);
     }
 
     const head = document.createElement('thead');
@@ -670,7 +671,7 @@ export class AnalysisTreeRenderer {
       if (cell && cell.exact !== '') {
         const b = makeButton(formatNumber(cell), () => drill(path, col, 0, selected));
         b.className = 'analysis-drill-link';
-        b.title = `${td.title} · 查看当前分组来源明细`;
+        b.title = localize('ui.tree.viewCurrentGroupSourceDetails', { title: td.title });
         b.disabled = model.blocked;
         td.append(b);
       } else {
@@ -690,13 +691,13 @@ export class AnalysisTreeRenderer {
         text.setAttribute('role', 'status');
         text.textContent =
           item.kind === 'truncated'
-            ? '此层仅显示前 N 项，小计包含未显示项'
+            ? localize('ui.tree.thisLayerOnlyDisplaysFirst')
             : this.status(item.node);
         td.append(text);
         if (item.kind === 'status') {
           this.statusNodes.set(item.node.key, text);
           const b = makeButton(
-            item.node.pending ? '取消' : '重试',
+            item.node.pending ? localize('ui.common.cancel') : localize('ui.tree.retry'),
             () => (item.node.pending ? model.cancel(item.node.path) : model.expand(item.node.path)),
             JSON.stringify(['status', item.node.path]),
           );
@@ -738,9 +739,9 @@ export class AnalysisTreeRenderer {
       if (hasChildren) b.setAttribute('aria-expanded', String(Boolean(node?.expanded)));
       b.setAttribute(
         'aria-label',
-        (hasChildren ? (node?.expanded ? '收起 ' : '展开 ') : '查看明细 ') +
+        (hasChildren ? (node?.expanded ? `${localize('ui.tree.putAway')} ` : `${localize('ui.tree.expand')} `) : `${localize('ui.tree.viewDetails')} `) +
           path
-            .map((v, i) => `${fieldName(q.rows[i] ?? '')}：${v === '' ? '空白值' : v}`)
+            .map((v, i) => `${fieldName(q.rows[i] ?? '')}：${v === '' ? localize('ui.tree.blankValues') : v}`)
             .join(' / '),
       );
 
@@ -750,7 +751,7 @@ export class AnalysisTreeRenderer {
       arrow.textContent = hasChildren ? (node?.expanded ? '▾' : '▸') : '·';
       const leafVal = path.at(-1) ?? '';
       const name = document.createElement('span');
-      name.textContent = leafVal === '' ? '空白' : leafVal;
+      name.textContent = leafVal === '' ? localize('ui.common.blank') : leafVal;
       if (leafVal === '') name.className = 'analysis-tree-empty';
       b.append(arrow, name);
       td.append(b);
@@ -825,7 +826,7 @@ export class AnalysisTreeRenderer {
     const foot = document.createElement('tfoot');
     const total = document.createElement('tr');
     const caption = document.createElement('td');
-    caption.textContent = result.truncated ? '全量总计（含未显示项）' : '范围总计';
+    caption.textContent = result.truncated ? localize('ui.tree.totalAllItemsIncludingUnshown') : localize('ui.tree.rangeTotal');
     total.append(caption);
     for (let c = 0; c < columns.length; c++) {
       const colKey = columns[c] ?? '';

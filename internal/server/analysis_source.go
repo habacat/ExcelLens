@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -43,7 +44,7 @@ func (a *App) sourceObserved(wb *workbook.Workbook, source string, header int, o
 		}
 		s := ws.Sheet(strings.TrimPrefix(source, "scratch:"))
 		if s == nil {
-			return analysisSource{}, errors.New("编辑表不存在")
+			return analysisSource{}, i18n.Error("service.analysisSource.tableDoesNotExist")
 		}
 		fields := make([]analysis.Field, len(s.Columns))
 		for i, name := range s.Columns {
@@ -90,22 +91,22 @@ func (a *App) sourceObserved(wb *workbook.Workbook, source string, header int, o
 		return analysisSource{fields: fields, scan: scan, total: len(s.Rows), stamp: stamp}, nil
 	}
 	if !strings.HasPrefix(source, "wb:") {
-		return analysisSource{}, errors.New("数据源格式错误")
+		return analysisSource{}, i18n.Error("service.analysisSource.dataSourceFormatError")
 	}
 	meta, ok := wb.FindSheet(strings.TrimPrefix(source, "wb:"))
 	if !ok {
-		return analysisSource{}, errors.New("源工作表不存在")
+		return analysisSource{}, i18n.Error("service.analysisSource.sourceWorksheetDoesNotExist")
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		return analysisSource{}, errors.New("源工作表尚未索引，请先选择该表或等待分析任务建立索引")
+		return analysisSource{}, i18n.Error("service.analysisSource.sourceWorksheetNotIndexedYet")
 	}
 	if header < 1 || header > idx.MaxRow {
-		return analysisSource{}, errors.New("表头行号无效")
+		return analysisSource{}, i18n.Error("service.analysisSource.invalidHeaderRowNumber")
 	}
 	cols := min(idx.MaxCol, analysis.MaxSourceColumns)
 	if cols < 1 {
-		return analysisSource{}, errors.New("源表没有可分析的列")
+		return analysisSource{}, i18n.Error("service.analysisSource.sourceTableNoAnalyzableColumns")
 	}
 	pos := idx.FindRowOffset(header)
 	var headerCells []workbook.CellData
@@ -167,7 +168,7 @@ func (a *App) handleAnalysisFields(w http.ResponseWriter, r *http.Request) {
 	header := clamp(parseIntDefault(r.URL.Query().Get("headerRow"), 1), 1, formats.ExternalRows)
 	release, err := a.acquireAnalysisQuerySlot(r.Context(), source, false)
 	if err != nil {
-		writeError(w, 408, "读取联合来源已取消")
+		writeMessage(w, 408, "service.analysisSource.canceledReadingCombinedSources")
 		return
 	}
 	defer release()
@@ -179,7 +180,7 @@ func (a *App) handleAnalysisFields(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "尚未索引") {
 			status = 409
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	defer s.close()
@@ -191,14 +192,14 @@ func (a *App) handleAnalysisFields(w http.ResponseWriter, r *http.Request) {
 	if s.lease != nil && s.lease.data.composition != nil {
 		sampled, err = compositionAnalysisPreview(r.Context(), &s)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		header = 0
 	} else if s.lease != nil {
 		sampled, err = scopedAnalysisPreview(r.Context(), wb, &s, header)
 		if err != nil {
-			writeError(w, 500, err.Error())
+			writeFailure(w, 500, err)
 			return
 		}
 	} else if strings.HasPrefix(source, "wb:") {
@@ -208,7 +209,7 @@ func (a *App) handleAnalysisFields(w http.ResponseWriter, r *http.Request) {
 		if start < idx.RowCount() {
 			rows, readErr := wb.ReadRowsContext(r.Context(), idx, start, min(8, idx.RowCount()-start), 1, len(s.fields))
 			if readErr != nil {
-				writeError(w, 500, readErr.Error())
+				writeFailure(w, 500, readErr)
 				return
 			}
 			counts := make([]int, len(s.fields))
@@ -261,7 +262,7 @@ func (a *App) handleAnalysisFields(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 		if err != nil && !errors.Is(err, errAnalysisSampleDone) {
-			writeError(w, 500, err.Error())
+			writeFailure(w, 500, err)
 			return
 		}
 	}

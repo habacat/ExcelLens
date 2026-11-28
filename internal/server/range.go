@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -46,7 +47,7 @@ type clipboardPayload struct {
 func selectClipboardRows(idx *workbook.SheetIndex, filtered *FilterResult, row1, row2, visual1, visual2, excludedThrough int, views ...*sheetRowView) ([]int, []int, error) {
 	numbers, err := sourceSelectionRows(idx, filtered, row1, row2, visual1, visual2, excludedThrough, clipboardMaxRows, views...)
 	if errors.Is(err, errSelectionLimit) {
-		return nil, nil, errors.New("每次最多复制250行")
+		return nil, nil, i18n.Error("service.range.upRowsCanBeCopied")
 	}
 	if err != nil || filtered == nil {
 		return numbers, nil, err
@@ -76,23 +77,23 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.range.noWorkbookOpen")
 		return
 	}
 	if r.URL.Query().Has("workbookKey") && r.URL.Query().Get("workbookKey") != wb.Fingerprint ||
 		r.URL.Query().Has("book") && r.URL.Query().Get("book") != sourceBookID(wb) {
-		writeError(w, http.StatusConflict, "复制来源已变化，请重新选择")
+		writeMessage(w, http.StatusConflict, "service.range.sourceChangedReselect")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "指定工作表不存在")
+		writeMessage(w, http.StatusNotFound, "service.range.specifiedWorksheetDoesNotExist")
 		return
 	}
 	col1, row1, err1 := workbook.ParseCellRef(r.URL.Query().Get("start"))
 	col2, row2, err2 := workbook.ParseCellRef(r.URL.Query().Get("end"))
 	if err1 != nil || err2 != nil {
-		writeError(w, http.StatusBadRequest, "选区地址无效")
+		writeMessage(w, http.StatusBadRequest, "service.range.selectedConstituencyAddressInvalid")
 		return
 	}
 	if col1 > col2 {
@@ -101,11 +102,11 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	colCount := col2 - col1 + 1
 	format := r.URL.Query().Get("format")
 	if format != "tsv" && colCount > clipboardMaxCols {
-		writeError(w, http.StatusBadRequest, "一次最多复制50列；请缩小选区")
+		writeMessage(w, http.StatusBadRequest, "service.range.upColumnsCanBeCopied")
 		return
 	}
 	if format != "" && format != "json" && format != "tsv" {
-		writeError(w, http.StatusBadRequest, "复制格式不受支持")
+		writeMessage(w, http.StatusBadRequest, "service.range.copyFormatNotSupported")
 		return
 	}
 	filterID := strings.TrimSpace(r.URL.Query().Get("filterId"))
@@ -116,12 +117,12 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		defer filtered.close()
 		valid := a.currentWorkbook() == wb && filtered != nil && filtered.SheetPath == meta.Path
 		if !valid {
-			writeError(w, http.StatusNotFound, "筛选结果已失效，请重新筛选")
+			writeMessage(w, http.StatusNotFound, "service.filter.expired")
 			return
 		}
 	}
 	if filtered == nil && viewID == "" && (r.URL.Query().Has("visualStart") || r.URL.Query().Has("visualEnd")) {
-		writeError(w, http.StatusBadRequest, "缺少筛选结果标识")
+		writeMessage(w, http.StatusBadRequest, "service.range.missingFilterResultIndicator")
 		return
 	}
 	visual1, error1 := strconv.Atoi(r.URL.Query().Get("visualStart"))
@@ -129,13 +130,13 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	through := 0
 	if filterID != "" {
 		if error1 != nil || error2 != nil {
-			writeError(w, http.StatusBadRequest, "筛选选区必须指定可视行位置")
+			writeMessage(w, http.StatusBadRequest, "service.range.filterSelectionMustSpecifyVisible")
 			return
 		}
 		var err error
 		through, err = strconv.Atoi(r.URL.Query().Get("excludeThroughRow"))
 		if err != nil || through < 0 || through > 30 {
-			writeError(w, http.StatusBadRequest, "冻结行参数无效")
+			writeMessage(w, http.StatusBadRequest, "service.range.frozenRowParametersInvalid")
 			return
 		}
 	}
@@ -144,14 +145,14 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		var err error
 		through, err = strconv.Atoi(r.URL.Query().Get("excludeThroughRow"))
 		if err != nil || through < 0 || through > 30 {
-			writeError(w, 400, "冻结行参数无效")
+			writeMessage(w, 400, "service.range.frozenRowParametersInvalid")
 			return
 		}
 	}
 	if format == "tsv" {
 		release, err := a.acquireQuerySlot(r.Context())
 		if err != nil {
-			writeError(w, http.StatusRequestTimeout, "复制已取消")
+			writeMessage(w, http.StatusRequestTimeout, "service.range.copiedCanceled")
 			return
 		}
 		defer release()
@@ -159,16 +160,16 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if a.currentWorkbook() != wb {
-		writeError(w, http.StatusConflict, "工作簿已切换")
+		writeMessage(w, http.StatusConflict, "service.range.workbookSwitched")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, http.StatusConflict, "请先打开工作表")
+		writeMessage(w, http.StatusConflict, "service.range.openWorksheetFirst")
 		return
 	}
 	if row1 > workbook.MaxRowsForIndex(idx) || row2 > workbook.MaxRowsForIndex(idx) {
-		writeError(w, http.StatusBadRequest, "复制地址超出源格式范围")
+		writeMessage(w, http.StatusBadRequest, "service.range.copiedAddressExceedsSourceFormat")
 		return
 	}
 	headerRow := 0
@@ -176,7 +177,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		var err error
 		headerRow, err = strconv.Atoi(r.URL.Query().Get("headerRow"))
 		if err != nil || headerRow < 1 || headerRow > workbook.MaxRowsForIndex(idx) || format != "json" {
-			writeError(w, http.StatusBadRequest, "复制表头行无效")
+			writeMessage(w, http.StatusBadRequest, "service.range.copyingHeaderRowsInvalid")
 			return
 		}
 	}
@@ -184,7 +185,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	if viewID != "" {
 		visible, err1 = a.rowViewSnapshot(viewID, wb, idx, meta.Path, filterID)
 		if err1 != nil {
-			writeError(w, 409, err1.Error())
+			writeFailure(w, 409, err1)
 			return
 		}
 		defer visible.close()
@@ -192,12 +193,12 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	if format == "tsv" {
 		view, err := newSelectionRowView(idx, filtered, through, visible)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		plan, err := view.plan(row1, row2, visual1, visual2)
 		if err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 		writeClipboardTSV(w, r, wb, plan, col1, col2)
@@ -205,7 +206,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 	}
 	numbers, _, err := selectClipboardRows(idx, filtered, row1, row2, visual1, visual2, through, visible)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeFailure(w, http.StatusBadRequest, err)
 		return
 	}
 	readNumbers := append([]int(nil), numbers...)
@@ -219,7 +220,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(readNumbers) > clipboardMaxRows || len(readNumbers)*colCount > clipboardMaxCells {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("复制区域（含表头）最多%d行、%d列、%d格，请缩小选区", clipboardMaxRows, clipboardMaxCols, clipboardMaxCells))
+		writeMessage(w, http.StatusBadRequest, "service.range.copiedAreaIncludingTableHeader", i18n.Args{"clipboardMaxRows": clipboardMaxRows, "clipboardMaxCols": clipboardMaxCols, "clipboardMaxCells": clipboardMaxCells})
 		return
 	}
 	readOptions := workbook.RowReadOptions{FormatValue: true, IncludeFormula: true, RichText: format == "json" && r.URL.Query().Get("richText") != "0"}
@@ -245,7 +246,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 			}
 			if textBytes > formats.ClipboardTextBytes {
 				tooLarge = true
-				return errors.New("复制文字超过4MiB，请缩小选区或使用导出")
+				return i18n.Error("service.range.copiedTextExceedsMibReduce")
 			}
 			if cell.RichText != nil || cell.Conditional != nil {
 				encoded, err := json.Marshal(struct {
@@ -258,7 +259,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 				styleBytes += len(encoded)
 				if styleBytes > formats.RichReadBytes {
 					tooLarge = true
-					return errors.New("复制样式超过本次容量，请缩小选区或关闭原始格式")
+					return i18n.Error("service.range.copyingStylesExceedsThisCapacity")
 				}
 			}
 		}
@@ -270,9 +271,9 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if tooLarge {
-			writeError(w, http.StatusRequestEntityTooLarge, err.Error())
+			writeFailure(w, http.StatusRequestEntityTooLarge, err)
 		} else {
-			writeError(w, http.StatusInternalServerError, "读取选区失败："+err.Error())
+			writeMessage(w, http.StatusInternalServerError, "service.range.readingSelectionFailed", i18n.Args{"detail": err})
 		}
 		return
 	}
@@ -338,7 +339,7 @@ func (a *App) handleRange(w http.ResponseWriter, r *http.Request) {
 func writeClipboardTSV(w http.ResponseWriter, r *http.Request, wb *workbook.Workbook, plan selectionRowPlan, first, last int) {
 	columns := last - first + 1
 	if plan.Len() > formats.ClipboardTSVRows || columns > formats.ClipboardTSVCols || plan.Len() > formats.ClipboardTSVCells/columns {
-		writeError(w, http.StatusRequestEntityTooLarge, "选区超过纯文本复制容量")
+		writeMessage(w, http.StatusRequestEntityTooLarge, "service.range.selectionExceedsCopyCapacityPlain")
 		return
 	}
 	var out strings.Builder
@@ -369,11 +370,11 @@ func writeClipboardTSV(w http.ResponseWriter, r *http.Request, wb *workbook.Work
 		return nil
 	})
 	if errors.Is(err, errSelectionLimit) {
-		writeError(w, http.StatusRequestEntityTooLarge, "选区文字超过 4 MB")
+		writeMessage(w, http.StatusRequestEntityTooLarge, "service.range.selectionTextExceedsMb")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		writeFailure(w, http.StatusConflict, err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

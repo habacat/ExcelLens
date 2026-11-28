@@ -2,6 +2,7 @@
  * In-grid data validation dropdown picker for list-constrained cells in editable copies.
  * Merges source list areas with live edit rules inside an interval tree for O(log n) lookup.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, HttpError, MergeRange } from '../contracts/common.ts';
 import type {
   EditChange,
@@ -274,7 +275,7 @@ export class GridValidationList {
     this.lookup = lookup;
     const current = (): boolean =>
       this.lookup === lookup && point === this.point && g.active && !g.blocked;
-    const activity = beginActivity('正在读取选项', { signal: lookup.signal });
+    const activity = beginActivity(localize('ui.editGridList.readingOptions'), { signal: lookup.signal });
     try {
       await this.ready;
       if (!current()) return;
@@ -283,7 +284,7 @@ export class GridValidationList {
         this.key = '';
         throw new Error(message);
       }
-      if (this.button.hidden) throw new Error('当前格没有可选列表');
+      if (this.button.hidden) throw new Error(localize('ui.editGridList.noOptionalListAvailableThis'));
       const target = g.ranges.target();
       const result = await g.owner.post(
         'choices',
@@ -292,7 +293,7 @@ export class GridValidationList {
       ).then(decodeChoicesResponse);
       if (!current()) return;
       const choices = result.choices;
-      if (!choices?.length) throw new Error('当前列表没有可选值');
+      if (!choices?.length) throw new Error(localize('ui.editGridList.noOptionalValuesAvailableCurrent'));
       this.list.replaceChildren(...choices.map((value) => new Option(value, value)));
       this.list.size = Math.max(2, Math.min(9, choices.length));
       this.list.value = cell.raw;

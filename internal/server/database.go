@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"sync"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/onlinedb"
 	"excellens/internal/workbook"
 )
@@ -58,7 +59,7 @@ func decodeDatabaseRequest(w http.ResponseWriter, r *http.Request, target any) b
 	d.DisallowUnknownFields()
 	var trailing any
 	if d.Decode(target) != nil || d.Decode(&trailing) != io.EOF {
-		writeError(w, http.StatusBadRequest, "数据库请求参数无效或超限")
+		writeMessage(w, http.StatusBadRequest, "service.database.databaseRequestParametersInvalidOr")
 		return false
 	}
 	return true
@@ -69,7 +70,7 @@ func takeDatabaseSlot(w http.ResponseWriter) bool {
 	case databaseSlots <- struct{}{}:
 		return true
 	default:
-		writeError(w, http.StatusTooManyRequests, "数据库连接繁忙，请等待当前读取完成")
+		writeMessage(w, http.StatusTooManyRequests, "service.database.databaseConnectionBusyWaitCurrent")
 		return false
 	}
 }
@@ -87,13 +88,13 @@ func (a *App) handleDatabaseConnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	connection, err := onlinedb.Open(ctx, cfg)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeFailure(w, http.StatusBadRequest, err)
 		return
 	}
 	defer connection.Close()
 	list, err := connection.Tables(ctx)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+		writeFailure(w, http.StatusBadGateway, err)
 		return
 	}
 	writeJSON(w, struct {
@@ -111,7 +112,7 @@ func (a *App) handleDatabaseImport(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		job := a.findDatabaseImport(r.URL.Query().Get("id"))
 		if job == nil {
-			writeError(w, http.StatusNotFound, "找不到当前页面的数据库读取任务")
+			writeMessage(w, http.StatusNotFound, "service.database.databaseReadingTaskCurrentPage")
 			return
 		}
 		writeJSON(w, job.status())
@@ -126,7 +127,7 @@ func (a *App) handleDatabaseImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(input.Tables) == 0 || len(input.Tables) > formats.DatabaseSelectedTables {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("请选择 1 至 %d 张表", formats.DatabaseSelectedTables))
+		writeMessage(w, http.StatusBadRequest, "service.database.selectTables", i18n.Args{"databaseSelectedTables": formats.DatabaseSelectedTables})
 		return
 	}
 	expected := a.currentWorkbook()
@@ -139,7 +140,7 @@ func (a *App) handleDatabaseImport(w http.ResponseWriter, r *http.Request) {
 		case <-old.done:
 		default:
 			a.databaseMu.Unlock()
-			writeError(w, http.StatusConflict, "本页面已有数据库读取任务")
+			writeMessage(w, http.StatusConflict, "service.database.thereAlreadyDatabaseReadingTasks")
 			return
 		}
 	}
@@ -193,7 +194,7 @@ func (a *App) handleDatabaseCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	job := a.findDatabaseImport(request.ID)
 	if job == nil {
-		writeError(w, http.StatusNotFound, "找不到该数据库读取任务")
+		writeMessage(w, http.StatusNotFound, "service.database.databaseReadTaskNotBe")
 		return
 	}
 	job.mu.Lock()
@@ -234,7 +235,7 @@ func (a *App) runDatabaseImport(ctx context.Context, job *databaseImportJob, req
 	for _, ref := range request.Tables {
 		table, ok := available[ref]
 		if !ok {
-			return errors.New("所选数据表重复、已变化或不可读取，请重新连接")
+			return i18n.Error("service.database.selectedDataTableDuplicateChanged")
 		}
 		selected = append(selected, workbook.DatabaseSnapshotTable{Schema: table.Schema, Name: table.Name, Kind: table.Kind})
 		delete(available, ref)
@@ -289,11 +290,11 @@ func (a *App) runDatabaseImport(ctx context.Context, job *databaseImportJob, req
 	// Full cache reset and restore can cancel or gate imports. Do not wait
 	// for this lock while the reset is joining the import from another page.
 	if !root.cacheResetMu.TryRLock() {
-		return errors.New("本地数据管理正在进行，数据库快照尚未保存")
+		return i18n.Error("service.database.localDataManagementProgressDatabase")
 	}
 	defer root.cacheResetMu.RUnlock()
 	if root.restoreState.pending() {
-		return errors.New("请先完成恢复事务")
+		return i18n.Error("service.database.completeRestorationProcessFirst")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -305,7 +306,7 @@ func (a *App) runDatabaseImport(ctx context.Context, job *databaseImportJob, req
 	a.archiveMu.Lock()
 	if a.archiveView != expectedArchive || !a.installWorkbook(wb, expected, true) {
 		a.archiveMu.Unlock()
-		return errors.New("快照已保存到「数据库快照」。当前工作簿已切换")
+		return i18n.Error("service.database.snapshotSavedDatabaseSnapshotCurrent")
 	}
 	view, archiveJob := a.detachArchiveLocked()
 	a.archiveMu.Unlock()

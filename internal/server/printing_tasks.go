@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/printing"
 	"excellens/internal/workbook"
 )
@@ -46,71 +47,71 @@ func (a *App) handlePrintStart(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.PrintPreviewRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.Sheet == "" {
-		writeError(w, 400, "打印预览参数无效")
+		writeMessage(w, 400, "service.printingTasks.printPreviewParametersInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "打印预览来源已切换，请重新准备")
+		writeMessage(w, 409, "service.printingTasks.printPreviewSourceSwitchedPrepare")
 		return
 	}
 	source, supported := formats.Lookup(wb.Format)
 	if !supported || !source.PrintMetadata {
-		writeError(w, 422, "此来源格式没有可读取的Excel打印设置")
+		writeMessage(w, 422, "service.printingTasks.thisSourceFormatDoesNot")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	meta, found := wb.FindSheet(req.Sheet)
 	if !found {
-		writeError(w, 404, "打印预览工作表不存在")
+		writeMessage(w, 404, "service.printingTasks.printPreviewWorksheetDoesNot")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil && req.IndexIfNeeded {
 		release, err := a.backgroundIndex(r.Context())
 		if err != nil {
-			writeError(w, 408, "准备工作表已取消")
+			writeMessage(w, 408, "service.printingTasks.preparationWorkTableCancelled")
 			return
 		}
 		idx, err = wb.BuildIndex(meta, nil, r.Context().Done())
 		release()
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 	}
 	if idx == nil {
-		writeError(w, 409, "请先打开并完成该工作表索引，再准备打印预览")
+		writeMessage(w, 409, "service.printingTasks.openCompleteWorksheetIndexBefore")
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &printTask{ID: randomID(), Mode: "preview", Status: "queued", Stage: "等待准备打印预览", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	job := &printTask{ID: randomID(), Mode: "preview", Status: "queued", Stage: "stage.task.waitingForPrintPreviewPreparation", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.printingTasks.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	if activeMetadataTasks(a.printJobs) >= formats.PrintPreviewActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "打印预览正在准备，请等待或取消后重试")
+		writeMessage(w, 429, "service.printingTasks.printPreviewBeingPreparedWait")
 		return
 	}
 	a.prunePrintTasksLocked("", formats.PrintPreviewTaskHistory-1)
 	unpin := a.pinWorkbooks(wb)
 	a.printJobs[job.ID] = job
 	a.mu.Unlock()
-	go runSourceMetadataTask(a, job, unpin, "打印预览", func() bool {
+	go runSourceMetadataTask(a, job, unpin, func() bool {
 		return a.wb == wb && a.printJobs[job.ID] == job && wb.GetCachedIndex(meta.Path) == idx
 	}, func() { a.prunePrintTasksLocked(job.ID, formats.PrintPreviewTaskHistory) }, func(progress func(int64, int64, string)) (*printSnapshot, error) {
 		source, err := wb.ReadPrintSource(job.ctx, meta, idx, progress)
 		if err != nil {
 			return nil, err
 		}
-		progress(0, 0, "正在计算纸张分页")
+		progress(0, 0, "stage.task.calculatingPaperPagination")
 		plan, err := printing.New(job.ctx, source, req.Options)
 		if err != nil {
 			return nil, err
@@ -120,10 +121,10 @@ func (a *App) handlePrintStart(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 		if len(layout.Merges) >= formats.PrintPreviewMergeLimit {
-			return nil, errors.New("源合并区域达到显示元数据容量，无法确认完整预览，未发布部分结果")
+			return nil, i18n.Error("service.printingTasks.sourceMergeAreaReachedCapacity")
 		}
 		if count, known := source.MergeCount(); known && count != len(layout.Merges) {
-			return nil, errors.New("打印预览的公共合并元数据与完整来源声明不一致，未发布部分结果")
+			return nil, i18n.Error("service.printingTasks.publicMergedMetadataPrintPreview")
 		}
 		settings := source.Settings()
 		propertyData, err := json.Marshal(settings.Properties)
@@ -132,7 +133,7 @@ func (a *App) handlePrintStart(w http.ResponseWriter, r *http.Request) {
 		}
 		bytes := plan.BudgetBytes() + int64(len(layout.Merges))*64 + int64(len(propertyData))*2 + 4096
 		if bytes > formats.PrintPreviewSnapshotBytes {
-			return nil, errors.New("打印预览快照超过容量，未发布部分结果")
+			return nil, i18n.Error("service.printingTasks.printPreviewSnapshotExceedsCapacity")
 		}
 		notices := slices.Clone(settings.Notices)
 		if layout.StateNotice != "" {
@@ -156,10 +157,10 @@ func (a *App) handlePrintStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.printJobs[r.URL.Query().Get("id")]
 	if job == nil || a.wb != job.Workbook || job.discarded {
 		a.mu.RUnlock()
-		writeError(w, 404, "打印预览任务已失效，请重新准备")
+		writeMessage(w, 404, "service.printingTasks.printPreviewTaskFailedPrepare")
 		return
 	}
-	payload := metadataTaskPayload(job)
+	payload := metadataTaskPayload(responseLocale(w), job)
 	a.mu.RUnlock()
 	writeJSON(w, payload)
 }
@@ -187,7 +188,7 @@ func (a *App) printSnapshotFor(r *http.Request) (*printTask, *printSnapshot, fun
 	defer a.mu.RUnlock()
 	job := a.printJobs[r.URL.Query().Get("id")]
 	if job == nil || job.Status != "done" || job.Snapshot == nil || job.discarded || a.wb != job.Workbook {
-		return nil, nil, nil, errors.New("打印预览结果已失效，请重新准备")
+		return nil, nil, nil, i18n.Error("service.printingTasks.printPreviewResultBecomeInvalid")
 	}
 	return job, job.Snapshot, a.pinWorkbooks(job.Workbook), nil
 }
@@ -200,7 +201,7 @@ func (a *App) printSnapshotCurrent(ctx context.Context, job *printTask, snapshot
 	current := a.wb == job.Workbook && a.printJobs[job.ID] == job && !job.discarded && job.Snapshot == snapshot
 	a.mu.RUnlock()
 	if !current {
-		return errors.New("打印预览来源或任务已变化，请重新准备")
+		return i18n.Error("service.printingTasks.sourceOrTaskPrintPreview")
 	}
 	return nil
 }
@@ -216,7 +217,7 @@ func (a *App) handlePrintSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	job, snapshot, release, err := a.printSnapshotFor(r)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer release()
@@ -224,7 +225,7 @@ func (a *App) handlePrintSummary(w http.ResponseWriter, r *http.Request) {
 	payload["summary"], payload["sourceProperties"] = snapshot.plan.Summary(), snapshot.properties
 	payload["sourceComplete"], payload["sourceNotices"] = snapshot.complete, snapshot.notices
 	if err := a.printSnapshotCurrent(r.Context(), job, snapshot); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, payload)
@@ -237,17 +238,17 @@ func (a *App) handlePrintPage(w http.ResponseWriter, r *http.Request) {
 	}
 	index, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if err != nil || index < 0 {
-		writeError(w, 400, "打印预览页码无效")
+		writeMessage(w, 400, "service.printingTasks.printPreviewPageNumberInvalid")
 		return
 	}
 	job, snapshot, release, err := a.printSnapshotFor(r)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer release()
 	if index >= snapshot.plan.Summary().Pages {
-		writeError(w, 400, "打印预览页码越界")
+		writeMessage(w, 400, "service.printingTasks.printPreviewPageNumberOut")
 		return
 	}
 	ctx, cancel := context.WithCancel(r.Context())
@@ -256,14 +257,14 @@ func (a *App) handlePrintPage(w http.ResponseWriter, r *http.Request) {
 	releaseQuery, err := a.lockQueryRead(ctx)
 	if err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, "打印预览任务已取消，请重新准备")
+			writeMessage(w, 409, "service.printingTasks.printPreviewTaskCancelledPrepare")
 		}
 		return
 	}
 	defer releaseQuery()
 	if err = a.printSnapshotCurrent(ctx, job, snapshot); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
@@ -271,7 +272,7 @@ func (a *App) handlePrintPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			if r.Context().Err() == nil {
-				writeError(w, 409, "打印预览任务已取消，请重新准备")
+				writeMessage(w, 409, "service.printingTasks.printPreviewTaskCancelledPrepare")
 			}
 			return
 		}
@@ -282,18 +283,18 @@ func (a *App) handlePrintPage(w http.ResponseWriter, r *http.Request) {
 		if currentErr := a.printSnapshotCurrent(ctx, job, snapshot); currentErr != nil {
 			err, status = currentErr, http.StatusConflict
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	payload := printEnvelope(job)
 	payload["page"], payload["content"] = index, page
 	data, err := json.Marshal(payload)
 	if err != nil || len(data) > formats.PrintPreviewPageBytes {
-		writeError(w, 413, "本页内容超过预览字节容量，请减少每页行列或缩小范围")
+		writeMessage(w, 413, "service.printingTasks.contentOnThisPageExceeds")
 		return
 	}
 	if err := a.printSnapshotCurrent(ctx, job, snapshot); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

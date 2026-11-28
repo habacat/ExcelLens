@@ -4,7 +4,13 @@
  */
 import type { MergeRange } from '../contracts/common.ts';
 import type { VisualStyle } from '../contracts/workbook.ts';
-import { chooseBorder } from './grid-borders.ts';
+import {
+  chooseBorder,
+  parseBorder,
+  resolveBorderCorner,
+  type BorderCorner,
+  type ParsedBorder,
+} from './grid-borders.ts';
 import type { ViewportBounds, WorkbookState } from './state.ts';
 
 export interface BackdropBounds {
@@ -101,28 +107,6 @@ export function paintBackdrop(backdrop: HTMLElement, bounds: BackdropBounds): vo
   }
 }
 
-interface ParsedPen {
-  readonly width: number;
-  readonly kind: string;
-  readonly color: string;
-}
-
-const pens = new Map<string, ParsedPen | null>();
-
-function parsePen(css: string | undefined): ParsedPen | null {
-  const key = css ?? '';
-  const cached = pens.get(key);
-  if (cached !== undefined) return cached;
-  const match = /^([\d.]+)px\s+(solid|double|dashed|dotted)\s+(.+)$/.exec(key);
-  const result =
-    match?.[1] && match[2] && match[3]
-      ? { width: Number(match[1]), kind: match[2], color: match[3] }
-      : null;
-  if (pens.size >= 256) pens.clear();
-  pens.set(key, result);
-  return result;
-}
-
 export interface PaintMissingTheme {
   readonly paper: string;
   readonly neutral: string;
@@ -198,7 +182,8 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
 
   const { paper, neutral, line, surface, muted, dark } = theme;
   const drawGrid = !S.showStyles || S.sourceGridLines;
-  const lines = new Map<ParsedPen, Path2D>();
+  const lines = new Map<ParsedBorder, Path2D>();
+  const corners: { readonly x: number; readonly y: number; readonly corner: BorderCorner }[] = [];
   const labels: { readonly r: number; readonly y: number; readonly height: number }[] = [];
 
   const addLine = (
@@ -209,7 +194,7 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
     yEnd: number,
     vertical: boolean,
   ): void => {
-    const stroke = parsePen(css ?? undefined);
+    const stroke = parseBorder(css ?? undefined);
     if (!stroke) return;
     let path = lines.get(stroke);
     if (!path) {
@@ -318,16 +303,20 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
       const edge = merge ? sample(r, c) : own;
       const right = meta[i + 1]?.c ?? c + 1;
       const below = S.filtered ? r + 1 : nextVisibleRow(r + 1) || r + 1;
-      const seam = (
-        primary: string | undefined,
-        other: VisualStyle | null,
-        side: 'borderLeft' | 'borderTop',
-      ): string | null =>
-        chooseBorder(primary, other?.[side]) || (!fill && !other?.background && drawGrid ? gridLine : null);
 
+      const rightStyle = sample(r, right);
+      const belowStyle = sample(below, c);
+      const explicitRight =
+        !merge || right > merge.endCol
+          ? chooseBorder(edge?.borderRight || own?.borderRight, rightStyle?.borderLeft)
+          : '';
+      const explicitBottom =
+        !merge || below > merge.endRow
+          ? chooseBorder(edge?.borderBottom || own?.borderBottom, belowStyle?.borderTop)
+          : '';
       if (!merge || right > merge.endCol) {
         addLine(
-          seam(edge?.borderRight || own?.borderRight, sample(r, right), 'borderLeft'),
+          explicitRight || (!fill && !rightStyle?.background && drawGrid ? gridLine : null),
           end,
           y,
           end,
@@ -337,7 +326,7 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
       }
       if (!merge || below > merge.endRow) {
         addLine(
-          seam(edge?.borderBottom || own?.borderBottom, sample(below, c), 'borderTop'),
+          explicitBottom || (!fill && !belowStyle?.background && drawGrid ? gridLine : null),
           x,
           endY,
           end,
@@ -345,11 +334,33 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
           false,
         );
       }
-      const leftPen = parsePen(own?.borderLeft);
+      if (!merge || (right > merge.endCol && below > merge.endRow)) {
+        const trMerge = mergeAt(r, right);
+        const blMerge = mergeAt(below, c);
+        const brMerge = mergeAt(below, right);
+        const belowRightStyle = sample(below, right);
+        const east =
+          trMerge && trMerge === brMerge
+            ? ''
+            : chooseBorder(
+                !trMerge || trMerge.endRow < below ? rightStyle?.borderBottom : undefined,
+                !brMerge || brMerge.row > r ? belowRightStyle?.borderTop : undefined,
+              );
+        const south =
+          east && !(blMerge && blMerge === brMerge)
+            ? chooseBorder(
+                !blMerge || blMerge.endCol < right ? belowStyle?.borderRight : undefined,
+                !brMerge || brMerge.col > c ? belowRightStyle?.borderLeft : undefined,
+              )
+            : '';
+        const corner = east && south ? resolveBorderCorner(explicitRight, explicitBottom, east, south) : null;
+        if (corner) corners.push({ x: end, y: endY, corner });
+      }
+      const leftPen = parseBorder(own?.borderLeft);
       if (colLeft(c) === 0 && leftPen) {
         addLine(own?.borderLeft, x + leftPen.width, y, x, endY, true);
       }
-      const topPen = parsePen(own?.borderTop);
+      const topPen = parseBorder(own?.borderTop);
       if (rowTop(r) === 0 && topPen) {
         addLine(own?.borderTop, x, y + topPen.width, end, y, false);
       }
@@ -381,6 +392,18 @@ export function paintMissingCells<TRecord>(params: PaintMissingParams<TRecord>):
       ctx.restore();
     } else {
       ctx.stroke(path);
+    }
+  }
+  for (const { x: cx, y: cy, corner } of corners) {
+    ctx.fillStyle = corner.color;
+    if (corner.kind === 'double') {
+      const tw = corner.width / 3;
+      const th = corner.height / 3;
+      ctx.fillRect(cx - corner.width, cy - corner.height, corner.width, th);
+      ctx.fillRect(cx - corner.width, cy - corner.height, tw, corner.height);
+      ctx.fillRect(cx - tw, cy - th, tw, th);
+    } else {
+      ctx.fillRect(cx - corner.width, cy - corner.height, corner.width, corner.height);
     }
   }
   ctx.restore();

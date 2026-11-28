@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"excellens/internal/buildinfo"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 // Files embeds the self-contained local browser interface.
@@ -26,21 +26,20 @@ func Index(token string) ([]byte, error) {
 	return IndexWithLayout(token, false, 0)
 }
 
-// RecoveryIndex has no workbook bootstrap or tab lease.
-func RecoveryIndex(token string) ([]byte, error) {
-	data, err := Files.ReadFile("web/storage-recovery.html")
-	if err != nil {
-		return nil, err
-	}
-	_, urls := assetCatalog()
-	return []byte(strings.ReplaceAll(urls.Replace(string(data)), "__APP_TOKEN__", token)), nil
+func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, error) {
+	return IndexLocalized(token, ribbon, cacheEpoch, i18n.Default)
 }
 
-func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, error) {
-	data, err := Files.ReadFile("web/index.html")
+func IndexLocalized(token string, ribbon bool, cacheEpoch uint64, locale i18n.Locale) ([]byte, error) {
+	page, err := indexPage(locale)
 	if err != nil {
 		return nil, err
 	}
+	return page.render("__APP_TOKEN__", token,
+		"__RIBBON_LAYOUT__", strconv.FormatBool(ribbon), "__CACHE_EPOCH__", strconv.FormatUint(cacheEpoch, 10)), nil
+}
+
+var indexFormatConfig = sync.OnceValues(func() (string, error) {
 	config, err := json.Marshal(struct {
 		Extensions     []string                  `json:"extensions"`
 		Sources        map[string]formats.Source `json:"sources"`
@@ -115,17 +114,8 @@ func IndexWithLayout(token string, ribbon bool, cacheEpoch uint64) ([]byte, erro
 			PageRows int `json:"pageRows"`
 			Active   int `json:"active"`
 		}{formats.AnalysisTreeBrowserNodes, formats.AnalysisTreeBrowserBytes, formats.AnalysisTreePageRows, formats.AnalysisTreeActiveTasks}})
-	if err != nil {
-		return nil, err
-	}
-	replacer := strings.NewReplacer("__APP_TOKEN__", token,
-		"__RIBBON_LAYOUT__", strconv.FormatBool(ribbon), "__CACHE_EPOCH__", strconv.FormatUint(cacheEpoch, 10),
-		"__APP_VERSION__", buildinfo.Version,
-		"__MAX_SOURCE_ROWS__", strconv.Itoa(formats.ExternalRows),
-		"__FILE_ACCEPT__", formats.Accept(), "__FILE_FORMATS__", string(config))
-	_, urls := assetCatalog()
-	return []byte(replacer.Replace(urls.Replace(string(data)))), nil
-}
+	return string(config), err
+})
 
 // The index names the exact bytes it uses. Unversioned URLs (including CSS
 // image references and local clients) revalidate on each use.

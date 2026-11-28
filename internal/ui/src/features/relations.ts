@@ -2,6 +2,7 @@
  * Two-table Relation & Extraction dialog: left/inner/unmatched/invalid joins,
  * bounded field pickers, preview paging, source navigation, and export handoff.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { CompositionSourceInfo } from '../contracts/analysis.ts';
 import type { ApiClient, ApiRequestOptions, ToastFn } from '../contracts/common.ts';
 import type {
@@ -157,12 +158,12 @@ function isRelationOutputMode(value: string): value is RelationOutputModeId {
 }
 
 const COUNT_DISPLAY_ITEMS: readonly (readonly [keyof RelationCounts, string])[] = [
-  ['leftMatched', '左匹配'],
-  ['rightMatched', '右匹配'],
-  ['leftOnly', '左未匹配'],
-  ['rightOnly', '右未匹配'],
-  ['leftInvalid', '左无效键'],
-  ['rightInvalid', '右无效键'],
+  ['leftMatched', localize('ui.relations.leftMatching')],
+  ['rightMatched', localize('ui.relations.rightMatching')],
+  ['leftOnly', localize('ui.relations.leftNotMatched')],
+  ['rightOnly', localize('ui.relations.rightMismatch')],
+  ['leftInvalid', localize('ui.relations.leftInvalidKey')],
+  ['rightInvalid', localize('ui.relations.rightInvalidKey')],
 ];
 
 export class Relations {
@@ -214,20 +215,20 @@ export class Relations {
       api: this.api,
       context: this.context,
       endpoint: '/api/relation',
-      label: '关联',
+      label: localize('ui.relations.association'),
     });
 
     this.dialog = makeNode('dialog', undefined, 'float-dialog relations-dialog');
     this.dialog.id = 'relationsDialog';
     this.dialog.setAttribute('aria-labelledby', 'relationsTitle');
-    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="relationsTitle" class="dialog-title">关联与提取</div><button class="dialog-close" value="cancel" aria-label="关闭关联与提取">×</button></form>
-        <div class="relations-body"><fieldset id="relationsConfig"><div class="relations-toolbar"><button id="relationsRefresh" class="mini-button" type="button">刷新来源</button><button id="relationsUpload" class="mini-button" type="button">添加文件</button><input id="relationsFile" type="file" hidden><button id="relationsSwap" class="mini-button" type="button">交换左右表</button><button id="relationsRead" class="mini-button" type="button">读取字段</button></div>
-        <div id="relationsSources" class="relations-sources"></div><div class="relations-key-heading"><strong>关联键</strong><button id="relationsAddKey" class="mini-button" type="button">添加键</button></div><div id="relationsKeys"></div></fieldset>
-        <section id="relationsResults" hidden><div class="relations-result-heading"><strong>结果</strong><span id="relationsPrevious" class="relations-previous" hidden>上次结果</span><span id="relationsResultSources"></span><button id="relationsClear" type="button" class="mini-button">清除</button></div>
-        <div id="relationsCounts" class="relations-counts"></div><div class="relations-results-tools"><label>提取<select id="relationsMode" class="field-control"></select></label><span id="relationsTotal"></span></div>
+    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="relationsTitle" class="dialog-title">${localizeHTML('ui.relations.associationExtraction')}</div><button class="dialog-close" value="cancel" aria-label="${localizeHTML('ui.relations.disconnectAssociationExtraction')}">×</button></form>
+        <div class="relations-body"><fieldset id="relationsConfig"><div class="relations-toolbar"><button id="relationsRefresh" class="mini-button" type="button">${localizeHTML('ui.relations.refreshSourceInformation')}</button><button id="relationsUpload" class="mini-button" type="button">${localizeHTML('ui.relations.addFile')}</button><input id="relationsFile" type="file" hidden><button id="relationsSwap" class="mini-button" type="button">${localizeHTML('ui.relations.swapLeftRightTables')}</button><button id="relationsRead" class="mini-button" type="button">${localizeHTML('ui.relations.readingFields')}</button></div>
+        <div id="relationsSources" class="relations-sources"></div><div class="relations-key-heading"><strong>${localizeHTML('ui.relations.associatedKeys')}</strong><button id="relationsAddKey" class="mini-button" type="button">${localizeHTML('ui.relations.addKey')}</button></div><div id="relationsKeys"></div></fieldset>
+        <section id="relationsResults" hidden><div class="relations-result-heading"><strong>${localizeHTML('ui.relations.results')}</strong><span id="relationsPrevious" class="relations-previous" hidden>${localizeHTML('ui.relations.lastResult')}</span><span id="relationsResultSources"></span><button id="relationsClear" type="button" class="mini-button">${localizeHTML('ui.relations.clear')}</button></div>
+        <div id="relationsCounts" class="relations-counts"></div><div class="relations-results-tools"><label>${localizeHTML('ui.relations.extract')}<select id="relationsMode" class="field-control"></select></label><span id="relationsTotal"></span></div>
         <div id="relationsTableWrap" class="relations-table-wrap"><table id="relationsTable" class="relations-table"></table></div><div class="relations-paging"><div id="relationsRowPaging"></div><div id="relationsColumnPaging"></div></div>
-        <div class="relations-export"><label>导出上限<input id="relationsMaximum" class="field-control" inputmode="numeric" aria-label="导出记录上限"></label><label>格式<select id="relationsFormat" class="field-control" aria-label="关联导出格式"></select></label><label><input id="relationsProtect" type="checkbox" checked>文本保护</label><button id="relationsExport" type="button" class="mini-button">导出结果</button></div></section></div>
-        <div class="relations-footer"><div id="relationsStatus" role="status" aria-live="polite"></div><button id="relationsCancel" class="mini-button" type="button" hidden>取消任务</button><button id="relationsRun" class="primary-button compact" type="button">运行关联</button></div>`;
+        <div class="relations-export"><label>${localizeHTML('ui.relations.exportLimit')}<input id="relationsMaximum" class="field-control" inputmode="numeric" aria-label="${localizeHTML('ui.relations.limitOnExportRecords')}"></label><label>${localizeHTML('ui.relations.format')}<select id="relationsFormat" class="field-control" aria-label="${localizeHTML('ui.relations.associatedExportFormat')}"></select></label><label><input id="relationsProtect" type="checkbox" checked>${localizeHTML('ui.relations.textProtection')}</label><button id="relationsExport" type="button" class="mini-button">${localizeHTML('ui.relations.exportResults')}</button></div></section></div>
+        <div class="relations-footer"><div id="relationsStatus" role="status" aria-live="polite"></div><button id="relationsCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.relations.cancelTask')}</button><button id="relationsRun" class="primary-button compact" type="button">${localizeHTML('ui.relations.runAssociation')}</button></div>`;
     document.body.append(this.dialog);
 
     this.picker = new FieldPicker({ id: 'relationsPicker', pageRows: options.fieldLimits.pickerRows });
@@ -374,7 +375,7 @@ export class Relations {
     this.picker.close();
     this.busy = false;
     if (this.accepted) requireSelect('relationsMode').value = this.accepted.data.outputMode;
-    if (report && pending) this.message('已取消');
+    if (report && pending) this.message(localize('ui.common.canceled'));
     this.controls();
   }
 
@@ -408,7 +409,7 @@ export class Relations {
 
   async open(): Promise<void> {
     if (!this.context().opened) {
-      this.toast('请先打开数据文件', 'warning');
+      this.toast(localize('ui.relations.openDataFileFirst'), 'warning');
       return;
     }
     if (this.identityKey !== this.identity()) {
@@ -460,7 +461,7 @@ export class Relations {
       );
       if (!current()) return;
       if (data.currentBook !== this.context().book) {
-        throw new Error('来源列表已变化，请刷新');
+        throw new Error(localize('ui.relations.sourceListChangedRefresh'));
       }
       const previous = new Map(this.books.map((book) => [book.id, book]));
       this.books = data.books.map((book) => {
@@ -514,12 +515,12 @@ export class Relations {
     this.inputs.forEach((input, side) => {
       const pane = makeNode('section', undefined, 'relations-source');
       const head = makeNode('div', undefined, 'relations-source-heading');
-      const title = makeNode('strong', side ? '右表' : '左表');
+      const title = makeNode('strong', side ? localize('ui.relations.rightTable') : localize('ui.relations.leftTable'));
       head.append(title);
       const meta = this.books.find((book) => book.id === input.book);
       if (meta?.attached) {
         head.append(
-          makeButton('移除文件', () => {
+          makeButton(localize('ui.relations.removeFiles'), () => {
             void this.action(async (current) => {
               await this.post('/api/reconcile/source/remove', { book: input.book });
               if (!current()) return;
@@ -532,7 +533,7 @@ export class Relations {
       }
 
       const book = makeNode('select', undefined, 'field-control');
-      book.setAttribute('aria-label', `${side ? '右' : '左'}表文件`);
+      book.setAttribute('aria-label', localize('ui.relations.tableFile', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }));
       book.dataset.side = String(side);
       book.dataset.choice = 'book';
       for (const item of this.books) {
@@ -543,15 +544,15 @@ export class Relations {
       book.value = input.book;
 
       const sheet = makeNode('select', undefined, 'field-control');
-      sheet.setAttribute('aria-label', `${side ? '右' : '左'}表工作表`);
+      sheet.setAttribute('aria-label', localize('ui.relations.tableWorksheets', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }));
       sheet.dataset.side = String(side);
       sheet.dataset.choice = 'source';
-      sheet.append(new Option('选择工作表', ''));
+      sheet.append(new Option(localize('ui.relations.selectWorksheet'), ''));
       for (const item of meta?.sheets ?? []) {
         sheet.append(new Option(item.name, `wb:${item.name}`));
       }
       for (const item of meta?.scratch ?? []) {
-        sheet.append(new Option(`${item.name}（分析表）`, `scratch:${item.id}`));
+        sheet.append(new Option(localize('ui.relations.tableAnalysis', { name: item.name }), `scratch:${item.id}`));
       }
       sheet.value = input.source;
 
@@ -572,32 +573,32 @@ export class Relations {
       };
 
       const bottom = makeNode('div', undefined, 'relations-source-tools');
-      const header = makeNode('label', '表头行');
+      const header = makeNode('label', localize('ui.relations.headerRow'));
       const number = makeNode('input', undefined, 'field-control');
       number.type = 'number';
       number.min = '0';
       number.max = String(this.formats.maxRows);
       number.value = String(input.headerRow);
-      number.title = '0：无表头';
+      number.title = localize('ui.relations.noHeader');
       number.disabled = input.source.startsWith('scratch:');
       number.dataset.side = String(side);
       number.dataset.choice = 'header';
-      number.setAttribute('aria-label', `${side ? '右' : '左'}表表头行`);
+      number.setAttribute('aria-label', localize('ui.relations.tableHeaderRows', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }));
       number.onchange = () => {
         input.headerRow = Number(number.value);
         this.invalidate(side);
       };
       header.append(number);
 
-      const selected = makeButton(`结果字段 ${input.columns.length}`, () => this.pickColumns(side));
+      const selected = makeButton(localize('ui.relations.resultFields', { count: input.columns.length }), () => this.pickColumns(side));
       selected.disabled = !input.info;
       selected.dataset.side = String(side);
       selected.dataset.choice = 'columns';
       const info = makeNode(
         'span',
         input.info
-          ? `${formatRelationCount(input.info.rows)} 条 / ${(input.info.fields ?? []).length} 列`
-          : '未读取字段',
+          ? localize('ui.relations.itemsColumns', { formatRelationCount: formatRelationCount(input.info.rows), detail: (input.info.fields ?? []).length })
+          : localize('ui.relations.unreadFields'),
         'relations-source-state',
       );
       bottom.append(header, selected, info);
@@ -609,19 +610,19 @@ export class Relations {
 
   async read(side: 0 | 1, current: () => boolean): Promise<void> {
     const input = this.inputs[side];
-    if (!input?.book || !input.source) throw new Error('请选择两侧文件和工作表');
+    if (!input?.book || !input.source) throw new Error(localize('ui.relations.selectBothFileWorksheet'));
     if (
       !Number.isSafeInteger(input.headerRow) ||
       input.headerRow < 0 ||
       input.headerRow > this.formats.maxRows
     ) {
-      throw new Error('表头行号无效');
+      throw new Error(localize('ui.relations.invalidHeaderRowNumber'));
     }
     const choice = { book: input.book, source: input.source, headerRow: input.headerRow };
     const identity = { ...this.context() };
     let result: { readonly id: string } | undefined;
     try {
-      this.message(`正在读取${side ? '右' : '左'}表字段…`);
+      this.message(localize('ui.relations.readingFieldsTable', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }));
       result = await this.fieldsTasks.run(decodeSourceTaskResultEnvelope, { mode: 'fields', choice }, current);
       if (!current() || this.inputs[side] !== input) return;
       const info = validateRelationFields(result, choice, identity, this.formats);
@@ -675,7 +676,7 @@ export class Relations {
     const info = input?.info;
     if (!input || !info || !this.limits) return;
     this.picker.open({
-      title: `${side ? '右' : '左'}表结果字段`,
+      title: localize('ui.relations.tableResultFields', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }),
       fields: info.fields ?? [],
       selected: input.columns,
       multiple: true,
@@ -699,7 +700,7 @@ export class Relations {
       .map((key) => (side ? key.right : key.left))
       .filter((col): col is number => col !== null);
     this.picker.open({
-      title: `${side ? '右' : '左'}表关联键`,
+      title: localize('ui.relations.tableAssociationKeys', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }),
       fields: info.fields ?? [],
       disabled,
       current: () => this.dialog.open && this.keys[index] === pair && input.info === info,
@@ -716,7 +717,7 @@ export class Relations {
     const host = requireEl('relationsKeys');
     host.replaceChildren();
     if (!this.keys.length) {
-      host.append(makeNode('span', '读取字段后选择关联键', 'relations-source-state'));
+      host.append(makeNode('span', localize('ui.relations.afterReadingFieldsSelectAssociated'), 'relations-source-state'));
       return;
     }
     this.keys.forEach((pair, index) => {
@@ -726,21 +727,21 @@ export class Relations {
         const sideInfo = this.inputs[side]?.info;
         const field = sideInfo?.fields?.find((f) => f.column === chosenCol);
         const pick = makeButton(
-          field ? `${labelColumn(field.column)} ${field.name}` : `${side ? '右' : '左'}表字段`,
+          field ? `${labelColumn(field.column)} ${field.name}` : localize('ui.relations.tableFields', { detail: side ? localize('ui.common.right') : localize('ui.common.left') }),
           () => this.pickKey(side, index),
           'relations-field-button',
         );
         pick.disabled = !sideInfo;
-        pick.setAttribute('aria-label', `${side ? '右' : '左'}表第${index + 1}个关联键`);
+        pick.setAttribute('aria-label', localize('ui.relations.relatedKeysTableRow', { detail: side ? localize('ui.common.right') : localize('ui.common.left'), index: index + 1 }));
         row.append(pick);
       }
 
       const mode = makeNode('select', undefined, 'field-control');
-      mode.setAttribute('aria-label', `第${index + 1}个键的匹配方式`);
+      mode.setAttribute('aria-label', localize('ui.relations.matchingMethodThKey', { index: index + 1 }));
       const modeChoices: readonly (readonly [string, string])[] = [
-        ['', '保留源类型'],
-        ['text', '按显示文本'],
-        ['number', '按精确数值'],
+        ['', localize('ui.relations.maintainSourceType')],
+        ['text', localize('ui.common.pressDisplayText')],
+        ['number', localize('ui.relations.exactValue')],
       ];
       for (const [value, text] of modeChoices) mode.append(new Option(text, value));
       mode.value = pair.mode;
@@ -757,8 +758,8 @@ export class Relations {
 
       const flags = makeNode('div', undefined, 'relations-key-flags');
       const flagSpecs: readonly (readonly ['trim' | 'ignoreCase', string])[] = [
-        ['trim', '去空格'],
-        ['ignoreCase', '忽略大小写'],
+        ['trim', localize('ui.relations.goSpace')],
+        ['ignoreCase', localize('ui.relations.ignoreCase')],
       ];
       for (const [key, text] of flagSpecs) {
         const wrap = makeNode('label');
@@ -780,7 +781,7 @@ export class Relations {
         this.changed();
         this.renderKeys();
       });
-      remove.title = '移除关联键';
+      remove.title = localize('ui.relations.removeAssociatedKeys');
       remove.disabled = this.keys.length === 1;
       row.append(remove);
       host.append(row);
@@ -792,7 +793,7 @@ export class Relations {
     const left = this.inputs[0];
     const right = this.inputs[1];
     if (!left?.info || !right?.info || !this.limits) {
-      throw new Error('请先读取两侧字段');
+      throw new Error(localize('ui.common.readFieldsOnBothSides'));
     }
     return validateRelationQuery(
       {
@@ -809,7 +810,7 @@ export class Relations {
     if (!this.canRun()) return;
     const left = this.inputs[0]?.info;
     const right = this.inputs[1]?.info;
-    if (!left || !right) throw new Error('请先读取两侧字段');
+    if (!left || !right) throw new Error(localize('ui.common.readFieldsOnBothSides'));
     const query = this.query();
     const infos: readonly [CompositionSourceInfo, CompositionSourceInfo] = [
       copyValue(left),
@@ -862,7 +863,7 @@ export class Relations {
     let response: { readonly id: string } | undefined;
     let published = false;
     try {
-      this.message('正在关联…');
+      this.message(localize('ui.relations.associatingProgress'));
       response = await this.tasks.run(decodeSourceTaskResultEnvelope,
         { ...request, ...(this.accepted ? { keepId: this.accepted.data.id } : {}) },
         current,
@@ -908,7 +909,7 @@ export class Relations {
       counts.append(
         makeNode(
           'span',
-          `多对多 ${formatRelationCount(data.counts.manyToManyGroups)} 组`,
+          localize('ui.relations.manyManyGroups', { formatRelationCount: formatRelationCount(data.counts.manyToManyGroups) }),
           'relations-multiple',
         ),
       );
@@ -918,7 +919,7 @@ export class Relations {
       counts,
       options,
       source: `${data.left.name} ↔ ${data.right.name}`,
-      total: `共 ${formatRelationCount(data.preview.total)} 条`,
+      total: localize('ui.relations.totalEntries', { formatRelationCount: formatRelationCount(data.preview.total) }),
       table: this.buildTable(candidate, 0, 0),
     };
   }
@@ -954,9 +955,9 @@ export class Relations {
     const fragment = document.createDocumentFragment();
     const head = makeNode('thead');
     const hr = makeNode('tr');
-    hr.append(makeNode('th', '源行'), makeNode('th', '状态'));
+    hr.append(makeNode('th', localize('ui.relations.sourceLine')), makeNode('th', localize('ui.common.status')));
     for (const item of columns) {
-      hr.append(makeNode('th', `${item.side ? '右 ' : '左 '}${labelColumn(item.column)} ${item.field.name}`));
+      hr.append(makeNode('th', `${item.side ? `${localize('ui.common.right')} ` : `${localize('ui.common.left')} `}${labelColumn(item.column)} ${item.field.name}`));
     }
     head.append(hr);
     fragment.append(head);
@@ -973,7 +974,7 @@ export class Relations {
           const keyCol = side ? firstKey.right : firstKey.left;
           origin.append(
             makeButton(
-              `${side ? '右 ' : '左 '}${record.number}`,
+              `${side ? `${localize('ui.common.right')} ` : `${localize('ui.common.left')} `}${record.number}`,
               () => {
                 void this.goSource(accepted, side, record.number, keyCol);
               },
@@ -985,7 +986,7 @@ export class Relations {
       tr.append(origin);
       const state = makeNode(
         'td',
-        row.status === 'matched' ? '已匹配' : row.status === 'invalid_key' ? '无效键' : '未匹配',
+        row.status === 'matched' ? localize('ui.relations.matchedSuccessfully') : row.status === 'invalid_key' ? localize('ui.relations.invalidKey') : localize('ui.relations.notMatched'),
         'relations-row-state',
       );
       state.dataset.status = row.status;
@@ -998,7 +999,7 @@ export class Relations {
         const cell = makeNode('td');
         if (record) {
           const raw = value?.missingCache
-            ? '缺缓存'
+            ? localize('ui.relations.noCache')
             : value?.exists
               ? cellDisplayValue(relationCell(value), false, true)
               : '';
@@ -1012,7 +1013,7 @@ export class Relations {
             },
             'relations-value',
           );
-          link.title = `${item.side ? '右 ' : '左 '}${labelColumn(item.column)}${record.number}`;
+          link.title = `${item.side ? `${localize('ui.common.right')} ` : `${localize('ui.common.left')} `}${labelColumn(item.column)}${record.number}`;
           if (value?.typeMissing || value?.uncertain || value?.truncated) {
             link.classList.add('relations-value-notice');
           }
@@ -1027,7 +1028,7 @@ export class Relations {
       const tr = makeNode('tr');
       const empty = makeNode(
         'td',
-        parseRelationCount(data.preview.total) === 0n ? '没有此类记录' : '预览内容过大，请导出查看',
+        parseRelationCount(data.preview.total) === 0n ? localize('ui.relations.noSuchRecords') : localize('ui.relations.previewContentTooLargeExport'),
         'relations-empty',
       );
       empty.colSpan = columns.length + 2;
@@ -1051,7 +1052,7 @@ export class Relations {
         this.rowPage = page;
         this.renderTable();
       },
-      `预览 ${previewCount} 条`,
+      localize('ui.relations.previewItems', { previewCount }),
     );
     this.paging(
       requireEl('relationsColumnPaging'),
@@ -1062,7 +1063,7 @@ export class Relations {
         this.columnPage = page;
         this.renderTable();
       },
-      '字段',
+      localize('ui.common.field'),
     );
   }
 
@@ -1089,8 +1090,8 @@ export class Relations {
     const info = makeNode('span', text + (count > size ? `　${page + 1} / ${Math.ceil(count / size)}` : ''));
     host.append(info);
     if (count <= size) return;
-    const previous = makeButton('上一页', () => change(page - 1));
-    const next = makeButton('下一页', () => change(page + 1));
+    const previous = makeButton(localize('ui.common.previousPage'), () => change(page - 1));
+    const next = makeButton(localize('ui.common.nextPage'), () => change(page + 1));
     previous.disabled = page === 0;
     next.disabled = (page + 1) * size >= count;
     host.append(previous, next);
@@ -1122,7 +1123,7 @@ export class Relations {
     if (!current()) return;
     const book = this.books.find((item) => item.id === data.book);
     const firstSheet = book?.sheets?.[0];
-    if (!firstSheet) throw new Error('新文件没有可用工作表');
+    if (!firstSheet) throw new Error(localize('ui.relations.noAvailableWorksheetsNewFile'));
     this.inputs[1] = {
       book: data.book,
       source: `wb:${firstSheet.name}`,
@@ -1155,14 +1156,14 @@ export class Relations {
     try {
       const maximum = requireInput('relationsMaximum').value.replace(/,/g, '').trim();
       if (!/^[1-9]\d*$/.test(maximum) || BigInt(maximum) > BigInt(this.limits.maximumRows)) {
-        throw new Error('导出上限无效');
+        throw new Error(localize('ui.relations.invalidExportLimit'));
       }
       if (parseRelationCount(accepted.data.preview.total) > BigInt(maximum)) {
-        throw new Error(`结果 ${formatRelationCount(accepted.data.preview.total)} 条，超过导出上限`);
+        throw new Error(localize('ui.relations.resultsTotalNumberItemsExceeding', { formatRelationCount: formatRelationCount(accepted.data.preview.total) }));
       }
       const format = requireSelect('relationsFormat').value;
       if (format && !this.exportOptions.some((option) => option.format === format)) {
-        throw new Error('关联导出格式无效');
+        throw new Error(localize('ui.relations.associatedExportFormatInvalid'));
       }
       const payload: RelationExportPayload = {
         jobId: accepted.data.id,
@@ -1235,7 +1236,7 @@ export class Relations {
         popup.location.assign(target.url);
         handled = true;
       } else {
-        this.toast('请允许弹出窗口后重试', 'warning');
+        this.toast(localize('ui.relations.allowPopUpWindowAppear'), 'warning');
       }
     } catch (error: unknown) {
       if (identity === this.identity() && ticket === this.navSerial) {

@@ -15,6 +15,7 @@ import (
 	"excellens/internal/analysis"
 	"excellens/internal/calculator"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -67,13 +68,13 @@ func (a *App) handleCalculatorEvaluate(w http.ResponseWriter, r *http.Request) {
 	}
 	var req calculator.Request
 	if decodeCalculator(w, r, &req) != nil {
-		writeError(w, 400, "计算参数无效")
+		writeMessage(w, 400, "service.calculator.calculationParametersInvalid")
 		return
 	}
 	result, err := calculator.Evaluate(r.Context(), req)
 	if err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 422, err.Error())
+			writeFailure(w, 422, err)
 		}
 		return
 	}
@@ -113,18 +114,18 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 	}
 	var req calculatorCaptureRequest
 	if decodeCalculator(w, r, &req) != nil {
-		writeError(w, 400, "取数参数无效")
+		writeMessage(w, 400, "service.calculator.invalidDataRetrievalParameters")
 		return
 	}
 	result := calculatorOperand{Kind: req.Kind, CapturedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	if req.Kind == "manual" {
 		if len(req.Raw) > 512 {
-			writeError(w, 422, "手输金额过长，请拆分输入")
+			writeMessage(w, 422, "service.calculator.manuallyEnteredAmountTooLong")
 			return
 		}
 		v, ok := calculatorNumber(req.Raw, true)
 		if !ok {
-			writeError(w, 422, "请输入有效金额；支持千位分隔、会计负数及百分数")
+			writeMessage(w, 422, "service.calculator.enterValidAmountThousandSeparate")
 			return
 		}
 		result.Value = v.RatString()
@@ -134,24 +135,24 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Kind != "cell" && req.Kind != "sum" {
-		writeError(w, 400, "请选择单格或选区合计")
+		writeMessage(w, 400, "service.calculator.selectSingleCellOrSelected")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey == "" || req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，请重新取数")
+		writeMessage(w, 409, "service.calculator.workbookSwitchedRetrieveDataAgain")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.calculator.worksheetDoesNotExist")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请等待工作表索引完成后取数")
+		writeMessage(w, 409, "service.calculator.waitUntilWorksheetIndexCompleted")
 		return
 	}
 	result.File = workbookDisplayName(wb)
@@ -164,17 +165,17 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 	if req.Kind == "cell" {
 		col, row, err := workbook.ParseCellRef(req.Ref)
 		if err != nil || col > formats.ExcelColumns || row > workbook.MaxRowsForIndex(idx) {
-			writeError(w, 400, "单元格地址无效")
+			writeMessage(w, 400, "service.calculator.cellAddressInvalid")
 			return
 		}
 		position := idx.FindRowOffset(row)
 		if position >= idx.RowCount() || idx.RowAt(position).Number != row {
-			writeError(w, 422, "该格为空白，未加入计算")
+			writeMessage(w, 422, "service.calculator.thisCellBlankNotCalculated")
 			return
 		}
 		rows, err := wb.ReadRowsContext(r.Context(), idx, position, 1, col, col)
 		if err != nil {
-			writeError(w, 500, "读取单元格失败："+err.Error())
+			writeMessage(w, 500, "service.calculator.failedReadCell", i18n.Args{"detail": err})
 			return
 		}
 		var cell workbook.CellData
@@ -185,16 +186,16 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if cell.CacheMissing {
-			writeError(w, 422, "该公式没有保存结果，未加入计算")
+			writeMessage(w, 422, "service.calculator.thisFormulaNotSavedAny")
 			return
 		}
 		if cell.Type == "e" {
-			writeError(w, 422, "该格为 Excel 错误值，未加入计算")
+			writeMessage(w, 422, "service.calculator.thisCellContainsExcelError")
 			return
 		}
 		v, ok := calcCellNumber(cell)
 		if !ok {
-			writeError(w, 422, "该格不是可计算金额；空白、编号及非数值文本不作0")
+			writeMessage(w, 422, "service.calculator.thisCellNotCalculableAmount")
 			return
 		}
 		result.Ref = workbook.ColumnName(col) + fmt.Sprint(row)
@@ -215,7 +216,7 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 		}
 		selection, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer selection.close()
@@ -225,16 +226,16 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 		statReq := selectionStatRequest{Sheet: req.Sheet, FilterID: req.FilterID, ViewID: req.ViewID, ExcludeThroughRow: req.ExcludeThroughRow, Ranges: req.Ranges}
 		if err := scanCalculatorSelection(r.Context(), wb, idx, selection.filter, statReq, &collector, selection.visible); err != nil {
 			if r.Context().Err() == nil {
-				writeError(w, 422, err.Error())
+				writeFailure(w, 422, err)
 			}
 			return
 		}
 		if collector.errors > 0 || collector.missing > 0 {
-			writeError(w, 422, fmt.Sprintf("选区含%d个错误值、%d个缺少缓存的公式；未生成不完整合计", collector.errors, collector.missing))
+			writeMessage(w, 422, "service.calculator.selectionContainsErrorValuesFormulas", i18n.Args{"errors": collector.errors, "missing": collector.missing})
 			return
 		}
 		if collector.number == 0 {
-			writeError(w, 422, "选区没有可计算数值，未将空白或文本当作0")
+			writeMessage(w, 422, "service.calculator.ifSelectionNoCalculableValues")
 			return
 		}
 		result.Value = collector.sum.RatString()
@@ -247,7 +248,7 @@ func (a *App) handleCalculatorCapture(w http.ResponseWriter, r *http.Request) {
 		result.TextNumbers = collector.textNumbers
 	}
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换，本次取数已放弃")
+		writeMessage(w, 409, "service.calculator.workbookSwitchedThisDataRetrieval")
 		return
 	}
 	writeJSON(w, result)
@@ -311,14 +312,14 @@ func (c *calculatorCollector) add(row workbook.RowData) error {
 // selections reuse the existing deduplicated, 400k-cell selection planner.
 func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *workbook.SheetIndex, filter *FilterResult, req selectionStatRequest, c *calculatorCollector, views ...*sheetRowView) error {
 	if req.ViewID != "" && (len(views) != 1 || views[0] == nil || views[0].isClosed() || views[0].data.id != req.ViewID) {
-		return errors.New("计算选区的可见行视图已失效，请重新选择")
+		return i18n.Error("service.calculator.visibleRowViewSelectedCalculation")
 	}
 	if len(req.Ranges) == 1 {
 		span := req.Ranges[0]
 		c1, r1, e1 := workbook.ParseCellRef(span.Start)
 		c2, r2, e2 := workbook.ParseCellRef(span.End)
 		if e1 != nil || e2 != nil || c1 > formats.ExcelColumns || c2 > formats.ExcelColumns || r1 > workbook.MaxRowsForIndex(idx) || r2 > workbook.MaxRowsForIndex(idx) {
-			return errors.New("选区地址无效")
+			return i18n.Error("service.calculator.selectedConstituencyAddressInvalid")
 		}
 		if c1 > c2 {
 			c1, c2 = c2, c1
@@ -367,7 +368,7 @@ func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *wo
 			}
 		} else {
 			if req.ExcludeThroughRow < 0 || req.ExcludeThroughRow > 30 {
-				return errors.New("冻结行参数无效")
+				return i18n.Error("service.calculator.frozenRowParametersInvalid")
 			}
 			pinned1, pinned2 := r1 <= req.ExcludeThroughRow, r2 <= req.ExcludeThroughRow
 			h1, h2, v1, v2 := 0, -1, span.VisualStart, span.VisualEnd
@@ -389,15 +390,15 @@ func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *wo
 				}
 			}
 			if pinned1 != pinned2 && v2 < v1 {
-				return errors.New("筛选选区已失效，请重新选择")
+				return i18n.Error("service.calculator.selectedFilterAreaNoLonger")
 			}
 			if v2 >= v1 && v1 < 1 {
-				return errors.New("筛选选区已失效，请重新选择")
+				return i18n.Error("service.calculator.selectedFilterAreaNoLonger")
 			}
 			count := max(0, v2-v1+1) + max(0, h2-h1+1)
 			c.total = int64(count) * int64(c2-c1+1)
 			if c.total <= 0 || c.total > 4000000 {
-				return errors.New("单选区合计最多400万格，请分段取数")
+				return i18n.Error("service.calculator.maximumNumberCellsSingleChoice")
 			}
 			// Store only selected positions. A tiny selection on a billion-row
 			// source must not allocate a source-sized bitset or scan all rows.
@@ -414,7 +415,7 @@ func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *wo
 					return err
 				}
 				if v2 > view.count() {
-					return errors.New("筛选选区已失效，请重新选择")
+					return i18n.Error("service.calculator.selectedFilterAreaNoLonger")
 				}
 				for visual := v1; visual <= v2; visual++ {
 					if err := ctx.Err(); err != nil {
@@ -422,7 +423,7 @@ func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *wo
 					}
 					i := filter.Rows.At(view.underlying(visual - 1))
 					if i < 0 || i >= idx.RowCount() {
-						return errors.New("筛选结果无效")
+						return i18n.Error("service.calculator.filteredResultsInvalid")
 					}
 					mark(i)
 				}
@@ -445,7 +446,7 @@ func scanCalculatorSelection(ctx context.Context, wb *workbook.Workbook, idx *wo
 			}
 		}
 		if c.total <= 0 || c.total > 4000000 {
-			return errors.New("单选区合计最多400万格，请分段取数")
+			return i18n.Error("service.calculator.maximumNumberCellsSingleChoice")
 		}
 		return wb.VisitRowsContext(ctx, idx, positions, c1, c2, c.add)
 	}

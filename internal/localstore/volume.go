@@ -8,13 +8,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
+
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/minio/sio"
 	"golang.org/x/crypto/argon2"
+
+	"excellens/internal/i18n"
 )
 
 // Only the format identifier, salt and opaque DARE streams are public.
@@ -46,16 +48,16 @@ func newVolume(root *os.Root, password string, create bool) (backupVolume, error
 			return v, nil
 		}
 		if errors.Is(err, os.ErrNotExist) {
-			return v, errors.New("备份缺少加密头，请核对目录和口令")
+			return v, i18n.Error("diagnostic.localstore.volume.backupLacksEncryptionHeaderCheck")
 		}
 		if err != nil {
 			return v, err
 		}
 		if len(header) != len(volumeHeader)+len(salt) || !bytes.HasPrefix(header, []byte(volumeHeader)) {
-			return v, errors.New("加密备份头无效")
+			return v, i18n.Error("diagnostic.localstore.volume.encryptedBackupHeaderInvalid")
 		}
 		if password == "" {
-			return v, errors.New("请输入加密备份的口令")
+			return v, i18n.Error("diagnostic.localstore.volume.enterPasswordEncryptedBackup")
 		}
 		copy(salt[:], header[len(volumeHeader):])
 	}
@@ -99,7 +101,7 @@ func (v backupVolume) read(name string) (io.ReadCloser, error) {
 		var marker [1]byte
 		_, err = io.ReadFull(reader, marker[:])
 		if err == nil && marker[0] != 1 {
-			err = errors.New("加密对象头无效")
+			err = i18n.Error("diagnostic.localstore.volume.encryptedObjectHeaderInvalid")
 		}
 	}
 
@@ -115,7 +117,7 @@ func (v backupVolume) read(name string) (io.ReadCloser, error) {
 func (v backupVolume) manifest() ([]byte, error) {
 	f, err := v.read("manifest.json")
 	if err != nil && v.key != nil {
-		return nil, fmt.Errorf("口令错误或备份清单受损：%w", err)
+		return nil, i18n.Wrap("diagnostic.localstore.volume.passwordErrorOrBackupList", err)
 	}
 	if err != nil {
 		return nil, err
@@ -123,10 +125,10 @@ func (v backupVolume) manifest() ([]byte, error) {
 	defer f.Close()
 	data, err := io.ReadAll(io.LimitReader(f, manifestLimit+1))
 	if err != nil && v.key != nil {
-		return nil, fmt.Errorf("口令错误或备份清单受损：%w", err)
+		return nil, i18n.Wrap("diagnostic.localstore.volume.passwordErrorOrBackupList", err)
 	}
 	if len(data) > manifestLimit {
-		return nil, errors.New("备份清单超过容量")
+		return nil, i18n.Error("diagnostic.localstore.volume.backupListExceedsCapacityLimit")
 	}
 	return data, err
 }
@@ -155,11 +157,11 @@ func readBounded(root *os.Root, name string, limit int64) ([]byte, error) {
 	}
 	defer f.Close()
 	if st.Size() > limit {
-		return nil, errors.New("记录过大")
+		return nil, i18n.Error("diagnostic.localstore.volume.excessiveRecords")
 	}
 	b, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if int64(len(b)) > limit {
-		return nil, errors.New("记录过大")
+		return nil, i18n.Error("diagnostic.localstore.volume.excessiveRecords")
 	}
 	return b, err
 }
@@ -174,7 +176,7 @@ func (v backupVolume) verify(ctx context.Context, name string, want fileRecord, 
 		return err
 	}
 	if got != want {
-		return fmt.Errorf("备份校验失败：%s", name)
+		return i18n.Error("diagnostic.localstore.volume.backupVerificationFailed", i18n.Args{"name": name})
 	}
 	return nil
 }

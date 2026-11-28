@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/minio/sio"
+
+	"excellens/internal/i18n"
 )
 
 // A reserve covers filesystem bookkeeping and bounded transfer receipts.
@@ -45,7 +47,7 @@ func existingDir(name string) (string, error) {
 		st, err := os.Stat(name)
 		if err == nil {
 			if !st.IsDir() {
-				return "", fmt.Errorf("不是目录：%s", name)
+				return "", i18n.Error("diagnostic.localstore.space.notCatalog", i18n.Args{"name": name})
 			}
 			return name, nil
 		}
@@ -71,10 +73,10 @@ func planVolumes(paths map[string]string, probe spaceProbe) (*transferSpace, err
 		}
 		info, err := probe(dir)
 		if err != nil {
-			return nil, fmt.Errorf("无法核验 %s 的可用空间：%w", dir, err)
+			return nil, i18n.Wrap("diagnostic.localstore.space.unableVerifyAvailableSpace", err, i18n.Args{"dir": dir})
 		}
 		if info.id == "" || info.block == 0 {
-			return nil, fmt.Errorf("无法确定磁盘和分配单位：%s", dir)
+			return nil, i18n.Error("diagnostic.localstore.space.unableDetermineDiskAllocationUnit", i18n.Args{"dir": dir})
 		}
 		v := s.volumes[info.id]
 		if v == nil {
@@ -87,7 +89,7 @@ func planVolumes(paths map[string]string, probe spaceProbe) (*transferSpace, err
 }
 func (v *diskNeed) add(bytes uint64) error {
 	if bytes > math.MaxInt64-v.remaining {
-		return errors.New("传输容量超过支持范围")
+		return i18n.Error("diagnostic.localstore.space.transmissionCapacityExceedsSupportedRange")
 	}
 	v.remaining += bytes
 	return nil
@@ -95,7 +97,7 @@ func (v *diskNeed) add(bytes uint64) error {
 func (v *diskNeed) file(bytes uint64) error {
 	// Round the contents to allocation units and allow a directory entry.
 	if bytes > math.MaxInt64-v.block {
-		return errors.New("文件容量超过支持范围")
+		return i18n.Error("diagnostic.localstore.space.fileCapacityExceedsSupportedRange")
 	}
 	allocated := bytes
 	if rem := bytes % v.block; rem != 0 {
@@ -116,10 +118,10 @@ func diskBytes(n uint64) string {
 func (v *diskNeed) check() error {
 	info, err := v.probe(v.path)
 	if err != nil {
-		return fmt.Errorf("无法核验 %s 的剩余空间：%w", v.path, err)
+		return i18n.Wrap("diagnostic.localstore.space.unableVerifyRemainingSpace", err, i18n.Args{"path": v.path})
 	}
 	if info.free < v.remaining {
-		return fmt.Errorf("磁盘空间不足（%s）：需要 %s，可用 %s", v.path, diskBytes(v.remaining), diskBytes(info.free))
+		return i18n.Error("diagnostic.localstore.space.insufficientDiskSpaceRequiredAvailable", i18n.Args{"path": v.path, "diskBytes": diskBytes(v.remaining), "diskBytes2": diskBytes(info.free)})
 	}
 	v.next = time.Now().Add(time.Second)
 	v.since = 0
@@ -160,7 +162,7 @@ func (v *diskNeed) writer(dst io.Writer) io.Writer {
 
 func encodedSize(bytes int64, encrypted bool) (uint64, error) {
 	if bytes < 0 || bytes == math.MaxInt64 {
-		return 0, errors.New("无效的文件大小")
+		return 0, i18n.Error("diagnostic.localstore.space.invalidFileSize")
 	}
 	if !encrypted {
 		return uint64(bytes), nil
@@ -188,7 +190,7 @@ func (r Roots) backupSpace(ctx context.Context, parent string, o TransferOptions
 				return err
 			}
 			if n > math.MaxInt64-total {
-				return errors.New("备份字节数超过容量")
+				return i18n.Error("diagnostic.localstore.space.backupByteCountExceedsCapacity")
 			}
 			total += n
 			sizes[g.base+"/"+name] = fileRecord{n, digest}
@@ -203,7 +205,7 @@ func (r Roots) backupSpace(ctx context.Context, parent string, o TransferOptions
 		return nil, 0, 0, err
 	}
 	if len(data) > manifestLimit {
-		return nil, 0, 0, errors.New("备份清单超过容量")
+		return nil, 0, 0, i18n.Error("diagnostic.localstore.space.backupListExceedsCapacityLimit")
 	}
 	size, err := encodedSize(int64(len(data)), o.Password != "")
 	if err == nil {
@@ -253,7 +255,7 @@ func (r Roots) restoreSpace(ctx context.Context, units []restoreUnit, files map[
 		return nil, err
 	}
 	if len(journal) > manifestLimit {
-		return nil, errors.New("恢复事务超过容量")
+		return nil, i18n.Error("diagnostic.localstore.space.recoveryTransactionsExceedCapacity")
 	}
 	if err = plan.targets["config"].add(uint64(len(journal)) + 1<<20); err != nil {
 		return nil, err

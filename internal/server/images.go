@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 // Image metadata requires the normal API token. A separate unpredictable
@@ -24,7 +25,7 @@ func (a *App) handleImages(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.images.noWorkbookOpen")
 		return
 	}
 	if source, _ := formats.Lookup(wb.Format); !source.PictureMetadata {
@@ -33,12 +34,12 @@ func (a *App) handleImages(w http.ResponseWriter, r *http.Request) {
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到工作表")
+		writeMessage(w, http.StatusNotFound, "service.images.unableFindWorksheet")
 		return
 	}
 	images, err := wb.SheetImages(meta)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "读取内嵌图片失败："+err.Error())
+		writeMessage(w, http.StatusUnprocessableEntity, "service.images.failedReadEmbeddedImage", i18n.Args{"detail": err})
 		return
 	}
 	type imageDTO struct {
@@ -100,7 +101,7 @@ func (a *App) handleImageContent(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("download") == "1" {
 		raw, name, err := wb.PictureRaw(meta, id)
 		if err != nil {
-			writeError(w, http.StatusUnprocessableEntity, "图片下载失败："+err.Error())
+			writeMessage(w, http.StatusUnprocessableEntity, "service.images.imageDownloadFailed", i18n.Args{"detail": err})
 			return
 		}
 		// The file name originates in a ZIP part, not from the HTTP client.
@@ -112,7 +113,7 @@ func (a *App) handleImageContent(w http.ResponseWriter, r *http.Request) {
 	}
 	data, mime, err := wb.PictureBytes(meta, id)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "图片不可预览："+err.Error())
+		writeMessage(w, http.StatusUnprocessableEntity, "service.images.imagesCannotBePreviewed", i18n.Args{"detail": err})
 		return
 	}
 	w.Header().Set("Content-Type", mime)

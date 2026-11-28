@@ -2,6 +2,7 @@
  * Search panel UI, chunked result list, advanced syntax validation, history,
  * server-paged full search, and grid hit navigation.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, ApiClient, ToastFn } from '../contracts/common.ts';
 import type {
   SearchHit,
@@ -31,14 +32,14 @@ import {
 const CHUNK_SIZE = 200;
 
 const SNIPPETS: readonly (readonly [string, string])[] = [
-  ['并且', ' AND '],
-  ['或者', ' OR '],
-  ['排除', ' NOT '],
-  ['范围', ' BETWEEN 100 AND 200'],
-  ['多选', ' IN ("债券","基金")'],
-  ['空值', ' IS EMPTY'],
-  ['正则', '~"^BX[0-9]+$"'],
-  ['公式', 'formula:SUMIF'],
+  [localize('ui.searchPanel.and'), ' AND '],
+  [localize('ui.searchPanel.or'), ' OR '],
+  [localize('ui.searchPanel.exclude'), ' NOT '],
+  [localize('ui.searchPanel.range'), ' BETWEEN 100 AND 200'],
+  [localize('ui.searchPanel.multipleSelection'), ' IN ("A","B")'],
+  [localize('ui.searchPanel.nullValues'), ' IS EMPTY'],
+  [localize('ui.searchPanel.regularExpression'), '~"^BX[0-9]+$"'],
+  [localize('ui.common.formula'), 'formula:SUMIF'],
 ];
 
 /** @httpResponse SearchHistoryApiResponse */
@@ -173,7 +174,7 @@ export class SearchPanel {
     requireInput('searchResultFilter').value = '';
     requireSelect('searchResultSheet').value = '';
     requireEl('searchHistoryPanel').hidden = true;
-    requireEl('searchSummary').textContent = '输入内容并搜索';
+    requireEl('searchSummary').textContent = localize('ui.searchPanel.enterContentSearch');
   }
 
   async refreshHistory(): Promise<void> {
@@ -185,7 +186,7 @@ export class SearchPanel {
     if (!this.s.serverSearchHistory.length) {
       const message = document.createElement('div');
       message.className = 'history-empty';
-      message.textContent = '尚无已完成的搜索';
+      message.textContent = localize('ui.searchPanel.noCompletedSearchYet');
       list.append(message);
       return;
     }
@@ -194,21 +195,21 @@ export class SearchPanel {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'history-item';
-      button.title = `${item.query} · ${item.scope === 'all' ? '全部工作表' : item.sheet} · ${item.hits} 条`;
+      button.title = localize('ui.searchPanel.items', { query: item.query, detail: item.scope === 'all' ? localize('ui.common.allWorksheets') : item.sheet, hits: item.hits });
       const query = document.createElement('span');
       query.className = 'history-query';
       const modeLabel =
         item.mode === 'value'
-          ? '内容'
+          ? localize('ui.searchPanel.content')
           : item.mode === 'reference'
-            ? '引用'
+            ? localize('ui.searchPanel.reference')
             : item.mode === 'advanced'
-              ? '高级'
-              : '公式';
+              ? localize('ui.searchPanel.advanced')
+              : localize('ui.common.formula');
       query.textContent = `${modeLabel} · ${item.query}`;
       const meta = document.createElement('span');
       meta.className = 'history-meta';
-      meta.textContent = `${item.scope === 'all' ? '全表' : '当前表'} · ${item.hits} 条`;
+      meta.textContent = localize('ui.searchPanel.sentences', { detail: item.scope === 'all' ? localize('ui.searchPanel.fullTable') : localize('ui.searchPanel.currentTable'), hits: item.hits });
       button.append(query, meta);
       button.addEventListener('click', () => {
         requireEl('searchHistoryPanel').hidden = true;
@@ -240,7 +241,7 @@ export class SearchPanel {
     select.replaceChildren();
     const all = document.createElement('option');
     all.value = '';
-    all.textContent = '全部工作表';
+    all.textContent = localize('ui.common.allWorksheets');
     select.append(all);
     for (const sheet of this.s.sheets) {
       if (!names.has(sheet.name)) continue;
@@ -278,7 +279,7 @@ export class SearchPanel {
 
   copyVisible(): void {
     const matches = this.s.searchSession?.matches ?? [];
-    const rows: string[][] = [['Sheet', '单元格', '缓存值', '公式']];
+    const rows: string[][] = [['Sheet', localize('ui.common.cell'), localize('ui.searchPanel.cacheValue'), localize('ui.common.formula')]];
     const clean = (value: string | undefined): string =>
       (value ?? '').replaceAll('\t', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ');
     for (const i of this.s.visibleSearchIndexes) {
@@ -301,13 +302,13 @@ export class SearchPanel {
       url.searchParams.set('sheet', requireSelect('searchResultSheet').value);
       const link = document.createElement('a');
       link.href = url.href;
-      link.download = 'ExcelLens_搜索结果.csv';
+      link.download = localize('ui.searchPanel.excellensSearchResultsCsv');
       link.click();
       return;
     }
     const matches = this.s.searchSession?.matches ?? [];
     if (!this.s.visibleSearchIndexes.length) {
-      this.toast('没有可导出的搜索结果', 'warning');
+      this.toast(localize('ui.searchPanel.noSearchResultsExport'), 'warning');
       return;
     }
     const guard = (text: string | undefined): string => {
@@ -315,7 +316,7 @@ export class SearchPanel {
       if (/^\s*[=+\-@]/.test(value)) value = `'${value}`;
       return `"${value.replaceAll('"', '""')}"`;
     };
-    const rows: (string | undefined)[][] = [['工作表', '单元格', '缓存显示值', '原始公式']];
+    const rows: (string | undefined)[][] = [[localize('ui.searchPanel.worksheet'), localize('ui.common.cell'), localize('ui.searchPanel.cachedDisplayValue'), localize('ui.searchPanel.originalFormula')]];
     for (const i of this.s.visibleSearchIndexes) {
       const hit = matches[i];
       if (!hit) continue;
@@ -330,10 +331,10 @@ export class SearchPanel {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'ExcelLens_搜索结果.csv';
+    link.download = localize('ui.searchPanel.excellensSearchResultsCsv');
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
-    this.toast(`已导出 ${this.s.visibleSearchIndexes.length} 条结果`, 'success');
+    this.toast(localize('ui.searchPanel.resultsHaveExported', { count: this.s.visibleSearchIndexes.length }), 'success');
   }
 
   displaySummary(message: string): void {
@@ -369,7 +370,7 @@ export class SearchPanel {
     const feedback = requireEl('searchAdvancedFeedback');
     feedback.classList.remove('is-invalid');
     if (!source) {
-      feedback.textContent = '输入表达式，或选择下面的示例';
+      feedback.textContent = localize('ui.searchPanel.enterExpressionOrSelectExample');
       return;
     }
     this.syntaxTimer = setTimeout(() => {
@@ -382,7 +383,7 @@ export class SearchPanel {
           });
           if (token === this.syntaxSeq) {
             feedback.classList.remove('is-invalid');
-            feedback.textContent = '语法正确 · 运行时将逐行联合判断';
+            feedback.textContent = localize('ui.searchPanel.syntaxCorrectCombinedJudgmentWill');
           }
         } catch (e: unknown) {
           if (token === this.syntaxSeq) {
@@ -424,7 +425,7 @@ export class SearchPanel {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = f.name;
-        btn.title = `插入字段 ${f.id}`;
+        btn.title = localize('ui.searchPanel.insertField', { id: f.id });
         btn.addEventListener('click', () => this.insertAdvanced(`[${f.name}]:`, false));
         fragment.append(btn);
       }
@@ -449,7 +450,7 @@ export class SearchPanel {
       scopeEl.value = this.s.searchSession.scope;
       inputEl.value = this.s.searchSession.input;
       advEl.value = this.s.searchSession.input;
-      this.displaySummary(this.s.searchSession.summary || '搜索结果已保留');
+      this.displaySummary(this.s.searchSession.summary || localize('ui.searchPanel.searchResultsRetained'));
       if (!this.pages) {
         this.renderResults({
           matches: this.s.searchSession.matches,
@@ -477,7 +478,7 @@ export class SearchPanel {
     jobID: string,
     requestID: number,
     alreadyCached: boolean,
-    activity: ActivityHandle | null = beginActivity('正在搜索', { slot: 'searchActivity' }),
+    activity: ActivityHandle | null = beginActivity(localize('ui.common.searching'), { slot: 'searchActivity' }),
   ): Promise<void> {
     this.s.searchActivity = activity;
     try {
@@ -500,13 +501,13 @@ export class SearchPanel {
           return;
         }
         if (requestID !== this.s.searchRequestID || this.s.searchJob !== jobID) return;
-        activity?.report(data.progress, 100, data.stage || '正在搜索');
+        activity?.report(data.progress, 100, data.stage || localize('ui.common.searching'));
         if (data.full) {
           if (this.s.searchSession) this.s.searchSession.status = data.status;
           requireInput('searchFull').checked = true;
           const count = data.hitCount ?? 0;
           if (data.status === 'running') {
-            this.displaySummary(`${data.stage || '全量搜索'} · ${count} 条`);
+            this.displaySummary(localize('ui.searchPanel.sentencese87eb4f', { stage: data.stage || localize('ui.searchPanel.fullTextSearch'), count }));
             continue;
           }
           this.s.searchJob = null;
@@ -523,11 +524,11 @@ export class SearchPanel {
               text: '',
               sheet: '',
             };
-            this.displaySummary(`共 ${count} 条匹配`);
+            this.displaySummary(localize('ui.searchPanel.thereTotalMatches', { count }));
             this.buildSheetChoices(this.s.sheets.map((x) => ({ sheet: x.name })));
             await this.loadPage('reset');
           } else {
-            this.displaySummary(data.error || '全量搜索已取消');
+            this.displaySummary(data.error || localize('ui.searchPanel.fullSearchCanceled'));
           }
           return;
         }
@@ -552,11 +553,11 @@ export class SearchPanel {
         if (data.status === 'running') {
           if (data.scope === 'all') {
             this.displaySummary(
-              `${(data.progress || 0).toFixed(0)}% · ${data.stage || '搜索中'} · ${matches.length} 条`,
+              localize('ui.searchPanel.items80ed62a', { progress: (data.progress || 0).toFixed(0), stage: data.stage || localize('ui.searchPanel.searching'), count: matches.length }),
             );
           } else {
             this.displaySummary(
-              `${(data.progress || 0).toFixed(0)}% · ${data.scanned || 0}/${data.total || 0} 行 · ${matches.length} 条`,
+              localize('ui.searchPanel.rowsItems', { progress: (data.progress || 0).toFixed(0), scanned: data.scanned || 0, total: data.total || 0, count: matches.length }),
             );
           }
           continue;
@@ -573,10 +574,10 @@ export class SearchPanel {
             }
           }
           const elapsed = alreadyCached
-            ? ' · 本机缓存'
-            : ` · ${((data.durationMs || 0) / 1000).toFixed(2)}秒`;
+            ? ` ${localize('ui.searchPanel.localCache')}`
+            : ` ${localize('ui.searchPanel.seconds', { durationMs: ((data.durationMs || 0) / 1000).toFixed(2) })}`;
           this.displaySummary(
-            `${matches.length} 条匹配${data.truncated ? '（最多显示500条）' : ''}${elapsed}`,
+            localize('ui.searchPanel.itemsMatched', { count: matches.length, detail: data.truncated ? localize('ui.searchPanel.displayUpItems') : '', elapsed }),
           );
           if (!alreadyCached) {
             this.refreshHistory().catch(() => {
@@ -584,9 +585,9 @@ export class SearchPanel {
             });
           }
         } else if (data.status === 'cancelled') {
-          this.displaySummary('已取消搜索 · 已找到的结果仍可访问');
+          this.displaySummary(localize('ui.searchPanel.searchCanceledFoundResultsStill'));
         } else {
-          this.displaySummary(data.error || '搜索失败');
+          this.displaySummary(data.error || localize('ui.searchPanel.searchFailed'));
         }
         this.s.searchJob = null;
         requireButton('searchBtn').disabled = false;
@@ -638,8 +639,8 @@ export class SearchPanel {
     }
     requireEl('searchPaging').hidden = true;
     const copyBtn = requireButton('copySearchResultsBtn');
-    copyBtn.title = '复制结果';
-    copyBtn.setAttribute('aria-label', '复制结果');
+    copyBtn.title = localize('ui.searchPanel.copyResults');
+    copyBtn.setAttribute('aria-label', localize('ui.searchPanel.copyResults'));
   }
 
   async loadPage(move: 'reset' | 'next' | 'prev'): Promise<void> {
@@ -705,10 +706,10 @@ export class SearchPanel {
       requireButton('searchPagePrev').disabled = !previous.length;
       requireButton('searchPageNext').disabled = !page.more;
       requireEl('searchPageCount').textContent =
-        `第 ${previous.length + 1} 页 · ${matches.length} 条${page.previewClipped ? ' · 长文本预览已缩短' : ''}`;
+        localize('ui.searchPanel.pageRowColumn', { count: previous.length + 1, count2: matches.length, detail: page.previewClipped ? ` ${localize('ui.searchPanel.longTextPreviewShortened')}` : '' });
       const copyBtn = requireButton('copySearchResultsBtn');
-      copyBtn.title = '复制本页预览';
-      copyBtn.setAttribute('aria-label', '复制本页预览');
+      copyBtn.title = localize('ui.searchPanel.copyThisPagePreview');
+      copyBtn.setAttribute('aria-label', localize('ui.searchPanel.copyThisPagePreview'));
     } catch (error: unknown) {
       if (serial === this.pageSerial && !(error instanceof Error && error.name === 'AbortError')) {
         this.toast(errorMessage(error), 'error');
@@ -748,7 +749,7 @@ export class SearchPanel {
       this.renderedData = null;
       requireEl('searchVisibleCount').hidden = true;
       this.buildSheetChoices([]);
-      box.textContent = data.status === 'done' ? '没有找到匹配项' : '正在搜索…';
+      box.textContent = data.status === 'done' ? localize('ui.searchPanel.noMatchingItemsFound') : localize('ui.common.searching39739fa');
       this.updateNavButtons();
       return;
     }
@@ -758,15 +759,15 @@ export class SearchPanel {
     counter.hidden = false;
     counter.textContent =
       this.s.visibleSearchIndexes.length === matches.length
-        ? `${matches.length} 条结果`
-        : `显示 ${this.s.visibleSearchIndexes.length} / ${matches.length} 条结果`;
+        ? localize('ui.searchPanel.results', { count: matches.length })
+        : localize('ui.searchPanel.displayResults', { count: this.s.visibleSearchIndexes.length, count2: matches.length });
     const prevScroll = box.scrollTop;
     this.renderedData = data;
     this.renderedCount = 0;
     if (!this.s.visibleSearchIndexes.length) {
       const empty = document.createElement('div');
       empty.className = 'history-empty';
-      empty.textContent = '没有符合结果筛选条件的记录';
+      empty.textContent = localize('ui.searchPanel.noRecordsMatchingFilterConditions');
       box.replaceChildren(empty);
       this.updateNavButtons();
       return;

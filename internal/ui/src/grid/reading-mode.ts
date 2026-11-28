@@ -3,6 +3,7 @@
  * existing nodes; source values, styles, coordinates, and exports stay untouched.
  */
 
+import { t as localize } from '../core/i18n.ts';
 export type ReadingPresetId =
   | 'off'
   | 'warm'
@@ -25,19 +26,19 @@ interface ReadingPreset {
 }
 
 const PRESETS: Readonly<Record<ReadingPresetId, ReadingPreset>> = Object.freeze({
-  off: { name: '原色', color: '' },
-  warm: { name: '暖纸', color: '#f4eedf' },
-  green: { name: '浅绿', color: '#e5f0e4' },
-  mist: { name: '柔灰', color: '#e9edf2' },
-  blush: { name: '杏粉', color: '#f4e6e3' },
-  ice: { name: '冰蓝', color: '#e3eef7' },
-  lavender: { name: '淡紫', color: '#eee8f4' },
-  graphite: { name: '石墨', dark: true, color: '' },
-  navy: { name: '深蓝', dark: true, color: '' },
-  forest: { name: '墨绿', dark: true, color: '' },
-  warmdark: { name: '暖灰', dark: true, color: '' },
-  plum: { name: '紫夜', dark: true, color: '' },
-  brown: { name: '深棕', dark: true, color: '' },
+  off: { name: localize('ui.readingMode.primaryColors'), color: '' },
+  warm: { name: localize('ui.readingMode.warmPaper'), color: '#f4eedf' },
+  green: { name: localize('ui.readingMode.lightGreen'), color: '#e5f0e4' },
+  mist: { name: localize('ui.readingMode.softGray'), color: '#e9edf2' },
+  blush: { name: localize('ui.readingMode.apricotPowder'), color: '#f4e6e3' },
+  ice: { name: localize('ui.readingMode.iceBlue'), color: '#e3eef7' },
+  lavender: { name: localize('ui.readingMode.lightPurple'), color: '#eee8f4' },
+  graphite: { name: localize('ui.readingMode.graphite'), dark: true, color: '' },
+  navy: { name: localize('ui.readingMode.deepBlue'), dark: true, color: '' },
+  forest: { name: localize('ui.readingMode.darkGreen'), dark: true, color: '' },
+  warmdark: { name: localize('ui.readingMode.warmGray'), dark: true, color: '' },
+  plum: { name: localize('ui.readingMode.purpleNight'), dark: true, color: '' },
+  brown: { name: localize('ui.readingMode.deepBrown'), dark: true, color: '' },
 });
 
 const KEY = 'ExcelLens.readingPreset';
@@ -133,7 +134,7 @@ export class ReadingMode {
     this.veil.hidden = this.value === 'off' || Boolean(preset.dark);
     this.veil.style.backgroundColor = preset.color;
     this.button.classList.toggle('is-active', this.value !== 'off');
-    this.button.title = `护眼模式：${preset.name}`;
+    this.button.title = localize('ui.readingMode.eyeProtectionMode', { name: preset.name });
     this.button.setAttribute('aria-label', this.button.title);
     for (const input of this.panel.querySelectorAll<HTMLInputElement>(
       'input[name="readingPreset"]',

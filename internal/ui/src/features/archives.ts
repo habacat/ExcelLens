@@ -1,6 +1,7 @@
 /**
  * Archive member browser & streaming extraction dialog controller.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, ApiClient, AsyncJobProgress } from '../contracts/common.ts';
 import type { ArchiveListResponse, ArchiveMember } from '../contracts/features.ts';
 import type { ArchiveSummary, WorkbookStatusResponse } from '../contracts/workbook.ts';
@@ -169,7 +170,7 @@ export class Archives {
     notice.hidden = !summary?.notice;
     const btn = requireEl('archiveBtn');
     btn.hidden = !summary;
-    btn.title = summary ? `浏览 ${summary.name ?? ''}` : '浏览当前压缩包';
+    btn.title = summary ? localize('ui.archives.browsing', { detail: summary.name ?? '' }) : localize('ui.archives.viewCurrentCompressedPackage');
   }
 
   present(summary: ArchiveDescriptor | null | undefined): void {
@@ -194,7 +195,7 @@ export class Archives {
     const controller = new AbortController();
     this.controller = controller;
     this.error('');
-    requireEl('archiveSummary').textContent = '正在读取文件目录…';
+    requireEl('archiveSummary').textContent = localize('ui.archives.readingFileDirectory');
     try {
       const params = new URLSearchParams({
         id: this.archive.id,
@@ -242,23 +243,23 @@ export class Archives {
       const iconEl = document.createElement('span');
       iconEl.className = 'archive-file-kind';
       iconEl.textContent = item.archive
-        ? '压缩包'
+        ? localize('ui.archives.compressedPackage')
         : (item.name.split('.').pop() ?? '').toUpperCase();
       const content = document.createElement('span');
       content.className = 'archive-file-label';
       const slash = item.name.lastIndexOf('/');
       const name = document.createElement('strong');
       name.textContent = item.name.slice(slash + 1);
-      if (item.incomplete) name.textContent += '（不完整片段）';
+      if (item.incomplete) name.textContent += localize('ui.archives.incompleteFragment');
       const folder = document.createElement('span');
-      folder.textContent = slash < 0 ? '根目录' : item.name.slice(0, slash);
+      folder.textContent = slash < 0 ? localize('ui.archives.rootDirectory') : item.name.slice(0, slash);
       folder.title = item.name;
       content.append(name, folder);
       const size = document.createElement('span');
       size.className = 'archive-file-size';
-      size.textContent = item.size < 0 ? '按需读取' : this.fmtBytes(item.size);
+      size.textContent = item.size < 0 ? localize('ui.archives.readAsNeeded') : this.fmtBytes(item.size);
       if (item.incomplete) {
-        size.title = `现存 ${this.fmtBytes(item.size)} / 原声明 ${this.fmtBytes(item.declaredSize)}`;
+        size.title = localize('ui.archives.existingOriginalStatement', { fmtBytes: this.fmtBytes(item.size), fmtBytes2: this.fmtBytes(item.declaredSize) });
       }
       row.append(iconEl, content, size);
       fragment.append(row);
@@ -266,7 +267,7 @@ export class Archives {
     if (!this.items.length) {
       const empty = document.createElement('div');
       empty.className = 'archive-empty';
-      empty.textContent = '没有匹配的文件，请调整筛选条件。';
+      empty.textContent = localize('ui.archives.noMatchingFilesFoundAdjust');
       fragment.append(empty);
     }
     list.replaceChildren(fragment);
@@ -281,7 +282,7 @@ export class Archives {
     const allowPartial = requireInput('archiveAllowPartial');
     allowPartial.disabled = this.busy;
     const openBtn = requireButton('archiveOpen');
-    openBtn.textContent = partial ? '查看 TXT 片段' : '打开文件';
+    openBtn.textContent = partial ? localize('ui.archives.viewTxtSnippet') : localize('ui.archives.openFile');
     openBtn.disabled = this.busy || this.selected < 0 || (partial && !allowPartial.checked);
     requireInput('archiveSearch').disabled = this.busy;
     requireButton('archivePrev').disabled = this.busy || this.offset === 0;
@@ -289,8 +290,8 @@ export class Archives {
     requireButton('archiveCancel').disabled = !this.busy;
     requireEl('archiveList').setAttribute('aria-busy', String(this.busy));
     requireEl('archiveSummary').textContent = this.total
-      ? `${this.offset + 1}–${this.offset + this.items.length} / ${this.total} 个文件`
-      : '0 个匹配文件';
+      ? localize('ui.archives.files', { offset: this.offset + 1, count: this.offset + this.items.length, total: this.total })
+      : localize('ui.archives.matchingFiles');
   }
 
   select(id: number, scroll = true): void {
@@ -331,7 +332,7 @@ export class Archives {
   async cancel(): Promise<void> {
     if (!this.job) return;
     requireButton('archiveCancel').disabled = true;
-    requireEl('archiveStage').textContent = '正在取消读取…';
+    requireEl('archiveStage').textContent = localize('ui.archives.cancelingRead');
     try {
       await this.api(`/api/archive/job?id=${encodeURIComponent(this.job)}`, { method: 'POST' });
     } catch (error: unknown) {
@@ -345,17 +346,17 @@ export class Archives {
     const partial = Boolean(this.items.find((item) => item.id === this.selected)?.incomplete);
     const allowPartial = requireInput('archiveAllowPartial');
     if (partial && !allowPartial.checked) {
-      this.error('该 TXT 不完整，请先勾选「仅查看现存 TXT 片段」。');
+      this.error(localize('ui.archives.thisTxtIncompleteFirstCheck'));
       return;
     }
     const operation = ++this.operation;
-    const activity = beginActivity('正在读取压缩包', { slot: 'archiveActivity' });
+    const activity = beginActivity(localize('ui.archives.compressedFilesBeingRead'), { slot: 'archiveActivity' });
     this.activity = activity;
     this.busy = true;
     this.error('');
     this.controls();
     requireEl('archiveProgress').hidden = false;
-    requireEl('archiveStage').textContent = '正在准备读取…';
+    requireEl('archiveStage').textContent = localize('ui.archives.preparingRead');
     const bar = requireEl('archiveBar');
     bar.removeAttribute('value');
     try {
@@ -393,9 +394,9 @@ export class Archives {
         } else {
           bar.removeAttribute('value');
         }
-        if (state.status === 'error') throw new Error(state.error || '读取失败');
+        if (state.status === 'error') throw new Error(state.error || localize('ui.archives.readingFailure'));
         if (state.status === 'cancelled') {
-          this.error('读取已取消。可以选择其他文件。');
+          this.error(localize('ui.archives.readingCanceledCanChooseAnother'));
           break;
         }
         if (state.status === 'done') {

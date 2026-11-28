@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 	"excellens/internal/checkpoint"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 type taskCheckpointRequest struct {
@@ -131,7 +131,7 @@ func readTaskCheckpointRequest(w http.ResponseWriter, r *http.Request) (taskChec
 	defer r.Body.Close()
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CheckpointRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || len(req.ID) != 32 {
-		return req, errors.New("任务恢复请求无效")
+		return req, i18n.Error("service.taskCheckpoint.taskRecoveryRequestInvalid")
 	}
 	return req, nil
 }
@@ -143,12 +143,12 @@ func (a *App) handleTaskCheckpointResume(w http.ResponseWriter, r *http.Request)
 	}
 	req, err := readTaskCheckpointRequest(w, r)
 	if err != nil || req.Revision == 0 {
-		writeError(w, 400, "任务恢复请求无效，请刷新后重试")
+		writeMessage(w, 400, "service.taskCheckpoint.taskRecoveryRequestInvalidRefresh")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.Book != sourceBookID(wb) || req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "请先打开任务的原始来源")
+		writeMessage(w, 409, "service.taskCheckpoint.openOriginalSourceTaskFirst")
 		return
 	}
 	if !a.admitCheckpoint(w) {
@@ -239,7 +239,7 @@ func (a *App) handleTaskCheckpointResume(w http.ResponseWriter, r *http.Request)
 		queue(lease)
 		return
 	}
-	writeError(w, 404, "恢复任务不存在")
+	writeMessage(w, 404, "service.taskCheckpoint.recoveryTaskDoesNotExist")
 }
 
 func (a *App) handleTaskCheckpointDiscard(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +249,7 @@ func (a *App) handleTaskCheckpointDiscard(w http.ResponseWriter, r *http.Request
 	}
 	req, err := readTaskCheckpointRequest(w, r)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	if !a.admitCheckpoint(w) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -82,17 +83,17 @@ func (a *App) handleBackground(w http.ResponseWriter, r *http.Request) {
 	a.sessionGate.Lock()
 	defer a.sessionGate.Unlock()
 	if a.restoreState.pending() {
-		writeError(w, 503, "请先完成恢复事务")
+		writeMessage(w, 503, "service.background.completeRestorationProcessFirst")
 		return
 	}
 	if r.Method == http.MethodPost {
 		var cmd struct{ Action, Session, ID, Kind string }
 		if err := decodeAnalysis(r, &cmd); err != nil {
-			writeError(w, 400, "后台任务参数无效")
+			writeMessage(w, 400, "service.background.invalidBackendTaskParameters")
 			return
 		}
 		if err := a.manageBackground(cmd.Action, cmd.Session, cmd.Kind, cmd.ID, r.Header.Get("X-ExcelLens-Session")); err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		writeJSON(w, map[string]bool{"ok": true})
@@ -112,6 +113,9 @@ func (a *App) handleBackground(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	slices.SortFunc(items, func(a, b backgroundItem) int { return b.Created.Compare(a.Created) })
+	for i := range items {
+		items[i].Stage = responseLocale(w).Stage(items[i].Stage)
+	}
 	writeJSON(w, map[string]any{"items": items, "sessions": sessions})
 }
 
@@ -130,13 +134,13 @@ func (a *App) manageBackground(action, sid, kind, id, requester string) error {
 	s := a.sessions[sid]
 	if s == nil {
 		a.sessionsMu.Unlock()
-		return errors.New("任务会话已释放")
+		return i18n.Error("service.background.taskSessionReleased")
 	}
 	if action == "release" {
 		running, _ := s.work.State(time.Now())
 		if !s.lease.Idle(time.Now()) || running {
 			a.sessionsMu.Unlock()
-			return errors.New("请先关闭标签页并取消或等待运行中的任务")
+			return i18n.Error("service.background.closeTabFirstCancelOr")
 		}
 		delete(a.sessions, sid)
 		a.sessionsMu.Unlock()

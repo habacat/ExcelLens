@@ -3,6 +3,7 @@
  * Never stores spreadsheet content, never accesses the network outside localhost,
  * and never assumes a missing file is safe to delete automatically.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { RecentEntry } from '../contracts/features.ts';
 import { errorMessage, formatBytes, icon } from '../core/display-format.ts';
@@ -62,31 +63,31 @@ export class RecentWorkbooks {
 
   prettyDate(raw: string, now = Date.now()): string {
     const timestamp = Date.parse(raw);
-    if (!Number.isFinite(timestamp)) return '时间未知';
+    if (!Number.isFinite(timestamp)) return localize('ui.recent.timeUnknown');
     const age = Math.max(0, now - timestamp);
     const minute = 60000;
     const hour = 60 * minute;
     const day = 24 * hour;
-    if (age < minute) return '刚刚';
-    if (age < hour) return `${Math.max(1, Math.floor(age / minute))}分钟前`;
-    if (age < day) return `${Math.max(1, Math.floor(age / hour))}小时前`;
-    if (age < 30 * day) return `${Math.max(1, Math.floor(age / day))}天前`;
+    if (age < minute) return localize('ui.recent.justNow');
+    if (age < hour) return localize('ui.recent.minutesAgo', { value: Math.max(1, Math.floor(age / minute)) });
+    if (age < day) return localize('ui.recent.hoursAgo', { value: Math.max(1, Math.floor(age / hour)) });
+    if (age < 30 * day) return localize('ui.recent.daysBefore', { value: Math.max(1, Math.floor(age / day)) });
     const date = new Date(timestamp);
     const today = new Date(now);
     const months =
       (today.getFullYear() - date.getFullYear()) * 12 + today.getMonth() - date.getMonth();
-    if (months === 1) return '上个月';
-    if (months >= 2 && months < 12 && age < 365 * day) return `${months}个月前`;
-    if (age < 60 * day) return '上个月';
-    if (age < 365 * day) return `${Math.max(2, Math.floor(age / (30 * day)))}个月前`;
-    return '很久以前';
+    if (months === 1) return localize('ui.recent.lastMonth');
+    if (months >= 2 && months < 12 && age < 365 * day) return localize('ui.recent.monthsAgo', { months });
+    if (age < 60 * day) return localize('ui.recent.lastMonth');
+    if (age < 365 * day) return localize('ui.recent.monthsAgo758e818', { value: Math.max(2, Math.floor(age / (30 * day))) });
+    return localize('ui.recent.longTimeAgo');
   }
 
   exactDate(raw: string): string {
     const date = new Date(raw);
     return Number.isNaN(date.getTime())
-      ? '时间未知'
-      : new Intl.DateTimeFormat('zh-CN', {
+      ? localize('ui.recent.timeUnknown')
+      : new Intl.DateTimeFormat(interfaceLocale(), {
           year: 'numeric',
           month: '2-digit',
           day: '2-digit',
@@ -117,7 +118,7 @@ export class RecentWorkbooks {
       this.render();
     } catch (error: unknown) {
       if (ticket !== this.ticket) return;
-      this.list.replaceChildren(this.empty(`最近文件读取失败：${errorMessage(error)}`));
+      this.list.replaceChildren(this.empty(localize('ui.recent.failureReadLatestFile', { detail: errorMessage(error) })));
     }
   }
 
@@ -160,14 +161,14 @@ export class RecentWorkbooks {
       if (latest?.id === item.id) {
         const tag = document.createElement('span');
         tag.className = 'recent-last-tag';
-        tag.textContent = '上次打开';
-        tag.title = '最近一次打开的工作簿';
+        tag.textContent = localize('ui.recent.lastOpen');
+        tag.title = localize('ui.recent.lastWorkbookOpened');
         title.append(tag);
       }
       const meta = document.createElement('div');
       meta.className = 'recent-meta';
       const one = document.createElement('span');
-      one.textContent = item.available ? `${item.sheetCount} 张表` : '文件已移动或删除';
+      one.textContent = item.available ? localize('ui.recent.table', { sheetCount: item.sheetCount }) : localize('ui.recent.fileMovedOrDeleted');
       const two = document.createElement('span');
       two.textContent = item.archiveName ? `${item.archiveName} / ${item.name}` : item.path;
       two.title = item.archivePath || item.path;
@@ -181,12 +182,12 @@ export class RecentWorkbooks {
       date.dataset.openedAt = item.openedAt;
       date.textContent = this.prettyDate(item.openedAt, now);
       const exact = this.exactDate(item.openedAt);
-      date.title = `打开时间：${exact}`;
-      date.setAttribute('aria-label', `打开时间：${exact}`);
+      date.title = localize('ui.recent.openingTime', { exact });
+      date.setAttribute('aria-label', localize('ui.recent.openingTime', { exact }));
       const size = document.createElement('span');
       size.className = 'recent-size';
       size.textContent = this.formatSize(item.fileSize);
-      size.title = size.textContent === '—' ? '原文件大小未知' : `原文件大小：${size.textContent}`;
+      size.title = size.textContent === '—' ? localize('ui.recent.originalFileSizeUnknown') : localize('ui.recent.originalFileSize', { textContent: size.textContent });
 
       const buttons = document.createElement('div');
       buttons.className = 'recent-controls';
@@ -195,28 +196,28 @@ export class RecentWorkbooks {
       pin.className = `recent-action${item.pinned ? ' is-pinned' : ''}`;
       pin.dataset.action = 'pin';
       pin.innerHTML = icon('pin');
-      pin.title = item.pinned ? '取消置顶' : '置顶';
+      pin.title = item.pinned ? localize('ui.recent.unpin') : localize('ui.recent.pinned');
       pin.setAttribute('aria-label', pin.title);
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'recent-action';
       remove.dataset.action = 'remove';
       remove.innerHTML = icon('x');
-      remove.title = '从列表移除（不删除文件）';
+      remove.title = localize('ui.recent.removedFromListFileNot');
       remove.setAttribute('aria-label', remove.title);
       buttons.append(pin, remove);
       side.append(date, size, buttons);
       btn.append(fileIcon, content, side);
       btn.setAttribute('role', 'button');
       btn.tabIndex = 0;
-      btn.title = item.available ? '' : '文件不在原位置，请重新选择文件';
+      btn.title = item.available ? '' : localize('ui.recent.fileNotOriginalLocationSelect');
       frag.appendChild(btn);
     }
     if (!matching.length) {
-      frag.appendChild(this.empty(q ? '没有匹配的文件' : '打开过的文件会列在这里'));
+      frag.appendChild(this.empty(q ? localize('ui.recent.noMatchingFilesFound') : localize('ui.recent.filesThatHaveOpenedWill')));
     }
     this.list.replaceChildren(frag);
-    requireEl('recentSummary').textContent = this.items.length ? `共 ${this.items.length} 个文件` : '';
+    requireEl('recentSummary').textContent = this.items.length ? localize('ui.recent.totalFiles', { count: this.items.length }) : '';
   }
 
   async handleClick(event: MouseEvent): Promise<void> {
@@ -228,7 +229,7 @@ export class RecentWorkbooks {
     if (!entry) return;
     const action = target?.closest<HTMLElement>('[data-action]')?.dataset.action || 'open';
     if (action === 'open' && !entry.available) {
-      this.toast('文件已移动或删除，可移除该记录后重新选择文件', 'warning');
+      this.toast(localize('ui.recent.fileMovedOrDeletedCan'), 'warning');
       return;
     }
     this.busy = true;

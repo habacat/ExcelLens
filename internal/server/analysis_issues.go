@@ -3,8 +3,7 @@ package server
 import (
 	"context"
 	"encoding/csv"
-	"errors"
-	"fmt"
+
 	"net/http"
 	"os"
 	"strings"
@@ -12,10 +11,11 @@ import (
 
 	"excellens/internal/analysis"
 	excelExport "excellens/internal/export"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
-var errAnalysisSourceChanged = errors.New("分析来源已修改，请重新运行分析后提取异常明细")
+var errAnalysisSourceChanged = i18n.Error("service.analysisIssues.analysisSourceModifiedRunAnalysis")
 
 type issueSnapshot struct {
 	query analysis.Query
@@ -40,12 +40,12 @@ func (a *App) handleAnalysisIssuesExport(w http.ResponseWriter, r *http.Request)
 		ProtectCSV bool   `json:"protectCSV"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "异常清单导出参数无效")
+		writeMessage(w, 400, "service.analysisIssues.invalidExportParametersExceptionList")
 		return
 	}
 	snapshot, err := a.issueSnapshot(wb, req.JobID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	job, err := a.newExportJob(wb, "csv")
@@ -90,7 +90,7 @@ func (a *App) runIssuesExport(job *ExportJob, snapshot issueSnapshot, protect bo
 	}
 	defer src.close()
 	job.mu.Lock()
-	job.Status, job.Stage, job.TotalRows = "running", "正在导出完整异常清单", snapshot.count
+	job.Status, job.Stage, job.TotalRows = "running", "stage.task.exportingCompleteExceptionList", snapshot.count
 	job.mu.Unlock()
 	name := safeExportBase(job.wb.DisplayName) + "_异常清单_" + time.Now().Format("20060102_150405") + "_" + job.ID[:6] + ".csv"
 	var written int64
@@ -137,7 +137,7 @@ func (a *App) runIssuesExport(job *ExportJob, snapshot issueSnapshot, protect bo
 			return err
 		}
 		if written != snapshot.count {
-			return fmt.Errorf("异常项目数量与分析结果不一致（%d / %d），请重新分析", written, snapshot.count)
+			return i18n.Error("service.analysisIssues.numberAbnormalItemsAnalysisResults", i18n.Args{"written": written, "count": snapshot.count})
 		}
 		out.Flush()
 		return out.Error()
@@ -147,7 +147,7 @@ func (a *App) runIssuesExport(job *ExportJob, snapshot issueSnapshot, protect bo
 		return
 	}
 	job.mu.Lock()
-	job.Status, job.Stage, job.Progress = "done", "完整异常清单导出完成", 100
+	job.Status, job.Stage, job.Progress = "done", "stage.task.completeExceptionListExported", 100
 	job.DoneRows, job.Finished = written, time.Now()
 	job.mu.Unlock()
 }
@@ -155,12 +155,12 @@ func (a *App) runIssuesExport(job *ExportJob, snapshot issueSnapshot, protect bo
 func (a *App) issueSnapshot(wb *workbook.Workbook, id string) (issueSnapshot, error) {
 	job := a.getAnalysisJob(id)
 	if job == nil || job.Workbook != wb {
-		return issueSnapshot{}, errors.New("分析任务已过期，请重新运行分析")
+		return issueSnapshot{}, i18n.Error("service.analysisIssues.analysisTaskExpiredRunAnalysis")
 	}
 	job.mu.RLock()
 	defer job.mu.RUnlock()
 	if job.Status != "done" || job.SourceStamp == "" {
-		return issueSnapshot{}, errors.New("分析尚未完成")
+		return issueSnapshot{}, i18n.Error("service.analysisIssues.analysisNotCompletedYet")
 	}
 	var rows *analysisSourceSnapshot
 	if job.Query.SourceScope != nil || job.Query.Composition != nil {
@@ -213,12 +213,12 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 		Limit int    `json:"limit"`
 	}
 	if decodeAnalysis(r, &req) != nil || !analysis.NameValid(req.Name) || req.Limit < 1 || req.Limit > analysis.MaxSheetRows {
-		writeError(w, 400, "异常明细提取参数无效（最多10,000项）")
+		writeMessage(w, 400, "service.analysisIssues.exceptionDetailsExtractionParametersInvalid")
 		return
 	}
 	snapshot, err := a.issueSnapshot(wb, req.JobID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
@@ -226,12 +226,12 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 	case a.analysisSem <- struct{}{}:
 		defer func() { <-a.analysisSem }()
 	case <-r.Context().Done():
-		writeError(w, 408, "异常明细提取已取消")
+		writeMessage(w, 408, "service.analysisIssues.exceptionDetailsExtractionCanceled")
 		return
 	}
 	release, err := a.acquireAnalysisQuerySlot(r.Context(), snapshot.query.Source, false)
 	if err != nil {
-		writeError(w, 408, "异常明细提取已取消")
+		writeMessage(w, 408, "service.analysisIssues.exceptionDetailsExtractionCanceled")
 		return
 	}
 	defer release()
@@ -245,7 +245,7 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 	src.close()
 	a.cacheMu.RUnlock()
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	provenance := issueProvenance(wb, snapshot)
@@ -257,7 +257,7 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 	id := randomID()
 	err = a.editAnalysis(wb, func(ws *analysis.Workspace) error {
 		if len(ws.Sheets) >= analysis.MaxSheets {
-			return errors.New("编辑表数量超过40")
+			return i18n.Error("service.analysisIssues.editingTablesExceeds")
 		}
 		if err := r.Context().Err(); err != nil {
 			return err
@@ -266,7 +266,7 @@ func (a *App) handleAnalysisIssuesMaterialize(w http.ResponseWriter, r *http.Req
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": id, "rows": len(rows), "total": snapshot.count, "truncated": truncated})

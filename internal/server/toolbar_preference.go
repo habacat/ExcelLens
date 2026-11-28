@@ -1,12 +1,13 @@
 package server
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"excellens/internal/i18n"
 )
 
 type toolbarPreference struct {
@@ -67,7 +68,7 @@ func (a *App) RibbonLayout() (bool, error) {
 		return false, err
 	}
 	if found && value == nil {
-		return false, errors.New("工具栏布局设置无效")
+		return false, i18n.Error("service.toolbarPreference.toolbarLayoutSettingsInvalid")
 	}
 	pref.ribbon = value != nil && *value
 	pref.loaded = true
@@ -79,7 +80,7 @@ func (a *App) SetRibbonLayout(ribbon bool) error {
 	pref.mu.Lock()
 	defer pref.mu.Unlock()
 	if a.rootApp().restoreState.pending() {
-		return errors.New("请先完成恢复事务")
+		return i18n.Error("service.toolbarPreference.completeRestorationProcessFirst")
 	}
 	if pref.loaded && pref.ribbon == ribbon {
 		return nil
@@ -101,11 +102,30 @@ func (a *App) SetRibbonLayout(ribbon bool) error {
 
 const interfaceWaitTimeout = 25 * time.Second
 
+type interfaceSettings struct {
+	Ribbon         bool        `json:"ribbon"`
+	CacheEpoch     uint64      `json:"cacheEpoch"`
+	Language       i18n.Locale `json:"language"`
+	LanguageChoice i18n.Locale `json:"languageChoice"`
+}
+
+func (a *App) readInterfaceSettings(r *http.Request) (interfaceSettings, error) {
+	ribbon, err := a.RibbonLayout()
+	if err != nil {
+		return interfaceSettings{}, err
+	}
+	choice := a.DisplayLanguageChoice()
+	return interfaceSettings{
+		Ribbon: ribbon, CacheEpoch: a.cacheEpoch.Load(),
+		Language: negotiatePageLocale(r, choice), LanguageChoice: choice,
+	}, nil
+}
+
 func (a *App) handleInterfaceSettings(w http.ResponseWriter, r *http.Request) {
 	root := a.rootApp()
 	if root.restoreState.pending() {
 		w.Header().Set("X-ExcelLens-Recovery", "required")
-		writeError(w, http.StatusServiceUnavailable, "恢复事务尚未完成，请从本地数据重试迁入")
+		writeMessage(w, http.StatusServiceUnavailable, "service.toolbarPreference.restorationTaskNotCompletedYet")
 		return
 	}
 	switch r.Method {
@@ -116,29 +136,38 @@ func (a *App) handleInterfaceSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	case http.MethodPost:
 		var req struct {
-			Ribbon *bool `json:"ribbon"`
+			Ribbon   *bool   `json:"ribbon"`
+			Language *string `json:"language"`
 		}
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1024))
-		if err != nil || decodeSavedConfig(data, &req) != nil || req.Ribbon == nil {
-			writeError(w, http.StatusBadRequest, "请选择工具栏布局")
+		if err != nil || decodeSavedConfig(data, &req) != nil || (req.Ribbon == nil) == (req.Language == nil) {
+			writeMessage(w, http.StatusBadRequest, "service.toolbarPreference.selectToolbarLayout")
 			return
 		}
-		if err := a.SetRibbonLayout(*req.Ribbon); err != nil {
-			writeError(w, http.StatusInternalServerError, "保存工具栏布局失败："+err.Error())
+		if req.Language != nil {
+			language := i18n.Locale(*req.Language)
+			if language != "" && !i18n.Supported(*req.Language) {
+				writeMessage(w, http.StatusBadRequest, "service.language.invalid")
+				return
+			}
+			if err := a.SetDisplayLanguage(language); err != nil {
+				writeFailure(w, http.StatusInternalServerError, err)
+				return
+			}
+		} else if err := a.SetRibbonLayout(*req.Ribbon); err != nil {
+			writeMessage(w, http.StatusInternalServerError, "service.toolbarPreference.failedSaveToolbarLayout", i18n.Args{"detail": err})
 			return
 		}
 	default:
 		methodNotAllowed(w)
 		return
 	}
-	ribbon, err := a.RibbonLayout()
+	settings, err := root.readInterfaceSettings(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取工具栏布局失败："+err.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.toolbarPreference.failedReadToolbarLayout", i18n.Args{"detail": err})
 		return
 	}
-	epoch := root.cacheEpoch.Load()
-	w.Header().Set("X-ExcelLens-Cache-Epoch", strconv.FormatUint(epoch, 10))
-	writeJSON(w, map[string]any{"ribbon": ribbon, "cacheEpoch": epoch})
+	writeInterfaceSettings(w, settings)
 }
 
 func (a *App) handleInterfaceWait(w http.ResponseWriter, r *http.Request) {
@@ -147,17 +176,18 @@ func (a *App) handleInterfaceWait(w http.ResponseWriter, r *http.Request) {
 	clientRibbon, hasRibbon := parseQueryBool(q.Get("ribbon"))
 	clientEpoch, errEpoch := strconv.ParseUint(q.Get("epoch"), 10, 64)
 	hasEpoch := errEpoch == nil
+	clientLanguage := q.Get("language")
 
-	// Subscribe BEFORE inspecting state so no layout or cache-epoch change can
-	// slip in between the check and the select wait.
+	// Subscribe before reading the settings to avoid missing a change.
 	ch, open := root.toolbar.waitChannel()
-	ribbon, err := a.RibbonLayout()
+	settings, err := root.readInterfaceSettings(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取工具栏布局失败："+err.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.toolbarPreference.failedReadToolbarLayout", i18n.Args{"detail": err})
 		return
 	}
-	epoch := root.cacheEpoch.Load()
-	if open && (!hasRibbon || ribbon == clientRibbon) && (!hasEpoch || epoch == clientEpoch) {
+	if open && (!hasRibbon || settings.Ribbon == clientRibbon) && (!hasEpoch || settings.CacheEpoch == clientEpoch) &&
+		(clientLanguage == "" || clientLanguage == string(settings.Language)) &&
+		(!q.Has("languageChoice") || q.Get("languageChoice") == string(settings.LanguageChoice)) {
 		timer := time.NewTimer(interfaceWaitTimeout)
 		defer timer.Stop()
 		select {
@@ -169,14 +199,17 @@ func (a *App) handleInterfaceWait(w http.ResponseWriter, r *http.Request) {
 		if r.Context().Err() != nil {
 			return
 		}
-		if ribbon, err = a.RibbonLayout(); err != nil {
-			writeError(w, http.StatusInternalServerError, "读取工具栏布局失败："+err.Error())
+		if settings, err = root.readInterfaceSettings(r); err != nil {
+			writeMessage(w, http.StatusInternalServerError, "service.toolbarPreference.failedReadToolbarLayout", i18n.Args{"detail": err})
 			return
 		}
-		epoch = root.cacheEpoch.Load()
 	}
-	w.Header().Set("X-ExcelLens-Cache-Epoch", strconv.FormatUint(epoch, 10))
-	writeJSON(w, map[string]any{"ribbon": ribbon, "cacheEpoch": epoch})
+	writeInterfaceSettings(w, settings)
+}
+
+func writeInterfaceSettings(w http.ResponseWriter, settings interfaceSettings) {
+	w.Header().Set("X-ExcelLens-Cache-Epoch", strconv.FormatUint(settings.CacheEpoch, 10))
+	writeJSON(w, settings)
 }
 
 func parseQueryBool(value string) (bool, bool) {

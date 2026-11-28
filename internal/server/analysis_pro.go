@@ -10,6 +10,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 // Batch writes implement optimistic concurrency. Clients with an outdated
@@ -30,15 +31,15 @@ func (a *App) handleAnalysisBatch(w http.ResponseWriter, r *http.Request) {
 		Changes          []analysis.CellChange `json:"changes"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "修改内容不合法")
+		writeMessage(w, 400, "service.analysisPro.invalidContentModification")
 		return
 	}
 	if req.ExpectedRevision == nil {
-		writeError(w, 400, "必须携带预期版本号")
+		writeMessage(w, 400, "service.analysisPro.expectedVersionNumberMustBe")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，编辑草稿未写入")
+		writeMessage(w, 409, "service.analysisPro.workbookSwitchedEditingDraftsNot")
 		return
 	}
 	var previous []analysis.CellChange
@@ -46,7 +47,7 @@ func (a *App) handleAnalysisBatch(w http.ResponseWriter, r *http.Request) {
 	err := a.editAnalysis(wb, func(ws *analysis.Workspace) error {
 		sheet := ws.Sheet(req.ID)
 		if sheet == nil {
-			return errors.New("编辑表不存在")
+			return i18n.Error("service.analysisPro.tableDoesNotExist")
 		}
 		if sheet.Revision != *req.ExpectedRevision {
 			return errAnalysisRevision
@@ -59,11 +60,11 @@ func (a *App) handleAnalysisBatch(w http.ResponseWriter, r *http.Request) {
 		return applyErr
 	})
 	if errors.Is(err, errAnalysisRevision) {
-		writeError(w, 409, "编辑表已被其他操作修改，请刷新后重试")
+		writeMessage(w, 409, "service.analysisPro.tableModifiedOtherOperationsRefresh")
 		return
 	}
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"saved": true, "revision": revision, "previous": previous})
@@ -85,11 +86,11 @@ func (a *App) handleAnalysisAppendRows(w http.ResponseWriter, r *http.Request) {
 		Count            int    `json:"count"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil || req.ExpectedRevision == nil {
-		writeError(w, 400, "追加行参数或预期版本无效")
+		writeMessage(w, 400, "service.analysisPro.appendedRowParameterOrExpected")
 		return
 	}
 	if req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，未追加行")
+		writeMessage(w, 409, "service.analysisPro.workbookSwitchedNoNewRows")
 		return
 	}
 	var revision int64
@@ -97,7 +98,7 @@ func (a *App) handleAnalysisAppendRows(w http.ResponseWriter, r *http.Request) {
 	err := a.editAnalysis(wb, func(ws *analysis.Workspace) error {
 		s := ws.Sheet(req.ID)
 		if s == nil {
-			return errors.New("编辑表不存在")
+			return i18n.Error("service.analysisPro.tableDoesNotExist")
 		}
 		if s.Revision != *req.ExpectedRevision {
 			return errAnalysisRevision
@@ -109,11 +110,11 @@ func (a *App) handleAnalysisAppendRows(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, errAnalysisRevision) {
-		writeError(w, 409, "编辑表已变化，请刷新后追加行")
+		writeMessage(w, 409, "service.analysisPro.editedTableChangedRefreshPage")
 		return
 	}
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"revision": revision, "total": total})
@@ -141,7 +142,7 @@ func (a *App) handleAnalysisBackup(w http.ResponseWriter, r *http.Request) {
 		ws, err := a.loadAnalysis(wb)
 		a.analysisMu.Unlock()
 		if err != nil {
-			writeError(w, 500, err.Error())
+			writeFailure(w, 500, err)
 			return
 		}
 		w.Header().Set("Content-Disposition", `attachment; filename="ExcelLens_analysis_backup.json"`)
@@ -150,20 +151,20 @@ func (a *App) handleAnalysisBackup(w http.ResponseWriter, r *http.Request) {
 		var backup analysisBackup
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, analysis.MaxWorkspaceBytes+(1<<20)))
 		if err := decoder.Decode(&backup); err != nil {
-			writeError(w, 400, "备份文件无法解析或超过大小限制")
+			writeMessage(w, 400, "service.analysisPro.backupFileCannotBeParsed")
 			return
 		}
 		if backup.Format != "ExcelLens-Analysis-v1" || backup.Fingerprint != wb.Fingerprint {
-			writeError(w, 400, "备份的原始工作簿与当前文件不匹配")
+			writeMessage(w, 400, "service.analysisPro.backupOriginalWorkbookDoesNot")
 			return
 		}
 		if err := analysis.ValidateWorkspace(backup.Workspace); err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 		err := a.editAnalysis(wb, func(ws *analysis.Workspace) error { *ws = backup.Workspace; return nil })
 		if err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 		writeJSON(w, map[string]bool{"restored": true})
@@ -186,13 +187,13 @@ func (a *App) handleAnalysisProfile(w http.ResponseWriter, r *http.Request) {
 	case a.analysisSem <- struct{}{}:
 		defer func() { <-a.analysisSem }()
 	case <-r.Context().Done():
-		writeError(w, 408, "字段画像已取消")
+		writeMessage(w, 408, "service.analysisPro.fieldImageCanceled")
 		return
 	}
 	source := r.URL.Query().Get("source")
 	release, err := a.acquireAnalysisQuerySlot(r.Context(), source, false)
 	if err != nil {
-		writeError(w, 408, "字段画像已取消")
+		writeMessage(w, 408, "service.analysisPro.fieldImageCanceled")
 		return
 	}
 	defer release()
@@ -202,7 +203,7 @@ func (a *App) handleAnalysisProfile(w http.ResponseWriter, r *http.Request) {
 	defer a.cacheMu.RUnlock()
 	src, err := a.sourceRequest(r.Context(), wb, source, header, r.URL.Query().Get("sourceId"))
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	defer src.close()
@@ -216,7 +217,7 @@ func (a *App) handleAnalysisProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !valid {
-		writeError(w, 400, "字段不存在")
+		writeMessage(w, 400, "service.analysisPro.fieldDoesNotExist")
 		return
 	}
 	const maxUnique = 50000
@@ -271,7 +272,7 @@ func (a *App) handleAnalysisProfile(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if scanErr != nil {
-		writeError(w, 500, scanErr.Error())
+		writeFailure(w, 500, scanErr)
 		return
 	}
 	type item struct {

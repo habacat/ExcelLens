@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -45,7 +46,7 @@ type recordResponse struct {
 	Notices      []string      `json:"notices"`
 }
 
-var errRecordCapacity = errors.New("本页字段内容超过记录卡字节容量，请减少字段数或使用导出")
+var errRecordCapacity = i18n.Error("service.record.fieldContentOnThisPage")
 
 // The existing row-view identity binds the exact source/index and its order.
 // A card has no independent full-table mapping, background job or row cache.
@@ -58,34 +59,34 @@ func (a *App) handleRecord(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.RecordCardRequestBytes))
 	var req recordRequest
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.ViewID == "" || req.Sheet == "" || req.Row < 1 || req.HeaderRow < 0 || req.FirstColumn < 1 || req.Columns < 1 || req.Columns > formats.RecordCardColumns || req.PinnedThroughRow < 0 || req.PinnedThroughRow > 30 {
-		writeError(w, 400, "记录卡参数无效，请重新选择记录")
+		writeMessage(w, 400, "service.record.recordCardParametersInvalidReselect")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "记录来源已切换，请重新打开记录卡")
+		writeMessage(w, 409, "service.record.recordSourceSwitchedReopenRecord")
 		return
 	}
 	releaseCapture := a.lockCacheRead()
 	defer releaseCapture()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "记录卡工作表不存在")
+		writeMessage(w, 404, "service.record.recordCardWorksheetDoesNot")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先完成工作表索引")
+		writeMessage(w, 409, "service.record.completeWorksheetIndexingFirst")
 		return
 	}
 	source, supported := formats.Lookup(wb.Format)
 	if !supported || req.Row > idx.MaxRow || req.HeaderRow > source.MaxRows || req.FirstColumn > idx.MaxCol || req.FirstColumn > source.MaxColumns || idx.MaxCol > source.MaxColumns {
-		writeError(w, 400, "记录或字段超出此来源的已用范围")
+		writeMessage(w, 400, "service.record.recordOrFieldExceedsUsed")
 		return
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
@@ -100,7 +101,7 @@ func (a *App) handleRecord(w http.ResponseWriter, r *http.Request) {
 		valid := a.wb == wb && !a.maintenance && view != nil && view.data == snapshot.visible.data && wb.GetCachedIndex(meta.Path) == idx
 		a.mu.RUnlock()
 		if !valid {
-			return errors.New("记录来源或可见行视图已变化，请重新打开记录卡")
+			return i18n.Error("service.record.sourceOrVisibleRowView")
 		}
 		return wb.CheckSourceUnchanged()
 	}
@@ -112,18 +113,18 @@ func (a *App) handleRecord(w http.ResponseWriter, r *http.Request) {
 	defer releaseQuery()
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
 	view, err := newSelectionRowView(idx, snapshot.filter, req.PinnedThroughRow, snapshot.visible)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	position, total, previous, next, err := recordNeighbors(view, req.Row)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	result, err := readRecord(r.Context(), wb, idx, req)
@@ -138,18 +139,18 @@ func (a *App) handleRecord(w http.ResponseWriter, r *http.Request) {
 		if changed := current(); changed != nil {
 			err, status = changed, 409
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	result.Position, result.TotalRecords, result.PreviousRow, result.NextRow = position, total, previous, next
 	data, err = json.Marshal(result)
 	if err != nil || len(data) > formats.RecordCardPageBytes {
-		writeError(w, 413, errRecordCapacity.Error())
+		writeFailure(w, 413, errRecordCapacity)
 		return
 	}
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
@@ -162,7 +163,7 @@ func (a *App) handleRecord(w http.ResponseWriter, r *http.Request) {
 // projection already excludes hidden rows and removes pinned duplicates.
 func recordNeighbors(view selectionRowView, row int) (position, total, previous, next int, err error) {
 	if row < 1 || row > view.idx.MaxRow {
-		err = errors.New("记录超出当前已用行范围")
+		err = i18n.Error("service.record.recordsExceedCurrentlyUsedRow")
 		return
 	}
 	through := min(view.through, view.idx.MaxRow)
@@ -170,14 +171,14 @@ func recordNeighbors(view selectionRowView, row int) (position, total, previous,
 	total = prefix + view.count()
 	if row <= through {
 		if view.visible != nil && !view.visible.data.visibility.Visible(row) {
-			err = errors.New("该记录已隐藏，请重新选择可见记录")
+			err = i18n.Error("service.record.thisRecordHiddenSelectVisible")
 			return
 		}
 		position = view.sourceRangeCount(1, row)
 	} else {
 		at, found := view.locate(row)
 		if !found {
-			err = errors.New("该记录不在当前可见行视图中，请重新选择")
+			err = i18n.Error("service.record.thisRecordNotPresentCurrent")
 			return
 		}
 		position = prefix + at + 1
@@ -188,7 +189,7 @@ func recordNeighbors(view selectionRowView, row int) (position, total, previous,
 		}
 		rows, e := view.numbersPage(at-prefix-1, 1)
 		if e != nil || len(rows) != 1 {
-			return 0, errors.New("记录行序已失效，请重新打开记录卡")
+			return 0, i18n.Error("service.record.recordRowOrderInvalidReopen")
 		}
 		return rows[0], nil
 	}

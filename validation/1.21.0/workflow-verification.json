@@ -1,0 +1,75 @@
+{
+  "version": "1.21.0",
+  "result": "PASS",
+  "environment": "Windows amd64, Go 1.27.4, isolated local service and headless Chromium",
+  "language": {
+    "checks": 11,
+    "locales": [
+      "en",
+      "ja",
+      "ko",
+      "ru",
+      "zh-Hans",
+      "zh-Hant"
+    ],
+    "validSearchExamples": 9,
+    "dialogCloseToLocalizedCheckMs": 830,
+    "sourceUnchanged": true
+  },
+  "borders": {
+    "closedCornerSamples": 44,
+    "devicePixelRatios": [
+      1,
+      1.25,
+      1.5,
+      2
+    ],
+    "alignedSeamScenarios": 24,
+    "worksheetZoomPercent": [
+      85,
+      100,
+      115
+    ],
+    "sourceUnchanged": true
+  },
+  "printPreview": {
+    "checks": 6,
+    "sourceUnchanged": true
+  },
+  "warmRussianPageRendering": {
+    "scope": "Go handler-side page generation, one logical CPU, warmed catalog",
+    "before": {
+      "samples": 7,
+      "nsPerOp": [
+        2207898,
+        2166676,
+        2293715,
+        2426628,
+        2724293,
+        2419696,
+        2344127
+      ],
+      "medianNsPerOp": 2344127,
+      "medianBytesPerOp": 2807026,
+      "medianAllocationsPerOp": 83
+    },
+    "after": {
+      "samples": 7,
+      "nsPerOp": [
+        320910,
+        342639,
+        437436,
+        492684,
+        486600,
+        487697,
+        478643
+      ],
+      "medianNsPerOp": 478643,
+      "medianBytesPerOp": 525720,
+      "medianAllocationsPerOp": 17
+    }
+  },
+  "desktopManualAcceptance": false,
+  "officeWpsAcceptance": false,
+  "fullNativeLanguageReview": false
+}

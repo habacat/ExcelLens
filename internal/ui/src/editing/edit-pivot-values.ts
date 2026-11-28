@@ -2,25 +2,26 @@
  * Pivot table value-filter sub-controller (top/bottom N, percent, sum, and
  * numeric comparison/between filters bound to a selected measure).
  */
+import { t as localize } from '../core/i18n.ts';
 import type { PivotInfo, PivotValueFilter } from '../contracts/edit.ts';
 import { requireButton, requireEl, requireInput, requireSelect } from '../core/dom.ts';
 
 const MODES: readonly (readonly [string, string])[] = [
-  ['topCount', '前 N 项'],
-  ['bottomCount', '后 N 项'],
-  ['topPercent', '累计占比最高'],
-  ['bottomPercent', '累计占比最低'],
-  ['topSum', '累计值最高'],
-  ['bottomSum', '累计值最低'],
-  ['valueGreaterThan', '大于'],
-  ['valueGreaterThanOrEqual', '大于或等于'],
-  ['valueLessThan', '小于'],
-  ['valueLessThanOrEqual', '小于或等于'],
-  ['valueEqual', '等于'],
-  ['valueNotEqual', '不等于'],
-  ['valueBetween', '介于'],
-  ['valueNotBetween', '不介于'],
-  ['clear', '清除筛选'],
+  ['topCount', localize('ui.editPivotValues.firstNItems')],
+  ['bottomCount', localize('ui.editPivotValues.lastNItems')],
+  ['topPercent', localize('ui.editPivotValues.highestCumulativeProportion')],
+  ['bottomPercent', localize('ui.editPivotValues.minimumCumulativeProportion')],
+  ['topSum', localize('ui.editPivotValues.maximumCumulativeValue')],
+  ['bottomSum', localize('ui.editPivotValues.minimumCumulativeValue')],
+  ['valueGreaterThan', localize('ui.common.greaterThan')],
+  ['valueGreaterThanOrEqual', localize('ui.common.greaterThanOrEqualeebbdff')],
+  ['valueLessThan', localize('ui.common.lessThan')],
+  ['valueLessThanOrEqual', localize('ui.common.lessThanOrEqualb1ce53e')],
+  ['valueEqual', localize('ui.common.equal')],
+  ['valueNotEqual', localize('ui.common.notEqual')],
+  ['valueBetween', localize('ui.common.between')],
+  ['valueNotBetween', localize('ui.common.neither')],
+  ['clear', localize('ui.common.clearFilters')],
 ];
 
 export type PivotValueFilterApplyFn = (filter: PivotValueFilter) => void;
@@ -117,12 +118,12 @@ export class PivotValues {
     this.start.hidden = kind === 'clear';
     this.end.hidden = !kind.endsWith('Between');
     requireEl('editCopyPivotThresholdLabel').textContent = kind.endsWith('Count')
-      ? '数量'
+      ? localize('ui.editPivotValues.quantity')
       : kind.endsWith('Percent')
-        ? '占比（%）'
+        ? localize('ui.editPivotValues.percentage')
         : kind.endsWith('Between')
-          ? '下限'
-          : '数值';
+          ? localize('ui.editPivotValues.lowerLimit')
+          : localize('ui.common.numericalValues');
     this.start.step = kind.endsWith('Count') ? '1' : 'any';
     this.apply.disabled = !this.read();
   }

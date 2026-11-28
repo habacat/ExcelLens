@@ -1,4 +1,5 @@
 /** Runtime checks used at the JSON boundary. Object checks allow additive server fields. */
+import { t as localize } from './i18n.ts';
 import type { JsonDecoder, JsonValue } from '../contracts/common.ts';
 
 type Guard<T> = (value: unknown) => value is T;
@@ -85,7 +86,7 @@ export function object<R extends Fields,O extends Fields>(required: R, optional:
 
 export function decoder<T>(name: string, matches: Guard<T>): JsonDecoder<T> {
   return value => {
-    if (!matches(value)) throw new Error(`本机服务返回的数据格式不正确（${failurePath(matches, value, name)}）`);
+    if (!matches(value)) throw new Error(localize('ui.jsonContract.dataReturnedLocalServiceIncorrect', { failurePath: failurePath(matches, value, name) }));
     return value;
   };
 }

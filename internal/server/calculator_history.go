@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"excellens/internal/calculator"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -60,7 +61,7 @@ func readCalculatorHistory(path string) (calculatorHistoryFile, error) {
 		return result, err
 	}
 	if len(data) > 4<<20 || json.Unmarshal(data, &result) != nil || result.Version != 1 || len(result.Records) > 50 {
-		return calculatorHistoryFile{}, errors.New("本机计算历史无法读取，原记录已保留，请先导出/备份后处理")
+		return calculatorHistoryFile{}, i18n.Error("service.calculatorHistory.localCalculationHistoryCannotBe")
 	}
 	return result, nil
 }
@@ -77,7 +78,7 @@ func writeCalculatorHistory(path string, value calculatorHistoryFile) error {
 		}
 	}
 	if len(data) > 4<<20 {
-		return errors.New("计算记录过大，请复制当前计算过程")
+		return i18n.Error("service.calculatorHistory.calculatedRecordsTooLargeCopy")
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
@@ -115,20 +116,20 @@ func writeCalculatorHistory(path string, value calculatorHistoryFile) error {
 }
 func validateCalculatorSnapshot(snapshot calculatorSnapshot) error {
 	if utf8.RuneCountInString(snapshot.Name) > 80 || utf8.RuneCountInString(snapshot.Note) > 800 || len(snapshot.Expression) > calculator.MaxExpression || len(snapshot.Operands) > calculator.MaxOperands {
-		return errors.New("计算名称、备注或取数项过长")
+		return i18n.Error("service.calculatorHistory.calculationNameRemarksOrData")
 	}
 	ids := map[string]bool{}
 	for _, op := range snapshot.Operands {
 		n, e := strconv.Atoi(op.ID)
 		if e != nil || n < 1 || n > 999999 || ids[op.ID] {
-			return errors.New("取数编号无效或重复")
+			return i18n.Error("service.calculatorHistory.dataExtractionNumberInvalidOr")
 		}
 		ids[op.ID] = true
 		if len(op.Raw) > 4096 || len(op.Display) > 4096 || len(op.File) > 8192 || len(op.Sheet) > 2048 || len(op.Detail) > 32768 || len(op.Notice) > 16384 || len(op.CapturedAt) > 64 || len(op.Ref) > 32 || len(op.WorkbookKey) > 128 || len(op.Ranges) > 256 {
-			return errors.New("取数记录过长，请拆分计算")
+			return i18n.Error("service.calculatorHistory.dataExtractionRecordTooLong")
 		}
 		if op.Kind != "cell" && op.Kind != "sum" && op.Kind != "manual" && op.Kind != "result" {
-			return errors.New("取数类别无效")
+			return i18n.Error("service.calculatorHistory.invalidDataRetrievalCategory")
 		}
 		if _, err := calculator.Canonical(op.Value); err != nil {
 			return err
@@ -146,7 +147,7 @@ func (a *App) handleCalculatorHistory(w http.ResponseWriter, r *http.Request) {
 	path := calculatorHistoryPath()
 	history, err := readCalculatorHistory(path)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -157,7 +158,7 @@ func (a *App) handleCalculatorHistory(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			writeError(w, 404, "计算记录已过期或不存在")
+			writeMessage(w, 404, "service.calculatorHistory.calculatedRecordsExpiredOrDo")
 			return
 		}
 		items := make([]map[string]any, 0, len(history.Records))
@@ -169,11 +170,11 @@ func (a *App) handleCalculatorHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	var snapshot calculatorSnapshot
 	if decodeCalculator(w, r, &snapshot) != nil {
-		writeError(w, 400, "计算记录格式无效")
+		writeMessage(w, 400, "service.calculatorHistory.invalidCalculationRecordFormat")
 		return
 	}
 	if err := validateCalculatorSnapshot(snapshot); err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	values := map[string]string{}
@@ -182,7 +183,7 @@ func (a *App) handleCalculatorHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := calculator.Evaluate(r.Context(), calculator.Request{Expression: snapshot.Expression, Operands: values, Precision: snapshot.Precision, Percent: snapshot.Percent})
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	used := map[string]bool{}
@@ -214,7 +215,7 @@ func (a *App) handleCalculatorHistory(w http.ResponseWriter, r *http.Request) {
 		history.Records = history.Records[:50]
 	}
 	if err := writeCalculatorHistory(path, history); err != nil {
-		writeError(w, 500, "保存计算记录失败："+err.Error())
+		writeMessage(w, 500, "service.calculatorHistory.failedSaveCalculationRecords", i18n.Args{"detail": err})
 		return
 	}
 	writeJSON(w, map[string]any{"id": id, "saved": true, "createdAt": record.CreatedAt})

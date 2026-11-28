@@ -3,6 +3,7 @@
  * Tracks vertical or horizontal fill drags, renders a preview outline, and
  * commits bounded auto-fill previews via the editable copy API.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, SelectionArea } from '../contracts/common.ts';
 import type { EditChange } from '../contracts/edit.ts';
 import type { DragPointKind, DragPointResult } from './edit-reference-view.ts';
@@ -217,7 +218,7 @@ export class FillHandle {
         return undefined;
       },
       false,
-      '正在填充选区',
+      localize('ui.common.selectionBeingFilled'),
     );
   }
 }

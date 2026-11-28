@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -95,7 +96,7 @@ type selectionQuickResponse struct {
 	Difference   *quickDifference `json:"difference,omitempty"`
 }
 
-var errQuickCapacity = errors.New("选区内容超过快速分析容量，请缩小选区或使用分析工作区")
+var errQuickCapacity = i18n.Error("service.selectionQuick.selectedContentExceedsCapacityQuick")
 
 func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -106,12 +107,12 @@ func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.SelectionQuickRequestBytes))
 	var req selectionQuickRequest
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.ViewID == "" || req.ExcludeThroughRow < 0 || req.ExcludeThroughRow > 30 {
-		writeError(w, 400, "快速分析参数无效，请重新选择")
+		writeMessage(w, 400, "service.selectionQuick.quickAnalysisParametersInvalidReselect")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "选区来源已切换，请重新打开快速分析")
+		writeMessage(w, 409, "service.selectionQuick.sourceSelectionSwitchedReopenQuick")
 		return
 	}
 	// Queue before acquiring the cache lock; cancellation while waiting needs
@@ -123,17 +124,17 @@ func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "快速分析工作表不存在")
+		writeMessage(w, 404, "service.selectionQuick.quickAnalysisWorksheetDoesNot")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先完成工作表索引")
+		writeMessage(w, 409, "service.selectionQuick.completeWorksheetIndexingFirst")
 		return
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
@@ -148,19 +149,19 @@ func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 		valid := a.wb == wb && !a.maintenance && wb.GetCachedIndex(meta.Path) == idx && view != nil && view.data == snapshot.visible.data
 		a.mu.RUnlock()
 		if !valid {
-			return errors.New("选区来源或可见行视图已变化，请重新选择")
+			return i18n.Error("service.selectionQuick.sourceSelectionOrVisibleRow")
 		}
 		return wb.CheckSourceUnchanged()
 	}
 	if err = current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
 	plan, first, last, err := quickSelectionPlan(idx, snapshot, req)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	result, err := readSelectionQuick(r.Context(), wb, plan, first, last, req)
@@ -175,17 +176,17 @@ func (a *App) handleSelectionQuick(w http.ResponseWriter, r *http.Request) {
 		if changed := current(); changed != nil {
 			err, status = changed, 409
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	data, err = json.Marshal(result)
 	if err != nil || len(data) > formats.SelectionQuickResultBytes {
-		writeError(w, 413, errQuickCapacity.Error())
+		writeFailure(w, 413, errQuickCapacity)
 		return
 	}
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
@@ -199,10 +200,10 @@ func quickSelectionPlan(idx *workbook.SheetIndex, snapshot selectionSnapshot, re
 	c2, r2, e2 := workbook.ParseCellRef(req.End)
 	first, last := min(c1, c2), max(c1, c2)
 	if e1 != nil || e2 != nil || first < 1 || last > idx.MaxCol || last-first+1 > formats.SelectionQuickColumns || r1 > idx.MaxRow || r2 > idx.MaxRow {
-		return selectionRowPlan{}, 0, 0, errors.New("请选择已用范围内最多16列的连续选区")
+		return selectionRowPlan{}, 0, 0, i18n.Error("service.selectionQuick.selectContinuousSelectionThatUses")
 	}
 	if (req.Minuend != 0 || req.Subtrahend != 0) && (req.Minuend < first || req.Minuend > last || req.Subtrahend < first || req.Subtrahend > last || req.Minuend == req.Subtrahend) {
-		return selectionRowPlan{}, 0, 0, errors.New("差额请选择选区内两个不同的源列")
+		return selectionRowPlan{}, 0, 0, i18n.Error("service.selectionQuick.differenceSelectTwoDifferentSource")
 	}
 	view, err := newSelectionRowView(idx, snapshot.filter, req.ExcludeThroughRow, snapshot.visible)
 	if err != nil {
@@ -213,7 +214,7 @@ func quickSelectionPlan(idx *workbook.SheetIndex, snapshot selectionSnapshot, re
 		return selectionRowPlan{}, 0, 0, err
 	}
 	if plan.Len() < 1 || int64(plan.Len())*int64(last-first+1) > formats.SelectionQuickCells {
-		return selectionRowPlan{}, 0, 0, errors.New("快速分析最多40万格，请缩小选区")
+		return selectionRowPlan{}, 0, 0, i18n.Error("service.selectionQuick.maximumAnalysisCapacityCellsReduce")
 	}
 	return plan, first, last, nil
 }
@@ -247,7 +248,7 @@ func readSelectionQuick(ctx context.Context, wb *workbook.Workbook, plan selecti
 		}
 		offset := idx.RowAt(ref.Position)
 		if offset.Start < 0 || offset.End < offset.Start || offset.End > idx.XMLSize {
-			return nil, errors.New("快速分析源行缓存范围无效")
+			return nil, i18n.Error("service.selectionQuick.quickAnalysisSourceRowCache")
 		}
 		length := offset.End - offset.Start
 		if length > formats.SelectionQuickSourceBytes-sourceBytes {

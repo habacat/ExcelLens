@@ -6,11 +6,12 @@ package tray
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"unicode/utf16"
@@ -18,6 +19,7 @@ import (
 
 	"excellens/internal/branding"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 const (
@@ -78,29 +80,6 @@ const (
 	menuOpenProgram     = 1017
 	menuClearAllCaches  = 1018
 )
-
-// Options contains only user-initiated callbacks. Cleanup callbacks return
-// their actual result; the tray never claims success before they finish.
-type Options struct {
-	Address              string
-	OnOpen               func()
-	OnChooseFile         func(path string) error
-	OnOpenCache          func() error
-	OnOpenTemp           func() error
-	OnOpenLog            func() error
-	OnOpenExports        func() error
-	OnOpenNotes          func() error
-	OnOpenLayouts        func() error
-	OnOpenProgram        func() error
-	RibbonLayout         func() (bool, error)
-	SetRibbonLayout      func(bool) error
-	OnClearAllCaches     func() (string, error)
-	OnClearCache         func() (string, error)
-	OnClearTemp          func() (string, error)
-	ContextMenuInstalled func() bool
-	OnInstallContextMenu func() error
-	OnRemoveContextMenu  func() error
-}
 
 var (
 	user32               = syscall.NewLazyDLL("user32.dll")
@@ -221,42 +200,42 @@ func messageBox(hwnd uintptr, title, body string, flags uintptr) uintptr {
 	result, _, _ := pMessageBox.Call(hwnd, uintptr(unsafe.Pointer(utf16ptr(body))), uintptr(unsafe.Pointer(utf16ptr(title))), flags)
 	return result
 }
-func alertErr(err error) {
+func alertErr(locale i18n.Locale, err error) {
 	if err != nil {
-		messageBox(0, "ExcelLens", err.Error(), mbIconError)
+		messageBox(0, "ExcelLens", locale.ErrorText(err), mbIconError)
 	}
 }
-func callAction(fn func() error) {
+func callAction(locale i18n.Locale, fn func() error) {
 	if fn == nil {
 		return
 	}
-	go func() { alertErr(fn()) }()
+	go func() { alertErr(locale, fn()) }()
 }
-func cleanAction(hwnd uintptr, prompt string, fn func() (string, error)) {
+func cleanAction(hwnd uintptr, locale i18n.Locale, prompt string, fn func() (string, error)) {
 	if fn == nil {
 		return
 	}
-	if messageBox(hwnd, "ExcelLens - 清理确认", prompt, mbYesNo|mbIconQuestion|mbDefaultButton2) != idYes {
+	if messageBox(hwnd, locale.Text("native.cleanup.title"), prompt, mbYesNo|mbIconQuestion|mbDefaultButton2) != idYes {
 		return
 	}
 	go func() {
 		info, err := fn()
 		if err != nil {
-			alertErr(fmt.Errorf("%s\n%w", info, err))
+			messageBox(0, "ExcelLens", strings.TrimSpace(info+"\n"+locale.ErrorText(err)), mbIconError)
 			return
 		}
 		messageBox(0, "ExcelLens", info, mbIconInfo)
 	}()
 }
 
-func chooseWorkbook() (string, error) {
+func chooseWorkbook(locale i18n.Locale) (string, error) {
 	var filename [32768]uint16
 	// Windows common-dialog filter strings are pairs separated by NUL and
 	// terminated by two NULs, not a single ordinary UTF-16 C string.
-	filter := utf16.Encode([]rune(formats.DialogFilter()))
+	filter := utf16.Encode([]rune(formats.DialogFilter(locale.Text("native.dialog.supportedFiles"), locale.Text("native.dialog.allFiles"))))
 	ofn := openFileName{
 		Size: uint32(unsafe.Sizeof(openFileName{})), Filter: &filter[0], FilterIndex: 1,
-		File: &filename[0], MaxFile: uint32(len(filename)), Title: utf16ptr("打开数据文件"),
+		File: &filename[0], MaxFile: uint32(len(filename)), Title: utf16ptr(locale.Text("native.dialog.openDataFile")),
 		Flags: ofnExplorer | ofnPathMustExist | ofnFileMustExist,
 	}
 	ok, _, err := pGetOpenFileName.Call(uintptr(unsafe.Pointer(&ofn)))
@@ -268,43 +247,43 @@ func chooseWorkbook() (string, error) {
 	if code == 0 {
 		return "", nil
 	} // user pressed Cancel
-	return "", fmt.Errorf("Windows 文件选择器打开失败（错误码 0x%x）：%v", code, err)
+	return "", i18n.Error("diagnostic.tray.trayWindows.windowsFileSelectorFailedOpen", i18n.Args{"code": fmt.Sprintf("%x", code), "detail": err})
 }
 
 func copyToClipboard(hwnd uintptr, value string) error {
 	data := syscall.StringToUTF16(value)
 	if len(data) < 2 {
-		return errors.New("访问地址为空")
+		return i18n.Error("diagnostic.tray.trayWindows.accessAddressEmpty")
 	}
 	ok, _, err := pOpenClipboard.Call(hwnd)
 	if ok == 0 {
-		return fmt.Errorf("无法打开剪贴板：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.unableOpenClipboard", err)
 	}
 	defer pCloseClipboard.Call()
 	if result, _, err := pEmptyClipboard.Call(); result == 0 {
-		return fmt.Errorf("无法清空剪贴板：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.unableClearClipboard", err)
 	}
 	bytes := uintptr(len(data) * 2)
 	mem, _, err := pGlobalAlloc.Call(gmemMoveable, bytes)
 	if mem == 0 {
-		return fmt.Errorf("分配剪贴板缓冲区失败：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.failedAllocateClipboardBuffer", err)
 	}
 	ptr, _, err := pGlobalLock.Call(mem)
 	if ptr == 0 {
 		pGlobalFree.Call(mem)
-		return fmt.Errorf("锁定剪贴板缓冲区失败：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.failedLockClipboardBuffer", err)
 	}
 	// GlobalLock returns an address as uintptr. Do not reinterpret it as
 	// a Go pointer; copy the UTF-16 bytes through a checked Win32 API.
 	if err := writeLocalMemory(ptr, unsafe.Pointer(&data[0]), bytes); err != nil {
 		pGlobalUnlock.Call(mem)
 		pGlobalFree.Call(mem)
-		return fmt.Errorf("写入剪贴板缓冲区失败：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.failedWriteClipboardBuffer", err)
 	}
 	pGlobalUnlock.Call(mem)
 	if ok, _, err := pSetClipboardData.Call(cfUnicodeText, mem); ok == 0 {
 		pGlobalFree.Call(mem)
-		return fmt.Errorf("复制访问地址失败：%w", err)
+		return i18n.Wrap("diagnostic.tray.trayWindows.failedCopyAccessAddress", err)
 	}
 	return nil // Windows owns the memory now
 }
@@ -321,8 +300,10 @@ func positionMenuOwner(hwnd uintptr, cursor point) {
 }
 
 func appendTrayCommands(menu uintptr, options Options) bool {
-	appendMenu(menu, menuOpen, "打开 ExcelLens")
-	appendMenu(menu, menuChoose, "打开 Excel 文件...")
+	locale := options.language()
+	appendMenu(menu, menuOpen, locale.Text("native.tray.open"))
+	appendMenu(menu, menuChoose, locale.Text("native.tray.openFile"))
+	appendLanguageMenu(menu, options, locale)
 	var ribbon bool
 	if options.RibbonLayout != nil {
 		var err error
@@ -334,30 +315,30 @@ func appendTrayCommands(menu uintptr, options Options) bool {
 		if err != nil {
 			log.Printf("读取工具栏布局失败：%v", err)
 		}
-		pAppendMenu.Call(menu, flags, menuRibbonLayout, uintptr(unsafe.Pointer(utf16ptr("选项卡布局"))))
+		pAppendMenu.Call(menu, flags, menuRibbonLayout, uintptr(unsafe.Pointer(utf16ptr(locale.Text("native.tray.ribbonLayout")))))
 	}
 	appendSeparator(menu)
-	appendMenu(menu, menuOpenProgram, "打开程序所在目录")
-	appendMenu(menu, menuOpenCache, "打开缓存目录")
-	appendMenu(menu, menuOpenTemp, "打开临时文件目录")
-	appendMenu(menu, menuOpenLog, "打开日志目录")
-	appendMenu(menu, menuOpenExports, "打开导出文件目录")
-	appendMenu(menu, menuOpenNotes, "打开审计标记目录")
-	appendMenu(menu, menuOpenLayouts, "打开行列尺寸设置目录")
-	appendMenu(menu, menuCopyURL, "复制本地访问地址")
+	appendMenu(menu, menuOpenProgram, locale.Text("native.tray.programFolder"))
+	appendMenu(menu, menuOpenCache, locale.Text("native.tray.cacheFolder"))
+	appendMenu(menu, menuOpenTemp, locale.Text("native.tray.tempFolder"))
+	appendMenu(menu, menuOpenLog, locale.Text("native.tray.logFolder"))
+	appendMenu(menu, menuOpenExports, locale.Text("native.tray.exportsFolder"))
+	appendMenu(menu, menuOpenNotes, locale.Text("native.tray.annotationsFolder"))
+	appendMenu(menu, menuOpenLayouts, locale.Text("native.tray.layoutFolder"))
+	appendMenu(menu, menuCopyURL, locale.Text("native.tray.copyAddress"))
 	appendSeparator(menu)
 	if options.ContextMenuInstalled != nil && options.ContextMenuInstalled() {
-		appendMenu(menu, menuRemoveShell, "移除 Windows 文件右键菜单")
+		appendMenu(menu, menuRemoveShell, locale.Text("native.tray.removeShell"))
 	} else {
-		appendMenu(menu, menuInstallShell, "添加到 Windows 文件右键菜单")
+		appendMenu(menu, menuInstallShell, locale.Text("native.tray.addShell"))
 	}
 	appendSeparator(menu)
-	appendMenu(menu, menuClearCache, "清理历史缓存（保留当前）...")
-	appendMenu(menu, menuClearAllCaches, "清除所有缓存（含当前）...")
-	appendMenu(menu, menuClearTemp, "清理临时文件（保留当前）...")
+	appendMenu(menu, menuClearCache, locale.Text("native.tray.clearUnusedCaches"))
+	appendMenu(menu, menuClearAllCaches, locale.Text("native.tray.clearAllCaches"))
+	appendMenu(menu, menuClearTemp, locale.Text("native.tray.clearTemporaryFiles"))
 	appendSeparator(menu)
-	appendMenu(menu, menuAbout, "关于 ExcelLens")
-	appendMenu(menu, menuQuit, "退出 ExcelLens")
+	appendMenu(menu, menuAbout, locale.Text("native.tray.about"))
+	appendMenu(menu, menuQuit, locale.Text("native.tray.exit"))
 	return ribbon
 }
 
@@ -376,76 +357,82 @@ func showMenu(hwnd uintptr) {
 	}
 	defer pDestroyMenu.Call(menu)
 	options := activeTray.options
+	locale := options.language()
 	ribbon := appendTrayCommands(menu, options)
 	pSetForegroundWindow.Call(hwnd)
 	command, _, _ := pTrackPopupMenu.Call(menu, tpmRightButton|tpmNonotify|tpmReturnCmd,
 		uintptr(int64(cursor.X)), uintptr(int64(cursor.Y)), 0, hwnd, 0)
+	if choice, ok := languageCommand(command); ok && options.SetLanguageChoice != nil {
+		alertErr(locale, options.SetLanguageChoice(choice))
+		pPostMessage.Call(hwnd, wmNull, 0, 0)
+		return
+	}
 	switch command {
 	case menuOpen:
 		if options.OnOpen != nil {
 			options.OnOpen()
 		}
 	case menuChoose:
-		path, err := chooseWorkbook()
+		path, err := chooseWorkbook(locale)
 		if err != nil {
-			alertErr(err)
+			alertErr(locale, err)
 		} else if path != "" && options.OnChooseFile != nil {
-			go func() { alertErr(options.OnChooseFile(path)) }()
+			go func() { alertErr(locale, options.OnChooseFile(path)) }()
 		}
 	case menuOpenCache:
-		callAction(options.OnOpenCache)
+		callAction(locale, options.OnOpenCache)
 	case menuOpenProgram:
-		callAction(options.OnOpenProgram)
+		callAction(locale, options.OnOpenProgram)
 	case menuRibbonLayout:
 		if options.SetRibbonLayout != nil {
-			alertErr(options.SetRibbonLayout(!ribbon))
+			alertErr(locale, options.SetRibbonLayout(!ribbon))
 		}
 	case menuOpenTemp:
-		callAction(options.OnOpenTemp)
+		callAction(locale, options.OnOpenTemp)
 	case menuOpenLog:
-		callAction(options.OnOpenLog)
+		callAction(locale, options.OnOpenLog)
 	case menuOpenExports:
-		callAction(options.OnOpenExports)
+		callAction(locale, options.OnOpenExports)
 	case menuOpenNotes:
-		callAction(options.OnOpenNotes)
+		callAction(locale, options.OnOpenNotes)
 	case menuOpenLayouts:
-		callAction(options.OnOpenLayouts)
+		callAction(locale, options.OnOpenLayouts)
 	case menuCopyURL:
 		if err := copyToClipboard(hwnd, options.Address); err != nil {
-			alertErr(err)
+			alertErr(locale, err)
 		}
 	case menuInstallShell:
-		callAction(func() error {
+		callAction(locale, func() error {
 			if options.OnInstallContextMenu == nil {
 				return nil
 			}
 			if err := options.OnInstallContextMenu(); err != nil {
 				return err
 			}
-			messageBox(0, "ExcelLens", "已添加到 Excel、CSV、TXT、SQLite 文件右键菜单。\nWindows 11 中可能需要点击「显示更多选项」才会看到。", mbIconInfo)
+			messageBox(0, "ExcelLens", locale.Text("native.shell.added"), mbIconInfo)
 			return nil
 		})
 	case menuRemoveShell:
-		if messageBox(hwnd, "ExcelLens", "确认移除 Excel、CSV、TXT、SQLite 文件右键菜单中的 ExcelLens 选项？", mbYesNo|mbIconQuestion|mbDefaultButton2) == idYes {
-			callAction(func() error {
+		if messageBox(hwnd, "ExcelLens", locale.Text("native.shell.removePrompt"), mbYesNo|mbIconQuestion|mbDefaultButton2) == idYes {
+			callAction(locale, func() error {
 				if options.OnRemoveContextMenu == nil {
 					return nil
 				}
 				if err := options.OnRemoveContextMenu(); err != nil {
 					return err
 				}
-				messageBox(0, "ExcelLens", "已移除文件右键菜单集成。", mbIconInfo)
+				messageBox(0, "ExcelLens", locale.Text("native.shell.removed"), mbIconInfo)
 				return nil
 			})
 		}
 	case menuClearCache:
-		cleanAction(hwnd, "清理未在使用的工作簿索引及搜索缓存？\n当前已打开的工作簿缓存会保留。", options.OnClearCache)
+		cleanAction(hwnd, locale, locale.Text("native.cleanup.unusedCachesPrompt"), options.OnClearCache)
 	case menuClearTemp:
-		cleanAction(hwnd, "清理历史上传的 Excel 临时副本？\n当前打开的文件和原始工作簿会保留。", options.OnClearTemp)
+		cleanAction(hwnd, locale, locale.Text("native.cleanup.temporaryFilesPrompt"), options.OnClearTemp)
 	case menuClearAllCaches:
-		cleanAction(hwnd, "清除所有工作簿缓存，包括当前正在使用的缓存？\n所有页面将返回首页，运行中的任务将取消。请先确认正在输入的编辑内容。原始文件、上传副本和已保存的编辑修订将保留。", options.OnClearAllCaches)
+		cleanAction(hwnd, locale, locale.Text("native.cleanup.allCachesPrompt"), options.OnClearAllCaches)
 	case menuAbout:
-		showAbout(hwnd)
+		showAbout(hwnd, locale)
 	case menuQuit:
 		RequestQuit()
 	}
@@ -530,7 +517,7 @@ func Run(ctx context.Context, options Options) error {
 	defer pDestroyIcon.Call(icon)
 	state := &trayState{hwnd: hwnd, icon: icon, options: options}
 	state.data = notifyIconData{Size: uint32(unsafe.Sizeof(notifyIconData{})), Hwnd: hwnd, ID: 1, Flags: nifMessage | nifIcon | nifTip, CallbackMessage: wmAppTray, Icon: icon}
-	copy(state.data.Tip[:], syscall.StringToUTF16("ExcelLens - 左键打开，右键管理"))
+	copy(state.data.Tip[:], syscall.StringToUTF16("ExcelLens"))
 	if ok, _, err := pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&state.data))); ok == 0 {
 		pDestroyWindow.Call(hwnd)
 		return fmt.Errorf("add notification icon: %w", err)

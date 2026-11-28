@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"io"
 	"net/http"
 	"strconv"
@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -40,17 +41,17 @@ func (a *App) handleCatalogueStart(w http.ResponseWriter, r *http.Request) {
 	var req catalogueStartRequest
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CatalogueRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || (req.Mode != "read" && req.Mode != "confirm") || (req.Mode == "read" && req.Sheet != "") {
-		writeError(w, 400, "名称与表目录的读取参数无效")
+		writeMessage(w, 400, "service.catalogue.nameTableDirectoryReadParameters")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "目录来源已切换，请重新打开目录")
+		writeMessage(w, 409, "service.catalogue.catalogSourceSwitchedOpenCatalog")
 		return
 	}
 	capability, supported := formats.Lookup(wb.Format)
 	if !supported || !capability.CatalogueMetadata {
-		writeError(w, 422, "此来源格式没有可读取的工作簿名称或表对象目录")
+		writeMessage(w, 422, "service.catalogue.thisSourceFormatNoReadable")
 		return
 	}
 	a.cacheMu.RLock()
@@ -61,28 +62,28 @@ func (a *App) handleCatalogueStart(w http.ResponseWriter, r *http.Request) {
 		var found bool
 		meta, found = wb.FindSheet(req.Sheet)
 		if !found {
-			writeError(w, 404, "要确认的工作表不存在")
+			writeMessage(w, 404, "service.catalogue.worksheetBeConfirmedDoesNot")
 			return
 		}
 		idx = wb.GetCachedIndex(meta.Path)
 		if idx == nil {
-			writeError(w, 409, "请先打开并索引该工作表，再确认表对象")
+			writeMessage(w, 409, "service.catalogue.openIndexThisWorksheetFirst")
 			return
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &catalogueTask{ID: randomID(), Mode: req.Mode, Status: "queued", Stage: "等待读取目录", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	job := &catalogueTask{ID: randomID(), Mode: req.Mode, Status: "queued", Stage: "stage.task.waitingForDirectoryReading", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.catalogue.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	if activeMetadataTasks(a.catalogueJobs) >= formats.CatalogueActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "目录任务正在读取，请等待或取消后重试")
+		writeMessage(w, 429, "service.catalogue.catalogTaskBeingReadWait")
 		return
 	}
 	a.pruneCatalogueLocked("", formats.CatalogueTaskHistory-1)
@@ -96,12 +97,12 @@ func (a *App) handleCatalogueStart(w http.ResponseWriter, r *http.Request) {
 func newCatalogueSnapshot(value workbook.Catalogue) (*catalogueSnapshot, error) {
 	data, err := json.Marshal(value)
 	if err != nil || len(data) > formats.CatalogueBytes || len(value.Items) > formats.CatalogueEntries {
-		return nil, errors.New("名称与表目录超过本次读取容量")
+		return nil, i18n.Error("service.catalogue.nameTableDirectoryExceedRead")
 	}
 	snapshot := &catalogueSnapshot{Value: value, Positions: make(map[string]int, len(value.Items)), Bytes: len(data)}
 	for i, item := range value.Items {
 		if _, duplicate := snapshot.Positions[item.ID]; duplicate || item.ID == "" {
-			return nil, errors.New("目录对象标识重复或缺失，不能确定唯一条目")
+			return nil, i18n.Error("service.catalogue.directoryObjectIdentifierDuplicatedOr")
 		}
 		snapshot.Positions[item.ID] = i
 	}
@@ -109,7 +110,7 @@ func newCatalogueSnapshot(value workbook.Catalogue) (*catalogueSnapshot, error) 
 }
 
 func (a *App) runCatalogue(job *catalogueTask, unpin func()) {
-	runSourceMetadataTask(a, job, unpin, "目录", func() bool {
+	runSourceMetadataTask(a, job, unpin, func() bool {
 		return a.wb == job.Workbook && a.catalogueJobs[job.ID] == job
 	}, func() { a.pruneCatalogueLocked(job.ID, formats.CatalogueTaskHistory) }, func(progress func(int64, int64, string)) (*catalogueSnapshot, error) {
 		var value workbook.Catalogue
@@ -147,10 +148,10 @@ func (a *App) handleCatalogueStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.catalogueJobs[r.URL.Query().Get("id")]
 	if job == nil || a.wb != job.Workbook || job.discarded {
 		a.mu.RUnlock()
-		writeError(w, 404, "目录任务已失效，请重新读取")
+		writeMessage(w, 404, "service.catalogue.catalogTaskBecomeInvalidRead")
 		return
 	}
-	payload := metadataTaskPayload(job)
+	payload := metadataTaskPayload(responseLocale(w), job)
 	a.mu.RUnlock()
 	writeJSON(w, payload)
 }
@@ -162,7 +163,7 @@ func (a *App) catalogueSnapshot(r *http.Request) (*workbook.Workbook, *catalogue
 	job := a.catalogueJobs[r.URL.Query().Get("id")]
 	if job == nil || job.Status != "done" || job.Snapshot == nil || a.wb != job.Workbook || job.discarded {
 		a.mu.RUnlock()
-		return nil, nil, errors.New("目录结果已失效，请重新读取")
+		return nil, nil, i18n.Error("service.catalogue.catalogResultBecomeInvalidRead")
 	}
 	wb, snapshot := job.Workbook, job.Snapshot
 	a.mu.RUnlock()
@@ -173,7 +174,7 @@ func (a *App) catalogueSnapshot(r *http.Request) (*workbook.Workbook, *catalogue
 	current := a.wb == wb && a.catalogueJobs[job.ID] == job && !job.discarded
 	a.mu.RUnlock()
 	if !current {
-		return nil, nil, errors.New("目录来源已切换，请重新打开目录")
+		return nil, nil, i18n.Error("service.catalogue.catalogSourceSwitchedOpenCatalog")
 	}
 	return wb, snapshot, nil
 }
@@ -229,12 +230,12 @@ func (a *App) handleCatalogueItems(w http.ResponseWriter, r *http.Request) {
 		offset, err = strconv.Atoi(q.Get("offset"))
 	}
 	if err != nil || offset < 0 || offset > formats.CatalogueEntries || len(query) > formats.CatalogueSearchBytes || kind != "" && kind != "name" && kind != "table" || scope != "" && scope != "workbook" || scope == "workbook" && sheet != "" {
-		writeError(w, 400, "目录筛选或分页参数无效")
+		writeMessage(w, 400, "service.catalogue.catalogFilteringOrPaginationParameters")
 		return
 	}
 	wb, snapshot, err := a.catalogueSnapshot(r)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
@@ -262,7 +263,7 @@ func (a *App) handleCatalogueItems(w http.ResponseWriter, r *http.Request) {
 		matched++
 	}
 	if offset > matched {
-		writeError(w, 400, "目录分页位置超出当前结果，请从第一页重试")
+		writeMessage(w, 400, "service.catalogue.directoryPagingPositionExceedsCurrent")
 		return
 	}
 	notices := make([]string, 0, len(snapshot.Value.Notices))
@@ -280,12 +281,12 @@ func (a *App) handleCatalogueDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	wb, snapshot, err := a.catalogueSnapshot(r)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	pos, found := snapshot.Positions[r.URL.Query().Get("item")]
 	if !found {
-		writeError(w, 404, "目录条目不存在")
+		writeMessage(w, 404, "service.catalogue.directoryEntryDoesNotExist")
 		return
 	}
 	writeJSON(w, map[string]any{"item": snapshot.Value.Items[pos], "workbookKey": wb.Fingerprint, "book": sourceBookID(wb)})
@@ -299,26 +300,26 @@ func (a *App) handleCatalogueResolve(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	area, err := strconv.Atoi(q.Get("area"))
 	if err != nil || area < 0 {
-		writeError(w, 400, "请选择有效的目录区域")
+		writeMessage(w, 400, "service.catalogue.selectValidDirectoryArea")
 		return
 	}
 	wb, snapshot, err := a.catalogueSnapshot(r)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if q.Get("workbookKey") != wb.Fingerprint || q.Get("book") != sourceBookID(wb) {
-		writeError(w, 409, "定位来源已切换，请重新打开目录")
+		writeMessage(w, 409, "service.catalogue.sourceSwitchedReopenDirectory")
 		return
 	}
 	pos, found := snapshot.Positions[q.Get("item")]
 	if !found {
-		writeError(w, 404, "目录条目不存在")
+		writeMessage(w, 404, "service.catalogue.directoryEntryDoesNotExist")
 		return
 	}
 	item := snapshot.Value.Items[pos]
 	if item.Status != "ready" || area >= len(item.Areas) || item.Table != nil && !item.Table.Verified {
-		writeError(w, 409, "此定义尚未确认或不能确定固定位置，请查看条目原因")
+		writeMessage(w, 409, "service.catalogue.thisDefinitionNotConfirmedOr")
 		return
 	}
 	writeJSON(w, map[string]any{"area": item.Areas[area], "workbookKey": wb.Fingerprint, "book": sourceBookID(wb)})

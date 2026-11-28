@@ -12,6 +12,7 @@ import (
 	"excellens/internal/checkpoint"
 	excelExport "excellens/internal/export"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -44,7 +45,7 @@ func (run *taskCheckpointRun) reject(created bool) error {
 func openTaskCheckpoints() (*checkpoint.Store, error) {
 	base, err := os.UserConfigDir()
 	if err != nil || base == "" {
-		return nil, errors.New("无法定位用户配置目录，任务恢复尚未保存")
+		return nil, i18n.Error("service.taskCheckpointSource.unableLocateUserConfigurationDirectory")
 	}
 	return checkpoint.Open(filepath.Join(base, "ExcelLens", "task-checkpoints"))
 }
@@ -83,7 +84,7 @@ func checkpointHTTPError(w http.ResponseWriter, err error) {
 	case errors.Is(err, os.ErrNotExist):
 		status = http.StatusNotFound
 	}
-	writeError(w, status, err.Error())
+	writeFailure(w, status, err)
 }
 
 func (a *App) admitCheckpoint(w http.ResponseWriter) bool {
@@ -91,7 +92,7 @@ func (a *App) admitCheckpoint(w http.ResponseWriter) bool {
 	case a.rootApp().recoverySem <- struct{}{}:
 		return true
 	default:
-		writeError(w, http.StatusTooManyRequests, "任务恢复繁忙，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.taskCheckpointSource.taskBusyTryAgainLater")
 		return false
 	}
 }

@@ -80,7 +80,8 @@ func receiveWorkbookCopyData(lparam uintptr) bool {
 		return false
 	}
 	callback := activeTray.options.OnChooseFile
-	go func() { alertErr(callback(path)) }()
+	locale := activeTray.options.language()
+	go func() { alertErr(locale, callback(path)) }()
 	return true
 }
 

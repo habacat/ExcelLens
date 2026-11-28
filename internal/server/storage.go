@@ -42,16 +42,16 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	roots, err := dataRoots()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
 		if !a.storageView.TryRLock() {
-			writeError(w, 409, "数据传输进行中，可查看任务进度")
+			writeMessage(w, 409, "service.storage.dataTransferProgressCanView")
 			return
 		}
 		defer a.storageView.RUnlock()
-		groups := roots.Inventory(r.Context())
+		groups := roots.Inventory(r.Context(), responseLocale(w))
 		usage, usageErr := workbook.InspectConditionalStatsCache(a.conditionalStatsProtector())
 		condStats := map[string]any{
 			"budgetBytes":    loadConditionalStatsBudget(),
@@ -79,35 +79,35 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<10))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, 400, "数据管理参数无效")
+		writeMessage(w, 400, "service.storage.dataManagementParametersInvalid")
 		return
 	}
 	if !a.storageMu.TryLock() {
-		writeError(w, 409, "另一项数据管理操作正在进行")
+		writeMessage(w, 409, "service.storage.anotherDataManagementOperationProgress")
 		return
 	}
 	if req.Action == "backup" || req.Action == "restore" || req.Action == "migrate" {
 		job, err := a.startStorage(roots, req.Action, req.Directory, req.Password)
 		if err != nil {
 			a.storageMu.Unlock()
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
-		writeJSONStatus(w, 202, job)
+		writeJSONStatus(w, 202, job.Localized(responseLocale(w)))
 		return
 	}
 	defer a.storageMu.Unlock()
 	a.storageView.Lock()
 	defer a.storageView.Unlock()
 	if a.restoreState.pending() {
-		writeError(w, 409, "请先完成恢复事务")
+		writeMessage(w, 409, "service.storage.completeRestorationProcessFirst")
 		return
 	}
 	var message string
 	switch req.Action {
 	case "repair-history":
 		if !req.Confirm || req.Revision == "" {
-			writeError(w, 400, "请确认保留诊断副本并重建传输历史")
+			writeMessage(w, 400, "service.storage.ensureThatDiagnosticCopyRetained")
 			return
 		}
 		var evidence string
@@ -118,7 +118,7 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 	case "list-stages":
 		stages, e := roots.BackupStages(req.Directory)
 		if e != nil {
-			writeError(w, 409, e.Error())
+			writeFailure(w, 409, e)
 			return
 		}
 		writeJSON(w, map[string]any{"stages": stages})
@@ -127,22 +127,22 @@ func (a *App) handleStorage(w http.ResponseWriter, r *http.Request) {
 		err = roots.CleanBackupStage(req.Directory, req.Stage)
 		message = "已清理未完成备份"
 	case "clear-cache":
-		message, err = a.ClearUnusedCaches()
+		message, err = a.clearUnusedCaches(responseLocale(w))
 	case "clear-conditional-stats":
 		message, err = a.ClearUnusedConditionalStats()
 	case "set-conditional-stats-budget":
 		message, err = a.UpdateConditionalStatsBudget(req.BudgetBytes)
 	case "clear-uploads":
-		message, err = a.ClearUnusedUploads()
+		message, err = a.clearUnusedUploads(responseLocale(w))
 	default:
-		writeError(w, 400, "请选择数据管理操作")
+		writeMessage(w, 400, "service.storage.selectDataManagementOperation")
 		return
 	}
 	if err != nil {
 		if message != "" {
 			err = errors.New(message + "。" + err.Error())
 		}
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]string{"message": message})
@@ -160,6 +160,7 @@ func (a *App) restoreStorage(ctx context.Context, roots localstore.Roots, folder
 	defer a.toolbar.notify()
 	defer a.toolbar.mu.Unlock()
 	defer func() { a.toolbar.loaded = false }()
+	defer a.locale.invalidate()
 	err := roots.RestoreWith(ctx, folder, options)
 	if err != nil && roots.Pending() {
 		a.restoreState.set(err)

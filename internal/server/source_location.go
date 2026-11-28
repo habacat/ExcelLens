@@ -12,6 +12,7 @@ import (
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -195,7 +196,7 @@ func (a *App) verifyLocation(ctx context.Context, book, previous, path string, c
 func (a *App) verifyLocationWith(ctx context.Context, book, previous, path string, confirm bool, beginCommit func() error) (relocationItem, error) {
 	var empty relocationItem
 	if !validExportDigest(book) || !filepath.IsAbs(path) {
-		return empty, errors.New("请选择来源记录并提供新文件的完整路径")
+		return empty, i18n.Error("service.sourceLocation.selectSourceRecordsProvideFull")
 	}
 	entries, err := relocationSources(ctx)
 	if err != nil {
@@ -218,7 +219,7 @@ func (a *App) verifyLocationWith(ctx context.Context, book, previous, path strin
 		defer release()
 		s := item.source
 		if wb.Fingerprint != s.Fingerprint {
-			return empty, errors.New("新文件的内容指纹与原来源不符")
+			return empty, i18n.Error("service.sourceLocation.contentFingerprintNewFileDoes")
 		}
 		digest, err := wb.SourceFileSHA256(ctx)
 		if err != nil {
@@ -238,7 +239,7 @@ func (a *App) verifyLocationWith(ctx context.Context, book, previous, path strin
 			if len(s.Fingerprint) != 64 {
 				old, free, err := a.openPinnedWorkbook(item.Path)
 				if err != nil {
-					return empty, errors.New("旧任务缺少整文件 SHA-256，请提供原位置的文件以核验")
+					return empty, i18n.Error("service.sourceLocation.oldTaskLacksEntireFile")
 				}
 				defer free()
 				if old.Fingerprint != s.Fingerprint {
@@ -253,7 +254,7 @@ func (a *App) verifyLocationWith(ctx context.Context, book, previous, path strin
 			}
 		}
 		if digest != proof {
-			return empty, errors.New("新文件的 SHA-256 与原来源不符")
+			return empty, i18n.Error("service.sourceLocation.shaHashNewFileDoes")
 		}
 		item.Candidate = wb.Path
 		if !confirm {

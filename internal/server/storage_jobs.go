@@ -2,12 +2,12 @@ package server
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"path/filepath"
 
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 	"excellens/internal/transferjobs"
 )
@@ -18,12 +18,12 @@ type storageJob = transferjobs.Job
 func (a *App) startStorage(roots localstore.Roots, action, dir, password string) (storageJob, error) {
 	return a.submitStorage(roots, action, func(ctx context.Context, options localstore.TransferOptions) (transferResult, error) {
 		options.Password = password
-		var msg string
+		var notice i18n.Message
 		var err error
 		switch action {
 		case "restore":
 			err = a.restoreStorage(ctx, roots, dir, options)
-			msg = "已核验并迁入备份，刷新页面可读取恢复记录"
+			notice.Key = "service.transfer.restored"
 		case "backup":
 			a.cacheResetMu.RLock()
 			var path string
@@ -33,23 +33,26 @@ func (a *App) startStorage(roots localstore.Roots, action, dir, password string)
 				path, err = roots.BackupWith(ctx, dir, options)
 			}
 			a.cacheResetMu.RUnlock()
-			msg = "备份已核验：" + path
+			notice = i18n.Message{Key: "service.transfer.backupVerified", Args: i18n.Args{"path": path}}
 			if missing > 0 {
-				msg += fmt.Sprintf("（%d 项旧任务缺少可迁移的来源或索引证明）", missing)
+				notice.Key = "service.transfer.backupVerifiedWithMissingSources"
+				notice.Args["count"] = missing
 			}
 		case "migrate":
 			a.cacheResetMu.RLock()
 			var report localstore.Migration
 			report, err = roots.MigrateLegacyWith(ctx, options)
 			a.cacheResetMu.RUnlock()
-			msg = fmt.Sprintf("已迁入 %d 个，相同 %d 个，内容不同且保留两份 %d 个", report.Copied, report.Identical, report.Different)
+			notice = i18n.Message{Key: "service.transfer.migrated", Args: i18n.Args{
+				"copied": report.Copied, "identical": report.Identical, "different": report.Different,
+			}}
 		}
-		return transferResult{Message: msg}, err
+		return transferResult{Notice: notice}, err
 	})
 }
 func (a *App) submitStorage(roots localstore.Roots, action string, run func(context.Context, localstore.TransferOptions) (transferResult, error)) (storageJob, error) {
 	if a.restoreState.pending() {
-		return storageJob{}, errors.New("请先完成恢复事务")
+		return storageJob{}, i18n.Error("service.storageJobs.completeRestorationProcessFirst")
 	}
 	return a.transfers.Start(filepath.Join(roots.Config, "transfer-history.json"), randomID(), action, func(ctx context.Context, options localstore.TransferOptions) (transferResult, error) {
 		a.storageView.Lock()
@@ -60,7 +63,7 @@ func (a *App) submitStorage(roots localstore.Roots, action string, run func(cont
 func (a *App) handleStorageJobs(w http.ResponseWriter, r *http.Request) {
 	roots, err := dataRoots()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	file := filepath.Join(roots.Config, "transfer-history.json")
@@ -68,6 +71,9 @@ func (a *App) handleStorageJobs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		jobs, issue := a.transfers.List(file)
+		for i := range jobs {
+			jobs[i] = jobs[i].Localized(responseLocale(w))
+		}
 		if id == "" {
 			writeJSON(w, map[string]any{"jobs": jobs, "historyIssue": issue})
 			return
@@ -78,16 +84,16 @@ func (a *App) handleStorageJobs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		writeError(w, 404, "传输任务不存在")
+		writeMessage(w, 404, "service.storageJobs.transferTaskDoesNotExist")
 	case http.MethodPost:
 		b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256))
 		var empty struct{}
 		if err != nil || len(b) > 0 && decodeSavedConfig(b, &empty) != nil {
-			writeError(w, 400, "取消参数无效")
+			writeMessage(w, 400, "service.storageJobs.invalidParameterCancellation")
 			return
 		}
 		if err := a.transfers.Cancel(file, id); err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		writeJSON(w, map[string]bool{"cancelled": true})

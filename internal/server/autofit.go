@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -49,29 +50,29 @@ func (a *App) handleAutofit(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.autofit.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "工作表不存在")
+		writeMessage(w, http.StatusNotFound, "service.autofit.worksheetDoesNotExist")
 		return
 	}
 	kind := r.URL.Query().Get("kind")
 	index := parseIntDefault(r.URL.Query().Get("index"), 0)
 	if kind != "col" && kind != "row" || index < 1 || (kind == "col" && index > formats.ExcelColumns) || (kind == "row" && index > formats.ExternalRows) {
-		writeError(w, http.StatusBadRequest, "自动适应目标无效")
+		writeMessage(w, http.StatusBadRequest, "service.autofit.automaticAdaptationTargetInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if a.currentWorkbook() != wb {
-		writeError(w, http.StatusConflict, "工作簿已切换")
+		writeMessage(w, http.StatusConflict, "service.autofit.workbookSwitched")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, http.StatusConflict, "工作表索引尚未建立")
+		writeMessage(w, http.StatusConflict, "service.autofit.worksheetIndexNotCreatedYet")
 		return
 	}
 	var offsets []int
@@ -82,7 +83,7 @@ func (a *App) handleAutofit(w http.ResponseWriter, r *http.Request) {
 		firstCol = parseIntDefault(r.URL.Query().Get("firstCol"), 1)
 		lastCol = parseIntDefault(r.URL.Query().Get("lastCol"), firstCol)
 		if firstCol < 1 || firstCol > formats.ExcelColumns || lastCol < firstCol || lastCol > formats.ExcelColumns || lastCol-firstCol+1 > 80 {
-			writeError(w, http.StatusBadRequest, "行高自动适应最多检查80个可见列")
+			writeMessage(w, http.StatusBadRequest, "service.autofit.rowHeightAutomaticallyAdaptsUp")
 			return
 		}
 		at := idx.FindRowOffset(index)
@@ -98,7 +99,7 @@ func (a *App) handleAutofit(w http.ResponseWriter, r *http.Request) {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
-			writeError(w, http.StatusInternalServerError, "自动适应预览失败："+err.Error())
+			writeMessage(w, http.StatusInternalServerError, "service.autofit.automaticAdaptationPreviewFailed", i18n.Args{"detail": err})
 			return
 		}
 	}

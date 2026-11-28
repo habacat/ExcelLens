@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"reflect"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 )
 
@@ -28,9 +29,9 @@ type compositionDefinitionStore struct {
 	Items    []savedComposition `json:"items"`
 }
 
-var errCompositionRevision = errors.New("联合来源目录已被其他页面修改，请刷新后重试")
-var errCompositionName = errors.New("已有同名联合来源，请更换名称")
-var errCompositionDefinitionMissing = errors.New("联合来源定义已移除，请刷新目录")
+var errCompositionRevision = i18n.Error("service.compositionStore.combinedSourceDirectoryModifiedOther")
+var errCompositionName = i18n.Error("service.compositionStore.thereAlreadyJointSourceSame")
+var errCompositionDefinitionMissing = i18n.Error("service.compositionStore.combinedSourceDefinitionRemovedRefresh")
 
 func compositionDefinitionsPath() (string, error) {
 	return savedConfigPath("compositions", "catalog")
@@ -43,7 +44,7 @@ func readCompositionDefinitions(path string) (compositionDefinitionStore, error)
 		return store, err
 	}
 	if store.Version != 1 || store.Revision < 0 || store.Revision >= maxConfigRevision || len(store.Items) > formats.CompositionDefinitions {
-		return store, errors.New("联合来源目录版本、修订或数量无效，原文件已保留")
+		return store, i18n.Error("service.compositionStore.combinationSourceDirectoryVersionRevision")
 	}
 	ids, captures, names := make(map[string]bool), make(map[string]bool), make(map[string]bool)
 	for i := range store.Items {
@@ -51,13 +52,13 @@ func readCompositionDefinitions(path string) (compositionDefinitionStore, error)
 		definition, err := item.Definition.Normalized()
 		name := strings.ToLower(definition.Name)
 		if err != nil || !validSessionID(item.ID) || !validSessionID(item.CaptureID) || ids[item.ID] || captures[item.CaptureID] || names[name] {
-			return store, errors.New("联合来源定义无效或重复，原文件已保留")
+			return store, i18n.Error("service.compositionStore.combinedSourceDefinitionInvalidOr")
 		}
 		if _, err := time.Parse(time.RFC3339Nano, item.Created); err != nil {
-			return store, errors.New("联合来源创建时间无效，原文件已保留")
+			return store, i18n.Error("service.compositionStore.invalidCreationTimeCombinedSource")
 		}
 		if _, err := time.Parse(time.RFC3339Nano, item.Updated); err != nil {
-			return store, errors.New("联合来源更新时间无效，原文件已保留")
+			return store, i18n.Error("service.compositionStore.invalidUpdateTimeCombinedSource")
 		}
 		item.Definition = definition
 		ids[item.ID], captures[item.CaptureID], names[name] = true, true, true
@@ -79,7 +80,7 @@ func findSavedCompositionCapture(path, captureID, targetID string) (savedComposi
 	for _, item := range store.Items {
 		if item.CaptureID == captureID {
 			if targetID != "" && item.ID != targetID || targetID == "" && item.ID != captureID {
-				return savedComposition{}, 0, false, errors.New("此保存请求已关联其他联合来源")
+				return savedComposition{}, 0, false, i18n.Error("service.compositionStore.thisSaveRequestAssociatedOther")
 			}
 			return item, store.Revision, true, nil
 		}
@@ -90,7 +91,7 @@ func findSavedCompositionCapture(path, captureID, targetID string) (savedComposi
 func saveCompositionDefinition(path string, value savedComposition, expected int64, replace bool, ops configWriteOps) (int64, error) {
 	definition, err := value.Definition.Normalized()
 	if err != nil || !validSessionID(value.ID) || !validSessionID(value.CaptureID) {
-		return 0, errors.New("联合来源保存参数无效")
+		return 0, i18n.Error("service.compositionStore.invalidSaveParametersJointSources")
 	}
 	value.Definition = definition
 	lock := persistentFileLock(path)
@@ -103,7 +104,7 @@ func saveCompositionDefinition(path string, value savedComposition, expected int
 	position := -1
 	for i, old := range store.Items {
 		if old.CaptureID == value.CaptureID && (old.ID != value.ID || !reflect.DeepEqual(old.Definition, value.Definition)) {
-			return 0, errors.New("此保存请求已完成，不能使用不同内容重试")
+			return 0, i18n.Error("service.compositionStore.thisSaveRequestCompletedRetry")
 		}
 		if old.ID == value.ID {
 			position = i
@@ -119,10 +120,10 @@ func saveCompositionDefinition(path string, value savedComposition, expected int
 		return 0, errCompositionDefinitionMissing
 	}
 	if !replace && position >= 0 {
-		return 0, errors.New("此保存请求已经完成，请使用新的来源准备结果")
+		return 0, i18n.Error("service.compositionStore.thisSaveRequestCompletedPrepare")
 	}
 	if position < 0 && len(store.Items) >= formats.CompositionDefinitions {
-		return 0, fmt.Errorf("最多保存%d个联合来源，请先删除不用的定义", formats.CompositionDefinitions)
+		return 0, i18n.Error("service.compositionStore.upJointSourcesCanBe", i18n.Args{"compositionDefinitions": formats.CompositionDefinitions})
 	}
 	for _, old := range store.Items {
 		if old.ID != value.ID && strings.EqualFold(old.Definition.Name, value.Definition.Name) {
@@ -130,7 +131,7 @@ func saveCompositionDefinition(path string, value savedComposition, expected int
 		}
 	}
 	if store.Revision+1 >= maxConfigRevision {
-		return 0, errors.New("联合来源目录修订号达到上限，原文件已保留")
+		return 0, i18n.Error("service.compositionStore.combinedSourceDirectoryRevisionNumbers")
 	}
 	value.Updated = time.Now().UTC().Format(time.RFC3339Nano)
 	if position >= 0 {
@@ -169,7 +170,7 @@ func deleteCompositionDefinition(path, id string, expected int64, ops configWrit
 		return 0, errCompositionDefinitionMissing
 	}
 	if store.Revision+1 >= maxConfigRevision {
-		return 0, errors.New("联合来源目录修订号达到上限，原文件已保留")
+		return 0, i18n.Error("service.compositionStore.combinedSourceDirectoryRevisionNumbers")
 	}
 	store.Items = append(store.Items[:position], store.Items[position+1:]...)
 	store.Revision++
@@ -196,7 +197,7 @@ func (a *App) compositionReferencesCurrent(ctx context.Context, source *composit
 		}
 		sheet := workspace.Sheet(strings.TrimPrefix(info.Ref.Source, "scratch:"))
 		if sheet == nil || analysisSheetStamp(sheet) != info.Ref.Stamp {
-			return errors.New("分析表内容已变化，请重新准备联合来源后保存")
+			return i18n.Error("service.compositionStore.contentAnalysisTableChangedPrepare")
 		}
 	}
 	return ctx.Err()
@@ -209,7 +210,7 @@ func compositionStoreError(w http.ResponseWriter, err error) {
 	} else if errors.Is(err, errCompositionDefinitionMissing) {
 		status = 404
 	}
-	writeError(w, status, err.Error())
+	writeFailure(w, status, err)
 }
 
 func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +220,7 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 	}
 	path, err := compositionDefinitionsPath()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -228,7 +229,7 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 		store, err := readCompositionDefinitions(path)
 		lock.RUnlock()
 		if err != nil {
-			writeError(w, 422, err.Error())
+			writeFailure(w, 422, err)
 			return
 		}
 		writeJSON(w, store)
@@ -244,12 +245,12 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CompositionCatalogRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.ExpectedRevision == nil || *req.ExpectedRevision < 0 || req.Action != "save" && req.Action != "delete" || req.ID != "" && !validSessionID(req.ID) || req.Action == "delete" && req.ID == "" || req.Action == "save" && !validSessionID(req.JobID) {
-		writeError(w, 400, "联合来源目录操作无效")
+		writeMessage(w, 400, "service.compositionStore.invalidDirectoryOperationsJointSources")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "工作簿已切换，联合来源未保存")
+		writeMessage(w, 409, "service.compositionStore.workbookSwitchedCombinedSourceNot")
 		return
 	}
 	a.cacheMu.RLock()
@@ -259,7 +260,7 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 		// the exact previously committed capture may bypass re-preparation.
 		item, revision, found, err := findSavedCompositionCapture(path, req.JobID, req.ID)
 		if err != nil {
-			writeError(w, 422, err.Error())
+			writeFailure(w, 422, err)
 			return
 		}
 		if found {
@@ -267,7 +268,7 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 			current := a.wb == wb && !a.maintenance
 			a.mu.RUnlock()
 			if !current {
-				writeError(w, 409, "工作簿已切换，保存确认未接受")
+				writeMessage(w, 409, "service.compositionStore.workbookSwitchedSaveConfirmationNot")
 				return
 			}
 			writeJSON(w, map[string]any{"id": item.ID, "revision": revision})
@@ -278,12 +279,12 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 	if req.Action == "save" {
 		source, err := a.borrowCompositionTask(req.JobID, wb)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer source.close()
 		if err := a.compositionReferencesCurrent(r.Context(), source); err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		value = savedComposition{ID: req.ID, CaptureID: req.JobID, Definition: source.data.plan.Definition()}
@@ -294,7 +295,7 @@ func (a *App) handleCompositionDefinitions(w http.ResponseWriter, r *http.Reques
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
-		writeError(w, 409, "工作簿已切换或保存已取消")
+		writeMessage(w, 409, "service.compositionStore.workbookSwitchedOrSaveOperation")
 		return
 	}
 	var revision int64

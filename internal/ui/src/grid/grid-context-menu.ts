@@ -1,6 +1,7 @@
 /**
  * Grid context menus, cell hover tooltip, zoom, fullscreen, and modal dialog helpers.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { CellRef } from '../contracts/common.ts';
 import type { CellData, CellHyperlink } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -153,18 +154,18 @@ export class GridControls {
       const head = document.createElement('b');
       head.textContent = `${ref}  `;
       const text = document.createElement('span');
-      text.textContent = value === '' ? '（空白）' : value;
+      text.textContent = value === '' ? localize('ui.common.empty') : value;
       const content: Node[] = [head, text];
       if (cell.hyperlink) {
         const hint = document.createElement('span');
         hint.className = 'tooltip-formula tooltip-hyperlink';
-        hint.textContent = `跳转至：${linkDescription(cell.hyperlink)}${visited ? '（已访问）' : ''}`;
+        hint.textContent = localize('ui.gridContextMenu.navigate', { linkDescription: linkDescription(cell.hyperlink), detail: visited ? localize('ui.gridContextMenu.visited') : '' });
         content.push(hint);
       }
       if (cell.raw !== undefined && cell.raw !== '' && cell.raw !== value) {
         const raw = document.createElement('span');
         raw.className = 'tooltip-formula';
-        raw.textContent = `原始值：${cell.raw}`;
+        raw.textContent = localize('ui.gridContextMenu.originalValue', { raw: cell.raw });
         content.push(raw);
       }
       if (cell.hasFormula && cell.formula) {
@@ -236,14 +237,14 @@ export class GridControls {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
       else await document.exitFullscreen();
     } catch (error: unknown) {
-      toast(`无法切换全屏：${errorMessage(error)}`, 'error');
+      toast(localize('ui.gridContextMenu.unableSwitchFullScreen', { detail: errorMessage(error) }), 'error');
     }
   }
 
   updateFullscreenButton(): void {
     const { icon, scheduleViewport } = this.d;
     const full = Boolean(document.fullscreenElement);
-    requireButton('fullscreenBtn').innerHTML = icon('fullscreen') + (full ? '退出全屏' : '全屏');
+    requireButton('fullscreenBtn').innerHTML = icon('fullscreen') + (full ? localize('ui.gridContextMenu.exitFullScreen') : localize('ui.gridContextMenu.fullScreen'));
     setTimeout(() => scheduleViewport(true), 80);
   }
 
@@ -307,14 +308,14 @@ export class GridControls {
       const menu = requireEl('sizeContextMenu');
       const multi = Boolean(span && span.start !== span.end);
       requireButton('sizeContextAdjust').textContent =
-        kind === 'row' ? `设置第 ${index} 行高度…` : `设置 ${colName(index)} 列宽度…`;
+        kind === 'row' ? localize('ui.gridContextMenu.setHeightThRow', { index }) : localize('ui.gridContextMenu.columnWidthSet', { colName: colName(index) });
       for (const id of ['sizeContextAdjust', 'sizeContextFit', 'sizeContextReset']) {
         requireButton(id).hidden = multi;
       }
       requireButton('sizeContextAdjust').disabled = kind === 'row' && S.filtered;
       requireButton('sizeContextReset').disabled = kind === 'row' && S.filtered;
-      requireButton('sizeContextHideCol').textContent = multi ? '隐藏选中列' : '隐藏此列';
-      requireButton('sizeContextShowCol').textContent = '显示隐藏列';
+      requireButton('sizeContextHideCol').textContent = multi ? localize('ui.gridContextMenu.hideSelectedColumns') : localize('ui.gridContextMenu.hideThisColumn');
+      requireButton('sizeContextShowCol').textContent = localize('ui.gridContextMenu.displayHiddenColumns');
       requireButton('sizeContextHideCol').hidden = kind !== 'col' || !hasColumnOfType(span, false);
       requireButton('sizeContextShowCol').hidden = kind !== 'col' || !hasColumnOfType(span, true);
       this.positionCellMenu(menu, event.clientX, event.clientY);
@@ -345,7 +346,7 @@ export class GridControls {
     requireButton('menuOpenHyperlink').hidden = !S.selected?.hyperlink;
     if (S.selected?.hyperlink) {
       requireButton('menuOpenHyperlink').textContent =
-        S.selected.hyperlink.kind === 'internal' ? '跳转到链接位置' : '打开超链接';
+        S.selected.hyperlink.kind === 'internal' ? localize('ui.gridContextMenu.jumpLinkLocation') : localize('ui.gridContextMenu.openHyperlinks');
     }
     this.positionCellMenu(requireEl('cellMenu'), event.clientX, event.clientY);
   }

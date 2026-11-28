@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"strings"
@@ -14,6 +14,7 @@ import (
 
 	"excellens/internal/checkpoint"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/searchdsl"
 	"excellens/internal/searchservice"
 	"excellens/internal/workbook"
@@ -44,14 +45,14 @@ type searchRequest struct {
 func (req *searchRequest) normalize() error {
 	req.Query = strings.TrimSpace(req.Query)
 	if req.Query == "" {
-		return errors.New("请输入搜索内容")
+		return i18n.Error("service.searchCheckpoint.enterSearchContent")
 	}
 	maximum := 256
 	if req.Mode == "advanced" {
 		maximum = searchdsl.MaxQueryLength
 	}
 	if len(req.Query) > maximum {
-		return fmt.Errorf("搜索内容不能超过 %d 个字符", maximum)
+		return i18n.Error("service.searchCheckpoint.searchContentCannotExceedCharacters", i18n.Args{"maximum": maximum})
 	}
 	if req.Mode != "value" && req.Mode != "reference" && req.Mode != "advanced" {
 		req.Mode = "formula"
@@ -130,7 +131,7 @@ func searchTaskDefinition(wb *workbook.Workbook, req searchRequest) (checkpoint.
 
 func (a *App) startCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *workbook.Workbook, req searchRequest) {
 	if req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "搜索来源已切换，请重新运行")
+		writeMessage(w, 409, "service.searchCheckpoint.searchSourceSwitchedRunProcess")
 		return
 	}
 	if !a.admitCheckpoint(w) {
@@ -172,7 +173,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 	ctx, cancel := context.WithCancel(context.Background())
 	m := lease.Snapshot()
 	job := &SearchJob{Full: req.Full, Ticket: randomID(), ID: randomID(), TaskID: m.ID, Sheet: req.Sheet, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
-		Status: "running", Stage: "准备搜索", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), checkpoint: run}
+		Status: "running", Stage: "stage.task.readyToSearch", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), checkpoint: run}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
@@ -181,7 +182,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 			checkpointHTTPError(w, err)
 			return
 		}
-		writeError(w, 409, "搜索来源已切换或请求已取消，请重试")
+		writeMessage(w, 409, "service.searchCheckpoint.searchSourceSwitchedOrRequest")
 		return
 	}
 	if !pruneSearchJobsLocked(a.searchJobs, formats.QueryTaskHistory) {
@@ -191,7 +192,7 @@ func (a *App) queueCheckpointSearch(w http.ResponseWriter, r *http.Request, wb *
 			checkpointHTTPError(w, err)
 			return
 		}
-		writeError(w, http.StatusTooManyRequests, "正在回收搜索任务，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.searchCheckpoint.recoveringSearchTaskTryAgain")
 		return
 	}
 	a.searchJobs[job.ID] = job
@@ -272,13 +273,13 @@ func (a *App) runCheckpointSearch(wb *workbook.Workbook, job *SearchJob) {
 	defer job.mu.Unlock()
 	if err != nil {
 		if job.ctx.Err() != nil || errors.Is(err, context.Canceled) {
-			job.Status, job.Stage = "cancelled", "已取消"
+			job.Status, job.Stage = "cancelled", "stage.task.cancelled"
 		} else {
 			job.Status, job.Error = "error", err.Error()
 		}
 		return
 	}
-	job.Status, job.Stage, job.Progress = "done", "搜索完成", 100
+	job.Status, job.Stage, job.Progress = "done", "stage.task.searchCompleted", 100
 }
 
 func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error {
@@ -309,7 +310,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 		job.SheetsDone, job.SheetsTotal = cursor.Sheet, len(spec.Sheets)
 		fraction := float64(next) / float64(max(1, cursor.Rows))
 		job.Progress = (float64(cursor.Sheet) + fraction) / float64(len(spec.Sheets)) * 100
-		job.Stage = "搜索 · " + spec.Sheets[cursor.Sheet].Name
+		job.Stage = "stage.task.search" + spec.Sheets[cursor.Sheet].Name
 		job.mu.Unlock()
 	}
 	policy, err := indexPolicy(wb, m)
@@ -324,7 +325,7 @@ func (a *App) scanCheckpointSearch(wb *workbook.Workbook, job *SearchJob) error 
 		idx := wb.GetCachedIndex(meta.Path)
 		if idx == nil {
 			if cursor.Index != "" && !policy.rebuild {
-				return errors.New("搜索恢复所需索引已被清理，请重新运行")
+				return i18n.Error("service.searchCheckpoint.searchRecoveryIndexClearedRun")
 			}
 			releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
 			if admissionErr != nil {

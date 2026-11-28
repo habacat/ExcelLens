@@ -3,6 +3,7 @@
  * All values come from Go's exact numeric scan of the original workbook, not
  * from cached visible DOM cells or JavaScript floating-point arithmetic.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { SelectionStatsResponse } from '../contracts/features.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -22,18 +23,18 @@ export type SelectionStatsMetric =
 export type SelectionStatsFormat = 'units' | 'thousands' | 'myriad' | 'plain';
 
 const METRICS: readonly (readonly [SelectionStatsMetric, string, string])[] = [
-  ['average', '平均值', 'A'],
-  ['nonEmpty', '计数', 'C'],
-  ['number', '数值计数', 'O'],
-  ['minimum', '最小值', 'I'],
-  ['maximum', '最大值', 'M'],
-  ['sum', '求和', 'S'],
+  ['average', localize('ui.selectionStats.averageValue'), 'A'],
+  ['nonEmpty', localize('ui.common.count'), 'C'],
+  ['number', localize('ui.selectionStats.numericalCounts'), 'O'],
+  ['minimum', localize('ui.selectionStats.minimumValue'), 'I'],
+  ['maximum', localize('ui.selectionStats.maximumValue'), 'M'],
+  ['sum', localize('ui.common.sum'), 'S'],
 ];
 
 const FORMATS: readonly (readonly [Exclude<SelectionStatsFormat, 'plain'>, string, string])[] = [
-  ['units', '带中文单位分隔', 'H'],
-  ['thousands', '使用千位分隔符', 'T'],
-  ['myriad', '按万位分隔', 'E'],
+  ['units', localize('ui.selectionStats.chineseUnitSeparators'), 'H'],
+  ['thousands', localize('ui.selectionStats.usingThousandsSeparator'), 'T'],
+  ['myriad', localize('ui.selectionStats.separatedThousands'), 'E'],
 ];
 
 const SETTINGS_KEY = 'ExcelLens.selectionStats';
@@ -102,7 +103,7 @@ export function formatStatusNumber(
     groups.unshift(digits.slice(Math.max(0, end - size), end));
   }
   if (mode !== 'units') return sign + groups.join(',') + frac + approx;
-  const units = ['', '万', '亿', '万亿'] as const;
+  const units = ['', localize('ui.selectionStats.tenThousand'), localize('ui.selectionStats.hundredMillion'), localize('ui.selectionStats.lastWeek')] as const;
   let result = '';
   groups.forEach((group, i) => {
     const power = groups.length - i - 1;
@@ -176,10 +177,10 @@ export class SelectionStats {
         if (typeof clipboard?.writeText === 'function') {
           clipboard
             .writeText(value)
-            .then(() => this.toast('已复制', 'success'))
-            .catch(() => this.toast('无法复制统计结果', 'error'));
+            .then(() => this.toast(localize('ui.common.copiedSuccessfully'), 'success'))
+            .catch(() => this.toast(localize('ui.selectionStats.unableCopyStatisticalResults'), 'error'));
         } else {
-          this.toast('当前环境不支持直接复制，请使用系统剪贴板快捷键', 'warning');
+          this.toast(localize('ui.selectionStats.currentEnvironmentDoesNotSupport'), 'warning');
         }
         return;
       }
@@ -189,7 +190,7 @@ export class SelectionStats {
       }
       const areas = MultiSelection.areas(this.s, true);
       if (areas.length > 1) {
-        this.toast('多选区精确统计显示在状态栏；详细分析可选择一个连续区域');
+        this.toast(localize('ui.selectionStats.preciseStatisticsMultipleSelectionsDisplayed'));
         return;
       }
       this.profile();
@@ -360,15 +361,15 @@ export class SelectionStats {
       return sum + rows * (Math.abs(a.col2 - a.col1) + 1);
     }, 0);
     if (areas.length > MultiSelection.LIMIT || upper > 400000) {
-      this.status = '超出即时统计限额';
+      this.status = localize('ui.selectionStats.exceedsImmediateStatisticsLimit');
       this.updateMenu();
       this.show(
-        ['选区', areas.length > 1 ? `${areas.length} 处` : `${upper.toLocaleString()} 格`],
-        ['统计', this.status],
+        [localize('ui.common.selection'), areas.length > 1 ? localize('ui.selectionStats.atPoint', { count: areas.length }) : localize('ui.selectionStats.grid', { upper: upper.toLocaleString(interfaceLocale()) })],
+        [localize('ui.selectionStats.statistics'), this.status],
       );
       return;
     }
-    this.show(['选区', areas.length > 1 ? `${areas.length} 处` : `${upper.toLocaleString()} 格`]);
+    this.show([localize('ui.common.selection'), areas.length > 1 ? localize('ui.selectionStats.atPoint', { count: areas.length }) : localize('ui.selectionStats.grid', { upper: upper.toLocaleString(interfaceLocale()) })]);
     const filterId = this.s.filtered ? this.s.filterId : '';
     const viewId = this.s.rowView?.id ?? '';
     const effectiveThrough = filterId ? through : 0;
@@ -389,7 +390,7 @@ export class SelectionStats {
       this.render(cached);
       return;
     }
-    this.status = '正在统计…';
+    this.status = localize('ui.selectionStats.counting');
     this.updateMenu();
     const ticket = this.ticket;
     this.timer = setTimeout(() => {
@@ -419,9 +420,9 @@ export class SelectionStats {
           this.render(result);
         } catch (err: unknown) {
           if (ctrl.signal.aborted || ticket !== this.ticket) return;
-          this.status = errorMessage(err) || '统计暂不可用';
+          this.status = errorMessage(err) || localize('ui.selectionStats.statisticsNotAvailableYet');
           this.updateMenu();
-          this.show(['选区', `${areas.length} 处`], ['统计', '暂不可用']);
+          this.show([localize('ui.common.selection'), localize('ui.selectionStats.atPoint', { count: areas.length })], [localize('ui.selectionStats.statistics'), localize('ui.selectionStats.notAvailable')]);
         } finally {
           if (this.abort === ctrl) this.abort = null;
         }

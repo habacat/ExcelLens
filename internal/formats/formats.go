@@ -351,9 +351,9 @@ func Extensions() []string {
 func Accept() string { return strings.Join(Extensions(), ",") }
 
 // DialogFilter returns the paired, double-NUL-terminated Windows filter.
-func DialogFilter() string {
+func DialogFilter(supported, all string) string {
 	patterns := "*" + strings.Join(Extensions(), ";*")
-	return "支持的数据文件 (" + patterns + ")\x00" + patterns + "\x00所有文件 (*.*)\x00*.*\x00\x00"
+	return supported + " (" + patterns + ")\x00" + patterns + "\x00" + all + " (*.*)\x00*.*\x00\x00"
 }
 
 // Sources returns independent presentation metadata for the browser bootstrap.

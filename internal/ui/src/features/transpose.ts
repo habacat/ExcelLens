@@ -2,6 +2,7 @@
  * Bounded transposed reading dialog for a contiguous grid selection.
  * Original CellData and coordinates remain intact in both grid and detail pane.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ToastFn } from '../contracts/common.ts';
 import type { RichTextLimits, TransposeLimits } from '../contracts/formats.ts';
 import type { CellData, VisualStyle } from '../contracts/workbook.ts';
@@ -123,7 +124,7 @@ export class Transpose {
     this.richLimits = options.richLimits;
 
     if (!this.limits.cells || !this.limits.bytes || !this.limits.pageColumns) {
-      throw new Error('转置容量配置不可用');
+      throw new Error(localize('ui.transpose.transposeCapacityConfigurationUnavailable'));
     }
 
     this.dialog = this.create();
@@ -181,7 +182,7 @@ export class Transpose {
     d.id = 'transposeDialog';
     d.setAttribute('aria-labelledby', 'transposeTitle');
     d.innerHTML =
-      '<div class="dialog-head"><div id="transposeTitle" class="dialog-title">转置阅读</div><button id="transposeClose" class="dialog-close" type="button" aria-label="关闭转置阅读">×</button></div><div class="transpose-tools"><span id="transposeSource"></span><select id="transposeMode" class="field-control" aria-label="显示内容"><option value="display">显示值</option><option value="raw">原值</option><option value="formula">公式</option></select><button id="transposeReload" type="button" class="mini-button">重新读取</button><button id="transposeCancel" type="button" class="mini-button" hidden>取消</button></div><div id="transposeBody" class="transpose-body"><table id="transposeTable" role="grid" aria-label="转置选区"></table></div><div class="transpose-pager"><button id="transposePrevious" class="mini-button" type="button" disabled>上一页</button><span id="transposePosition"></span><button id="transposeNext" class="mini-button" type="button" disabled>下一页</button></div><section id="transposeDetail" class="transpose-detail" hidden><div class="transpose-detail-head"><strong id="transposeRef"></strong><span id="transposeType"></span><span class="status-spacer"></span><button id="transposeCopy" class="mini-button" type="button">复制</button><button id="transposeLocate" class="mini-button" type="button">定位原格</button></div><pre id="transposeValue" tabindex="0"></pre><p id="transposeNotice" hidden></p></section><p id="transposeStatus" class="transpose-status" role="status" aria-live="polite" hidden></p>';
+      `<div class="dialog-head"><div id="transposeTitle" class="dialog-title">${localizeHTML('ui.transpose.transposeReading')}</div><button id="transposeClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.transpose.closeTransposedReading')}">×</button></div><div class="transpose-tools"><span id="transposeSource"></span><select id="transposeMode" class="field-control" aria-label="${localizeHTML('ui.transpose.displayContent')}"><option value="display">${localizeHTML('ui.transpose.displayValue')}</option><option value="raw">${localizeHTML('ui.transpose.originalValue')}</option><option value="formula">${localizeHTML('ui.transpose.formula')}</option></select><button id="transposeReload" type="button" class="mini-button">${localizeHTML('ui.transpose.readAgain')}</button><button id="transposeCancel" type="button" class="mini-button" hidden>${localizeHTML('ui.transpose.cancel')}</button></div><div id="transposeBody" class="transpose-body"><table id="transposeTable" role="grid" aria-label="${localizeHTML('ui.transpose.transposeSelections')}"></table></div><div class="transpose-pager"><button id="transposePrevious" class="mini-button" type="button" disabled>${localizeHTML('ui.transpose.previousPage')}</button><span id="transposePosition"></span><button id="transposeNext" class="mini-button" type="button" disabled>${localizeHTML('ui.transpose.nextPage')}</button></div><section id="transposeDetail" class="transpose-detail" hidden><div class="transpose-detail-head"><strong id="transposeRef"></strong><span id="transposeType"></span><span class="status-spacer"></span><button id="transposeCopy" class="mini-button" type="button">${localizeHTML('ui.transpose.copy')}</button><button id="transposeLocate" class="mini-button" type="button">${localizeHTML('ui.transpose.locateOriginalCell')}</button></div><pre id="transposeValue" tabindex="0"></pre><p id="transposeNotice" hidden></p></section><p id="transposeStatus" class="transpose-status" role="status" aria-live="polite" hidden></p>`;
     document.body.append(d);
     return d;
   }
@@ -210,7 +211,7 @@ export class Transpose {
   open(): void {
     if (this.dialog.open) return;
     try {
-      this.snapshot = this.capture({ purpose: '转置', limits: this.limits });
+      this.snapshot = this.capture({ purpose: localize('ui.transpose.transpose'), limits: this.limits });
     } catch (error: unknown) {
       this.toast(errorMessage(error), 'warning');
       return;
@@ -263,7 +264,7 @@ export class Transpose {
 
   cancel(): void {
     this.stop();
-    this.status('已取消');
+    this.status(localize('ui.common.canceled'));
     this.controls();
   }
 
@@ -282,7 +283,7 @@ export class Transpose {
     this.abort = controller;
     this.busy = true;
     this.controls();
-    this.status('正在读取…');
+    this.status(localize('ui.common.reading'));
     const current = (): boolean =>
       serial === this.serial &&
       !controller.signal.aborted &&
@@ -308,7 +309,7 @@ export class Transpose {
       this.status('');
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
-        this.status(`${errorMessage(error)}${this.data ? '（保留上次内容）' : ''}`, true);
+        this.status(`${errorMessage(error)}${this.data ? localize('ui.transpose.contentRemainsSameAsLast') : ''}`, true);
       }
     } finally {
       if (serial === this.serial) {
@@ -349,7 +350,7 @@ export class Transpose {
     const line = makeEl('tr');
     const width = Math.min(this.columns, this.data.rows.length - this.start);
     const warnings = new Set<string>();
-    line.append(makeEl('th', '', '源列 / 源行'));
+    line.append(makeEl('th', '', localize('ui.transpose.sourceColumnSourceRow')));
     for (let index = this.start; index < this.start + width; index++) {
       const row = this.data.rows[index];
       if (!row) continue;
@@ -414,7 +415,7 @@ export class Transpose {
         const cell = item.cell;
         const value = transposeValue(item, this.mode, state.showStyles);
         const text =
-          value === null ? (this.mode === 'formula' ? '公式不可还原' : '无保存结果') : value;
+          value === null ? (this.mode === 'formula' ? localize('ui.transpose.formulasBeRestored') : localize('ui.transpose.noSavedResults')) : value;
         const td = makeEl('td');
         const button = makeEl('button', 'transpose-cell');
         const node = makeSpanCell('transpose-cell-value');
@@ -455,7 +456,7 @@ export class Transpose {
         button.classList.toggle('is-selected', isSelected);
         button.setAttribute(
           'aria-label',
-          `${item.ref} ${cell ? cellSourceTypeLabel(cell) : '空白'}`,
+          `${item.ref} ${cell ? cellSourceTypeLabel(cell) : localize('ui.common.blank')}`,
         );
         button.setAttribute('aria-selected', String(isSelected));
         button.onclick = () => {
@@ -501,9 +502,9 @@ export class Transpose {
     this.selectedItem = item;
     requireEl('transposeDetail').hidden = false;
     requireEl('transposeRef').textContent = item.ref;
-    requireEl('transposeType').textContent = item.cell ? cellSourceTypeLabel(item.cell) : '空白';
+    requireEl('transposeType').textContent = item.cell ? cellSourceTypeLabel(item.cell) : localize('ui.common.blank');
     requireEl('transposeValue').textContent =
-      value === null ? (this.mode === 'formula' ? '公式不可还原' : '公式无保存结果') : value;
+      value === null ? (this.mode === 'formula' ? localize('ui.transpose.formulasBeRestored') : localize('ui.transpose.formulasHaveNoSavedResults')) : value;
     const notes = [item.notice, item.cell?.conditional?.notice].filter((n): n is string =>
       Boolean(n),
     );

@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/csv"
-	"errors"
+
 	"net/http"
 	"os"
 	"strconv"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	excelExport "excellens/internal/export"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -23,14 +24,14 @@ func (a *App) handleClusterExport(w http.ResponseWriter, r *http.Request) {
 		ProtectCSV bool   `json:"protectCSV"`
 	}
 	if decodeClusterRequest(w, r, &req) != nil {
-		writeError(w, 400, "候选清单导出参数无效")
+		writeMessage(w, 400, "service.clusteringExport.invalidExportParametersCandidateList")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	owner, snapshot, err := a.clusterSnapshot(r.Context(), req.JobID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	job, err := a.newExportJob(owner.Workbook, "csv")
@@ -53,7 +54,7 @@ func (a *App) handleClusterExport(w http.ResponseWriter, r *http.Request) {
 		defer a.cacheMu.RUnlock()
 		check := func() error {
 			if owner.Index != nil && owner.Workbook.GetCachedIndex(owner.Meta.Path) != owner.Index {
-				return errors.New("聚类来源索引已更换，请重新检查后导出")
+				return i18n.Error("service.clusteringExport.clusteringSourceIndexChangedRecheck")
 			}
 			return a.checkClusterSource(job.ctx, owner.Workbook, snapshot)
 		}
@@ -62,7 +63,7 @@ func (a *App) handleClusterExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		job.mu.Lock()
-		job.Status, job.Stage = "running", "导出疑似重复候选清单"
+		job.Status, job.Stage = "running", "stage.task.exportSuspectedDuplicateCandidateList"
 		job.mu.Unlock()
 		name := safeExportBase(job.wb.DisplayName) + "_疑似重复_" + job.ID[:6] + ".csv"
 		var rows int64
@@ -115,7 +116,7 @@ func (a *App) handleClusterExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		job.mu.Lock()
-		job.Status, job.Stage, job.Progress = "done", "候选清单已导出", 100
+		job.Status, job.Stage, job.Progress = "done", "stage.task.candidateListHasBeenExported", 100
 		job.DoneRows, job.TotalRows, job.Finished = rows, rows, time.Now()
 		job.mu.Unlock()
 	}()

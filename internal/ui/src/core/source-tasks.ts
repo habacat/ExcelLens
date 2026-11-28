@@ -2,6 +2,7 @@
  * Asynchronous source preparation task runner shared by composition and relation
  * workflows. Each preparation owns its own runtime token, including late starts.
  */
+import { t as localize } from './i18n.ts';
 import type { ActivityHandle, ActivityService, ApiClient } from '../contracts/common.ts';
 import type { AsyncJobProgress } from '../contracts/common.ts';
 import { decodeSourceTaskProgress, decodeSourceTaskStartResponse } from './http-decoders.generated.ts';
@@ -20,9 +21,9 @@ export interface SourceTaskProgress extends Omit<AsyncJobProgress, 'done' | 'tot
 
 function progressCount(value: number | string | undefined): number | undefined {
   if (value === undefined) return undefined;
-  if (typeof value === 'string' && !/^(0|[1-9]\d*)$/.test(value)) throw new Error('来源任务的进度计数无效');
+  if (typeof value === 'string' && !/^(0|[1-9]\d*)$/.test(value)) throw new Error(localize('ui.sourceTasks.progressCountSourceTaskInvalid'));
   const count = Number(value);
-  if (count < 0) throw new Error('来源任务的进度计数无效');
+  if (count < 0) throw new Error(localize('ui.sourceTasks.progressCountSourceTaskInvalid'));
   return Number.isSafeInteger(count) ? count : undefined;
 }
 
@@ -56,7 +57,7 @@ interface PendingRecord {
 const VALID_STATUSES = new Set<string>(['queued', 'running', 'done', 'error', 'cancelled']);
 
 function makeAbortError(): Error {
-  const err = new Error('联合来源准备已取消');
+  const err = new Error(localize('ui.sourceTasks.preparationCombinedSourcesCanceled'));
   err.name = 'AbortError';
   return err;
 }
@@ -75,7 +76,7 @@ export class SourceTasks {
     this.context = options.context;
     this.sleep = options.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
     this.endpoint = options.endpoint ?? '/api/composition';
-    this.label = options.label ?? '来源';
+    this.label = options.label ?? localize('ui.common.source');
     this.activity = options.activity;
   }
 
@@ -110,7 +111,7 @@ export class SourceTasks {
     const record: PendingRecord = {
       id: '',
       cancelled: false,
-      activity: this.activity?.begin(`正在准备${this.label}`) ?? null,
+      activity: this.activity?.begin(localize('ui.sourceTasks.preparing', { label: this.label })) ?? null,
     };
     this.pending.add(record);
     const current = (): boolean => {
@@ -132,7 +133,7 @@ export class SourceTasks {
       }).then(decodeSourceTaskStartResponse);
       if (typeof start.jobId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(start.jobId)) {
         record.id = '';
-        throw new Error(`${this.label}任务未创建，请重试`);
+        throw new Error(localize('ui.sourceTasks.taskNotCreatedYetTry', { label: this.label }));
       }
       record.id = start.jobId;
       if (!current()) throw makeAbortError();
@@ -150,11 +151,11 @@ export class SourceTasks {
           (status.id !== undefined && status.id !== record.id) ||
           (status.jobId !== undefined && status.jobId !== record.id)
         ) {
-          throw new Error(`${this.label}任务状态无效，请重试`);
+          throw new Error(localize('ui.sourceTasks.taskStatusInvalidTryAgain', { label: this.label }));
         }
         if (status.status === 'done') break;
         if (status.status === 'error' || status.status === 'cancelled') {
-          throw new Error(status.error || '来源准备未完成');
+          throw new Error(status.error || localize('ui.sourceTasks.sourcePreparationNotCompleted'));
         }
         await this.sleep(250);
         if (!current()) throw makeAbortError();
@@ -165,7 +166,7 @@ export class SourceTasks {
       );
       if (!current()) throw makeAbortError();
       if (result.id !== record.id || result.workbookKey !== c.bookKey || result.book !== c.book) {
-        throw new Error('来源响应已变化，请重新准备');
+        throw new Error(localize('ui.sourceTasks.sourceResponseChangedPrepareAgain'));
       }
       accepted = true;
       return { ...result, id: record.id };

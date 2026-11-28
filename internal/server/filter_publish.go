@@ -13,9 +13,9 @@ func failFilterJob(job *FilterJob, err error) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
 	if job.ctx.Err() != nil || errors.Is(err, context.Canceled) || err.Error() == "filter cancelled" {
-		job.Status, job.Stage = "cancelled", "已取消"
+		job.Status, job.Stage = "cancelled", "stage.task.cancelled"
 	} else {
-		job.Status, job.Stage, job.Error = "error", "筛选失败", err.Error()
+		job.Status, job.Stage, job.Error = "error", "stage.task.filterFailure", err.Error()
 	}
 }
 
@@ -43,7 +43,7 @@ func (a *App) publishFilterResult(wb *workbook.Workbook, meta workbook.SheetMeta
 		return
 	}
 	job.mu.Lock()
-	job.Status, job.Stage, job.Progress = "done", "筛选完成", 100
+	job.Status, job.Stage, job.Progress = "done", "stage.task.filterCompleted", 100
 	job.Scanned, job.ResultID = job.Total, result.ID
 	job.mu.Unlock()
 }

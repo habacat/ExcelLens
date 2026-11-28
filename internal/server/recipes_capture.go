@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/recipe"
 	"excellens/internal/workbook"
 )
@@ -54,30 +55,30 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 		Format      string `json:"format"`
 	}
 	if decodeAnalysis(r, &req) != nil || (req.Format != "csv" && req.Format != "xlsx") {
-		writeError(w, 400, "分析方案捕获参数无效")
+		writeMessage(w, 400, "service.recipesCapture.analysisPlanCaptureParametersInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	wb := a.currentWorkbook()
 	if wb == nil || req.Book != sourceBookID(wb) || req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，请重新选择分析结果")
+		writeMessage(w, 409, "service.recipesCapture.workbookSwitchedSelectAnalysisResult")
 		return
 	}
 	original := a.getAnalysisJob(req.JobID)
 	if original == nil {
-		writeError(w, 409, "分析结果已过期，请先重新运行分析")
+		writeMessage(w, 409, "service.recipesCapture.analysisResultsHaveExpiredRun")
 		return
 	}
 	original.mu.RLock()
 	if original.Status != "done" || original.Workbook != wb || original.SourceStamp == "" {
 		original.mu.RUnlock()
-		writeError(w, 409, "分析结果未完成或缺少来源快照")
+		writeMessage(w, 409, "service.recipesCapture.analysisResultIncompleteOrSource")
 		return
 	}
 	if original.Query.Composition != nil {
 		original.mu.RUnlock()
-		writeError(w, 409, "联合来源请保存报表；分析方案捕获尚未接入")
+		writeMessage(w, 409, "service.recipesCapture.saveReportJointSourcesAnalysis")
 		return
 	}
 	encoded, _ := json.Marshal(original.Query)
@@ -88,7 +89,7 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 		captured, err = original.SourceRows.retain()
 		if err != nil {
 			original.mu.RUnlock()
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 	}
@@ -96,13 +97,13 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 	defer captured.close()
 	var query analysis.Query
 	if json.Unmarshal(encoded, &query) != nil {
-		writeError(w, 400, "分析配置无法捕获")
+		writeMessage(w, 400, "service.recipesCapture.analysisConfigurationCannotCapture")
 		return
 	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != wb || a.maintenance {
-		writeError(w, 409, "工作簿已切换或正在维护，未捕获分析方案")
+		writeMessage(w, 409, "service.recipesCapture.workbookSwitchedOrUnderMaintenance")
 		return
 	}
 	a.recipeMu.Lock()
@@ -111,7 +112,7 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-old.done:
 		default:
-			writeError(w, 429, "已有分析方案捕获任务，请先完成或取消")
+			writeMessage(w, 429, "service.recipesCapture.thereAlreadyAnalysisPlanCapture")
 			return
 		}
 	}
@@ -125,7 +126,7 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 		delete(a.recipeCaptures, oldest.ID)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &recipeCaptureTask{ID: randomID(), Workbook: wb, Query: query, SourceStamp: stamp, Format: req.Format, Status: "queued", Stage: "等待字段类型捕获", Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), release: a.pinWorkbooks(wb)}
+	job := &recipeCaptureTask{ID: randomID(), Workbook: wb, Query: query, SourceStamp: stamp, Format: req.Format, Status: "queued", Stage: "stage.task.waitingForFieldTypeCapture", Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), release: a.pinWorkbooks(wb)}
 	if captured != nil {
 		job.SourceRows, _ = captured.retain()
 	}
@@ -137,9 +138,9 @@ func (a *App) handleRecipeCaptureStart(w http.ResponseWriter, r *http.Request) {
 func (job *recipeCaptureTask) fail(err error) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
-	job.Status, job.Stage, job.Error = "error", "分析方案捕获失败", err.Error()
+	job.Status, job.Stage, job.Error = "error", "stage.task.analysisPlanCaptureFailed", err.Error()
 	if errors.Is(err, context.Canceled) {
-		job.Status, job.Stage, job.Error = "cancelled", "分析方案捕获已取消", ""
+		job.Status, job.Stage, job.Error = "cancelled", "stage.task.analysisPlanCaptureCancelled", ""
 	}
 }
 
@@ -157,7 +158,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 	defer a.cacheMu.RUnlock()
 	wb, q := job.Workbook, job.Query
 	job.mu.Lock()
-	job.Status, job.Stage = "running", "核对已完成分析的来源"
+	job.Status, job.Stage = "running", "stage.task.sourceThatAnalyzedVerified"
 	job.mu.Unlock()
 	ref := reconcileSourceRef{Book: sourceBookID(wb), Source: q.Source, HeaderRow: q.HeaderRow}
 	if strings.HasPrefix(q.Source, "scratch:") {
@@ -170,7 +171,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 	}
 	needed := analysis.RequiredFields(q)
 	if len(needed) > analysis.MaxSourceFields {
-		job.fail(errors.New("分析方案引用字段超过当前分析容量"))
+		job.fail(i18n.Error("service.recipesCapture.analysisPlanExceedsCurrentAnalysis"))
 		return
 	}
 	fields := make([]recipe.Field, 0, len(needed))
@@ -179,7 +180,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 	for _, id := range needed {
 		column, e := strconv.Atoi(strings.TrimPrefix(id, "C"))
 		if e != nil || column < 1 || column > analysis.MaxSourceColumns || column > len(meta.Info.Fields) {
-			job.fail(fmt.Errorf("分析方案字段%s不存在或超出当前分析范围", id))
+			job.fail(i18n.Error("service.recipesCapture.analysisSchemeFieldDoesNot", i18n.Args{"id": id}))
 			return
 		}
 		f := sourceFields[column-1]
@@ -202,7 +203,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 	}
 	defer src.close()
 	if src.stamp() != job.SourceStamp {
-		job.fail(errors.New("分析来源已修改，请重新运行分析后保存分析方案"))
+		job.fail(i18n.Error("service.recipesCapture.analysisSourceModifiedRunAnalysis"))
 		return
 	}
 	if err := analysis.Validate(q, src.fields); err != nil {
@@ -210,7 +211,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 		return
 	}
 	job.mu.Lock()
-	job.Stage, job.Total = "逐行捕获实际读取类型", int64(src.total)
+	job.Stage, job.Total = "stage.task.captureActualTypeDataRead", int64(src.total)
 	job.mu.Unlock()
 	if len(needed) > 0 {
 		var scanned int64
@@ -226,7 +227,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 			return job.ctx.Err()
 		})
 		if err == nil && scanned != int64(src.total) {
-			err = errors.New("字段类型捕获未完整扫描来源")
+			err = i18n.Error("service.recipesCapture.fieldTypeCaptureDidNot")
 		}
 		if err != nil {
 			job.fail(err)
@@ -237,7 +238,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 		mask := recipeTypeMask(fields[i].Mask)
 		fields[i].Uncertain = mask.uncertain()
 		if mask == 0 || fields[i].Uncertain {
-			job.fail(fmt.Errorf("字段%s的读取类型为%s，请先在普通分析中核对；未保存分析方案", fields[i].Name, mask.label()))
+			job.fail(i18n.Error("service.recipesCapture.readingTypeFieldVerifyThis", i18n.Args{"value": fields[i].Name, "label": mask.label()}))
 			return
 		}
 	}
@@ -253,7 +254,7 @@ func (a *App) runRecipeCapture(job *recipeCaptureTask) {
 		job.fail(job.ctx.Err())
 		return
 	}
-	job.Draft, job.Status, job.Stage, job.Progress = draft, "done", "字段类型捕获完成，尚未保存", int64(src.total)
+	job.Draft, job.Status, job.Stage, job.Progress = draft, "done", "stage.task.fieldTypeCaptureCompleteBut", int64(src.total)
 	job.mu.Unlock()
 }
 
@@ -264,11 +265,11 @@ func (a *App) handleRecipeCaptureStatus(w http.ResponseWriter, r *http.Request) 
 	}
 	job := a.getRecipeCapture(r.URL.Query().Get("id"))
 	if job == nil || a.currentWorkbook() != job.Workbook {
-		writeError(w, 404, "分析方案捕获已过期或工作簿已切换")
+		writeMessage(w, 404, "service.recipesCapture.analysisPlanCapturedExpiredData")
 		return
 	}
 	job.mu.RLock()
-	out := map[string]any{"status": job.Status, "stage": job.Stage, "error": job.Error, "progress": job.Progress, "total": job.Total}
+	out := map[string]any{"status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "error": job.Error, "progress": job.Progress, "total": job.Total}
 	if job.Status == "done" {
 		out["result"] = map[string]any{"captureId": job.ID, "fields": job.Draft.Fields, "steps": len(job.Draft.Steps), "origin": job.Draft.Origin}
 	}
@@ -285,7 +286,7 @@ func (a *App) handleRecipeCaptureCancel(w http.ResponseWriter, r *http.Request) 
 		ID string `json:"id"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "捕获任务参数无效")
+		writeMessage(w, 400, "service.recipesCapture.captureInvalidTaskParameters")
 		return
 	}
 	if job := a.getRecipeCapture(req.ID); job != nil {
@@ -307,18 +308,18 @@ func (a *App) handleRecipeCaptureCommit(w http.ResponseWriter, r *http.Request) 
 		ExpectedRevision *int64 `json:"expectedRevision"`
 	}
 	if decodeAnalysis(r, &req) != nil || req.ExpectedRevision == nil || !recipe.ValidName(strings.TrimSpace(req.Name)) {
-		writeError(w, 400, "分析方案名称或保存参数无效")
+		writeMessage(w, 400, "service.recipesCapture.invalidAnalysisPlanNameOr")
 		return
 	}
 	job := a.getRecipeCapture(req.ID)
 	if job == nil {
-		writeError(w, 409, "分析方案捕获已过期，请重新捕获")
+		writeMessage(w, 409, "service.recipesCapture.analysisPlanExpiredCaptureAgain")
 		return
 	}
 	job.mu.RLock()
 	if job.Status != "done" || job.ctx.Err() != nil {
 		job.mu.RUnlock()
-		writeError(w, 409, "分析方案捕获未完成或已取消")
+		writeMessage(w, 409, "service.recipesCapture.analysisPlanCaptureUncompletedOr")
 		return
 	}
 	value := job.Draft
@@ -328,7 +329,7 @@ func (a *App) handleRecipeCaptureCommit(w http.ResponseWriter, r *http.Request) 
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != wb || req.Book != sourceBookID(wb) || req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，分析方案未保存")
+		writeMessage(w, 409, "service.recipesCapture.workbookSwitchedAnalysisPlanNot")
 		return
 	}
 	revision, err := saveCapturedRecipe(value, *req.ExpectedRevision)
@@ -337,7 +338,7 @@ func (a *App) handleRecipeCaptureCommit(w http.ResponseWriter, r *http.Request) 
 		if errors.Is(err, errRecipeRevision) || errors.Is(err, errRecipeName) {
 			code = 409
 		}
-		writeError(w, code, err.Error())
+		writeFailure(w, code, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": value.ID, "revision": revision})

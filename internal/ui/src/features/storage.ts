@@ -2,6 +2,7 @@
  * Local storage usage, backup/restore/migration jobs, conditional-stats cache budget,
  * and source-file relocation dialog controller.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import { errorMessage, formatBytes } from '../core/display-format.ts';
 import { byId, requireButton, requireDialog, requireEl, requireInput, requireSelect } from '../core/dom.ts';
@@ -89,37 +90,37 @@ export interface StorageDialogOptions {
 
 const CONFIRMATIONS: Readonly<Record<string, ConfirmOverlayOptions>> = {
   'clear-cache': {
-    title: '清理历史索引',
-    message: '清理未使用的工作簿索引？',
-    confirmLabel: '清理',
+    title: localize('ui.storage.clearHistoricalIndex'),
+    message: localize('ui.storage.wantClearUnusedWorkbookIndexes'),
+    confirmLabel: localize('ui.common.cleanUp'),
     danger: true,
   },
   'clear-conditional-stats': {
-    title: '清理条件统计缓存',
-    message: '清理未使用的条件统计索引？正在使用的索引会保留。',
-    confirmLabel: '清理',
+    title: localize('ui.storage.clearingConditionalStatisticsCache'),
+    message: localize('ui.storage.cleanUpUnusedConditionalStatistics'),
+    confirmLabel: localize('ui.common.cleanUp'),
     danger: true,
   },
   'clear-uploads': {
-    title: '清理闲置上传副本',
-    message: '删除未使用的上传副本？仅存于此处的文件将无法从这里找回。',
-    confirmLabel: '删除',
+    title: localize('ui.storage.cleaningUpIdleUploadCopies'),
+    message: localize('ui.storage.deleteUnusedUploadedCopiesFiles'),
+    confirmLabel: localize('ui.common.delete'),
     danger: true,
   },
 };
 
 const COMMAND_LABELS: Readonly<Record<string, string>> = {
-  backup: '备份',
-  restore: '迁入备份',
-  migrate: '迁入旧设置',
-  'verify-source': '核验来源',
-  'relocate-source': '更新来源',
+  backup: localize('ui.storage.backUp'),
+  restore: localize('ui.storage.migrateBackup'),
+  migrate: localize('ui.storage.migratingOldSettings'),
+  'verify-source': localize('ui.storage.verificationSource'),
+  'relocate-source': localize('ui.storage.updateSource'),
 };
 
 const STAGE_LABELS: Readonly<Record<StorageStageItem['state'], string>> = {
-  active: '正在使用',
-  orphan: '未完成',
-  unknown: '缺少标记，请在目录中核对',
+  active: localize('ui.common.use'),
+  orphan: localize('ui.storage.notCompleted'),
+  unknown: localize('ui.storage.missingTagsCheckTableContents'),
 };
 
 function requireDetails(id: string): HTMLDetailsElement {
@@ -165,7 +166,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
   async function refresh(): Promise<void> {
     const { roots, groups, conditionalStats } = await api('/api/storage', undefined, decodeStorageUsageResponse);
     if (roots) {
-      requireEl('storageRoots').textContent = `用户配置　${roots.config}\n本机数据　${roots.local}`;
+      requireEl('storageRoots').textContent = localize('ui.storage.userConfigurationLocalData', { config: roots.config, local: roots.local });
     }
     const budgetInput = byId('storageConditionalBudget');
     if (conditionalStats && budgetInput instanceof HTMLInputElement) {
@@ -178,9 +179,9 @@ export function initStorageDialog(options: StorageDialogOptions): void {
         const used = formatBytes(conditionalStats.usedBytes ?? conditionalStats.bytes ?? 0);
         const limit = formatBytes(conditionalStats.budgetBytes || 0);
         const active = conditionalStats.protectedFiles
-          ? `（在用 ${conditionalStats.protectedFiles} 个）`
+          ? localize('ui.storage.using', { protectedFiles: conditionalStats.protectedFiles })
           : '';
-        summary.textContent = `当前 ${used} / 上限 ${limit}${active}`;
+        summary.textContent = localize('ui.storage.currentlyUpperLimit', { used, limit, active });
       }
     }
     const fragment = document.createDocumentFragment();
@@ -196,7 +197,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       details.append(summary, paths);
       name.append(details);
       row.append(name);
-      const values = [group.kind ?? '', group.error ? '未知' : formatBytes(group.allocated)];
+      const values = [group.kind ?? '', group.error ? localize('ui.storage.unknown') : formatBytes(group.allocated)];
       for (const value of values) {
         const cell = document.createElement('td');
         cell.textContent = value;
@@ -229,7 +230,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       [item.message, item.error].filter(Boolean).join('。') ||
       [
         p.phase,
-        p.files ? `${p.files} / ${p.items || '…'} 项` : '',
+        p.files ? localize('ui.storage.items', { files: p.files, items: p.items || '…' }) : '',
         p.bytes ? `${formatBytes(p.bytes)}${p.total ? ` / ${formatBytes(p.total)}` : ''}` : '',
       ]
         .filter(Boolean)
@@ -242,10 +243,10 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     holder.replaceChildren();
     for (const item of jobs) {
       const row = document.createElement('div');
-      row.textContent = `${new Date(item.started).toLocaleString()}　${COMMAND_LABELS[item.action] ?? item.action}　${describe(item)}`;
+      row.textContent = `${new Date(item.started).toLocaleString(interfaceLocale())}　${COMMAND_LABELS[item.action] ?? item.action}　${describe(item)}`;
       holder.append(row);
     }
-    if (!jobs.length) holder.textContent = '没有传输记录';
+    if (!jobs.length) holder.textContent = localize('ui.storage.noTransferRecords');
   }
 
   function schedule(ticket: number): void {
@@ -264,9 +265,9 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     requireEl('storageMoves').textContent = item
       ? [
           item.original,
-          ...(item.moves ?? []).map((x) => `${new Date(x.at).toLocaleString()}　${x.to}`),
+          ...(item.moves ?? []).map((x) => `${new Date(x.at).toLocaleString(interfaceLocale())}　${x.to}`),
         ].join('\n')
-      : '没有可重定位的来源';
+      : localize('ui.storage.noRelocationSourcesAvailable');
     requireButton('storageRelocate').disabled = !item;
   }
 
@@ -300,7 +301,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       issueEl.hidden = !historyIssue;
       if (historyIssue) {
         requireEl('storageHistoryReason').textContent =
-          `${historyIssue.reason}。本次传输记录暂存于内存。`;
+          localize('ui.storage.thisTransferRecordTemporarilyStored', { reason: historyIssue.reason });
         const repairBtn = issueEl.querySelector('button');
         if (repairBtn) repairBtn.hidden = !historyIssue.revision;
       }
@@ -338,9 +339,9 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       if (
         !revision ||
         !(await confirmOverlay({
-          title: '重建传输历史',
-          message: '保留原文件作为诊断副本，并使用本次运行的记录重建传输历史？',
-          confirmLabel: '重建',
+          title: localize('ui.storage.rebuildTransferHistory'),
+          message: localize('ui.storage.keepOriginalFileAsDiagnostic'),
+          confirmLabel: localize('ui.storage.reconstruction'),
         }))
       ) {
         return;
@@ -370,7 +371,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     const directoryInput = requireInput('storageDirectory');
     const directory = directoryInput.value.trim();
     if ((action === 'backup' || action === 'restore') && !directory) {
-      show('请输入目录的完整路径', true);
+      show(localize('ui.storage.enterFullPathDirectory'), true);
       directoryInput.focus();
       return;
     }
@@ -380,9 +381,9 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       action === 'backup' &&
       password &&
       !(await confirmOverlay({
-        title: '加密备份',
-        message: '使用此口令加密备份？恢复时需要同一口令。',
-        confirmLabel: '开始备份',
+        title: localize('ui.storage.encryptionBackup'),
+        message: localize('ui.storage.useThisPasswordEncryptionBackup'),
+        confirmLabel: localize('ui.storage.startBackup'),
       }))
     ) {
       return;
@@ -390,7 +391,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     if (isBusy() || !isDialogOpen()) return;
     const ticket = ++serial;
     working(true);
-    show('正在处理…');
+    show(localize('ui.storage.processingProgress'));
     try {
       if (action === 'refresh') {
         await observe(ticket);
@@ -407,13 +408,13 @@ export function initStorageDialog(options: StorageDialogOptions): void {
             const remove = document.createElement('button');
             remove.type = 'button';
             remove.className = 'mini-button';
-            remove.textContent = '清理';
+            remove.textContent = localize('ui.common.cleanUp');
             remove.onclick = async (): Promise<void> => {
               if (
                 !(await confirmOverlay({
-                  title: '清理未完成备份',
+                  title: localize('ui.storage.cleanUpIncompleteBackups'),
                   message: stage.name,
-                  confirmLabel: '清理',
+                  confirmLabel: localize('ui.common.cleanUp'),
                   danger: true,
                 }))
               ) {
@@ -422,7 +423,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
               try {
                 await post('/api/storage', { action: 'clean-stage', directory, stage: stage.name });
                 row.remove();
-                show('已清理未完成备份');
+                show(localize('ui.storage.completedBackupsCleared'));
               } catch (error: unknown) {
                 show(errorMessage(error), true);
               }
@@ -431,7 +432,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
           }
           holder.append(row);
         }
-        if (!stages.length) holder.textContent = '没有未完成的备份';
+        if (!stages.length) holder.textContent = localize('ui.storage.noUnfinishedBackups');
         working(false);
         show('');
         return;
@@ -440,7 +441,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
         const budgetEl = byId('storageConditionalBudget');
         const mb = budgetEl instanceof HTMLInputElement ? Number(budgetEl.value) : Number.NaN;
         if (!Number.isFinite(mb) || mb < 64 || mb > 65536) {
-          show('请输入 64 到 65536 MB 之间的上限', true);
+          show(localize('ui.storage.enterUpperLimitBetweenMb'), true);
           if (budgetEl instanceof HTMLInputElement) budgetEl.focus();
           working(false);
           return;
@@ -480,7 +481,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     void (async () => {
       try {
         await post(`/api/storage/jobs?id=${encodeURIComponent(activeJob)}`, {});
-        show('正在取消…');
+        show(localize('ui.storage.cancelingProgress'));
       } catch (error: unknown) {
         show(errorMessage(error), true);
       }
@@ -498,7 +499,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
     ticket: number,
   ): Promise<StorageJobItem | null> {
     const started = await post('/api/storage/sources', request).then(decodeStorageActionResponse);
-    if (!started.id) throw new Error('来源核验任务启动失败');
+    if (!started.id) throw new Error(localize('ui.storage.sourceVerificationTaskFailedStart'));
     job = started.id;
     while (ticket === serial && isDialogOpen()) {
       const item = await api(
@@ -518,7 +519,7 @@ export function initStorageDialog(options: StorageDialogOptions): void {
       }
       if (item.state !== 'running') {
         job = null;
-        throw new Error(item.error || '来源核验失败');
+        throw new Error(item.error || localize('ui.storage.sourceVerificationFailed'));
       }
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
@@ -541,9 +542,9 @@ export function initStorageDialog(options: StorageDialogOptions): void {
         const checked = await locate(request, ticket);
         if (!checked || ticket !== serial || !isDialogOpen()) return;
         const accepted = await confirmOverlay({
-          title: '确认更新来源位置',
-          message: `内容指纹相符。确认更新来源位置？\n${item.path}\n→ ${checked.candidate ?? ''}`,
-          confirmLabel: '确认更新',
+          title: localize('ui.storage.confirmUpdateSourceLocation'),
+          message: localize('ui.storage.contentFingerprintsMatchConfirmUpdated', { path: item.path, detail: checked.candidate ?? '' }),
+          confirmLabel: localize('ui.storage.confirmUpdate'),
         });
         if (!accepted || ticket !== serial || !isDialogOpen()) return;
         if (await locate({ ...request, path: checked.candidate, confirm: true }, ticket)) {

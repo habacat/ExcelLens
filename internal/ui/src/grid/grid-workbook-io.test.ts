@@ -7,7 +7,14 @@ import {
   makeDefaultWorkbookIODeps,
   makeTestTransport,
 } from '../test-helpers/grid-fixture.ts';
-import { renderSourceIntegrity, WorkbookIO } from './grid-workbook-io.ts';
+import {
+  bindSourceIntegrityControls,
+  collapseSourceIntegrity,
+  expandSourceIntegrity,
+  hideSourceIntegrity,
+  renderSourceIntegrity,
+  WorkbookIO,
+} from './grid-workbook-io.ts';
 
 test('canOpenWorkbook blocks switching while opening, during blocked edit entry, or with unsaved analysis', () => {
   const dom = installDom({ fromIndexHtml: true });
@@ -282,7 +289,66 @@ test('renderSourceIntegrity combines notices and toggles retainDatabaseSnapshot 
     });
     assert.equal(document.getElementById('sourceIntegrityNotice')?.hidden, true);
     assert.equal(document.getElementById('retainDatabaseSnapshot')?.hidden, true);
+    assert.equal(document.getElementById('sourceIntegrityBadge')?.hidden, true);
     assert.equal(formatBytes(2048), '2 KB');
+  } finally {
+    dom.restore();
+  }
+});
+
+test('source integrity banner collapses into the titlebar badge and re-expands cleanly across updates', () => {
+  const dom = installDom({ fromIndexHtml: true });
+  try {
+    bindSourceIntegrityControls();
+    const notice = document.getElementById('sourceIntegrityNotice');
+    const badge = document.getElementById('sourceIntegrityBadge');
+    const closeBtn = document.getElementById('sourceIntegrityCloseBtn');
+    assert.ok(notice && badge && closeBtn);
+
+    const damaged = {
+      format: 'sqlite',
+      incomplete: true,
+      notice: '在线数据库快照存在未完整读取字段',
+      databaseSnapshot: { legacy: true, retained: false },
+    };
+    renderSourceIntegrity(damaged, 'book-a');
+    assert.equal(notice.hidden, false);
+    assert.equal(badge.hidden, true);
+    assert.equal(badge.getAttribute('aria-expanded'), 'true');
+
+    // User closes the yellow bar -> collapses to the yellow exclamation badge on the titlebar.
+    closeBtn.click();
+    assert.equal(notice.hidden, true);
+    assert.equal(badge.hidden, false);
+    assert.equal(badge.getAttribute('aria-expanded'), 'false');
+
+    // Re-rendering the same workbook with the same notice keeps it collapsed.
+    renderSourceIntegrity(damaged, 'book-a');
+    assert.equal(notice.hidden, true);
+    assert.equal(badge.hidden, false);
+
+    // Clicking the badge re-expands the yellow bar.
+    badge.click();
+    assert.equal(notice.hidden, false);
+    assert.equal(badge.hidden, true);
+    assert.equal(badge.getAttribute('aria-expanded'), 'true');
+
+    // Collapsing again, then switching to a different workbook with the same notice shows the bar anew.
+    collapseSourceIntegrity();
+    assert.equal(notice.hidden, true);
+    assert.equal(badge.hidden, false);
+    renderSourceIntegrity(damaged, 'book-b');
+    assert.equal(notice.hidden, false);
+    assert.equal(badge.hidden, true);
+
+    // Returning to welcome hides both the bar and the badge and clears dismissal.
+    collapseSourceIntegrity();
+    hideSourceIntegrity();
+    assert.equal(notice.hidden, true);
+    assert.equal(badge.hidden, true);
+    expandSourceIntegrity();
+    assert.equal(notice.hidden, true);
+    assert.equal(badge.hidden, true);
   } finally {
     dom.restore();
   }

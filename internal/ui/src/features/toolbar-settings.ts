@@ -5,14 +5,19 @@
 import type { SessionService } from '../contracts/common.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { byId, readAppToken } from '../core/dom.ts';
+import { interfaceLocale, languageHeader, t as localize } from '../core/i18n.ts';
+import { reloadHome } from '../core/session.ts';
 import { getOverlayMenus, type AnchorBox, type OverlayMenus } from '../core/overlays.ts';
 import type { AdaptiveToolbar } from './toolbar.ts';
 
 const WATCH_NAME = 'ExcelLens.interface.v1';
+const SETTINGS_CHANGED = 'changed';
 
 interface InterfaceSettings {
   readonly ribbon?: boolean;
   readonly cacheEpoch?: string | number;
+  readonly language?: string;
+  readonly languageChoice?: string;
   readonly error?: string;
 }
 
@@ -21,9 +26,11 @@ export interface ToolbarSettingsDependencies {
   readonly session?: SessionService | null;
   readonly menus?: OverlayMenus | null;
   readonly token?: string;
+  readonly canReloadLanguage: () => boolean;
 }
 
 export interface ToolbarSettingsController {
+  applyLanguageOnHome(): void;
   dispose(): void;
 }
 
@@ -55,12 +62,24 @@ export function initToolbarSettings(
 
   const headers: Record<string, string> = {
     'X-ExcelLens-Token': deps.token ?? readAppToken(),
+    [languageHeader]: interfaceLocale(),
   };
   const epoch = document.documentElement.dataset.cacheEpoch ?? '';
   let channel: BroadcastChannel | null = null;
   let controller: AbortController | null = null;
   let saving = false;
   let revision = 0;
+  const pageLanguage = interfaceLocale();
+  let observedLanguage = pageLanguage;
+  let observedChoice: string | undefined;
+  let reloading = false;
+
+  function applyLanguageOnHome(): void {
+    if (!reloading && observedLanguage !== pageLanguage && deps.canReloadLanguage()) {
+      reloading = true;
+      reloadHome();
+    }
+  }
 
   function apply(settings: InterfaceSettings): void {
     if (String(settings.cacheEpoch ?? '') !== epoch) {
@@ -71,6 +90,11 @@ export function initToolbarSettings(
       bar.setLayout(settings.ribbon);
       toggle?.setAttribute('aria-checked', String(settings.ribbon));
     }
+    if (typeof settings.language === 'string' && settings.language) {
+      observedLanguage = settings.language;
+      applyLanguageOnHome();
+    }
+    observedChoice = settings.languageChoice;
   }
 
   async function read(query: string, signal?: AbortSignal): Promise<InterfaceSettings | null> {
@@ -83,7 +107,7 @@ export function initToolbarSettings(
       window.location.replace(window.location.pathname);
       return null;
     }
-    if (!response.ok) throw new Error('无法同步工具栏布局');
+    if (!response.ok) throw new Error(localize('ui.toolbarSettings.unableSynchronizeToolbarLayout'));
     const raw: unknown = await response.json();
     return isInterfaceSettings(raw) ? raw : null;
   }
@@ -106,13 +130,17 @@ export function initToolbarSettings(
     while (!isAborted() && !deps.session?.cacheCleared) {
       const ticket = revision;
       const ribbon = bar.ribbon;
-      const query = new URLSearchParams({ wait: '1', ribbon: String(ribbon), epoch });
+      const language = observedLanguage;
+      const languageChoice = observedChoice;
+      const query = new URLSearchParams({ wait: '1', ribbon: String(ribbon), epoch, language });
+      if (languageChoice !== undefined) query.set('languageChoice', languageChoice);
       try {
         const settings = await read(`?${query.toString()}`, signal);
         if (!settings || isAborted()) return;
         if (!saving && ticket === revision) {
-          if (settings.ribbon !== ribbon || String(settings.cacheEpoch ?? '') !== epoch) {
-            channel?.postMessage(settings);
+          if (settings.ribbon !== ribbon || String(settings.cacheEpoch ?? '') !== epoch ||
+              settings.language !== language || settings.languageChoice !== languageChoice) {
+            channel?.postMessage(SETTINGS_CHANGED);
           }
           apply(settings);
         }
@@ -143,9 +171,10 @@ export function initToolbarSettings(
     try {
       channel = new BroadcastChannel(WATCH_NAME);
       channel.onmessage = (event: MessageEvent): void => {
-        if (!saving && isInterfaceSettings(event.data) && typeof event.data.ribbon === 'boolean') {
+        // Automatic language is negotiated for this tab's request.
+        if (!saving && event.data === SETTINGS_CHANGED) {
           ++revision;
-          apply(event.data);
+          void syncNow(signal);
         }
       };
     } catch {
@@ -198,10 +227,10 @@ export function initToolbarSettings(
         const raw: unknown = await response.json();
         const settings = isInterfaceSettings(raw) ? raw : {};
         if (!response.ok) {
-          throw new Error(settings.error || '无法保存工具栏布局');
+          throw new Error(settings.error || localize('ui.toolbarSettings.unableSaveToolbarLayout'));
         }
         apply(settings);
-        channel?.postMessage(settings);
+        channel?.postMessage(SETTINGS_CHANGED);
         watch();
       } catch (error: unknown) {
         document.dispatchEvent(
@@ -218,19 +247,24 @@ export function initToolbarSettings(
   };
 
   document.addEventListener('contextmenu', onContextMenu);
+  document.addEventListener('close', applyLanguageOnHome, true);
   toggle.addEventListener('click', onToggleClick);
   window.addEventListener('focus', onFocus);
+  window.addEventListener('languagechange', onFocus);
   window.addEventListener('pageshow', watch);
   window.addEventListener('pagehide', stopWatch);
   document.addEventListener('visibilitychange', watch);
   watch();
 
   return {
+    applyLanguageOnHome,
     dispose(): void {
       stopWatch();
       document.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('close', applyLanguageOnHome, true);
       toggle.removeEventListener('click', onToggleClick);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('languagechange', onFocus);
       window.removeEventListener('pageshow', watch);
       window.removeEventListener('pagehide', stopWatch);
       document.removeEventListener('visibilitychange', watch);

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 	"excellens/internal/sourceview"
 	"excellens/internal/workbook"
@@ -31,11 +32,11 @@ func (a *App) handleSnapshotRemoval(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if workbook.DatabaseSnapshotPath(req.Key) == "" {
-		writeError(w, 400, "数据库快照标识无效")
+		writeMessage(w, 400, "service.databaseSnapshotRemoval.databaseSnapshotIdentifierInvalid")
 		return
 	}
 	if !a.storageMu.TryLock() {
-		writeError(w, 409, "另一项数据管理操作正在进行")
+		writeMessage(w, 409, "service.databaseSnapshotRemoval.anotherDataManagementOperationProgress")
 		return
 	}
 	defer a.storageMu.Unlock()
@@ -44,7 +45,7 @@ func (a *App) handleSnapshotRemoval(w http.ResponseWriter, r *http.Request) {
 	a.cacheResetMu.Lock()
 	defer a.cacheResetMu.Unlock()
 	if a.restoreState.pending() {
-		writeError(w, 409, "请先完成恢复事务")
+		writeMessage(w, 409, "service.databaseSnapshotRemoval.completeRestorationProcessFirst")
 		return
 	}
 	a.sessionGate.Lock()
@@ -53,16 +54,16 @@ func (a *App) handleSnapshotRemoval(w http.ResponseWriter, r *http.Request) {
 	defer a.cacheMu.Unlock()
 	refs, err := a.snapshotReferences(r.Context(), req.Key)
 	if err != nil {
-		writeError(w, 409, "无法完整核对引用，已保留快照："+err.Error())
+		writeMessage(w, 409, "service.databaseSnapshotRemoval.unableFullyVerifyReferenceSnapshot", i18n.Args{"detail": err})
 		return
 	}
 	if req.Confirm {
 		if len(refs) != 0 {
-			writeError(w, 409, "快照仍被引用："+strings.Join(refs, "、"))
+			writeMessage(w, 409, "service.databaseSnapshotRemoval.snapshotStillReferenced", i18n.Args{"join": strings.Join(refs, "、")})
 			return
 		}
 		if err := workbook.RemoveDatabaseSnapshot(r.Context(), req.Key); err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 	}
@@ -200,7 +201,7 @@ func snapshotWorkspaceReferences(ctx context.Context, roots localstore.Roots, ke
 		seen[name] = true
 		w, err := analysis.LoadWorkspace(filepath.Join(dir, name))
 		if err != nil {
-			return nil, fmt.Errorf("分析工作区 %s：%w", name, err)
+			return nil, i18n.Wrap("service.databaseSnapshotRemoval.analysisWorkspace", err, i18n.Args{"name": name})
 		}
 		own := name == key+".json"
 		if own && len(w.Sheets) != 0 {

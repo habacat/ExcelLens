@@ -2,6 +2,7 @@
  * Retained database snapshots manager: filtering, storage/review policy reminders,
  * staging diagnostics, cryptographic verification, reference-checked deletion, and opening.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { WorkbookStatusResponse } from '../contracts/workbook.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import type { DatabaseSnapshotSummary } from '../contracts/features.ts';
@@ -62,9 +63,9 @@ export interface DatabaseSnapshotsOptions {
 const ENDPOINT = '/api/database/snapshots';
 
 const STAGE_STATES: Readonly<Record<string, string>> = {
-  active: '正在使用',
-  orphan: '已中断，下次启动清理',
-  unknown: '归属未确认，关闭采集程序后核对目录',
+  active: localize('ui.common.use'),
+  orphan: localize('ui.databaseSnapshots.interruptedNextTimeStartCleaning'),
+  unknown: localize('ui.databaseSnapshots.ownershipNotConfirmedCheckDirectory'),
 };
 
 function requireForm(id: string): HTMLFormElement {
@@ -142,7 +143,7 @@ export class DatabaseSnapshots {
       this.retain(legacyKey);
       return;
     }
-    void this.run('正在读取快照', (signal) => this.refresh(signal));
+    void this.run(localize('ui.databaseSnapshots.readingSnapshot'), (signal) => this.refresh(signal));
   }
 
   private async refresh(signal: AbortSignal, message = ''): Promise<void> {
@@ -172,7 +173,7 @@ export class DatabaseSnapshots {
     if (!stages.length) return;
     const summaryEl = area.querySelector('summary');
     if (summaryEl) {
-      summaryEl.textContent = `采集暂存 · ${this.fmtBytes(stages.reduce((n, s) => n + s.bytes, 0))}`;
+      summaryEl.textContent = localize('ui.databaseSnapshots.dataCollectionTemporaryStorage', { fmtBytes: this.fmtBytes(stages.reduce((n, s) => n + s.bytes, 0)) });
     }
     const location = document.createElement('p');
     location.textContent = root;
@@ -192,7 +193,7 @@ export class DatabaseSnapshots {
       budgetBytes: Math.round((budget || 0) * 1024 ** 3),
       reviewDays: days || 0,
     };
-    void this.run('正在保存提醒', async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.savingReminderProgress'), async (signal) => {
       const saved = await this.api(ENDPOINT, {
         method: 'POST',
         body: JSON.stringify({ action: 'policy', policy }),
@@ -201,7 +202,7 @@ export class DatabaseSnapshots {
       if (signal.aborted) return;
       this.policy = saved;
       this.render();
-      this.feedback('已保存提醒');
+      this.feedback(localize('ui.databaseSnapshots.savedReminder'));
     });
   }
 
@@ -276,13 +277,13 @@ export class DatabaseSnapshots {
         });
 
     const bytes = this.items.reduce((sum, item) => sum + item.bytes, 0);
-    const summary = [`共 ${this.items.length} 份`, `目录占用 ${this.fmtBytes(bytes)}`];
+    const summary = [localize('ui.databaseSnapshots.totalCopies', { count: this.items.length }), localize('ui.databaseSnapshots.directoryOccupiesSpace', { fmtBytes: this.fmtBytes(bytes) })];
     const budget = this.policy.budgetBytes;
     if (budget) {
-      summary.push(`${bytes >= budget ? '已达容量提醒 ' : '提醒容量 '}${this.fmtBytes(budget)}`);
+      summary.push(`${bytes >= budget ? `${localize('ui.databaseSnapshots.capacityAlertReached')} ` : `${localize('ui.databaseSnapshots.reminderCapacity')} `}${this.fmtBytes(budget)}`);
     }
     if (this.items.some((item) => Boolean(item.error))) {
-      summary.push('含异常目录，请核对容量');
+      summary.push(localize('ui.databaseSnapshots.containsAbnormalDirectoryCheckCapacity'));
     }
     requireEl('dbSnapshotUsage').textContent = summary.join(' · ');
 
@@ -290,9 +291,9 @@ export class DatabaseSnapshots {
       source || table || from || until || minInput.value || maxInput.value || dueInput.checked,
     );
     requireEl('dbSnapshotMatches').textContent = invalid
-      ? '请核对日期和容量范围'
+      ? localize('ui.databaseSnapshots.verifyDateCapacityRange')
       : active
-        ? `符合条件 ${items.length} 份 · ${this.fmtBytes(items.reduce((sum, item) => sum + item.bytes, 0))}`
+        ? localize('ui.databaseSnapshots.numberMatchingItems', { count: items.length, fmtBytes: this.fmtBytes(items.reduce((sum, item) => sum + item.bytes, 0)) })
         : '';
 
     this.list.replaceChildren();
@@ -305,16 +306,16 @@ export class DatabaseSnapshots {
       const details = document.createElement('small');
       name.textContent = item.name;
       const parts = [
-        new Date(item.taken).toLocaleString(),
-        `${(item.sheets || 0).toLocaleString()} 张表`,
+        new Date(item.taken).toLocaleString(interfaceLocale()),
+        localize('ui.databaseSnapshots.table', { sheets: (item.sheets || 0).toLocaleString(interfaceLocale()) }),
       ];
       if (item.retained) {
-        parts.push(`${item.records.toLocaleString()} 条记录`, this.fmtBytes(item.bytes));
+        parts.push(localize('ui.databaseSnapshots.thereRecords', { records: item.records.toLocaleString(interfaceLocale()) }), this.fmtBytes(item.bytes));
       } else {
-        parts.push('旧版快照', this.fmtBytes(item.bytes));
+        parts.push(localize('ui.databaseSnapshots.oldVersionSnapshot'), this.fmtBytes(item.bytes));
       }
-      if (item.legacyKey) parts.push('旧版已保存快照');
-      if (this.due(item)) parts.push('待复核');
+      if (item.legacyKey) parts.push(localize('ui.databaseSnapshots.oldVersionSavedSnapshot'));
+      if (this.due(item)) parts.push(localize('ui.databaseSnapshots.beReviewedFurther'));
       details.textContent = item.error || parts.join(' · ');
       identity.append(name, details);
       row.append(identity);
@@ -322,12 +323,12 @@ export class DatabaseSnapshots {
       const actions = document.createElement('div');
       actions.className = 'database-actions';
       const secondary: readonly [string, () => void] = item.retained
-        ? ['核验详情', () => this.verify(item)]
-        : ['保存', () => this.retain(item.key)];
+        ? [localize('ui.databaseSnapshots.verificationDetails'), () => this.verify(item)]
+        : [localize('ui.databaseSnapshots.save'), () => this.retain(item.key)];
       const choices: (readonly [string, () => void])[] = item.error
         ? []
-        : [secondary, ['打开', () => this.open(item)]];
-      choices.push(['删除', () => this.inspectRemoval(item)]);
+        : [secondary, [localize('ui.databaseSnapshots.openUp'), () => this.open(item)]];
+      choices.push([localize('ui.common.delete'), () => this.inspectRemoval(item)]);
       for (const [text, work] of choices) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -344,26 +345,26 @@ export class DatabaseSnapshots {
     if (!items.length) {
       const empty = document.createElement('p');
       empty.className = 'database-empty';
-      empty.textContent = this.items.length ? '没有符合条件的快照' : '暂无已保存的数据库快照';
+      empty.textContent = this.items.length ? localize('ui.databaseSnapshots.noMatchingSnapshotsFound') : localize('ui.databaseSnapshots.noSavedDatabaseSnapshotAvailable');
       this.list.append(empty);
     }
   }
 
   private retain(key: string): void {
-    void this.run('正在保存旧快照', async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.savingOldSnapshotsProgress'), async (signal) => {
       await this.request('retain', key, signal);
       if (signal.aborted) return;
       this.onRetained(key);
-      await this.refresh(signal, '已保存旧快照');
+      await this.refresh(signal, localize('ui.databaseSnapshots.oldSnapshotsSaved'));
     });
   }
 
   private verify(item: DatabaseSnapshotSummary): void {
-    void this.run(`正在核验 ${item.name}`, async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.verifying', { name: item.name }), async (signal) => {
       const result = await this.request('verify', item.key, signal).then(decodeDatabaseEvidenceVerifyResult);
       if (signal.aborted) return;
       if (!result.verified || result.key !== item.key) {
-        throw new Error('快照核验结果与选择不一致');
+        throw new Error(localize('ui.databaseSnapshots.snapshotVerificationResultDoesNot'));
       }
       this.feedback('');
       this.evidence.show(result);
@@ -380,7 +381,7 @@ export class DatabaseSnapshots {
   }
 
   private inspectRemoval(item: DatabaseSnapshotSummary): void {
-    void this.run('正在检查快照引用', async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.checkingSnapshotReferences'), async (signal) => {
       const result = await this.api(`${ENDPOINT}/removal`, {
         method: 'POST',
         body: JSON.stringify({ key: item.key }),
@@ -391,8 +392,8 @@ export class DatabaseSnapshots {
       requireEl('dbSnapshotRemovalName').textContent = `${item.name} · ${this.fmtBytes(item.bytes)}`;
       const refs = result.references ?? [];
       requireEl('dbSnapshotRemovalReason').textContent = refs.length
-        ? `仍被引用：${refs.join('、')}`
-        : '未发现本机工作成果引用。确认删除这份快照？删除后无法撤销。';
+        ? localize('ui.databaseSnapshots.stillReferenced', { value: refs.join('、') })
+        : localize('ui.databaseSnapshots.noResultsFromLocalWork');
       requireButton('dbSnapshotRemovalConfirm').hidden = refs.length > 0;
       requireButton('dbSnapshotRemovalBack').focus();
       this.feedback('');
@@ -402,7 +403,7 @@ export class DatabaseSnapshots {
   private confirmRemoval(): void {
     const item = this.removing;
     if (!item || requireButton('dbSnapshotRemovalConfirm').hidden) return;
-    void this.run('正在重新核对引用并删除', async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.recheckingReferencesRemovingDuplicates'), async (signal) => {
       await this.api(`${ENDPOINT}/removal`, {
         method: 'POST',
         body: JSON.stringify({ key: item.key, confirm: true }),
@@ -410,12 +411,12 @@ export class DatabaseSnapshots {
       });
       if (signal.aborted) return;
       this.setRemoval(null);
-      await this.refresh(signal, `已删除 ${item.name}`);
+      await this.refresh(signal, localize('ui.databaseSnapshots.deleted', { name: item.name }));
     });
   }
 
   private open(item: DatabaseSnapshotSummary): void {
-    void this.run(`正在核验并打开 ${item.name}`, async (signal) => {
+    void this.run(localize('ui.databaseSnapshots.verifyingOpeningProgress', { name: item.name }), async (signal) => {
       const opened = await this.openWorkbook(
         () => this.request('open', item.key, signal).then(decodeOpenedWorkbook),
         '',
@@ -456,7 +457,7 @@ export class DatabaseSnapshots {
     requireButton('dbSnapshotRemovalConfirm').disabled = busy;
     requireButton('dbSnapshotRemovalBack').disabled = busy;
     requireEl('databaseSnapshotsProgress').hidden = !busy;
-    requireButton('databaseSnapshotsCancel').textContent = busy ? '取消' : '关闭';
+    requireButton('databaseSnapshotsCancel').textContent = busy ? localize('ui.common.cancel') : localize('ui.common.close');
   }
 
   close(): void {

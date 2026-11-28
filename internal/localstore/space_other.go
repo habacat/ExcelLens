@@ -2,8 +2,10 @@
 
 package localstore
 
-import "errors"
+import (
+	"excellens/internal/i18n"
+)
 
 func availableSpace(string) (volumeSpace, error) {
-	return volumeSpace{}, errors.New("当前系统无法核验可用空间")
+	return volumeSpace{}, i18n.Error("diagnostic.localstore.spaceOther.systemCannotVerifyAvailableSpace")
 }

@@ -2,6 +2,7 @@
  * Single-cell provenance, numeric eligibility, formula state, filter/sort context,
  * and presentation notice explanation dialog with strict response validation.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, CellRef, ToastFn } from '../contracts/common.ts';
 import type { CellExplanationResponse } from '../contracts/features.ts';
 import type { CellExplanationLimits, SourceCapabilities } from '../contracts/formats.ts';
@@ -49,49 +50,49 @@ interface CellExplanationBinding {
 }
 
 const REASONS = new Map<string, string>([
-  ['number', '可用'],
-  ['imported-amount', '可用（导入金额）'],
-  ['source-text', '不参与（源为文本）'],
-  ['text-or-identifier', '不参与（文本或编号）'],
-  ['blank', '不参与（空白）'],
-  ['missing-result', '不参与（公式无保存结果）'],
-  ['invalid-number', '不参与（无效数值）'],
-  ['error', '不参与（错误值）'],
-  ['boolean', '不参与（布尔值）'],
-  ['date', '不参与（日期文本）'],
-  ['unsupported-type', '不参与（不支持的源类型）'],
+  ['number', localize('ui.cellExplanation.available')],
+  ['imported-amount', localize('ui.cellExplanation.availableImportedAmount')],
+  ['source-text', localize('ui.cellExplanation.notParticipatingSourceText')],
+  ['text-or-identifier', localize('ui.cellExplanation.notParticipatingTextOrNumber')],
+  ['blank', localize('ui.cellExplanation.notInvolvedBlank')],
+  ['missing-result', localize('ui.cellExplanation.notApplicableFormulaNoSaved')],
+  ['invalid-number', localize('ui.cellExplanation.notInvolvedInvalidValue')],
+  ['error', localize('ui.cellExplanation.notParticipatingErrorValue')],
+  ['boolean', localize('ui.cellExplanation.notParticipatingBooleanValue')],
+  ['date', localize('ui.cellExplanation.notParticipatingDateText')],
+  ['unsupported-type', localize('ui.cellExplanation.notApplicableUnsupportedSourceType')],
 ]);
 
 const ROW_STATES = new Map<string, string>([
-  ['visible', '当前可见'],
-  ['outside', '已用范围外'],
-  ['hidden', '当前已隐藏'],
-  ['header', '表头，不参与筛选'],
-  ['pinned', '冻结保留行'],
-  ['matched', '在筛选结果中'],
-  ['filtered-out', '不在筛选结果中'],
+  ['visible', localize('ui.cellExplanation.currentlyVisible')],
+  ['outside', localize('ui.cellExplanation.usedOutsideRange')],
+  ['hidden', localize('ui.cellExplanation.currentlyHidden')],
+  ['header', localize('ui.cellExplanation.headerColumnsNotParticipatingFiltering')],
+  ['pinned', localize('ui.cellExplanation.freezeRetainRows')],
+  ['matched', localize('ui.cellExplanation.filteredResults')],
+  ['filtered-out', localize('ui.cellExplanation.notFilterResults')],
 ]);
 
 const OPERATORS = new Map<string, string>([
-  ['contains', '包含'],
-  ['notContains', '不包含'],
-  ['equals', '等于'],
-  ['notEquals', '不等于'],
-  ['startsWith', '开头是'],
-  ['endsWith', '结尾是'],
-  ['gt', '大于'],
-  ['gte', '大于等于'],
-  ['lt', '小于'],
-  ['lte', '小于等于'],
-  ['blank', '为空'],
-  ['notBlank', '非空'],
-  ['in', '属于'],
+  ['contains', localize('ui.common.including')],
+  ['notContains', localize('ui.common.notIncluded')],
+  ['equals', localize('ui.common.equal')],
+  ['notEquals', localize('ui.common.notEqual')],
+  ['startsWith', localize('ui.common.beginning')],
+  ['endsWith', localize('ui.common.ending')],
+  ['gt', localize('ui.common.greaterThan')],
+  ['gte', localize('ui.common.greaterThanOrEqual')],
+  ['lt', localize('ui.common.lessThan')],
+  ['lte', localize('ui.common.lessThanOrEqual')],
+  ['blank', localize('ui.common.ifEmptyThenLeaveEmpty')],
+  ['notBlank', localize('ui.common.notEmpty')],
+  ['in', localize('ui.cellExplanation.belong')],
 ]);
 
 const SORT_MODE_LABELS: Readonly<Record<string, string>> = {
-  number: '（数值）',
-  text: '（文本）',
-  natural: '（自然）',
+  number: localize('ui.cellExplanation.numericalValue'),
+  text: localize('ui.cellExplanation.text'),
+  natural: localize('ui.cellExplanation.natural'),
 };
 
 function makeEl<K extends keyof HTMLElementTagNameMap>(
@@ -284,10 +285,10 @@ export function validateCellExplanation(
   parseRef: (value: string) => CellRef | null,
 ): CellExplanationResponse {
   if (!limits || !isValidExplanationPayload(page, request, limits, source, parseRef)) {
-    throw new Error('单元格信息与当前来源不一致，请重试');
+    throw new Error(localize('ui.cellExplanation.cellInformationDoesNotMatch'));
   }
   if (new TextEncoder().encode(JSON.stringify(page)).length > limits.bytes) {
-    throw new Error('单元格信息超过显示容量，请使用导出');
+    throw new Error(localize('ui.cellExplanation.cellInformationExceedsDisplayCapacity'));
   }
   return page;
 }
@@ -403,7 +404,7 @@ export class CellExplanation {
 
   async open(): Promise<void> {
     if (!this.enabled()) {
-      this.toast('请先完成工作表加载并选择单元格', 'warning');
+      this.toast(localize('ui.cellExplanation.completeSheetLoadingSelectCells'), 'warning');
       return;
     }
     this.clear();
@@ -427,14 +428,14 @@ export class CellExplanation {
     const status = requireEl('detailStatus');
     const retry = requireButton('detailRetry');
     const detailBody = requireEl('detailBody');
-    status.textContent = '正在读取…';
+    status.textContent = localize('ui.common.reading');
     status.setAttribute('role', 'status');
     retry.hidden = true;
     detailBody.setAttribute('aria-busy', 'true');
     try {
       const body = JSON.stringify(bound.request);
       if (new TextEncoder().encode(body).length > this.limits.requestBytes) {
-        throw new Error('单元格信息请求超过容量');
+        throw new Error(localize('ui.cellExplanation.cellInformationRequestExceedsCapacity'));
       }
       const response = await this.api('/api/cell/explain', {
         method: 'POST',
@@ -478,38 +479,38 @@ export class CellExplanation {
       fragment.append(makeEl('div', 'detail-label', label), value);
     };
     const displayText = cellDisplayValue(cell, false, this.s.showStyles);
-    add('位置', `${page.sheet}!${page.ref}`);
+    add(localize('ui.cellExplanation.location'), `${page.sheet}!${page.ref}`);
     add(
-      '显示值',
+      localize('ui.common.displayValue'),
       cell.cacheMissing
-        ? '未保存计算结果'
+        ? localize('ui.cellExplanation.calculationResultsNotSaved')
         : displayText !== ''
           ? displayText
           : cell.hasFormula
-            ? '（空文本）'
-            : '（空白）',
+            ? localize('ui.cellExplanation.emptyText')
+            : localize('ui.common.empty'),
     );
-    add('原始值', cell.raw === '' ? '（空白）' : cell.raw);
-    add('源类型', cellSourceTypeLabel(cell));
-    add('数值统计', REASONS.get(page.numeric.reason) ?? '');
+    add(localize('ui.cellExplanation.originalValues'), cell.raw === '' ? localize('ui.common.empty') : cell.raw);
+    add(localize('ui.cellExplanation.sourceType'), cellSourceTypeLabel(cell));
+    add(localize('ui.cellExplanation.numericalStatistics'), REASONS.get(page.numeric.reason) ?? '');
     if (page.numeric.eligible && page.numeric.exact && page.numeric.exact !== cell.raw) {
-      add('统计数值', page.numeric.exact);
+      add(localize('ui.cellExplanation.statisticValue'), page.numeric.exact);
     }
     if (page.formulaState !== 'none') {
-      add('公式', page.formulaAvailable ? (cellFormulaText(cell) ?? '原文无法还原') : '原文无法还原');
-      add('计算结果', page.formulaState === 'missing' ? '未保存' : '已保存');
+      add(localize('ui.common.formula'), page.formulaAvailable ? (cellFormulaText(cell) ?? localize('ui.cellExplanation.unableRestoreOriginal')) : localize('ui.cellExplanation.unableRestoreOriginal'));
+      add(localize('ui.cellExplanation.calculationResult'), page.formulaState === 'missing' ? localize('ui.cellExplanation.notSaved') : localize('ui.common.saved'));
     }
     if (page.filter) {
       const filterRules = page.filter.rules ?? [];
       if (filterRules.length) {
         const rules = makeEl('div', 'cell-explanation-rules');
         for (const rule of filterRules) {
-          const column = `${this.colName(rule.column)}列 `;
+          const column = `${localize('ui.cellExplanation.column', { colName: this.colName(rule.column) })} `;
           const op = OPERATORS.get(rule.operator) ?? rule.operator;
           if (rule.operator === 'in') {
             const values = rule.values ?? [];
             const details = makeEl('details');
-            const summary = makeEl('summary', '', `${column}${op} ${values.length.toLocaleString()} 项`);
+            const summary = makeEl('summary', '', localize('ui.cellExplanation.items', { column, op, count: values.length.toLocaleString(interfaceLocale()) }));
             details.append(summary);
             details.addEventListener('toggle', () => {
               if (details.open && details.children.length === 1) {
@@ -525,8 +526,8 @@ export class CellExplanation {
             rules.append(makeEl('div', '', `${column}${op}${suffix}`));
           }
         }
-        add('已应用筛选', rules);
-        add('当前行', ROW_STATES.get(page.rowState) ?? '');
+        add(localize('ui.cellExplanation.filterApplied'), rules);
+        add(localize('ui.cellExplanation.currentLine'), ROW_STATES.get(page.rowState) ?? '');
       }
       const sortKeys = page.filter.sortKeys ?? [];
       const sorts = sortKeys.length
@@ -536,11 +537,11 @@ export class CellExplanation {
           : [];
       if (sorts.length) {
         add(
-          '已应用排序',
+          localize('ui.cellExplanation.sortingApplied'),
           sorts
             .map(
               (sort) =>
-                `${this.colName(sort.column)}列 ${sort.descending ? '降序' : '升序'}${sort.mode ? (SORT_MODE_LABELS[sort.mode] ?? '') : ''}`,
+                localize('ui.cellExplanation.columncef86ee', { colName: this.colName(sort.column), detail: sort.descending ? localize('ui.cellExplanation.descendingOrder') : localize('ui.cellExplanation.ascendingOrder'), detail2: sort.mode ? (SORT_MODE_LABELS[sort.mode] ?? '') : '' }),
             )
             .join('\n'),
         );
@@ -548,18 +549,18 @@ export class CellExplanation {
     }
     const hasFilterRules = Boolean(page.filter?.rules?.length);
     if (!hasFilterRules && (page.rowState === 'hidden' || page.rowState === 'outside')) {
-      add('当前行', ROW_STATES.get(page.rowState) ?? '');
+      add(localize('ui.cellExplanation.currentLine'), ROW_STATES.get(page.rowState) ?? '');
     }
-    if (cell.presentationOnly) add('源单元格', '源为空白，仅显示条件格式');
+    if (cell.presentationOnly) add(localize('ui.cellExplanation.sourceCell'), localize('ui.cellExplanation.sourceBlankOnlyConditionalFormatting'));
     if (cell.conditional?.display != null && cell.conditional.display !== cell.display) {
-      add('源显示值', cell.display);
+      add(localize('ui.cellExplanation.sourceDisplayValue'), cell.display);
     }
     const notice =
       this.notice(cell) ||
       page.presentationNotice ||
       cell.conditional?.notice ||
       cell.richText?.notice;
-    if (notice) add('呈现状态', notice);
+    if (notice) add(localize('ui.cellExplanation.presentationStatus'), notice);
     return fragment;
   }
 }

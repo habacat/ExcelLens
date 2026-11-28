@@ -1,6 +1,7 @@
 /**
  * Pivot table axis layout editor (rows, columns, and lazy-loaded page item filters).
  */
+import { t as localize } from '../core/i18n.ts';
 import type { PivotInfo, PivotItem, PivotPage } from '../contracts/edit.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireEl, requireInput, requireSelect } from '../core/dom.ts';
@@ -31,9 +32,9 @@ export interface PivotLayoutOwner {
 }
 
 const AXIS_LABELS: Readonly<Record<PivotAxisKey, string>> = {
-  rows: '行字段',
-  columns: '列字段',
-  pages: '分页筛选',
+  rows: localize('ui.editPivot.rowField'),
+  columns: localize('ui.editPivot.columnFields'),
+  pages: localize('ui.editPivot.paginationFilter'),
 };
 
 const AXIS_KEYS: readonly PivotAxisKey[] = ['rows', 'columns', 'pages'];
@@ -43,7 +44,7 @@ function keyOf(item: PivotItem): string {
 }
 
 function display(item: PivotItem): string {
-  if (item.type === 'm') return '(空白)';
+  if (item.type === 'm') return localize('ui.editPivot.blank');
   if (item.type === 'b') return item.value === '1' ? 'TRUE' : 'FALSE';
   if (item.type === 'd') {
     const trimmed = item.value.endsWith('T00:00:00') ? item.value.slice(0, -9) : item.value;
@@ -142,18 +143,18 @@ export class PivotLayout {
         if (key === 'rows' && index === 0) select.id = 'editCopyPivotRows';
         const controls = document.createElement('div');
         controls.className = 'edit-pivot-order';
-        const up = createPivotActionButton(`上移${name}`, 'm6 14 6-6 6 6', () =>
+        const up = createPivotActionButton(localize('ui.editPivot.moveUp', { name }), 'm6 14 6-6 6 6', () =>
           this.move(key, index, -1),
         );
         up.disabled = index === 0;
-        const down = createPivotActionButton(`下移${name}`, 'm6 10 6 6 6-6', () =>
+        const down = createPivotActionButton(localize('ui.editPivot.moveDown', { name }), 'm6 10 6 6 6-6', () =>
           this.move(key, index, 1),
         );
         down.disabled = index === group.length - 1;
         controls.append(
           up,
           down,
-          createPivotActionButton(`移除${name}`, 'm7 7 10 10 M17 7 7 17', () =>
+          createPivotActionButton(localize('ui.editPivot.remove', { name }), 'm7 7 10 10 M17 7 7 17', () =>
             this.change(key, index, ''),
           ),
         );
@@ -172,11 +173,11 @@ export class PivotLayout {
     select.dataset.index = String(index);
     select.setAttribute(
       'aria-label',
-      name ? `${AXIS_LABELS[key]} ${index + 1}` : `添加${AXIS_LABELS[key]}`,
+      name ? `${AXIS_LABELS[key]} ${index + 1}` : localize('ui.editPivot.add47ab4c6', { value: AXIS_LABELS[key] }),
     );
     if (!name) {
       select.className = 'edit-pivot-add';
-      select.add(new Option(`添加${AXIS_LABELS[key]}…`, ''));
+      select.add(new Option(localize('ui.editPivot.add', { value: AXIS_LABELS[key] }), ''));
     }
     const existing: readonly (string | MutablePivotPage)[] = this.axes ? this.axes[key] : [];
     for (const f of this.info?.fields ?? []) {
@@ -251,21 +252,21 @@ export class PivotLayout {
       const first = selected.values().next().value;
       summary.textContent =
         selected.size > 1
-          ? `已选 ${selected.size} 项`
+          ? localize('ui.editPivot.itemsSelected', { size: selected.size })
           : first
             ? display(first)
-            : '全部项目';
+            : localize('ui.editPivot.allItems');
     };
     caption();
-    summary.setAttribute('aria-label', `${page.field} 筛选项目`);
+    summary.setAttribute('aria-label', localize('ui.editPivot.filterItems', { field: page.field }));
     box.append(summary);
     const panel = document.createElement('div');
     panel.className = 'edit-pivot-options';
     box.append(panel);
     const search = document.createElement('input');
     search.type = 'search';
-    search.placeholder = '查找项目';
-    search.setAttribute('aria-label', `查找${page.field}项目`);
+    search.placeholder = localize('ui.editPivot.searchItems');
+    search.setAttribute('aria-label', localize('ui.editPivot.searchProject', { field: page.field }));
     const list = document.createElement('div');
     list.className = 'edit-pivot-items';
     const message = document.createElement('output');
@@ -273,12 +274,12 @@ export class PivotLayout {
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'mini-button';
-    more.textContent = '更多项目';
+    more.textContent = localize('ui.editPivot.moreItems');
     more.hidden = true;
     const all = document.createElement('button');
     all.type = 'button';
     all.className = 'mini-button';
-    all.textContent = '显示全部';
+    all.textContent = localize('ui.editPivot.showAll');
     panel.append(search, all, list, message, more);
     let offset = 0;
     let ticket = 0;
@@ -300,7 +301,7 @@ export class PivotLayout {
         list.replaceChildren();
       }
       more.hidden = true;
-      message.textContent = '正在读取…';
+      message.textContent = localize('ui.common.reading');
       const doc = this.editor.data?.document;
       const info = this.info;
       if (!doc || !info) return;
@@ -335,7 +336,7 @@ export class PivotLayout {
         }
         offset += reply.items.length;
         more.hidden = !reply.more;
-        message.textContent = offset ? '' : '没有匹配项目';
+        message.textContent = offset ? '' : localize('ui.editPivot.noMatchingItems');
         loaded = true;
       } catch (error: unknown) {
         if (current === ticket && !signal?.aborted) {

@@ -2,6 +2,7 @@
  * Server-backed source-row visibility & outline-group controller with
  * bounded LRU caching, task cancellation, and safe recovery mode.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { AxisViewSettings } from '../contracts/analysis.ts';
 import type { ApiClient, ApiRequestOptions, ToastFn } from '../contracts/common.ts';
 import type { RowViewChange, RowViewState } from '../contracts/workbook.ts';
@@ -64,7 +65,7 @@ export interface RowViewStartResponse {
 }
 
 function interrupted(): DOMException {
-  return new DOMException('已取消行显隐更新', 'AbortError');
+  return new DOMException(localize('ui.rowViews.disabledRowVisibilityUpdate'), 'AbortError');
 }
 
 function isAbortError(error: unknown): boolean {
@@ -183,7 +184,7 @@ export class RowViews {
     this.job = '';
     if (!keepBusy) {
       this.changeSerial++;
-      if (this.busy) this.status('已取消更新');
+      if (this.busy) this.status(localize('ui.rowViews.updateCanceled'));
       this.setBusy(false);
     }
     this.controls();
@@ -228,11 +229,11 @@ export class RowViews {
       data.totalRows < 0 ||
       data.totalRows > max
     ) {
-      throw new Error('可见行视图来源或数量无效');
+      throw new Error(localize('ui.rowViews.invalidSourceOrQuantityVisible'));
     }
     const visibility = new RowVisibility(max, data.hiddenRanges ?? []);
     if (!filterId && data.totalRows !== visibility.count(1, data.maxRow)) {
-      throw new Error('可见行数量与源显隐不一致');
+      throw new Error(localize('ui.rowViews.numberVisibleRowsDoesNot'));
     }
     return visibility;
   }
@@ -285,7 +286,7 @@ export class RowViews {
     this.abort = abort;
     let owned = '';
     let accepted = false;
-    const activity = beginActivity('正在更新可见行', { signal: abort.signal });
+    const activity = beginActivity(localize('ui.rowViews.visibleRowsBeingUpdated'), { signal: abort.signal });
     const current = (): boolean =>
       this.current(ticket, book, origin, epoch) &&
       !abort.signal.aborted &&
@@ -306,11 +307,11 @@ export class RowViews {
           signal: abort.signal,
         }, decodeWorkbookStatus);
         if (!current() || status.workbookKey !== book) {
-          throw new DOMException('已切换来源', 'AbortError');
+          throw new DOMException(localize('ui.rowViews.sourceSwitched'), 'AbortError');
         }
         this.s.book = status.book ?? '';
       }
-      if (!current()) throw new DOMException('已取消', 'AbortError');
+      if (!current()) throw new DOMException(localize('ui.common.canceled'), 'AbortError');
       const request: Record<string, unknown> = {
         workbookKey: book,
         book: this.s.book,
@@ -328,9 +329,9 @@ export class RowViews {
       owned = started.jobId ?? '';
       if (!owned) {
         owned = '';
-        throw new Error('可见行任务标识无效，请重试');
+        throw new Error(localize('ui.rowViews.visibleRowTaskIdentifierInvalid'));
       }
-      if (!current()) throw new DOMException('已取消', 'AbortError');
+      if (!current()) throw new DOMException(localize('ui.common.canceled'), 'AbortError');
       this.job = owned;
       for (;;) {
         const state = await this.api(
@@ -338,18 +339,18 @@ export class RowViews {
           { signal: abort.signal },
           decodeRowViewStatusResponse,
         );
-        if (!current()) throw new DOMException('已取消', 'AbortError');
+        if (!current()) throw new DOMException(localize('ui.common.canceled'), 'AbortError');
         activity?.job({ scanned: state.scanned, total: state.total });
         if (state.status === 'done') break;
         if (state.status === 'error' || state.status === 'cancelled') {
-          throw new Error(state.error || '可见行任务已取消');
+          throw new Error(state.error || localize('ui.rowViews.visibleRowTasksHaveCanceled'));
         }
         if (state.status !== 'queued' && state.status !== 'running') {
-          throw new Error('可见行任务状态无效，请重试');
+          throw new Error(localize('ui.rowViews.visibleRowTaskStatusInvalid'));
         }
         if (this.busy) {
           this.status(
-            `正在更新可见行${state.total ? ` · ${(state.scanned || 0).toLocaleString()} / ${state.total.toLocaleString()}` : ''}…`,
+            localize('ui.rowViews.visibleRowsBeingUpdated89d9aa8', { detail: state.total ? ` · ${(state.scanned || 0).toLocaleString(interfaceLocale())} / ${state.total.toLocaleString(interfaceLocale())}` : '' }),
           );
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 60));
@@ -359,7 +360,7 @@ export class RowViews {
       }, decodeRowViewState);
       if (!current()) throw interrupted();
       this.validate(data, sheet, filterId);
-      if (data.id !== owned) throw new Error('可见行任务结果不一致，请重试');
+      if (data.id !== owned) throw new Error(localize('ui.rowViews.resultsVisibleRowTasksInconsistent'));
       accepted = true;
       return data;
     } catch (error: unknown) {
@@ -406,7 +407,7 @@ export class RowViews {
             decodeRowViewState,
           );
           if (!current() || ticket !== this.serial) throw interrupted();
-          if (data.id !== cached.id) throw new Error('可见行快照不一致，请重试');
+          if (data.id !== cached.id) throw new Error(localize('ui.rowViews.inconsistentSnapshotsVisibleRowsTry'));
           this.install(data);
           return data;
         } catch (error: unknown) {
@@ -453,7 +454,7 @@ export class RowViews {
     const remember = requireInput('rowsRemember');
     remember.disabled = this.busy || Boolean(this.s.rowView?.settingsWarning);
     remember.title = this.s.rowView?.settingsWarning
-      ? '原设置无法读取；当前操作临时生效，重新打开后可重试保存'
+      ? localize('ui.rowViews.originalSettingsNotReadableCurrent')
       : '';
     requireButton('rowsCancel').hidden = !this.busy;
     requireEl('rowsGroupList').inert = this.busy;
@@ -469,7 +470,7 @@ export class RowViews {
 
   async open(): Promise<void> {
     if (!this.s.indexReady) {
-      this.toast('请先打开工作表', 'warning');
+      this.toast(localize('ui.common.openWorksheetFirst'), 'warning');
       return;
     }
     const range = this.s.range;
@@ -501,14 +502,15 @@ export class RowViews {
         row.className = 'outline-item';
         row.style.setProperty('--outline-level', String(group.level));
         const label = document.createElement('span');
-        label.textContent = `${group.min}–${group.max} 行`;
+        label.textContent = localize('ui.rowViews.row', { min: group.min, max: group.max });
         const level = document.createElement('small');
-        level.textContent = `第${group.level}级`;
+        level.textContent = localize('ui.rowViews.level', { level: group.level });
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'tool-button';
-        button.textContent = group.collapsed || !group.visible ? '展开' : '折叠';
-        button.setAttribute('aria-expanded', String(Boolean(group.visible) && !group.collapsed));
+        const expanded = Boolean(group.visible) && !group.collapsed;
+        button.textContent = expanded ? localize('ui.rowViews.collapse') : localize('ui.rowViews.expand');
+        button.setAttribute('aria-expanded', String(expanded));
         button.addEventListener('click', () => {
           void this.change({
             action: 'group',
@@ -516,7 +518,7 @@ export class RowViews {
               min: group.min,
               max: group.max,
               level: group.level,
-              collapsed: button.textContent === '折叠',
+              collapsed: expanded,
             },
           });
         });
@@ -526,7 +528,7 @@ export class RowViews {
       if (!data.total) {
         const empty = document.createElement('p');
         empty.className = 'dialog-summary';
-        empty.textContent = '此工作表没有分组大纲';
+        empty.textContent = localize('ui.rowViews.thisWorksheetNoGroupedOutlines');
         list.append(empty);
       }
       this.groupTotal = data.total;
@@ -551,7 +553,7 @@ export class RowViews {
       last < first ||
       last > this.maximum()
     ) {
-      this.status('请输入有效的源行范围', true);
+      this.status(localize('ui.rowViews.enterValidSourceRange'), true);
       return;
     }
     void this.change({ action: 'range', first, last, hidden });
@@ -577,7 +579,7 @@ export class RowViews {
       guard();
     this.setBusy(true);
     this.controls();
-    this.status('正在更新可见行…');
+    this.status(localize('ui.rowViews.updatingVisibleRows'));
     try {
       const pending = this.build({
         baseId: base.id,
@@ -593,10 +595,10 @@ export class RowViews {
       if (!current() || this.s.rowView?.id !== data.id) throw interrupted();
       this.status(
         temporary
-          ? '已临时显示；未改动已保存设置'
+          ? localize('ui.rowViews.temporarilyDisplayedSavedSettingsHave')
           : data.settingsWarning
-            ? '已临时更新；原设置文件已保留'
-            : '已更新行显隐',
+            ? localize('ui.rowViews.temporarilyUpdatedOriginalSettingsFile')
+            : localize('ui.rowViews.updatedRowDisplayHide'),
       );
       this.page = 0;
       if (requireDialog('rowsDialog').open) await this.groups();

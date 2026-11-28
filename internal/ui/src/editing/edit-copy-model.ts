@@ -2,6 +2,7 @@
  * Pure value validation, coordinate parsing, CR/backslash escaping,
  * request-budget batching, TSV paste expansion, and exact decimal fill series.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   EditAddress,
   EditChange,
@@ -42,12 +43,12 @@ export function parseEditTarget(
   const hit = /^([A-Z]{1,3})([1-9][0-9]{0,8})$/.exec(ref.trim().toUpperCase());
   const letters = hit?.[1];
   const digits = hit?.[2];
-  if (!sheet || !letters || !digits) throw new Error('输入有效的源单元格地址');
+  if (!sheet || !letters || !digits) throw new Error(localize('ui.editCopyModel.enterValidSourceCellAddress'));
   let col = 0;
   for (const char of letters) col = col * 26 + char.charCodeAt(0) - 64;
   const row = Number(digits);
   if (row < sheet.firstRow || row > sheet.rows || col < sheet.firstCol || col > sheet.cols) {
-    throw new Error('地址超出可编辑区域');
+    throw new Error(localize('ui.editCopyModel.addressExceedsEditableArea'));
   }
   return { sheet: sheet.name, row, col };
 }
@@ -61,7 +62,7 @@ export function decodeEditText(text: string, escaped: boolean): string {
   return text.replace(/\\(?:[\\r]|[\s\S]|$)/g, (part) => {
     if (part === '\\r') return '\r';
     if (part === '\\\\') return '\\';
-    throw new Error('回车输入使用 \\r，反斜线输入使用 \\\\');
+    throw new Error(localize('ui.editCopyModel.invalidEscape', { carriageReturn: '\\r', backslash: '\\\\' }));
   });
 }
 
@@ -72,23 +73,23 @@ export function buildEditValue(
 ): EditValue {
   if (kind === 'blank' || (kind === 'text' && raw === '')) return { kind: 'blank', raw: '' };
   let nextRaw = raw;
-  if (bytes(nextRaw) > limits.cellBytes) throw new Error('单元格原文超出编辑上限');
+  if (bytes(nextRaw) > limits.cellBytes) throw new Error(localize('ui.editCopyModel.originalCellContentExceedsEditing'));
   if (kind === 'boolean') {
     nextRaw = nextRaw.toUpperCase();
-    if (nextRaw !== 'TRUE' && nextRaw !== 'FALSE') throw new Error('布尔值请输入 TRUE 或 FALSE');
+    if (nextRaw !== 'TRUE' && nextRaw !== 'FALSE') throw new Error(localize('ui.editCopyModel.booleanValuesEnterTrueOr'));
   }
   if (
     kind === 'number' &&
     !/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$/.test(nextRaw)
   ) {
-    throw new Error('请输入有效数值');
+    throw new Error(localize('ui.editCopyModel.enterValidValues'));
   }
   if (kind === 'formula') {
     nextRaw = nextRaw.trim();
-    if (!nextRaw.startsWith('=') || !nextRaw.slice(1).trim()) throw new Error('公式请以 = 开头');
+    if (!nextRaw.startsWith('=') || !nextRaw.slice(1).trim()) throw new Error(localize('ui.editCopyModel.formulasMustStart'));
     nextRaw = `=${nextRaw.slice(1).trim()}`;
     if (limits.formulaBytes !== undefined && bytes(nextRaw) > limits.formulaBytes) {
-      throw new Error('公式原文超出编辑上限');
+      throw new Error(localize('ui.editCopyModel.originalFormulaExceedsEditingLimit'));
     }
   }
   return { kind, raw: nextRaw };
@@ -103,11 +104,11 @@ export function boundedChanges(
   for (const change of changes) {
     size += bytes(JSON.stringify(change)) + (result.length ? 1 : 0);
     if (result.length === limits.batchCells || size > limits.requestBytes) {
-      throw new Error('区域超出一次编辑容量，请缩小范围');
+      throw new Error(localize('ui.common.selectedAreaExceedsMaximumEditing'));
     }
     result.push(change);
   }
-  if (!result.length) throw new Error('没有可提交的单元格');
+  if (!result.length) throw new Error(localize('ui.editCopyModel.noCellsAvailableSubmission'));
   return result;
 }
 
@@ -119,7 +120,7 @@ export function buildEditPaste(
   limits: EditModelLimits,
   parse: EditTsvParser,
 ): EditPastePlan {
-  if (text === '') throw new Error('请先粘贴表格文本');
+  if (text === '') throw new Error(localize('ui.editCopyModel.pasteTableTextFirst'));
   const rows = parse(text, {
     maxRows: limits.batchCells,
     maxCols: sheet.cols - first.col + 1,
@@ -127,7 +128,7 @@ export function buildEditPaste(
     maxCellLength: limits.cellBytes,
     maxTextLength: limits.requestBytes,
   });
-  if (first.row + rows.length - 1 > sheet.rows) throw new Error('粘贴范围超出可编辑区域');
+  if (first.row + rows.length - 1 > sheet.rows) throw new Error(localize('ui.editCopyModel.pasteRangeExceedsEditableArea'));
   const changes: EditChange[] = [];
   rows.forEach((row, i) => {
     row.forEach((cellText, j) => {
@@ -163,11 +164,11 @@ function parseExactDecimal(text: string): ExactDecimal {
   const frac = hit?.[3] ?? '';
   const exp = hit?.[4] ?? '';
   if (!hit || (!whole && !frac) || text.length > 80) {
-    throw new Error('起始值和步长必须是有效数字');
+    throw new Error(localize('ui.editCopyModel.startingValueStepSizeMust'));
   }
   const scale = frac.length - Number(exp || 0);
   if (!Number.isSafeInteger(scale) || Math.abs(scale) > 40) {
-    throw new Error('序列小数位数或指数超出范围');
+    throw new Error(localize('ui.editCopyModel.sequenceDecimalPlacesOrExponent'));
   }
   return { number: BigInt(`${sign || '+'}${whole}${frac}`), scale };
 }
@@ -190,7 +191,7 @@ export function buildEditFill(
   const deltaCol = Math.sign(last.col - first.col);
   const count = Math.abs(last.row - first.row) + Math.abs(last.col - first.col);
   if ((deltaRow && deltaCol) || !count || count > limits.batchCells) {
-    throw new Error('请选择同列或同行的填充终点');
+    throw new Error(localize('ui.editCopyModel.selectFillEndPointSame'));
   }
   const changes: EditChange[] = [];
   if (numeric) {
@@ -213,7 +214,7 @@ export function buildEditFill(
     }
   } else {
     if (!['blank', 'text', 'number', 'boolean'].includes(start.kind)) {
-      throw new Error('当前值不可用于填充');
+      throw new Error(localize('ui.editCopyModel.currentValueCannotBeUsed'));
     }
     for (let i = 1; i <= count; i++) {
       changes.push({

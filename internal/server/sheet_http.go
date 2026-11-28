@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -19,7 +20,7 @@ func (a *App) handleSheets(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.noWorkbookOpen")
 		return
 	}
 	writeJSON(w, map[string]any{"sheets": wb.Sheets, "activeTab": wb.ActiveTab})
@@ -34,24 +35,24 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 		Sheet string `json:"sheet"`
 	}
 	if err := decodeControlRequest(w, r, 8<<10, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.sheetHttp.requestedContentInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.sheetHttp.unableFindSpecifiedWorksheet")
 		return
 	}
 	a.mu.RLock()
 	maintenance := a.maintenance
 	a.mu.RUnlock()
 	if maintenance {
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.localCacheBeingMaintainedTry")
 		return
 	}
 	a.cacheMu.RLock()
@@ -65,12 +66,12 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	if a.maintenance {
 		a.mu.Unlock()
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.localCacheBeingMaintainedTry")
 		return
 	}
 	if a.wb != wb {
 		a.mu.Unlock()
-		writeError(w, http.StatusConflict, "工作簿已切换，请重新选择工作表")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.workbookSwitchedChooseNewWorksheet")
 		return
 	}
 	if existingID := a.indexBySheet[meta.Path]; existingID != "" {
@@ -89,7 +90,7 @@ func (a *App) handleIndexStart(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	job := &IndexJob{
 		ID: randomID(), Sheet: meta.Name, Path: meta.Path, Status: "queued",
-		Stage: "等待索引任务", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{}),
+		Stage: "stage.task.waitingForIndexTasks", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{}),
 	}
 	a.indexJobs[job.ID] = job
 	a.indexBySheet[meta.Path] = job.ID
@@ -113,13 +114,13 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 	case <-job.ctx.Done():
 		job.mu.Lock()
 		job.Status = "cancelled"
-		job.Stage = "已取消"
+		job.Stage = "stage.task.cancelled"
 		job.mu.Unlock()
 		return
 	}
 	job.mu.Lock()
 	job.Status = "running"
-	job.Stage = "正在解压并建立行索引"
+	job.Stage = "stage.task.decompressingEstablishingRowIndices"
 	job.mu.Unlock()
 	update := func(done, total int64, stage string) {
 		job.mu.Lock()
@@ -137,10 +138,10 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 	if err != nil {
 		if errors.Is(err, context.Canceled) || err.Error() == "index cancelled" || job.ctx.Err() != nil {
 			job.Status = "cancelled"
-			job.Stage = "已取消"
+			job.Stage = "stage.task.cancelled"
 		} else {
 			job.Status = "error"
-			job.Stage = "索引失败"
+			job.Stage = "stage.task.indexFailure"
 			job.Error = err.Error()
 		}
 		return
@@ -149,7 +150,7 @@ func (a *App) runIndex(wb *workbook.Workbook, meta workbook.SheetMeta, job *Inde
 	job.Progress = 100
 	job.DoneBytes = job.TotalBytes
 	job.Status = "done"
-	job.Stage = "索引完成"
+	job.Stage = "stage.task.indexComplete"
 }
 
 func (a *App) handleIndexStatus(w http.ResponseWriter, r *http.Request) {
@@ -162,12 +163,12 @@ func (a *App) handleIndexStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.indexJobs[id]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, http.StatusNotFound, "索引任务不存在或已失效")
+		writeMessage(w, http.StatusNotFound, "service.sheetHttp.indexTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
 	out := map[string]any{
-		"id": job.ID, "sheet": job.Sheet, "status": job.Status, "stage": job.Stage,
+		"id": job.ID, "sheet": job.Sheet, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage),
 		"progress": job.Progress, "doneBytes": job.DoneBytes, "totalBytes": job.TotalBytes,
 		"error": job.Error,
 	}
@@ -193,7 +194,7 @@ func (a *App) handleIndexCancel(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.sheetHttp.requestedContentInvalid")
 		return
 	}
 	a.mu.RLock()
@@ -214,31 +215,31 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.noWorkbookOpen")
 		return
 	}
 	a.mu.RLock()
 	maintenance := a.maintenance
 	a.mu.RUnlock()
 	if maintenance {
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.localCacheBeingMaintainedTry")
 		return
 	}
 	query := r.URL.Query()
 	meta, ok := wb.FindSheet(query.Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.sheetHttp.unableFindSpecifiedWorksheet")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx, integrityErr := wb.CachedIndexForRead(r.Context(), meta.Path)
 	if integrityErr != nil {
-		writeError(w, http.StatusConflict, integrityErr.Error())
+		writeFailure(w, http.StatusConflict, integrityErr)
 		return
 	}
 	if idx == nil {
-		writeError(w, http.StatusConflict, "工作表索引尚未建立")
+		writeMessage(w, http.StatusConflict, "service.sheetHttp.worksheetIndexNotCreatedYet")
 		return
 	}
 	offset := parseIntDefault(query.Get("offset"), 0)
@@ -249,21 +250,21 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	if value := query.Get("columns"); value != "" {
 		parts := strings.Split(value, ",")
 		if len(parts) > 80 {
-			writeError(w, 400, "可视列数量超限")
+			writeMessage(w, 400, "service.sheetHttp.numberVisibleColumnsExceedsLimit")
 			return
 		}
 		previous := 0
 		for _, part := range parts {
 			number, err := strconv.Atoi(part)
 			if err != nil || number <= previous || number > formats.ExcelColumns {
-				writeError(w, 400, "可视列索引无效")
+				writeMessage(w, 400, "service.sheetHttp.indexVisibleColumnsInvalid")
 				return
 			}
 			sparseCols = append(sparseCols, number)
 			previous = number
 		}
 		if len(sparseCols) == 0 {
-			writeError(w, 400, "可视列不能为空")
+			writeMessage(w, 400, "service.sheetHttp.visualColumnsCannotBeEmpty")
 			return
 		}
 		startCol = sparseCols[0]
@@ -276,7 +277,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		var err error
 		visible, err = a.rowViewSnapshot(viewID, wb, idx, meta.Path, filterID)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer visible.close()
@@ -285,7 +286,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 	if query.Has("pinnedThroughRow") {
 		value, err := strconv.Atoi(query.Get("pinnedThroughRow"))
 		if visible == nil || err != nil || value < 1 || value > 30 || parseIntDefault(query.Get("excludeThroughRow"), 0) != 0 {
-			writeError(w, 400, "冻结源行范围或可见行视图无效")
+			writeMessage(w, 400, "service.sheetHttp.sourceRowRangeFrozenOr")
 			return
 		}
 		pinnedThrough = value
@@ -294,7 +295,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		filtered = a.filterSnapshot(filterID)
 		defer filtered.close()
 		if filtered == nil || filtered.SheetPath != meta.Path {
-			writeError(w, http.StatusNotFound, "筛选结果已失效，请重新应用筛选条件")
+			writeMessage(w, http.StatusNotFound, "service.filter.expired")
 			return
 		}
 	}
@@ -306,7 +307,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		if visible != nil && query.Has("excludeThroughRow") {
 			value, err := strconv.Atoi(query.Get("excludeThroughRow"))
 			if err != nil || value < 0 || value > 30 {
-				writeError(w, 400, "冻结行参数无效")
+				writeMessage(w, 400, "service.sheetHttp.frozenRowParametersInvalid")
 				return
 			}
 			through = value
@@ -314,13 +315,19 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		var viewErr error
 		rowView, viewErr = newSelectionRowView(idx, filtered, through, visible)
 		if viewErr != nil {
-			writeError(w, 400, viewErr.Error())
+			writeFailure(w, 400, viewErr)
 			return
 		}
 		totalRows = rowView.count()
 	}
+	var pinnedBorderNeighbor []int
 	if pinnedThrough > 0 {
 		totalRows = rowView.sourceRangeCount(1, pinnedThrough)
+		if query.Get("pinnedBorderNeighbor") == "1" {
+			// Read one adjacent source row without extending the frozen prefix.
+			pinnedBorderNeighbor = rowView.sourceWindow(pinnedThrough+1, 1)
+			totalRows += len(pinnedBorderNeighbor)
+		}
 	}
 	if rowStr := query.Get("row"); rowStr != "" {
 		rowNum := clamp(parseIntDefault(rowStr, 1), 1, workbook.MaxRowsForIndex(idx))
@@ -365,13 +372,16 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 			if query.Has("row") {
 				value, parseErr := strconv.Atoi(query.Get("row"))
 				if parseErr != nil || value < 1 || value > pinnedThrough {
-					writeError(w, 400, "冻结源行起点无效")
+					writeMessage(w, 400, "service.sheetHttp.freezingSourceRowStartPoint")
 					return
 				}
 				first = value
 			}
 			offset = rowView.sourceRangeCount(1, first-1)
 			numbers = rowView.appendSourceRange(make([]int, 0, min(limit, pinnedThrough)), first, min(limit, rowView.sourceRangeCount(first, pinnedThrough)))
+			if len(numbers) < limit {
+				numbers = append(numbers, pinnedBorderNeighbor...)
+			}
 		} else if filterID == "" && query.Get("rowWindow") == "1" {
 			first := clamp(parseIntDefault(query.Get("row"), 1), 1, workbook.MaxRowsForIndex(idx))
 			numbers = rowView.sourceWindow(first, limit)
@@ -422,7 +432,7 @@ func (a *App) handleSheet(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, context.Canceled) {
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "读取单元格失败："+err.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.sheetHttp.failedReadCell", i18n.Args{"detail": err})
 		return
 	}
 	if r.Context().Err() != nil {

@@ -21,14 +21,14 @@ func (a *App) handleRelationNavigate(w http.ResponseWriter, r *http.Request) {
 		Col   int    `json:"col"`
 	}
 	if decodeRelationRequest(w, r, &req) != nil || req.Side < 0 || req.Side > 1 || req.Row < 1 || req.Row > formats.ExternalRows || req.Col < 1 || req.Col > formats.ExcelColumns {
-		writeError(w, 400, "关联源坐标无效")
+		writeMessage(w, 400, "service.relationNavigation.invalidAssociatedSourceCoordinates")
 		return
 	}
 	select {
 	case a.querySem <- struct{}{}:
 		defer func() { <-a.querySem }()
 	case <-r.Context().Done():
-		writeError(w, 408, "关联定位已取消")
+		writeMessage(w, 408, "service.relationNavigation.associatedPositioningCanceled")
 		return
 	}
 	a.cacheMu.RLock()
@@ -40,7 +40,7 @@ func (a *App) handleRelationNavigate(w http.ResponseWriter, r *http.Request) {
 	}()
 	source, err := a.borrowRelationTask(req.JobID, a.currentWorkbook())
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer source.Close()
@@ -48,41 +48,41 @@ func (a *App) handleRelationNavigate(w http.ResponseWriter, r *http.Request) {
 	input := data.inputs.Value()
 	book, ref := input.books[req.Side], input.refs[req.Side]
 	if req.Book != ref.Book {
-		writeError(w, 409, "关联定位来源不一致")
+		writeMessage(w, 409, "service.relationNavigation.associatedLocationSourcesInconsistent")
 		return
 	}
 	info := data.plan.Sources()[req.Side]
 	if !slices.ContainsFunc(info.Fields, func(field reconcile.Field) bool { return field.Column == req.Col }) {
-		writeError(w, 400, "定位字段不属于关联结果")
+		writeMessage(w, 400, "service.relationNavigation.locatedFieldDoesNotBelong")
 		return
 	}
 	if err := input.primary.CheckSourceUnchanged(); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if err := data.plan.Check(r.Context()); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if info.Kind == "analysis" {
 		if req.Row > info.Total {
-			writeError(w, 400, "关联来源行不存在")
+			writeMessage(w, 400, "service.relationNavigation.associatedSourceRowDoesNot")
 			return
 		}
 	} else {
 		meta, found := book.FindSheet(info.Sheet)
 		if !found {
-			writeError(w, 409, "关联来源工作表已失效")
+			writeMessage(w, 409, "service.relationNavigation.associatedSourceWorksheetBecomeInvalid")
 			return
 		}
 		idx := book.GetCachedIndex(meta.Path)
 		if idx == nil {
-			writeError(w, 409, "关联来源索引已失效")
+			writeMessage(w, 409, "service.relationNavigation.associatedSourceIndexBecomeInvalid")
 			return
 		}
 		at := idx.FindRowOffset(req.Row)
 		if req.Row <= info.HeaderRow || at >= idx.RowCount() || idx.RowAt(at).Number != req.Row {
-			writeError(w, 400, "关联来源行不存在")
+			writeMessage(w, 400, "service.relationNavigation.associatedSourceRowDoesNot")
 			return
 		}
 	}
@@ -90,7 +90,7 @@ func (a *App) handleRelationNavigate(w http.ResponseWriter, r *http.Request) {
 	locked = false
 	target, err := a.sourceNavigation(book, info.Kind, ref.Source, info.Sheet, req.Row, req.Col)
 	if err != nil {
-		writeError(w, 429, err.Error())
+		writeFailure(w, 429, err)
 		return
 	}
 	writeJSON(w, target)

@@ -2,6 +2,7 @@
  * Presentation of aggregate cells only. Never infer numeric source types or
  * convert exact amounts to binary floating point, including for rounding.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisCell,
   AnalysisDisplayOptions,
@@ -160,7 +161,7 @@ export function getAnalysisNumberOptions(): AnalysisDisplayOptions {
 
 export function setAnalysisNumberOptions(value: unknown): void {
   if (!isValidAnalysisNumberOptions(value)) {
-    throw new Error('分析显示设置无效');
+    throw new Error(localize('ui.numbers.analysisDisplaySettingsInvalid'));
   }
   currentOptions = { ...value };
 }

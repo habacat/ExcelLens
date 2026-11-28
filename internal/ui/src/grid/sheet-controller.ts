@@ -3,6 +3,7 @@
  * advanced filter & multi-sort orchestration, text table headers, row-view
  * adoption, named view capture/apply, task recovery adoption, and search execution.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import { SheetConditionalStats, type ConditionalStatsDeps } from './sheet-conditional-stats.ts';
 import type { ActivityHandle, SelectionArea } from '../contracts/common.ts';
 import type {
@@ -72,19 +73,23 @@ export interface NamedViewPrepared {
 
 const reread = <T>(read: () => T): T => read();
 
+function isExpiredFilter(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'service.filter.expired';
+}
+
 export const FILTER_OPERATORS: readonly (readonly [string, string])[] = [
-  ['contains', '包含'],
-  ['notContains', '不包含'],
-  ['equals', '等于'],
-  ['notEquals', '不等于'],
-  ['startsWith', '开头是'],
-  ['endsWith', '结尾是'],
-  ['gt', '大于'],
-  ['gte', '大于等于'],
-  ['lt', '小于'],
-  ['lte', '小于等于'],
-  ['blank', '为空'],
-  ['notBlank', '非空'],
+  ['contains', localize('ui.common.including')],
+  ['notContains', localize('ui.common.notIncluded')],
+  ['equals', localize('ui.common.equal')],
+  ['notEquals', localize('ui.common.notEqual')],
+  ['startsWith', localize('ui.common.beginning')],
+  ['endsWith', localize('ui.common.ending')],
+  ['gt', localize('ui.common.greaterThan')],
+  ['gte', localize('ui.common.greaterThanOrEqual')],
+  ['lt', localize('ui.common.lessThan')],
+  ['lte', localize('ui.common.lessThanOrEqual')],
+  ['blank', localize('ui.common.ifEmptyThenLeaveEmpty')],
+  ['notBlank', localize('ui.common.notEmpty')],
 ];
 
 export interface SheetControllerPanels {
@@ -172,7 +177,7 @@ export interface SheetControllerDeps extends ConditionalStatsDeps {
   readonly geometry: Geometry;
   readonly mergedCells: MergedCells;
   readonly tiles: TileCache;
-  readonly setStatus: (text: string) => void;
+  readonly setStatus: (text: string, hidden?: boolean) => void;
   readonly colName: (col: number) => string;
   readonly parseColumn: (text: string) => number;
   readonly parseRef: (text: string | null | undefined) => {
@@ -372,8 +377,8 @@ export class SheetController {
       );
       if (epoch !== S.sheetEpoch) return null;
       getWorkbookIO().reportIndexProgress(activity, progress);
-      if (progress.status === 'error') throw new Error(progress.error || '索引建立失败');
-      if (progress.status === 'cancelled') throw new Error('索引任务已取消');
+      if (progress.status === 'error') throw new Error(progress.error || localize('ui.sheetController.indexCreationFailed'));
+      if (progress.status === 'cancelled') throw new Error(localize('ui.sheetController.indexTaskCancelled'));
       if (progress.status === 'done') return progress;
     }
     return null;
@@ -536,14 +541,14 @@ export class SheetController {
     requireEl('retryIndexBtn').hidden = true;
     requireEl('showRowsRecoveryBtn').hidden = true;
     workbookIO.renderSheetTabs();
-    setStatus(`正在打开 · ${name}`);
+    setStatus(localize('ui.sheetController.opening', { name }));
     const activity =
-      openingActivity ?? beginActivity('正在准备工作表', { priority: 2, signal: opening.signal });
+      openingActivity ?? beginActivity(localize('ui.common.preparingScheduleProgress'), { priority: 2, signal: opening.signal });
     const onOpeningAbort = (): void => {
       activity?.end();
     };
     if (openingActivity) opening.signal.addEventListener('abort', onOpeningAbort, { once: true });
-    activity?.stage('正在读取工作表', openingActivity ? 65 : 0, 85);
+    activity?.stage(localize('ui.sheetController.readingWorksheets'), openingActivity ? 65 : 0, 85);
     try {
       const start: IndexStartResponse = warm
         ? { ...(warm.index as IndexStartResponse), ready: true }
@@ -575,7 +580,7 @@ export class SheetController {
       S.previewData = null;
       cancelAnimationFrame(S.previewFrame);
       S.previewFrame = 0;
-      activity?.stage('正在读取工作表布局', 85, 95);
+      activity?.stage(localize('ui.sheetController.readingWorksheetLayoutProgress'), 85, 95);
       S.usedMaxRow = Math.max(1, S.index.maxRow ?? 1);
       S.usedMaxCol = Math.max(1, S.index.maxCol ?? 1);
       S.dimension =
@@ -612,7 +617,7 @@ export class SheetController {
         S.columnOverrides = {};
         applyColumnVisibility();
         setDisplayFontSelection('');
-        toast(`读取列布局失败：${errorMessage(error)}`, 'error');
+        toast(localize('ui.sheetController.failedReadColumnLayout', { detail: errorMessage(error) }), 'error');
       }
       try {
         const view =
@@ -648,7 +653,7 @@ export class SheetController {
           await panels.rowViews.prepare({ signal: opening.signal });
         } catch (error: unknown) {
           if (epoch !== S.sheetEpoch || opening.signal.aborted) return undefined;
-          if (!S.filtered || !errorMessage(error).includes('筛选结果已失效')) throw error;
+          if (!S.filtered || !isExpiredFilter(error)) throw error;
           S.filtersBySheet.delete(name);
           S.filterTotalsBySheet.delete(name);
           S.filterId = '';
@@ -666,7 +671,7 @@ export class SheetController {
             settings: previousRows?.settings,
           });
           if (epoch !== S.sheetEpoch) return undefined;
-          toast('此前的筛选结果已失效，已保留行显隐并恢复源行顺序', 'warning');
+          toast(localize('ui.sheetController.previousFilterResultsHaveBecome'), 'warning');
         }
         if (epoch !== S.sheetEpoch) return undefined;
         const preparedVisibility = this.d.S.rowVisibility;
@@ -679,7 +684,7 @@ export class SheetController {
         ?.load(name, epoch)
         .then(() => panels.pictures?.schedule())
         .catch((error: unknown) => {
-          if (epoch === S.sheetEpoch) toast(`图片读取失败：${errorMessage(error)}`, 'error');
+          if (epoch === S.sheetEpoch) toast(localize('ui.sheetController.imageReadingFailed', { detail: errorMessage(error) }), 'error');
         });
       if (previousView && !targetRef) {
         setVirtualScrollTop(previousView.top);
@@ -698,10 +703,10 @@ export class SheetController {
         tiles.store(viewportKey(warm.entry.request), warm.entry.data, warm.entry.request);
       }
       try {
-        activity?.stage('正在显示单元格', 95, 99);
+        activity?.stage(localize('ui.sheetController.displayingCells'), 95, 99);
         await loadViewport(true, epoch, true);
       } catch (error: unknown) {
-        if (S.filtered && errorMessage(error).includes('筛选结果已失效')) {
+        if (S.filtered && isExpiredFilter(error)) {
           if (S.sheet) {
             S.filtersBySheet.delete(S.sheet);
             S.filterTotalsBySheet.delete(S.sheet);
@@ -719,7 +724,7 @@ export class SheetController {
       }
       if (epoch !== S.sheetEpoch) return undefined;
       requireEl('indexOverlay').hidden = true;
-      setStatus(`已打开 · ${name}`);
+      setStatus(localize('ui.sheetController.opened', { name }), true);
       let arrived = true;
       if (targetRef) {
         try {
@@ -776,11 +781,11 @@ export class SheetController {
       requireEl('indexOverlay').hidden = false;
       S.indexReady = false;
       this.finishSheetSwitch(epoch, false);
-      requireEl('indexTitle').textContent = `${name} · 读取失败`;
+      requireEl('indexTitle').textContent = localize('ui.sheetController.readFailure', { name });
       requireEl('indexDetail').textContent = errorMessage(error);
       requireEl('retryIndexBtn').hidden = false;
       requireEl('showRowsRecoveryBtn').hidden = !S.rowViewFailure;
-      setStatus('读取失败');
+      setStatus(localize('ui.sheetController.readingFailure'));
       toast(errorMessage(error), 'error');
       return undefined;
     } finally {
@@ -810,7 +815,7 @@ export class SheetController {
     const rows = S.freeze.rows;
     const cols = S.freeze.cols;
     const label =
-      !rows && !cols ? '冻结' : `冻结 ${rows ? `${rows}行` : ''}${cols ? ` ${cols}列` : ''}`;
+      !rows && !cols ? localize('ui.sheetController.freeze') : localize('ui.sheetController.freeze0dbdef2', { detail: rows ? localize('ui.sheetController.row', { rows }) : '', detail2: cols ? ` ${localize('ui.sheetController.column', { cols })}` : '' });
     requireEl('freezeBtnLabel').textContent = label;
     const status = requireEl('freezeStatus');
     status.hidden = !rows && !cols;
@@ -847,7 +852,7 @@ export class SheetController {
       rows > 30 ||
       cols > 12
     ) {
-      toast('冻结行数应为0–30，列数应为0–12', 'warning');
+      toast(localize('ui.sheetController.numberFrozenRowsShouldBe'), 'warning');
       return;
     }
     if (!S.indexReady || !S.sheet) return;
@@ -871,7 +876,7 @@ export class SheetController {
       panels.pictures?.schedule();
       closeDialog('freezeDialog');
     } catch (error: unknown) {
-      toast(`保存冻结窗格失败：${errorMessage(error)}`, 'error');
+      toast(localize('ui.sheetController.failedSaveFrozenPane', { detail: errorMessage(error) }), 'error');
     }
   }
 
@@ -918,7 +923,7 @@ export class SheetController {
     if (!current()) return;
     const oldSession = S.searchSession;
     if (!full && !recoverable && oldSession?.key === key && oldSession.status === 'done') {
-      panels.searchPanel.displaySummary(`${oldSession.matches.length} 条匹配 · 已保留`);
+      panels.searchPanel.displaySummary(localize('ui.sheetController.itemsMatchedRetained', { count: oldSession.matches.length }));
       panels.searchPanel.renderResults({ matches: oldSession.matches, status: 'done', mode });
       return;
     }
@@ -932,13 +937,13 @@ export class SheetController {
       S.searchSession.status = 'done';
       S.searchSession.truncated = Boolean(cached.truncated);
       panels.searchPanel.displaySummary(
-        `${cached.matches.length} 条匹配 · 本机缓存${cached.truncated ? '（已截断）' : ''}`,
+        localize('ui.sheetController.itemsMatchedLocalCache', { count: cached.matches.length, detail: cached.truncated ? localize('ui.sheetController.truncated') : '' }),
       );
       requireButton('searchBtn').disabled = false;
       requireEl('cancelSearchBtn').hidden = true;
       return;
     }
-    const activity = beginActivity('正在搜索', { slot: 'searchActivity' });
+    const activity = beginActivity(localize('ui.common.searching'), { slot: 'searchActivity' });
     S.searchActivity = activity;
     try {
       const start = await api(
@@ -992,7 +997,7 @@ export class SheetController {
       matches: [],
       status: 'running',
       truncated: false,
-      summary: '正在搜索…',
+      summary: localize('ui.common.searching39739fa'),
       selected: -1,
     };
     requireInput('searchResultFilter').value = '';
@@ -1001,7 +1006,7 @@ export class SheetController {
     S.searchSelectedIndex = -1;
     panels.searchPanel.buildHits([]);
     panels.searchPanel.applyHighlightClasses();
-    panels.searchPanel.displaySummary('正在搜索…');
+    panels.searchPanel.displaySummary(localize('ui.common.searching39739fa'));
     requireEl('searchResults').replaceChildren();
     requireEl('searchResultsPane').hidden = true;
     requireButton('searchBtn').disabled = true;
@@ -1021,7 +1026,7 @@ export class SheetController {
       if (S.searchSession) S.searchSession.status = 'cancelled';
       requireButton('searchBtn').disabled = false;
       requireEl('cancelSearchBtn').hidden = true;
-      panels.searchPanel.displaySummary('已取消搜索 · 已找到的结果仍可访问');
+      panels.searchPanel.displaySummary(localize('ui.sheetController.searchCanceledFoundResultsStill'));
     }
     try {
       await api('/api/search/cancel', {
@@ -1177,8 +1182,8 @@ export class SheetController {
     const colInput = document.createElement('input');
     colInput.className = 'field-control filter-column';
     colInput.value = colName(column);
-    colInput.placeholder = '列 A';
-    colInput.title = '列标识，例如 A 或 27';
+    colInput.placeholder = localize('ui.sheetController.column52fc639');
+    colInput.title = localize('ui.sheetController.columnIdentifierSuchAsOr');
     const op = document.createElement('select');
     op.className = 'field-control filter-operator';
     for (const [v, label] of FILTER_OPERATORS) {
@@ -1191,22 +1196,22 @@ export class SheetController {
     const val = document.createElement('input');
     val.className = 'field-control filter-value';
     val.value = value;
-    val.placeholder = '筛选值';
+    val.placeholder = localize('ui.common.filteringValues');
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'remove-rule';
     remove.textContent = '×';
-    remove.title = '删除条件';
-    remove.setAttribute('aria-label', '删除条件');
+    remove.title = localize('ui.sheetController.deletionConditions');
+    remove.setAttribute('aria-label', localize('ui.sheetController.deletionConditions'));
     remove.addEventListener('click', () => row.remove());
     op.addEventListener('change', () => {
       val.disabled = ['blank', 'notBlank'].includes(op.value);
-      val.placeholder = val.disabled ? '无需填写' : '筛选值';
+      val.placeholder = val.disabled ? localize('ui.sheetController.noNeedFill') : localize('ui.common.filteringValues');
     });
     const fields: readonly (readonly [string, HTMLElement])[] = [
-      ['列', colInput],
-      ['条件', op],
-      ['筛选值', val],
+      [localize('ui.common.column'), colInput],
+      [localize('ui.sheetController.conditions'), op],
+      [localize('ui.common.filteringValues'), val],
     ];
     for (const [caption, control] of fields) {
       const label = document.createElement('label');
@@ -1229,15 +1234,15 @@ export class SheetController {
     }
     const largeStatus = requireEl('largeDataStatus');
     largeStatus.hidden = !S.largeData;
-    largeStatus.title = `大表模式已启用：关闭纵向 Ctrl+方向键全列扫描，查重最多 ${fileFormats.largeDataRows.toLocaleString('zh-CN')} 行；筛选与排序共用 ${(fileFormats.queryTempBytes / 1024 ** 3).toLocaleString('zh-CN')} GB 临时空间。`;
+    largeStatus.title = localize('ui.sheetController.largeTableModeEnabledDisabling', { largeDataRows: fileFormats.largeDataRows.toLocaleString(interfaceLocale()), queryTempBytes: (fileFormats.queryTempBytes / 1024 ** 3).toLocaleString(interfaceLocale()) });
     const enabled = Boolean(S.autoFilter);
     const button = requireButton('filterOpenBtn');
     button.classList.toggle('format-active', enabled);
     button.setAttribute('aria-pressed', String(enabled));
     button.title = S.autoFilter
-      ? `关闭筛选（表头在第 ${S.autoFilter.row} 行，Ctrl+Shift+L）`
-      : '以当前行为表头开启筛选（Ctrl+Shift+L）';
-    button.innerHTML = `${icon('filter')}筛选`;
+      ? localize('ui.sheetController.disableFilteringHeaderAppearsRow', { row: S.autoFilter.row })
+      : localize('ui.sheetController.filterCurrentRowAsHeader');
+    button.innerHTML = localize('ui.sheetController.filtering', { icon: icon('filter') });
     const headerButton = requireButton('textHeaderBtn');
     headerButton.hidden = S.source?.format !== 'txt';
     headerButton.disabled = !S.indexReady;
@@ -1245,8 +1250,8 @@ export class SheetController {
     headerButton.classList.toggle('format-active', tableMode);
     headerButton.title =
       tableMode && S.autoFilter
-        ? `表头第 ${S.autoFilter.row} 行${S.autoFilter.detected ? '（自动识别）' : ''}，点击更改或切换普通文本视图`
-        : '自动识别或指定 TXT 表头行';
+        ? localize('ui.sheetController.rowHeaderClickChangeOr', { row: S.autoFilter.row, detail: S.autoFilter.detected ? localize('ui.sheetController.automaticallyRecognized') : '' })
+        : localize('ui.sheetController.automaticallyIdentifiedOrSpecifiedTxt');
     document.querySelector('.grid-region')?.classList.toggle('text-table-view', tableMode);
     this.syncTableColumnHeaders();
   }
@@ -1334,12 +1339,12 @@ export class SheetController {
     if (automatic) {
       header = S.source.tableHeader;
       if (!header) {
-        toast('未识别到可靠表头，请填写表头所在行，或保持普通文本视图', 'warning');
+        toast(localize('ui.sheetController.noReliableHeaderWasIdentified'), 'warning');
         return;
       }
     } else {
       if (!Number.isInteger(number) || number < 1 || number > S.usedMaxRow) {
-        toast('表头行须在已用数据范围内', 'warning');
+        toast(localize('ui.sheetController.headerRowsMustBeWithin'), 'warning');
         return;
       }
       try {
@@ -1349,7 +1354,7 @@ export class SheetController {
           decodeTextTableHeader,
         );
       } catch (error: unknown) {
-        if (epoch === S.sheetEpoch) toast(`读取表头失败：${errorMessage(error)}`, 'error');
+        if (epoch === S.sheetEpoch) toast(localize('ui.sheetController.headerReadingFailed', { detail: errorMessage(error) }), 'error');
         return;
       }
     }
@@ -1364,7 +1369,7 @@ export class SheetController {
     this.updateAutoFilterButton();
     this.refreshAutoFilterHeaders();
     closeDialog('textHeaderDialog');
-    toast(`第 ${header.row} 行已设为表头；顶部字段栏可直接筛选和排序`, 'success');
+    toast(localize('ui.sheetController.rowSetAsHeaderTop', { row: header.row }), 'success');
   }
 
   async disableTextTableHeader(): Promise<void> {
@@ -1394,7 +1399,7 @@ export class SheetController {
     panels.autoFilterUI?.hide();
     if (S.autoFilter && S.source?.format === 'txt') {
       await this.disableTextTableHeader();
-      toast('已切换为普通文本视图');
+      toast(localize('ui.sheetController.switchedNormalTextView'));
       return;
     }
     if (S.autoFilter) {
@@ -1405,7 +1410,7 @@ export class SheetController {
       S.sortHeaderBySheet.delete(S.sheet);
       if (S.filterId) await this.clearFilter();
       this.refreshAutoFilterHeaders();
-      toast('已关闭自动筛选');
+      toast(localize('ui.sheetController.automaticFilterDisabled'));
     } else {
       const row = Math.max(1, Math.min(S.usedMaxRow, S.selected?.row ?? 1));
       if (S.source?.format === 'txt') {
@@ -1423,7 +1428,7 @@ export class SheetController {
       };
       S.autoFiltersBySheet.set(S.sheet, S.autoFilter);
       this.refreshAutoFilterHeaders();
-      toast(`第 ${row} 行已设为表头；点击表头单元格右侧的 ▾ 筛选`, 'success');
+      toast(localize('ui.sheetController.rowSetAsHeaderClick', { row }), 'success');
     }
     this.updateAutoFilterButton();
   }
@@ -1464,7 +1469,7 @@ export class SheetController {
         this.refreshAutoFilterHeaders();
       }
     } catch (err: unknown) {
-      toast(`筛选失败：${errorMessage(err)}`, 'error');
+      toast(localize('ui.sheetController.filteringFailed', { detail: errorMessage(err) }), 'error');
     }
   }
 
@@ -1474,7 +1479,7 @@ export class SheetController {
     const selected = { ...S.selected };
     const value = selected.display;
     if (value.length > 1024) {
-      toast('当前单元格超过1024字符，请使用「条件」设置筛选', 'warning');
+      toast(localize('ui.sheetController.currentCellExceedsCharactersUse'), 'warning');
       return;
     }
     if (!S.autoFilter) {
@@ -1490,7 +1495,7 @@ export class SheetController {
     }
     const config = S.autoFilter;
     if (selected.row <= config.row) {
-      toast(`请选择第 ${config.row} 行表头下面的数据单元格`, 'warning');
+      toast(localize('ui.sheetController.selectDataCellsBelowHeader', { row: config.row }), 'warning');
       return;
     }
     config.rules.set(
@@ -1531,8 +1536,8 @@ export class SheetController {
   private collectFilterRules(): SourceFilterRule[] {
     const { parseColumn } = this.d;
     const rows = [...requireEl('filterRules').querySelectorAll('.filter-rule')];
-    if (!rows.length) throw new Error('请至少添加一个筛选条件');
-    if (rows.length > 32) throw new Error('最多支持 32 个筛选条件');
+    if (!rows.length) throw new Error(localize('ui.sheetController.addAtLeastOneFilter'));
+    if (rows.length > 32) throw new Error(localize('ui.sheetController.supportsUpFilteringConditions'));
     return rows.map((row, index) => {
       const colEl = row.querySelector<HTMLInputElement>('.filter-column');
       const opEl = row.querySelector<HTMLSelectElement>('.filter-operator');
@@ -1540,9 +1545,9 @@ export class SheetController {
       const column = parseColumn(colEl?.value ?? '');
       const operator = opEl?.value ?? 'contains';
       const value = valEl?.value ?? '';
-      if (!column) throw new Error(`第 ${index + 1} 个条件的列标识无效`);
+      if (!column) throw new Error(localize('ui.sheetController.columnIdentifierThConditionInvalid', { index: index + 1 }));
       if (!['blank', 'notBlank'].includes(operator) && !value.trim()) {
-        throw new Error(`第 ${index + 1} 个条件需要填写筛选值`);
+        throw new Error(localize('ui.sheetController.thConditionRequiresFillingFilter', { index: index + 1 }));
       }
       return { column, operator, value };
     });
@@ -1593,10 +1598,10 @@ export class SheetController {
     requireButton('applyFilterBtn').disabled = true;
     requireEl('filterProgress').hidden = false;
     requireEl('filterBar').style.width = '0%';
-    requireEl('filterProgressText').textContent = '正在扫描当前工作表…';
-    setStatus(`正在筛选 · ${sheet}`);
+    requireEl('filterProgressText').textContent = localize('ui.sheetController.scanningCurrentWorksheet');
+    setStatus(localize('ui.sheetController.filtering5cfa1ef', { sheet }));
     S.filterActivity?.end();
-    const activity = beginActivity('正在筛选数据', { slot: 'filterActivity' });
+    const activity = beginActivity(localize('ui.common.filteringDataProgress'), { slot: 'filterActivity' });
     S.filterActivity = activity;
     try {
       const start = await api('/api/filter/start', {
@@ -1622,7 +1627,7 @@ export class SheetController {
       requireEl('filterProgressText').textContent = errorMessage(error);
       requireButton('applyFilterBtn').disabled = false;
       requireEl('cancelFilterJobBtn').hidden = true;
-      setStatus(`已打开 · ${sheet}`);
+      setStatus(localize('ui.sheetController.openedbb2d14e', { sheet }), true);
       toast(errorMessage(error), 'error');
       return false;
     } finally {
@@ -1805,7 +1810,7 @@ export class SheetController {
   } {
     const { S } = this.d;
     if (!S.opened || !S.indexReady || !S.sheet || S.opening || S.sheetLoadingEpoch || S.filterJob) {
-      throw new Error('请先完成工作表加载或筛选，再保存视图');
+      throw new Error(localize('ui.sheetController.completeWorksheetLoadingOrFiltering'));
     }
     const table = S.autoFilter;
     return {
@@ -1859,12 +1864,12 @@ export class SheetController {
       panels,
     } = this.d;
     if (!current()) return false;
-    if (S.filterJob) throw new Error('当前有筛选任务，未替换视图');
+    if (S.filterJob) throw new Error(localize('ui.sheetController.thereFilteringTaskProgressView'));
     const view = prepared.view;
     const sheet = view.source.sheet;
     const config = view.config;
     const query = view.query;
-    if (data && (!data.filterId || data.sheet !== sheet)) throw new Error('视图查询来源不一致');
+    if (data && (!data.filterId || data.sheet !== sheet)) throw new Error(localize('ui.sheetController.viewQuerySourcesInconsistent'));
     let preparedRows: RowViewState | null = null;
     if (panels.rowViews) {
       preparedRows = await panels.rowViews.build({
@@ -1891,7 +1896,7 @@ export class SheetController {
               sortColumn: 0,
               descending: false,
             };
-        if (!table) throw new Error('视图表头已失效');
+        if (!table) throw new Error(localize('ui.sheetController.viewHeaderInvalid'));
         const queryRules = query.rules ?? [];
         table.rules = new Map(
           queryRules.map((rule) => [
@@ -2017,7 +2022,7 @@ export class SheetController {
     initialActivity?: ActivityHandle | null,
   ): Promise<boolean> {
     const { S, api, setStatus, toast } = this.d;
-    const activity = initialActivity ?? beginActivity('正在筛选数据', { slot: 'filterActivity' });
+    const activity = initialActivity ?? beginActivity(localize('ui.common.filteringDataProgress'), { slot: 'filterActivity' });
     S.filterActivity = activity;
     try {
       const wait = this.d.delay ?? delay;
@@ -2043,10 +2048,10 @@ export class SheetController {
         requireEl('filterBar').style.width = `${percent}%`;
         requireEl('filterProgressText').textContent =
           data.status === 'done'
-            ? '正在显示筛选结果…'
-            : `${data.stage || '正在筛选'} · ${data.scanned ?? 0}/${data.total ?? 0} 行`;
+            ? localize('ui.sheetController.displayingFilteredResults614770e')
+            : localize('ui.sheetController.row72d7d52', { stage: data.stage || localize('ui.sheetController.filteringProgress'), detail: data.scanned ?? 0, detail2: data.total ?? 0 });
         if (data.status === 'done') {
-          activity?.stage('正在显示筛选结果', 95, 99);
+          activity?.stage(localize('ui.sheetController.displayingFilteredResults'), 95, 99);
           const abort = new AbortController();
           S.filterCommitAbort = abort;
           let accepted = false;
@@ -2069,8 +2074,8 @@ export class SheetController {
             S.pendingFilterSpec = null;
             requireButton('applyFilterBtn').disabled = false;
             requireEl('cancelFilterJobBtn').hidden = true;
-            requireEl('filterProgressText').textContent = '视图已变化；筛选任务已结束';
-            setStatus(`已打开 · ${sheet}`);
+            requireEl('filterProgressText').textContent = localize('ui.sheetController.viewChangedFilteringTaskCompleted');
+            setStatus(localize('ui.sheetController.openedbb2d14e', { sheet }), true);
             return false;
           }
           if (S.pendingFilterSpec?.sheet === sheet) {
@@ -2078,26 +2083,26 @@ export class SheetController {
             S.pendingFilterSpec = null;
           }
           requireEl('filterProgressText').textContent =
-            `筛选完成 · ${S.filterTotal.toLocaleString()} 行符合条件`;
+            localize('ui.sheetController.filterCompletedRowsMeetConditions', { filterTotal: S.filterTotal.toLocaleString(interfaceLocale()) });
           requireEl('filterStatus').hidden = false;
           requireButton('clearFilterBtn').disabled = false;
           requireButton('applyFilterBtn').disabled = false;
           requireEl('cancelFilterJobBtn').hidden = true;
           S.filterJob = null;
-          setStatus(`已打开 · ${sheet}`);
+          setStatus(localize('ui.sheetController.openedbb2d14e', { sheet }), true);
           toast(
-            `筛选完成 · ${Math.max(0, S.filterTotal - (S.autoFilter?.row ?? 0)).toLocaleString()} 行`,
+            localize('ui.sheetController.filterCompletedRow', { detail: Math.max(0, S.filterTotal - (S.autoFilter?.row ?? 0)).toLocaleString(interfaceLocale()) }),
             'success',
           );
           return true;
         }
         if (data.status === 'error' || data.status === 'cancelled') {
-          requireEl('filterProgressText').textContent = data.error || '筛选已取消';
+          requireEl('filterProgressText').textContent = data.error || localize('ui.sheetController.filterCancelled');
           requireButton('applyFilterBtn').disabled = false;
           requireEl('cancelFilterJobBtn').hidden = true;
           S.filterJob = null;
-          setStatus(`已打开 · ${sheet}`);
-          if (data.status === 'error') toast(data.error || '筛选失败', 'error');
+          setStatus(localize('ui.sheetController.openedbb2d14e', { sheet }), true);
+          if (data.status === 'error') toast(data.error || localize('ui.sheetController.filterFailure'), 'error');
           return false;
         }
       }
@@ -2118,8 +2123,8 @@ export class SheetController {
       S.filterJob = null;
       requireButton('applyFilterBtn').disabled = false;
       requireEl('cancelFilterJobBtn').hidden = true;
-      requireEl('filterProgressText').textContent = '筛选已取消';
-      setStatus(`已打开 · ${S.sheet ?? ''}`);
+      requireEl('filterProgressText').textContent = localize('ui.sheetController.filterCancelled');
+      setStatus(localize('ui.sheetController.openeda77e173', { detail: S.sheet ?? '' }), true);
     }
     try {
       if (!jobID.startsWith('pending:')) {
@@ -2173,7 +2178,7 @@ export class SheetController {
           preparedRows = await pending;
         } catch (error: unknown) {
           if (current() && !(error instanceof Error && error.name === 'AbortError')) {
-            toast(`清除筛选失败：${errorMessage(error)}`, 'error');
+            toast(localize('ui.sheetController.filterClearingFailed', { detail: errorMessage(error) }), 'error');
           }
           return;
         }

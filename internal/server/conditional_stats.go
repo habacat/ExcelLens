@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -45,7 +46,7 @@ func loadConditionalStatsBudget() int64 {
 
 func saveConditionalStatsBudget(budgetBytes int64) error {
 	if !validConditionalStatsBudget(budgetBytes) {
-		return fmt.Errorf("条件统计缓存上限必须在 %s 到 %s 之间", formatReadableBytes(formats.ConditionalStatsMinBudgetBytes), formatReadableBytes(formats.ConditionalStatsMaxBudgetBytes))
+		return i18n.Error("service.conditionalStats.maximumCacheLimitConditionalStatistics", i18n.Args{"formatReadableBytes": formatReadableBytes(formats.ConditionalStatsMinBudgetBytes), "formatReadableBytes2": formatReadableBytes(formats.ConditionalStatsMaxBudgetBytes)})
 	}
 	roots, err := dataRoots()
 	if err != nil {
@@ -129,31 +130,31 @@ func (a *App) handleConditionalStatsStart(w http.ResponseWriter, r *http.Request
 		Sheet string `json:"sheet"`
 	}
 	if err := decodeControlRequest(w, r, 8<<10, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.conditionalStats.requestedContentInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.conditionalStats.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.conditionalStats.unableFindSpecifiedWorksheet")
 		return
 	}
 	a.mu.RLock()
 	maintenance := a.maintenance
 	a.mu.RUnlock()
 	if maintenance {
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.conditionalStats.localCacheBeingMaintainedTry")
 		return
 	}
 	a.cacheMu.RLock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		a.cacheMu.RUnlock()
-		writeError(w, http.StatusConflict, "工作表索引尚未建立")
+		writeMessage(w, http.StatusConflict, "service.conditionalStats.worksheetIndexNotCreatedYet")
 		return
 	}
 	info, err := wb.ConditionalStatisticsState(r.Context(), meta, idx)
@@ -175,12 +176,12 @@ func (a *App) handleConditionalStatsStart(w http.ResponseWriter, r *http.Request
 	a.mu.Lock()
 	if a.maintenance {
 		a.mu.Unlock()
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.conditionalStats.localCacheBeingMaintainedTry")
 		return
 	}
 	if a.wb != wb {
 		a.mu.Unlock()
-		writeError(w, http.StatusConflict, "工作簿已切换，请重新选择工作表")
+		writeMessage(w, http.StatusConflict, "service.conditionalStats.workbookSwitchedChooseNewWorksheet")
 		return
 	}
 	if existingID := a.conditionalStatsBySheet[meta.Path]; existingID != "" {
@@ -201,7 +202,7 @@ func (a *App) handleConditionalStatsStart(w http.ResponseWriter, r *http.Request
 		return queryTaskLifetime{Started: j.Started, Done: j.done, Cancel: j.cancel}
 	}) {
 		a.mu.Unlock()
-		writeError(w, http.StatusTooManyRequests, "条件统计任务已满，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.conditionalStats.conditionalStatisticsTaskFullTry")
 		return
 	}
 	for path, id := range a.conditionalStatsBySheet {
@@ -210,9 +211,9 @@ func (a *App) handleConditionalStatsStart(w http.ResponseWriter, r *http.Request
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	stage := "等待建立条件统计索引"
+	stage := "stage.task.waitingEstablishConditionalStatisticsIndex"
 	if damaged {
-		stage = "等待重建条件统计索引"
+		stage = "stage.task.waitingReconstructConditionalStatisticsIndex"
 	}
 	job := &ConditionalStatsJob{
 		ID:      randomID(),
@@ -240,7 +241,7 @@ func (a *App) runConditionalStats(wb *workbook.Workbook, meta workbook.SheetMeta
 	if admissionErr != nil {
 		job.mu.Lock()
 		job.Status = "cancelled"
-		job.Stage = "已取消"
+		job.Stage = "stage.task.cancelled"
 		job.mu.Unlock()
 		return
 	}
@@ -249,9 +250,9 @@ func (a *App) runConditionalStats(wb *workbook.Workbook, meta workbook.SheetMeta
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 
-	runningStage := "正在建立条件统计索引"
+	runningStage := "stage.task.establishingConditionalStatisticalIndexes"
 	if job.Damaged {
-		runningStage = "正在重建条件统计索引"
+		runningStage = "stage.task.rebuildingConditionBasedStatisticsIndices"
 	}
 	job.mu.Lock()
 	job.Status = "running"
@@ -274,10 +275,10 @@ func (a *App) runConditionalStats(wb *workbook.Workbook, meta workbook.SheetMeta
 	if err != nil {
 		if errors.Is(err, context.Canceled) || job.ctx.Err() != nil {
 			job.Status = "cancelled"
-			job.Stage = "已取消"
+			job.Stage = "stage.task.cancelled"
 		} else {
 			job.Status = "error"
-			job.Stage = "条件统计失败"
+			job.Stage = "stage.task.failedToPerformConditionalStatisticsCalculations"
 			job.Error = err.Error()
 		}
 		return
@@ -285,7 +286,7 @@ func (a *App) runConditionalStats(wb *workbook.Workbook, meta workbook.SheetMeta
 	job.Progress = 100
 	job.DoneRows = job.TotalRows
 	job.Status = "done"
-	job.Stage = "条件统计完成"
+	job.Stage = "stage.task.conditionStatisticsCompleted"
 }
 
 func (a *App) handleConditionalStatsStatus(w http.ResponseWriter, r *http.Request) {
@@ -307,7 +308,7 @@ func (a *App) handleConditionalStatsStatus(w http.ResponseWriter, r *http.Reques
 	}
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, http.StatusNotFound, "条件统计任务不存在或已失效")
+		writeMessage(w, http.StatusNotFound, "service.conditionalStats.conditionStatisticsTaskDoesNot")
 		return
 	}
 	job.mu.RLock()
@@ -315,7 +316,7 @@ func (a *App) handleConditionalStatsStatus(w http.ResponseWriter, r *http.Reques
 		"id":        job.ID,
 		"sheet":     job.Sheet,
 		"status":    job.Status,
-		"stage":     job.Stage,
+		"stage":     responseLocale(w).Stage(job.Stage),
 		"progress":  job.Progress,
 		"doneRows":  job.DoneRows,
 		"totalRows": job.TotalRows,
@@ -336,7 +337,7 @@ func (a *App) handleConditionalStatsCancel(w http.ResponseWriter, r *http.Reques
 		Sheet string `json:"sheet"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.conditionalStats.requestedContentInvalid")
 		return
 	}
 	a.mu.RLock()
@@ -362,7 +363,7 @@ func (a *App) ClearUnusedConditionalStats() (string, error) {
 	root.cacheResetMu.RLock()
 	defer root.cacheResetMu.RUnlock()
 	if root.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.conditionalStats.completeRestorationProcessFirst")
 	}
 	root.cacheMu.Lock()
 	defer root.cacheMu.Unlock()
@@ -376,7 +377,7 @@ func (a *App) UpdateConditionalStatsBudget(budgetBytes int64) (string, error) {
 	root.cacheResetMu.RLock()
 	defer root.cacheResetMu.RUnlock()
 	if root.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.conditionalStats.completeRestorationProcessFirst")
 	}
 	if err := saveConditionalStatsBudget(budgetBytes); err != nil {
 		return "", err

@@ -2,6 +2,7 @@
  * Crosshair highlight color & visibility toggle. Display-only preference.
  */
 
+import { t as localize } from '../core/i18n.ts';
 export type HighlightColorId = 'blue' | 'green' | 'amber' | 'purple' | 'rose';
 
 interface HighlightColorSpec {
@@ -10,11 +11,11 @@ interface HighlightColorSpec {
 }
 
 const COLORS: Readonly<Record<HighlightColorId, HighlightColorSpec>> = Object.freeze({
-  blue: { name: '蓝色', color: '#3c7dc3' },
-  green: { name: '绿色', color: '#109968' },
-  amber: { name: '琥珀', color: '#b77a19' },
-  purple: { name: '紫色', color: '#8654b6' },
-  rose: { name: '玫红', color: '#b95179' },
+  blue: { name: localize('ui.highlightMode.blue'), color: '#3c7dc3' },
+  green: { name: localize('ui.highlightMode.green'), color: '#109968' },
+  amber: { name: localize('ui.highlightMode.amber'), color: '#b77a19' },
+  purple: { name: localize('ui.highlightMode.purple'), color: '#8654b6' },
+  rose: { name: localize('ui.highlightMode.roseRed'), color: '#b95179' },
 });
 
 const ENABLED_KEY = 'ExcelLens.crosshairEnabled';
@@ -103,7 +104,7 @@ export class HighlightMode {
     this.root.style.setProperty('--crosshair-color', palette.color);
     this.root.style.setProperty('--selection-color', palette.color);
     this.root.style.setProperty('--selection-active-fill', `${palette.color}1f`);
-    this.button.title = `行列与选区颜色：${palette.name}`;
+    this.button.title = localize('ui.highlightMode.columnRowColors', { name: palette.name });
     this.button.setAttribute('aria-label', this.button.title);
     for (const input of this.panel.querySelectorAll<HTMLInputElement>(
       'input[name="crosshairColor"]',

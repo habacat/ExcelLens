@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"math"
 	"os"
@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 func (r Roots) Restore(ctx context.Context, folder string) error {
@@ -44,7 +45,7 @@ func (r Roots) RestoreWith(ctx context.Context, folder string, options TransferO
 	}
 	var m manifest
 	if err = json.Unmarshal(data, &m); err != nil || m.Version != 1 || m.Files == nil {
-		return errors.New("备份清单无效")
+		return i18n.Error("diagnostic.localstore.restore.invalidBackupList")
 	}
 	units, err := r.units(m.Files)
 	if err != nil {
@@ -56,7 +57,7 @@ func (r Roots) RestoreWith(ctx context.Context, folder string, options TransferO
 	if len(units) == 0 {
 		return nil
 	}
-	phase(ctx, "预算磁盘空间", 0, len(m.Files))
+	phase(ctx, "stage.task.budgetDiskSpace", 0, len(m.Files))
 	space, err := r.restoreSpace(ctx, units, m.Files, options)
 	if err != nil {
 		return err
@@ -95,11 +96,11 @@ func (r Roots) RestoreWith(ctx context.Context, folder string, options TransferO
 	var total int64
 	for _, f := range m.Files {
 		if f.Bytes > math.MaxInt64-total {
-			return errors.New("备份字节数无效")
+			return i18n.Error("diagnostic.localstore.restore.backupByteCountInvalid")
 		}
 		total += f.Bytes
 	}
-	phase(ctx, "核验并暂存", total, len(m.Files))
+	phase(ctx, "stage.task.verificationAndTemporaryStorage", total, len(m.Files))
 	for _, u := range units {
 		stage := stages[u.base]
 		dest, err := openDirectory(r.directory(u.base))
@@ -119,7 +120,7 @@ func (r Roots) RestoreWith(ctx context.Context, folder string, options TransferO
 	for _, record := range pending {
 		stagedBytes += record.Bytes
 	}
-	phase(ctx, "复核暂存", stagedBytes, len(pending))
+	phase(ctx, "stage.task.reviewAndTentativeStorage", stagedBytes, len(pending))
 	for name, want := range pending {
 		base, rel, _ := strings.Cut(name, "/")
 		got, err := readFile(ctx, stages[base], rel, io.Discard)
@@ -127,7 +128,7 @@ func (r Roots) RestoreWith(ctx context.Context, folder string, options TransferO
 			return err
 		}
 		if got != want {
-			return fmt.Errorf("暂存文件校验失败：%s", name)
+			return i18n.Error("diagnostic.localstore.restore.fileSaveCheckFailed", i18n.Args{"name": name})
 		}
 		finishFile(ctx)
 	}
@@ -165,7 +166,7 @@ func stageUnit(ctx context.Context, volume backupVolume, files map[string]fileRe
 		return err
 	}
 	if exists && st.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("迁入目标含链接：%s", u.key)
+		return i18n.Error("diagnostic.localstore.restore.migrateTargetLink", i18n.Args{"key": u.key})
 	}
 	for _, name := range u.names {
 		rel := strings.TrimPrefix(name, u.base+"/")
@@ -176,11 +177,11 @@ func stageUnit(ctx context.Context, volume backupVolume, files map[string]fileRe
 			}
 			got, err := readFile(withoutMeter(ctx), dest, rel, io.Discard)
 			if err != nil || got != want {
-				return fmt.Errorf("目标已有不同数据：%s", u.key)
+				return i18n.Error("diagnostic.localstore.restore.targetAlreadyDifferentData", i18n.Args{"key": u.key})
 			}
 		} else {
 			if _, planned := space.planned[name]; !planned {
-				return fmt.Errorf("空间预检后目标发生变化：%s", u.key)
+				return i18n.Error("diagnostic.localstore.restore.targetChangedAfterSpatialPre", i18n.Args{"key": u.key})
 			}
 			err := writeNew(stage, rel, func(f *os.File) error {
 				if err := volume.verify(ctx, name, want, space.targets[u.base].writer(f)); err != nil {

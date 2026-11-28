@@ -3,6 +3,7 @@
  * Only final, bounded CSS pixels become JS Numbers; differences are computed
  * before any lossy conversion.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { MergeRange } from '../contracts/common.ts';
 import type {
   PrintCellBorders,
@@ -135,7 +136,7 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
 }
 
 function fail(): never {
-  throw new Error('预览返回的页面数据无效，请重新准备');
+  throw new Error(localize('ui.printingModel.pageDataReturnedPreviewInvalid'));
 }
 
 export function printUnits(value: unknown, negative = false): bigint {
@@ -150,11 +151,11 @@ function parseCellPoint(
   source: Pick<SourceCapabilities, 'maxRows' | 'maxColumns'>,
 ): { readonly row: number; readonly col: number } {
   const match = /^\$?([A-Za-z]+)\$?([1-9]\d*)$/.exec(text.trim());
-  if (!match?.[1] || !match[2]) throw new Error(`区域地址无效：${text}`);
+  if (!match?.[1] || !match[2]) throw new Error(localize('ui.printingModel.invalidRegionAddress', { text }));
   const col = columnNumber(match[1]);
   const row = Number(match[2]);
   if (!isInteger(row) || !isInteger(col) || col < 1 || row > source.maxRows || col > source.maxColumns) {
-    throw new Error(`区域地址超出此来源范围：${text}`);
+    throw new Error(localize('ui.printingModel.regionAddressExceedsSourceRange', { text }));
   }
   return { row, col };
 }
@@ -165,7 +166,7 @@ function parseList(text: string, maximum: number): string[] {
     .split(/[,，;；]/)
     .map((s) => s.trim());
   if (parts.some((s) => !s) || parts.length > maximum) {
-    throw new Error('区域数量超限或含空地址');
+    throw new Error(localize('ui.printingModel.numberRegionsExceedsLimitOr'));
   }
   return parts;
 }
@@ -177,10 +178,10 @@ export function parsePrintAreas(
 ): MergeRange[] {
   return parseList(text, limits.areas).map((part) => {
     const pair = part.split(':');
-    if (pair.length > 2 || !pair[0]) throw new Error(`区域地址无效：${part}`);
+    if (pair.length > 2 || !pair[0]) throw new Error(localize('ui.printingModel.invalidRegionAddresscb89ca6', { part }));
     const a = parseCellPoint(pair[0], source);
     const b = parseCellPoint(pair[1] || pair[0], source);
-    if (b.row < a.row || b.col < a.col) throw new Error('区域终点不能在起点之前');
+    if (b.row < a.row || b.col < a.col) throw new Error(localize('ui.printingModel.endPointRegionCannotBe'));
     return { row: a.row, col: a.col, endRow: b.row, endCol: b.col };
   });
 }
@@ -197,7 +198,7 @@ export function parsePrintTitles(
       .replaceAll('$', '')
       .split(':')
       .map((s) => s.trim());
-    if (pair.length > 2 || !pair[0]) throw new Error('重复标题范围无效');
+    if (pair.length > 2 || !pair[0]) throw new Error(localize('ui.printingModel.invalidDuplicateTitleRange'));
     const parseNum = (value: string): number =>
       axis === 'row' && /^[1-9]\d*$/.test(value)
         ? Number(value)
@@ -207,7 +208,7 @@ export function parsePrintTitles(
     const first = parseNum(pair[0]);
     const last = parseNum(pair[1] || pair[0]);
     if (!isInteger(first) || !isInteger(last) || first < 1 || last < first || last > maximum) {
-      throw new Error('重复标题范围超出此来源或顺序无效');
+      throw new Error(localize('ui.printingModel.repeatedTitleRangeExceedsThis'));
     }
     return { first, last };
   });
@@ -229,7 +230,7 @@ function parseDecimal(text: string, label: string, positive = true): string {
     Number(value) < 0 ||
     (positive && Number(value) === 0)
   ) {
-    throw new Error(`${label}请输入${positive ? '正数' : '大于等于 0 的数'}`);
+    throw new Error(localize('ui.printingModel.enter', { label, detail: positive ? localize('ui.printingModel.positiveNumbers') : localize('ui.printingModel.numbersGreaterThanOrEqual') }));
   }
   return value;
 }
@@ -237,7 +238,7 @@ function parseDecimal(text: string, label: string, positive = true): string {
 function parseCount(text: string, label: string, max: number): number {
   const value = text.trim();
   if (!/^\d+$/.test(value) || !isInteger(Number(value)) || Number(value) > max) {
-    throw new Error(`${label}超出允许范围`);
+    throw new Error(localize('ui.printingModel.exceedsAllowedRange', { label }));
   }
   return Number(value);
 }
@@ -265,43 +266,43 @@ export function buildPrintOptions(
   limits: PrintingLimits,
 ): Partial<PrintOptions> & { readonly usePreviewDefaults: boolean } {
   if (!source || !isInteger(source.maxRows) || !isInteger(source.maxColumns)) {
-    throw new Error('来源容量不可用，请重新打开工作表');
+    throw new Error(localize('ui.printingModel.sourceCapacityUnavailableReopenWorksheet'));
   }
   const out: MutablePrintOptions = { usePreviewDefaults: input.defaults };
   const presetPaper = Object.hasOwn(PAPERS, input.paper) ? PAPERS[input.paper] : undefined;
   if (input.paper === 'custom') {
     out.paper = {
-      width: `${parseDecimal(input.width, '纸张宽度')}mm`,
-      height: `${parseDecimal(input.height, '纸张高度')}mm`,
+      width: `${parseDecimal(input.width, localize('ui.printingModel.paperWidth'))}mm`,
+      height: `${parseDecimal(input.height, localize('ui.printingModel.paperHeight'))}mm`,
     };
   } else if (presetPaper) {
     out.paper = { ...presetPaper };
   } else if (input.paper !== 'source') {
-    throw new Error('请选择有效纸张');
+    throw new Error(localize('ui.printingModel.selectValidPaperSize'));
   }
 
   if (input.orientation) {
     if (input.orientation !== 'portrait' && input.orientation !== 'landscape') {
-      throw new Error('请选择有效纸张方向');
+      throw new Error(localize('ui.printingModel.selectValidPaperOrientation'));
     }
     out.orientation = input.orientation;
   }
 
   if (input.scaleMode === 'percent') {
-    out.scalePercent = parseDecimal(input.percent, '打印缩放');
+    out.scalePercent = parseDecimal(input.percent, localize('ui.printingModel.printScaling'));
     if (Number(out.scalePercent) < 1 || Number(out.scalePercent) > 400) {
-      throw new Error('打印缩放须在1%到400%之间');
+      throw new Error(localize('ui.printingModel.printScalingMustBeBetween'));
     }
   } else if (input.scaleMode === 'fit') {
     out.fit = {
-      width: parseCount(input.fitWidth, '横向页数', limits.pages),
-      height: parseCount(input.fitHeight, '纵向页数', limits.pages),
+      width: parseCount(input.fitWidth, localize('ui.printingModel.horizontalPages'), limits.pages),
+      height: parseCount(input.fitHeight, localize('ui.printingModel.verticalPages'), limits.pages),
     };
     if (!out.fit.width && !out.fit.height) {
-      throw new Error('适配页数至少指定一个方向，0表示该方向不限');
+      throw new Error(localize('ui.printingModel.pageAdaptationRequiresAtLeast'));
     }
   } else if (input.scaleMode !== 'source') {
-    throw new Error('请选择有效打印缩放方式');
+    throw new Error(localize('ui.printingModel.chooseValidPrintingScaleMode'));
   }
 
   if (input.area.trim()) {
@@ -320,40 +321,40 @@ export function buildPrintOptions(
 
   if (input.marginMode === 'custom') {
     out.margins = {
-      left: `${parseDecimal(input.left, '页边距', false)}mm`,
-      right: `${parseDecimal(input.right, '页边距', false)}mm`,
-      top: `${parseDecimal(input.top, '页边距', false)}mm`,
-      bottom: `${parseDecimal(input.bottom, '页边距', false)}mm`,
-      header: `${parseDecimal(input.header, '页边距', false)}mm`,
-      footer: `${parseDecimal(input.footer, '页边距', false)}mm`,
+      left: `${parseDecimal(input.left, localize('ui.common.margins'), false)}mm`,
+      right: `${parseDecimal(input.right, localize('ui.common.margins'), false)}mm`,
+      top: `${parseDecimal(input.top, localize('ui.common.margins'), false)}mm`,
+      bottom: `${parseDecimal(input.bottom, localize('ui.common.margins'), false)}mm`,
+      header: `${parseDecimal(input.header, localize('ui.common.margins'), false)}mm`,
+      footer: `${parseDecimal(input.footer, localize('ui.common.margins'), false)}mm`,
     };
   } else if (input.marginMode !== 'source') {
-    throw new Error('请选择有效页边距设置');
+    throw new Error(localize('ui.printingModel.selectValidMarginSettings'));
   }
 
   if (input.pageOrder) {
     if (input.pageOrder !== 'downThenOver' && input.pageOrder !== 'overThenDown') {
-      throw new Error('请选择有效页序');
+      throw new Error(localize('ui.printingModel.selectValidPageOrder'));
     }
     out.pageOrder = input.pageOrder;
   }
 
   if (input.firstPage.trim()) {
-    if (!/^-?\d+$/.test(input.firstPage.trim())) throw new Error('起始页码请输入整数');
+    if (!/^-?\d+$/.test(input.firstPage.trim())) throw new Error(localize('ui.printingModel.enterIntegerStartingPageNumber'));
     out.firstPageNumber = Number(input.firstPage);
     if (
       !isInteger(out.firstPageNumber) ||
       out.firstPageNumber < limits.firstPageMin ||
       out.firstPageNumber > limits.firstPageMax
     ) {
-      throw new Error('起始页码超出源格式范围');
+      throw new Error(localize('ui.printingModel.startingPageNumberExceedsSource'));
     }
   }
 
-  if (input.rowHeight.trim()) out.missingRowHeight = parseDecimal(input.rowHeight, '默认行高');
-  if (input.columnWidth.trim()) out.missingColumnWidth = parseDecimal(input.columnWidth, '默认列宽');
+  if (input.rowHeight.trim()) out.missingRowHeight = parseDecimal(input.rowHeight, localize('ui.printingModel.defaultRowHeight'));
+  if (input.columnWidth.trim()) out.missingColumnWidth = parseDecimal(input.columnWidth, localize('ui.printingModel.defaultColumnWidth'));
   if (input.ignoreBreaks) out.ignoreManualBreaks = true;
-  if (JSON.stringify(out).length > limits.requestBytes) throw new Error('页面设置超出本次容量');
+  if (JSON.stringify(out).length > limits.requestBytes) throw new Error(localize('ui.printingModel.pageSettingsExceedCurrentCapacity'));
   return out;
 }
 
@@ -369,7 +370,7 @@ export function checkPrintEnvelope(
     value.book !== binding.book ||
     value.sheet !== binding.sheet
   ) {
-    throw new Error('预览来源或任务已变化，请重新准备');
+    throw new Error(localize('ui.printingModel.previewSourceOrTaskChanged'));
   }
   return value;
 }
@@ -828,7 +829,7 @@ export function printPixels(
   const q = (amount * n * 4n * 1000000n) / (d * 3n * BigInt(limits.unitsPerPoint));
   const limitScaled = BigInt(limits.domPixels) * 1000000n;
   if (q > limitScaled || q < -limitScaled) {
-    throw new Error('本页物理尺寸超出浏览器预览容量，请调整纸张、缩放或范围');
+    throw new Error(localize('ui.printingModel.physicalSizeThisPageExceeds'));
   }
   return Number(q) / 1000000;
 }

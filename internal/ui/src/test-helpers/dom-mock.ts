@@ -7,9 +7,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseMessageCatalog } from '../core/i18n.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const INDEX_HTML_PATH = path.resolve(HERE, '../../web/index.html');
+const CATALOG_PATH = path.resolve(HERE, '../../../i18n/catalogs/zh-Hans.json');
 
 interface IndexOptionSpec {
   readonly value: string;
@@ -28,9 +30,16 @@ interface IndexElementSpec {
 
 let cachedIndexSpecs: readonly IndexElementSpec[] | null = null;
 
+export function readIndexHtml(): string {
+  const catalog = parseMessageCatalog(fs.readFileSync(CATALOG_PATH, 'utf8'));
+  return fs.readFileSync(INDEX_HTML_PATH, 'utf8').replace(
+    /\{\{\.T \x60([^\x60]+)\x60\}\}/g, (_, key: string) => catalog[key] ?? '',
+  );
+}
+
 function parseIndexHtmlSpecs(): readonly IndexElementSpec[] {
   if (cachedIndexSpecs) return cachedIndexSpecs;
-  const html = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
+  const html = readIndexHtml();
   const specs: IndexElementSpec[] = [];
   const seen = new Set<string>();
   const tagRegex = /<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g;

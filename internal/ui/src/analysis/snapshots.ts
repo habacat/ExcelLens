@@ -2,6 +2,7 @@
  * Comparison Snapshots dialog controller: capture, browse, delete, and compare
  * two saved exact analysis snapshots side-by-side with sparkline trends.
  */
+import { interfaceLocale, t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type {
   AnalysisCell,
   ComparisonSnapshot,
@@ -52,12 +53,12 @@ interface DeleteIntent {
 }
 
 const DELTA_STATES: Readonly<Record<string, string>> = {
-  only_left: '仅基准有',
-  only_right: '仅对比有',
-  empty: '无有效值',
-  unavailable: '无法比较',
-  missing: '两侧均无',
-  zero_base: '基准为0',
+  only_left: localize('ui.snapshots.onlyBaseline'),
+  only_right: localize('ui.snapshots.onlyComparison'),
+  empty: localize('ui.snapshots.noValidValues'),
+  unavailable: localize('ui.snapshots.incomparable'),
+  missing: localize('ui.snapshots.noneOnBothSides'),
+  zero_base: localize('ui.snapshots.baseline'),
 };
 
 function makeNode<K extends keyof HTMLElementTagNameMap>(
@@ -170,16 +171,16 @@ export class SnapshotsController {
     const d = makeNode('dialog', 'float-dialog snapshots-dialog');
     d.id = 'snapshotsDialog';
     d.setAttribute('aria-labelledby', 'snapshotsTitle');
-    d.innerHTML = `<div class="dialog-head"><div id="snapshotsTitle" class="dialog-title">比较快照</div><button id="snapshotsClose" type="button" class="dialog-close" aria-label="关闭比较快照">×</button></div>
-      <form id="snapshotsCapture" class="snapshots-tools"><input id="snapshotsName" class="field-control" aria-label="新快照名称" maxlength="80" placeholder="快照名称"><button id="snapshotsSave" type="button" class="mini-button">保存当前结果</button></form>
+    d.innerHTML = `<div class="dialog-head"><div id="snapshotsTitle" class="dialog-title">${localizeHTML('ui.snapshots.compareSnapshots')}</div><button id="snapshotsClose" type="button" class="dialog-close" aria-label="${localizeHTML('ui.snapshots.disableComparisonSnapshots')}">×</button></div>
+      <form id="snapshotsCapture" class="snapshots-tools"><input id="snapshotsName" class="field-control" aria-label="${localizeHTML('ui.snapshots.newSnapshotName')}" maxlength="80" placeholder="${localizeHTML('ui.snapshots.snapshotName')}"><button id="snapshotsSave" type="button" class="mini-button">${localizeHTML('ui.snapshots.saveCurrentResults')}</button></form>
       <div class="snapshots-scroll"><div id="snapshotsSides" class="snapshots-sides">${(['Left', 'Right'] as const)
         .map(
           (side, i) =>
-            `<section><div class="snapshots-picker"><label for="snapshots${side}">${i ? '对比' : '基准'}</label><select id="snapshots${side}" class="field-control"></select><button id="snapshotsDelete${side}" type="button" class="mini-button" aria-label="删除${i ? '对比' : '基准'}快照">删除</button></div><div id="snapshots${side}Content" class="snapshots-content"></div></section>`,
+            `<section><div class="snapshots-picker"><label for="snapshots${side}">${i ? localize('ui.common.comparison') : localize('ui.common.baselines')}</label><select id="snapshots${side}" class="field-control"></select><button id="snapshotsDelete${side}" type="button" class="mini-button" aria-label="${localizeHTML('ui.snapshots.deleteSnapshot', { detail: i ? localize('ui.common.comparison') : localize('ui.common.baselines') })}">${localizeHTML('ui.snapshots.delete')}</button></div><div id="snapshots${side}Content" class="snapshots-content"></div></section>`,
         )
         .join('')}</div>
-      <div id="snapshotsComparison" hidden><div class="snapshots-table-tools"><label>系列 <select id="snapshotsSeries" class="field-control"></select></label><span id="snapshotsCount"></span></div><div id="snapshotsTable" class="snapshots-table"></div><div class="snapshots-pager"><button id="snapshotsPrevious" class="mini-button" type="button">上一页</button><span id="snapshotsPage"></span><button id="snapshotsNext" class="mini-button" type="button">下一页</button></div></div></div>
-      <div class="snapshots-footer"><span id="snapshotsStatus" role="status" aria-live="polite"></span><button id="snapshotsRefresh" type="button" class="mini-button">刷新目录</button></div>`;
+      <div id="snapshotsComparison" hidden><div class="snapshots-table-tools"><label>${localizeHTML('ui.snapshots.series')} <select id="snapshotsSeries" class="field-control"></select></label><span id="snapshotsCount"></span></div><div id="snapshotsTable" class="snapshots-table"></div><div class="snapshots-pager"><button id="snapshotsPrevious" class="mini-button" type="button">${localizeHTML('ui.snapshots.previousPage')}</button><span id="snapshotsPage"></span><button id="snapshotsNext" class="mini-button" type="button">${localizeHTML('ui.snapshots.nextPage')}</button></div></div></div>
+      <div class="snapshots-footer"><span id="snapshotsStatus" role="status" aria-live="polite"></span><button id="snapshotsRefresh" type="button" class="mini-button">${localizeHTML('ui.snapshots.refreshCatalog')}</button></div>`;
     d.querySelector('form')?.addEventListener('submit', (e: SubmitEvent) => {
       e.preventDefault();
       void this.save();
@@ -216,7 +217,7 @@ export class SnapshotsController {
     }
     this.reset();
     this.capture = capture?.current() ? capture : null;
-    requireInput('snapshotsName').value = capture?.title || '分析快照';
+    requireInput('snapshotsName').value = capture?.title || localize('ui.snapshots.analyzeSnapshots');
     this.controls();
     this.dialog.showModal();
     void this.refresh();
@@ -264,7 +265,7 @@ export class SnapshotsController {
     this.readAbort?.abort();
     const ctrl = new AbortController();
     this.readAbort = ctrl;
-    this.status('正在读取…');
+    this.status(localize('ui.common.reading'));
     try {
       const raw = await this.api('/api/analysis/snapshots', { signal: ctrl.signal });
       const data = validateSnapshotCatalog(raw, this.limits);
@@ -286,7 +287,7 @@ export class SnapshotsController {
     for (const [i, side] of (['Left', 'Right'] as const).entries()) {
       const node = requireSelect(`snapshots${side}`);
       const old = node.value;
-      node.replaceChildren(new Option('选择快照', ''));
+      node.replaceChildren(new Option(localize('ui.snapshots.chooseSnapshot'), ''));
       for (const item of items) node.append(new Option(`${item.name} — ${item.file}`, item.id));
       const fallback = items[Math.max(0, items.length - (i ? 1 : 2))]?.id ?? '';
       node.value = side === 'Right' && newID ? newID : ids.has(old) ? old : fallback;
@@ -299,7 +300,7 @@ export class SnapshotsController {
     const capture = this.capture;
     const name = requireInput('snapshotsName').value.trim();
     if (!name) {
-      this.status('请填写快照名称', true);
+      this.status(localize('ui.snapshots.enterSnapshotName'), true);
       return;
     }
     await this.write(
@@ -322,7 +323,7 @@ export class SnapshotsController {
     if (this.deleteIntent?.id !== id || this.deleteIntent.side !== side) {
       this.deleteIntent = { id, side };
       for (const key of ['Left', 'Right'] as const) {
-        requireButton(`snapshotsDelete${key}`).textContent = key === side ? '确认删除' : '删除';
+        requireButton(`snapshotsDelete${key}`).textContent = key === side ? localize('ui.snapshots.confirmDeletion') : localize('ui.common.delete');
       }
       return;
     }
@@ -340,7 +341,7 @@ export class SnapshotsController {
     ++this.pairSerial;
     this.pairAbort?.abort();
     this.controls();
-    this.status('正在保存…');
+    this.status(localize('ui.snapshots.savingCurrently'));
     try {
       const raw = await this.api('/api/analysis/snapshots', {
         method: 'POST',
@@ -370,7 +371,7 @@ export class SnapshotsController {
     const epoch = this.epoch;
     this.deleteIntent = null;
     for (const side of ['Left', 'Right'] as const) {
-      requireButton(`snapshotsDelete${side}`).textContent = '删除';
+      requireButton(`snapshotsDelete${side}`).textContent = localize('ui.common.delete');
     }
     this.pairAbort?.abort();
     const ctrl = new AbortController();
@@ -383,7 +384,7 @@ export class SnapshotsController {
       }
       requireEl('snapshotsTable').replaceChildren();
       requireEl('snapshotsComparison').hidden = true;
-      this.status(this.store?.items.length ? '请选择两个快照' : '尚无快照');
+      this.status(this.store?.items.length ? localize('ui.snapshots.selectTwoSnapshots') : localize('ui.snapshots.noSnapshotsYet'));
       return;
     }
     const current = (): boolean =>
@@ -391,7 +392,7 @@ export class SnapshotsController {
       epoch === this.epoch &&
       serial === this.pairSerial &&
       !ctrl.signal.aborted;
-    this.status('正在比较…');
+    this.status(localize('ui.snapshots.comparing'));
     try {
       const fetchSnap = async (id: string): Promise<ComparisonSnapshot> => {
         const raw = await this.api(`/api/analysis/snapshots?id=${encodeURIComponent(id)}`, {
@@ -418,9 +419,9 @@ export class SnapshotsController {
       this.page = 0;
       this.renderSides();
       const select = requireSelect('snapshotsSeries');
-      select.replaceChildren(new Option('分组合计', '-1'));
+      select.replaceChildren(new Option(localize('ui.snapshots.groupSummary'), '-1'));
       for (const [i, key] of (comparison?.columnKeys ?? []).entries()) {
-        select.append(new Option(key || '空白列', String(i)));
+        select.append(new Option(key || localize('ui.snapshots.blankColumns'), String(i)));
       }
       select.value = '-1';
       this.renderRows();
@@ -428,7 +429,7 @@ export class SnapshotsController {
       this.status(message, Boolean(message));
     } catch (e: unknown) {
       if (current() && !isAbortError(e)) {
-        this.status(`${errorMessage(e)}${this.accepted ? '（保留上次结果）' : ''}`, true);
+        this.status(`${errorMessage(e)}${this.accepted ? localize('ui.common.keepPreviousResult') : ''}`, true);
       }
     }
   }
@@ -443,19 +444,19 @@ export class SnapshotsController {
       const r = s.result;
       const host = requireEl(`snapshots${side}Content`);
       host.replaceChildren();
-      const meta = makeNode('p', 'snapshots-meta', `${s.file}  ${new Date(s.created).toLocaleString()}`);
+      const meta = makeNode('p', 'snapshots-meta', `${s.file}  ${new Date(s.created).toLocaleString(interfaceLocale())}`);
       const metric = makeNode('div', 'snapshots-metric', snapshotMetricLabel(s));
       const value = makeNode('strong', 'snapshots-grand', formatAnalysisNumber(r.grand));
       value.title = r.grand.comparison?.exact || r.grand.exact;
       const canvas = makeNode('canvas', 'snapshots-trend');
       canvas.id = `snapshotsTrend${side}`;
       canvas.setAttribute('role', 'img');
-      canvas.setAttribute('aria-label', `${side === 'Left' ? '基准' : '对比'}分类趋势`);
+      canvas.setAttribute('aria-label', localize('ui.snapshots.categoryTrends', { detail: side === 'Left' ? localize('ui.common.baselines') : localize('ui.common.comparison') }));
       host.append(makeNode('h3', '', s.name), meta, metric, value, canvas);
-      if (r.truncated) host.append(makeNode('p', 'snapshots-limit', `仅含前 ${r.rows.length} 个分类`));
-      if (r.tree) host.append(makeNode('p', 'snapshots-limit', '首层分类'));
+      if (r.truncated) host.append(makeNode('p', 'snapshots-limit', localize('ui.snapshots.onlyContainsFirstCategories', { count: r.rows.length })));
+      if (r.tree) host.append(makeNode('p', 'snapshots-limit', localize('ui.snapshots.firstLevelClassification')));
       const details = makeNode('details');
-      const summary = makeNode('summary', '', '来源与规则');
+      const summary = makeNode('summary', '', localize('ui.snapshots.sourceRules'));
       const pre = makeNode('pre');
       details.append(summary, pre);
       details.addEventListener('toggle', () => {
@@ -482,7 +483,7 @@ export class SnapshotsController {
     const table = makeNode('table');
     const head = makeNode('thead');
     const tr = makeNode('tr');
-    for (const title of ['分类', '基准', '对比', '差额', '变化']) {
+    for (const title of [localize('ui.common.classification'), localize('ui.common.baselines'), localize('ui.common.comparison'), localize('ui.snapshots.difference'), localize('ui.snapshots.changes')]) {
       const th = makeNode('th', '', title);
       th.scope = 'col';
       tr.append(th);
@@ -502,17 +503,17 @@ export class SnapshotsController {
     ): void => {
       if (!d) return;
       const row = makeNode('tr');
-      const label = makeNode('td', '', keys.map((k) => k || '（空白）').join(' / ') || '全部');
+      const label = makeNode('td', '', keys.map((k) => k || localize('ui.common.empty')).join(' / ') || localize('ui.common.all'));
       label.title = JSON.stringify(keys);
       row.append(label, this.renderValueCell(d.left), this.renderValueCell(d.right));
       row.append(
         d.status
-          ? makeNode('td', 'snapshots-state', DELTA_STATES[d.status] ?? '无法比较')
+          ? makeNode('td', 'snapshots-state', DELTA_STATES[d.status] ?? localize('ui.snapshots.incomparable'))
           : this.renderValueCell(d.difference),
       );
       row.append(
         d.change.status
-          ? makeNode('td', 'snapshots-state', DELTA_STATES[d.change.status] ?? '无法计算')
+          ? makeNode('td', 'snapshots-state', DELTA_STATES[d.change.status] ?? localize('ui.snapshots.unableCalculate'))
           : this.renderValueCell(d.change),
       );
       host.append(row);
@@ -526,13 +527,13 @@ export class SnapshotsController {
     }
     table.append(body);
     const foot = makeNode('tfoot');
-    add(foot, ['全量总计'], col < 0 ? c.grand : c.totals[col]);
+    add(foot, [localize('ui.snapshots.totalAmount')], col < 0 ? c.grand : c.totals[col]);
     table.append(foot);
     requireEl('snapshotsTable').replaceChildren(table);
     requireButton('snapshotsPrevious').disabled = this.page === 0;
     requireButton('snapshotsNext').disabled = this.page >= pages - 1;
     requireEl('snapshotsPage').textContent = `${this.page + 1} / ${pages}`;
-    requireEl('snapshotsCount').textContent = `${c.rows.length} 个分类`;
+    requireEl('snapshotsCount').textContent = localize('ui.snapshots.categories', { count: c.rows.length });
   }
 
   draw(): void {

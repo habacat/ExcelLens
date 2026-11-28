@@ -1,3 +1,4 @@
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import { decodeDataRulesJobStatus } from '../core/http-decoders.generated.ts';
 import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
@@ -76,37 +77,37 @@ export interface DataRuleResolveEnvelope {
 }
 
 const RULE_TYPES: Readonly<Record<string, string>> = {
-  none: '任意值',
-  whole: '整数',
-  decimal: '小数',
-  list: '列表',
-  date: '日期',
-  time: '时间',
-  textLength: '文本长度',
-  custom: '自定义公式',
+  none: localize('ui.dataRules.anyValue'),
+  whole: localize('ui.dataRules.integers'),
+  decimal: localize('ui.dataRules.decimals'),
+  list: localize('ui.dataRules.list'),
+  date: localize('ui.common.date'),
+  time: localize('ui.common.time'),
+  textLength: localize('ui.dataRules.textLength'),
+  custom: localize('ui.dataRules.customFormula'),
 };
 
 const RULE_OPERATORS: Readonly<Record<string, string>> = {
-  between: '介于',
-  notBetween: '不介于',
-  equal: '等于',
-  notEqual: '不等于',
-  greaterThan: '大于',
-  lessThan: '小于',
-  greaterThanOrEqual: '大于或等于',
-  lessThanOrEqual: '小于或等于',
+  between: localize('ui.common.between'),
+  notBetween: localize('ui.common.neither'),
+  equal: localize('ui.common.equal'),
+  notEqual: localize('ui.common.notEqual'),
+  greaterThan: localize('ui.common.greaterThan'),
+  lessThan: localize('ui.common.lessThan'),
+  greaterThanOrEqual: localize('ui.common.greaterThanOrEqualeebbdff'),
+  lessThanOrEqual: localize('ui.common.lessThanOrEqualb1ce53e'),
 };
 
 const RULE_STATES: Readonly<Record<string, string>> = {
-  described: '已读取定义',
-  unresolved: '未完整解释',
-  invalid: '定义需核对',
+  described: localize('ui.dataRules.definitionRead'),
+  unresolved: localize('ui.dataRules.notFullyExplained'),
+  invalid: localize('ui.dataRules.definitionNeedsVerification'),
 };
 
 const ERROR_STYLES: Readonly<Record<string, string>> = {
-  stop: '停止',
-  warning: '警告',
-  information: '信息',
+  stop: localize('ui.dataRules.stop'),
+  warning: localize('ui.dataRules.warning'),
+  information: localize('ui.dataRules.information'),
 };
 
 function labelFrom(
@@ -175,7 +176,7 @@ export class DataRules {
     this.canNavigate = options.canNavigate ?? (() => true);
 
     if (!Number.isSafeInteger(this.limits.pageRows) || this.limits.pageRows < 1) {
-      throw new Error('数据规则分页容量无效');
+      throw new Error(localize('ui.dataRules.dataRulePaginationCapacityInvalid'));
     }
 
     const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
@@ -187,7 +188,7 @@ export class DataRules {
       requestIdentity: () => this.s.workbookKey,
       sleep,
       endpoint: '/api/data-rules',
-      label: '数据规则',
+      label: localize('ui.dataRules.dataRules'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
       onProgress: (status) => {
@@ -195,7 +196,7 @@ export class DataRules {
         const done = status.doneBytes ?? 0;
         const total = status.totalBytes ?? 0;
         this.status(
-          (status.stage || '正在读取数据规则') +
+          (status.stage || localize('ui.dataRules.readingDataRules')) +
             (total > 0 ? ` · ${Math.min(100, Math.round((done / total) * 100))}%` : ''),
         );
       },
@@ -241,7 +242,7 @@ export class DataRules {
     d.setAttribute('aria-labelledby', 'dataRuleTitle');
     // Workbook content is inserted exclusively as text, never as markup.
     d.innerHTML =
-      '<div class="dialog-head"><div id="dataRuleTitle" class="dialog-title">数据规则</div><button id="dataRuleClose" class="dialog-close" type="button" aria-label="关闭数据规则">×</button></div><p id="dataRuleSource" class="data-rule-source"></p><div class="data-rule-tools"><select id="dataRuleScope" class="field-control" aria-label="规则范围"><option value="cell">当前单元格</option><option value="sheet">本表全部规则</option></select><select id="dataRuleType" class="field-control" aria-label="规则类型"><option value="">全部类型</option></select><select id="dataRuleState" class="field-control" aria-label="规则定义状态"><option value="">全部状态</option><option value="issues">需核对的定义</option><option value="described">已读取的定义</option></select><button id="dataRuleRefresh" class="mini-button" type="button">重新读取</button></div><p id="dataRuleSummary" class="data-rule-summary" role="status"></p><div class="data-rule-main"><div class="data-rule-master"><div id="dataRuleList" class="data-rule-list" role="listbox" aria-label="保存的数据规则" tabindex="0"></div><div class="data-rule-paging"><button id="dataRulePrev" class="mini-button" type="button">上一页</button><span id="dataRuleCount"></span><button id="dataRuleNext" class="mini-button" type="button">下一页</button></div></div><section id="dataRuleDetail" class="data-rule-detail" aria-label="规则定义详情"></section></div><div class="data-rule-footer"><p id="dataRuleStatus" role="status" aria-live="polite"></p><button id="dataRuleCancel" class="mini-button" type="button" hidden>取消读取</button><span class="data-rule-readonly">仅查看保存的规则，未校验数据</span></div>';
+      `<div class="dialog-head"><div id="dataRuleTitle" class="dialog-title">${localizeHTML('ui.dataRules.dataRules')}</div><button id="dataRuleClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.dataRules.disableDataRules')}">×</button></div><p id="dataRuleSource" class="data-rule-source"></p><div class="data-rule-tools"><select id="dataRuleScope" class="field-control" aria-label="${localizeHTML('ui.dataRules.ruleRange')}"><option value="cell">${localizeHTML('ui.dataRules.currentCell')}</option><option value="sheet">${localizeHTML('ui.dataRules.allRulesThisSheet')}</option></select><select id="dataRuleType" class="field-control" aria-label="${localizeHTML('ui.dataRules.ruleType')}"><option value="">${localizeHTML('ui.dataRules.allTypes')}</option></select><select id="dataRuleState" class="field-control" aria-label="${localizeHTML('ui.dataRules.ruleDefinitionStatus')}"><option value="">${localizeHTML('ui.dataRules.allStates')}</option><option value="issues">${localizeHTML('ui.dataRules.definitionsBeVerified')}</option><option value="described">${localizeHTML('ui.dataRules.readDefinitions')}</option></select><button id="dataRuleRefresh" class="mini-button" type="button">${localizeHTML('ui.dataRules.readAgain')}</button></div><p id="dataRuleSummary" class="data-rule-summary" role="status"></p><div class="data-rule-main"><div class="data-rule-master"><div id="dataRuleList" class="data-rule-list" role="listbox" aria-label="${localizeHTML('ui.dataRules.rulesSavedData')}" tabindex="0"></div><div class="data-rule-paging"><button id="dataRulePrev" class="mini-button" type="button">${localizeHTML('ui.dataRules.previousPage')}</button><span id="dataRuleCount"></span><button id="dataRuleNext" class="mini-button" type="button">${localizeHTML('ui.dataRules.nextPage')}</button></div></div><section id="dataRuleDetail" class="data-rule-detail" aria-label="${localizeHTML('ui.dataRules.ruleDefinitionDetails')}"></section></div><div class="data-rule-footer"><p id="dataRuleStatus" role="status" aria-live="polite"></p><button id="dataRuleCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.dataRules.cancelReading')}</button><span class="data-rule-readonly">${localizeHTML('ui.dataRules.onlySavedRulesDisplayedData')}</span></div>`;
     document.body.append(d);
     const typeSelect = requireSelect('dataRuleType');
     for (const [value, text] of Object.entries(RULE_TYPES)) {
@@ -271,7 +272,7 @@ export class DataRules {
       value.sheet !== this.sheet ||
       this.sheet !== this.s.sheet
     ) {
-      throw new Error('数据规则来源已切换，请重新读取');
+      throw new Error(localize('ui.dataRules.sourceDataRulesChangedReload'));
     }
   }
 
@@ -332,7 +333,7 @@ export class DataRules {
       this.s.opening ||
       this.s.sheetLoadingEpoch
     ) {
-      this.toast('请先打开并完成支持数据规则的工作表加载', 'warning');
+      this.toast(localize('ui.dataRules.openCompleteWorksheetLoadingData'), 'warning');
       return;
     }
     const source = JSON.stringify([this.s.workbookKey, this.s.book, this.s.sheet]);
@@ -340,10 +341,10 @@ export class DataRules {
     this.boundSource = source;
     this.sheet = this.s.sheet;
     this.ref = this.s.selected?.ref || 'A1';
-    requireEl('dataRuleSource').textContent = `${this.s.fileName || '当前工作簿'} / ${this.sheet}`;
+    requireEl('dataRuleSource').textContent = `${this.s.fileName || localize('ui.common.currentWorkbook')} / ${this.sheet}`;
     const scopeSelect = requireSelect('dataRuleScope');
     const firstOption = scopeSelect.options[0];
-    if (firstOption) firstOption.textContent = `当前单元格 ${this.ref}`;
+    if (firstOption) firstOption.textContent = localize('ui.dataRules.currentCelld93c87e', { ref: this.ref });
     if (!this.dialog.open) this.dialog.showModal();
     this.controls();
     if (this.job && !this.busy) await this.loadPage(0);
@@ -393,7 +394,7 @@ export class DataRules {
 
   cancel(): void {
     this.stop();
-    this.status('已取消读取，原规则结果保留');
+    this.status(localize('ui.dataRules.readingCancelledButOriginalRule'));
   }
 
   async refresh(): Promise<void> {
@@ -407,7 +408,7 @@ export class DataRules {
     this.busy = true;
     this.loading = false;
     this.controls();
-    this.status('正在读取保存的数据规则…');
+    this.status(localize('ui.dataRules.readingSavedDataRulesProgress'));
     const current = (): boolean =>
       request === this.request && identity === this.identity() && this.dialog.open;
     let owned = '';
@@ -474,7 +475,7 @@ export class DataRules {
       value.ref !== ref ||
       !isNonNegativeInt(value.summary.rules)
     ) {
-      throw new Error('数据规则分页响应无效');
+      throw new Error(localize('ui.dataRules.dataRulePaginationResponseInvalid'));
     }
     const ids = new Set<number>();
     for (const item of p.items) {
@@ -487,7 +488,7 @@ export class DataRules {
         !isNonNegativeInt(item.listItems) ||
         !Object.hasOwn(RULE_STATES, item.status)
       ) {
-        throw new Error('数据规则列表条目无效');
+        throw new Error(localize('ui.dataRules.dataRuleListEntriesInvalid'));
       }
       ids.add(item.id);
     }
@@ -527,8 +528,8 @@ export class DataRules {
       if (first) await this.select(first.id);
     } catch (error: unknown) {
       if (serial === this.pageRequest && identity === this.identity() && !isAbortError(error)) {
-        this.status(`${errorMessage(error)}；列表未更新，请重试`, true);
-        requireEl('dataRuleDetail').textContent = '规则列表读取失败，请重试';
+        this.status(localize('ui.dataRules.listNotUpdatedTryAgain', { detail: errorMessage(error) }), true);
+        requireEl('dataRuleDetail').textContent = localize('ui.dataRules.readingRuleListFailedTry');
       }
     } finally {
       if (serial === this.pageRequest && identity === this.identity()) {
@@ -543,19 +544,19 @@ export class DataRules {
     this.renderList();
     const summary = value.summary;
     requireEl('dataRuleSummary').textContent =
-      `本表 ${summary.rules} 条规则` +
-      (summary.unresolved ? `，${summary.unresolved} 条定义需核对` : '') +
+      localize('ui.dataRules.thisTableContainsRules', { rules: summary.rules }) +
+      (summary.unresolved ? localize('ui.dataRules.definitionItemsNeedsBeVerified', { unresolved: summary.unresolved }) : '') +
       (!summary.promptSettingsKnown
-        ? '；不同规则容器的提示开关不一致'
+        ? localize('ui.dataRules.promptSwitchesDifferentRuleContainers')
         : summary.disablePrompts
-          ? '；本表全局关闭输入提示'
+          ? localize('ui.dataRules.thisTableGlobalInputPrompt')
           : '') +
-      (summary.inputWindowClosed ? '；源提示窗口已关闭' : '');
+      (summary.inputWindowClosed ? localize('ui.dataRules.sourcePromptWindowClosed') : '');
     this.status(
-      (value.page.scopeComplete ? '' : '存在未完整读取或范围未知的规则。') +
+      (value.page.scopeComplete ? '' : localize('ui.dataRules.thereRulesThatHaveNot')) +
         (summary.notices ?? []).join('；'),
     );
-    requireEl('dataRuleDetail').textContent = '选择规则查看保存的条件、提示与列表项';
+    requireEl('dataRuleDetail').textContent = localize('ui.dataRules.selectRulesViewConditionsPrompts');
     this.controls();
   }
 
@@ -566,12 +567,12 @@ export class DataRules {
     list.replaceChildren();
     if (!p.items.length) {
       const message = !p.scopeComplete
-        ? '未找到已识别的规则；仍有未读取或范围未知的定义。'
+        ? localize('ui.dataRules.noRecognizedRulesFoundThere')
         : p.total
-          ? '没有符合条件的规则。'
+          ? localize('ui.dataRules.noRulesMatchingCriteria')
           : this.page.ref
-            ? `${this.ref} 没有保存的数据规则。`
-            : '本表没有保存的数据规则。';
+            ? localize('ui.dataRules.noSavedDataRules', { ref: this.ref })
+            : localize('ui.dataRules.thisTableNoSavedData');
       list.append(makeEl('p', 'data-rule-empty', message));
     }
     for (const item of p.items) {
@@ -586,9 +587,9 @@ export class DataRules {
         makeEl(
           'span',
           'data-rule-item-title',
-          `#${item.id} ${labelFrom(RULE_TYPES, item.type, `未知类型：${item.type}`)}`,
+          `#${item.id} ${labelFrom(RULE_TYPES, item.type, localize('ui.dataRules.unknownType', { type: item.type }))}`,
         ),
-        makeEl('span', 'data-rule-item-range', item.sqref || '适用范围未知'),
+        makeEl('span', 'data-rule-item-range', item.sqref || localize('ui.dataRules.scopeApplicationUnknown')),
         makeEl('span', 'data-rule-item-state', labelFrom(RULE_STATES, item.status)),
       );
       button.addEventListener('click', () => {
@@ -600,7 +601,7 @@ export class DataRules {
     else list.removeAttribute('aria-activedescendant');
     requireEl('dataRuleCount').textContent = p.matched
       ? `${p.offset + 1}–${p.next} / ${p.matched}`
-      : '0 条';
+      : localize('ui.dataRules.items');
   }
 
   async select(
@@ -621,7 +622,7 @@ export class DataRules {
     this.detail = null;
     this.renderList();
     if (focus) requireEl('dataRuleList').focus({ preventScroll: true });
-    requireEl('dataRuleDetail').textContent = '正在读取规则定义…';
+    requireEl('dataRuleDetail').textContent = localize('ui.dataRules.readingRuleDefinitions');
     this.controls();
     try {
       const value = await this.api(
@@ -669,7 +670,7 @@ export class DataRules {
         d.rangePrevious !== Math.max(0, rangeOffset - this.limits.pageRows) ||
         d.listPrevious !== Math.max(0, listOffset - this.limits.pageRows)
       ) {
-        throw new Error('数据规则详情响应无效');
+        throw new Error(localize('ui.dataRules.dataRuleDetailsResponseInvalid'));
       }
       this.detail = d;
       this.renderDetail();
@@ -678,7 +679,7 @@ export class DataRules {
     } catch (error: unknown) {
       if (serial === this.detailRequest && identity === this.identity() && !isAbortError(error)) {
         this.status(errorMessage(error), true);
-        requireEl('dataRuleDetail').textContent = '定义未读取完成，请重新选择或重试';
+        requireEl('dataRuleDetail').textContent = localize('ui.dataRules.definitionNotFullyReadReselect');
       }
     }
   }
@@ -699,8 +700,8 @@ export class DataRules {
   ): void {
     if (total <= this.limits.pageRows || !this.detail) return;
     const row = makeEl('div', 'data-rule-paging');
-    const prev = makeEl('button', 'mini-button', '上一页');
-    const more = makeEl('button', 'mini-button', '下一页');
+    const prev = makeEl('button', 'mini-button', localize('ui.common.previousPage'));
+    const more = makeEl('button', 'mini-button', localize('ui.common.nextPage'));
     prev.type = 'button';
     more.type = 'button';
     prev.id = `dataRule${kind}Prev`;
@@ -734,12 +735,12 @@ export class DataRules {
     );
     if (item.reason) body.append(makeEl('p', 'data-rule-reason', item.reason));
     if (item.type === 'list' && item.listSource === 'inline') {
-      body.append(makeEl('h4', '', `保存的列表项（${d.listCount}）`));
+      body.append(makeEl('h4', '', localize('ui.dataRules.savedListItems', { listCount: d.listCount })));
       const list = makeEl('ol', 'data-rule-values');
       list.id = 'dataRuleValues';
       list.start = d.listOffset + 1;
       for (const text of item.inlineList ?? []) {
-        const n = makeEl('li', '', text === '' ? '（空白项）' : text);
+        const n = makeEl('li', '', text === '' ? localize('ui.dataRules.blankItem') : text);
         n.dataset.empty = String(text === '');
         list.append(n);
       }
@@ -747,49 +748,49 @@ export class DataRules {
       this.pager(body, 'List', d.listOffset, d.listNext, d.listCount);
     }
     if (item.type !== 'none' && item.type !== 'list' && item.type !== 'custom') {
-      this.field(body, '条件', labelFrom(RULE_OPERATORS, item.operator));
+      this.field(body, localize('ui.dataRules.conditions'), labelFrom(RULE_OPERATORS, item.operator));
     }
     if (
       item.formula1 !== undefined &&
       item.formula1 !== '' &&
       !(item.type === 'list' && item.listSource === 'inline')
     ) {
-      this.field(body, '条件定义 1', item.formula1, true);
+      this.field(body, localize('ui.dataRules.conditionDefinition385c3e2'), item.formula1, true);
     }
     if (item.formula2 !== undefined && item.formula2 !== '') {
-      this.field(body, '条件定义 2', item.formula2, true);
+      this.field(body, localize('ui.dataRules.conditionDefinition'), item.formula2, true);
     }
-    const flag = (value: boolean): string => (item.status === 'invalid' ? '未确认' : value ? '是' : '否');
+    const flag = (value: boolean): string => (item.status === 'invalid' ? localize('ui.dataRules.unconfirmed') : value ? localize('ui.dataRules.sJustThat') : localize('ui.dataRules.no'));
     this.field(
       body,
-      '保存的设置',
-      `允许空白：${flag(item.allowBlank)}` +
-        (item.type === 'list' ? `；隐藏下拉箭头：${flag(item.suppressDropDown)}` : '') +
-        `；显示输入提示：${flag(item.showInputMessage)}；显示错误提示：${flag(item.showErrorMessage)}`,
+      localize('ui.dataRules.savedSettings'),
+      localize('ui.dataRules.allowBlanks', { flag: flag(item.allowBlank) }) +
+        (item.type === 'list' ? localize('ui.dataRules.hideDropDownArrow', { flag: flag(item.suppressDropDown) }) : '') +
+        localize('ui.dataRules.inputPromptDisplayErrorPrompt', { flag: flag(item.showInputMessage), flag2: flag(item.showErrorMessage) }),
     );
     if (item.promptTitle || item.prompt) {
       this.field(
         body,
-        `输入提示${item.promptTitle ? ` · ${item.promptTitle}` : ''}`,
-        item.prompt || '（空白）',
+        localize('ui.dataRules.enterPrompt', { detail: item.promptTitle ? ` · ${item.promptTitle}` : '' }),
+        item.prompt || localize('ui.common.empty'),
       );
     }
     if (item.errorTitle || item.error || item.showErrorMessage) {
       this.field(
         body,
-        `错误提示 · ${labelFrom(ERROR_STYLES, item.errorStyle)}${item.errorTitle ? ` · ${item.errorTitle}` : ''}`,
-        item.error || '（未保存提示文字）',
+        localize('ui.dataRules.errorMessage', { labelFrom: labelFrom(ERROR_STYLES, item.errorStyle), detail: item.errorTitle ? ` · ${item.errorTitle}` : '' }),
+        item.error || localize('ui.dataRules.promptMessageUnsavedData'),
       );
     }
-    body.append(makeEl('h4', '', `适用源区域（${d.rangeCount}）`));
+    body.append(makeEl('h4', '', localize('ui.dataRules.applicableSourceArea', { rangeCount: d.rangeCount })));
     const ranges = makeEl('div', 'data-rule-areas');
     const select = makeEl('select', 'field-control');
     select.id = 'dataRuleArea';
-    select.setAttribute('aria-label', '选择数据规则源区域');
+    select.setAttribute('aria-label', localize('ui.dataRules.selectDataRuleSourceArea'));
     for (const [at, area] of item.ranges.entries()) {
       select.append(new Option(this.areaText(area), String(d.rangeOffset + at)));
     }
-    const go = makeEl('button', 'primary-button compact', '定位区域');
+    const go = makeEl('button', 'primary-button compact', localize('ui.dataRules.locationArea'));
     go.type = 'button';
     go.id = 'dataRuleLocate';
     go.addEventListener('click', () => {
@@ -798,34 +799,34 @@ export class DataRules {
     select.disabled = !item.ranges.length;
     ranges.append(select, go);
     body.append(ranges);
-    if (!d.rangeCount) body.append(makeEl('p', 'data-rule-reason', '源范围未确认，不能定位。'));
+    if (!d.rangeCount) body.append(makeEl('p', 'data-rule-reason', localize('ui.dataRules.sourceRangeNotConfirmedCannot')));
     this.pager(body, 'Range', d.rangeOffset, d.rangeNext, d.rangeCount);
 
     if (item.type === 'list' && item.listSource !== 'inline') {
-      body.append(makeEl('h4', '', `保存的列表项（${d.listCount}）`));
-      body.append(makeEl('p', 'data-rule-reason', '列表来自引用或未确认的定义，尚未读取候选值。'));
+      body.append(makeEl('h4', '', localize('ui.dataRules.savedListItems', { listCount: d.listCount })));
+      body.append(makeEl('p', 'data-rule-reason', localize('ui.dataRules.listComesFromReferencedOr')));
     }
 
     const raw = makeEl('details', 'data-rule-raw');
-    raw.append(makeEl('summary', '', '原始定义'));
+    raw.append(makeEl('summary', '', localize('ui.dataRules.originalDefinitions')));
     if (item.type === 'list' && item.listSource === 'inline' && item.formula1) {
-      this.field(raw, '列表源表达式', item.formula1, true);
+      this.field(raw, localize('ui.dataRules.listSourceExpression'), item.formula1, true);
     }
     const rawEntries: readonly (readonly [string, string | undefined])[] = [
-      ['源区域文字', item.sqref],
-      ['源命名空间', item.namespace],
-      ['原始 XML', item.rawXml],
-      ['BIFF 记录', item.recordHex],
-      ['条件 1 原始令牌', item.formula1Tokens],
-      ['条件 2 原始令牌', item.formula2Tokens],
-      ['扩展列表定义', item.listDefinition],
+      [localize('ui.dataRules.sourceAreaText'), item.sqref],
+      [localize('ui.dataRules.sourceNamespace'), item.namespace],
+      [localize('ui.dataRules.originalXml'), item.rawXml],
+      [localize('ui.dataRules.biffRecords'), item.recordHex],
+      [localize('ui.dataRules.conditionOriginalTokenc77dd7c'), item.formula1Tokens],
+      [localize('ui.dataRules.conditionOriginalToken'), item.formula2Tokens],
+      [localize('ui.dataRules.expandListDefinition'), item.listDefinition],
     ];
     for (const [label, text] of rawEntries) {
       if (text) this.field(raw, label, text, true);
     }
-    if (item.attributes) this.field(raw, '原始属性', JSON.stringify(item.attributes, null, 2), true);
+    if (item.attributes) this.field(raw, localize('ui.dataRules.originalAttributes'), JSON.stringify(item.attributes, null, 2), true);
     for (const [at, text] of (item.continuationHex ?? []).entries()) {
-      this.field(raw, `续记录 ${at + 1}`, text, true);
+      this.field(raw, localize('ui.dataRules.continueRecording', { at: at + 1 }), text, true);
     }
     body.append(raw);
   }
@@ -925,7 +926,7 @@ export class DataRules {
       this.close();
       if ((await this.navigateArea(value.area, arriving)) && arriving()) {
         this.toast(
-          `已定位：${value.area.sheet}!${value.area.start}${value.area.end === value.area.start ? '' : `:${value.area.end}`}`,
+          localize('ui.dataRules.positioned', { sheet: value.area.sheet, start: value.area.start, detail: value.area.end === value.area.start ? '' : `:${value.area.end}` }),
           'success',
         );
       }

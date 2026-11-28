@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -35,7 +36,7 @@ func (a *App) editAnalysis(wb *workbook.Workbook, edit func(*analysis.Workspace)
 	a.analysisMu.Lock()
 	defer a.analysisMu.Unlock()
 	if a.currentWorkbook() != wb {
-		return errors.New("工作簿已切换")
+		return i18n.Error("service.analysisWorkspace.workbookSwitched")
 	}
 	path := a.analysisPath(wb)
 	lock := persistentFileLock(path)
@@ -56,7 +57,7 @@ func decodeAnalysis(r *http.Request, dst any) error {
 func requireAnalysisWorkbook(a *App, w http.ResponseWriter) *workbook.Workbook {
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "请先打开原始工作簿")
+		writeMessage(w, 409, "service.analysisWorkspace.openOriginalWorkbookFirst")
 		return nil
 	}
 	return wb
@@ -74,7 +75,7 @@ func (a *App) handleAnalysisWorkspace(w http.ResponseWriter, r *http.Request) {
 	data, err := a.loadAnalysis(wb)
 	a.analysisMu.Unlock()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	sheets := make([]map[string]any, 0, len(data.Sheets))
@@ -96,12 +97,12 @@ func (a *App) handleAnalysisSheet(w http.ResponseWriter, r *http.Request) {
 	data, err := a.loadAnalysis(wb)
 	a.analysisMu.Unlock()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	s := data.Sheet(r.URL.Query().Get("id"))
 	if s == nil {
-		writeError(w, 404, "编辑表不存在")
+		writeMessage(w, 404, "service.analysisWorkspace.tableDoesNotExist")
 		return
 	}
 	from := clamp(parseIntDefault(r.URL.Query().Get("offset"), 0), 0, analysis.MaxSheetRows-1)
@@ -130,30 +131,30 @@ func (a *App) handleAnalysisCreate(w http.ResponseWriter, r *http.Request) {
 		Rows    [][]string `json:"rows"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	if !analysis.NameValid(req.Name) {
-		writeError(w, 400, "请输入有效的工作表名称")
+		writeMessage(w, 400, "service.analysisWorkspace.enterValidWorksheetName")
 		return
 	}
 	if len(req.Columns) == 0 {
 		req.Columns = []string{"字段1", "字段2", "字段3", "字段4", "字段5"}
 	}
 	if len(req.Columns) > analysis.MaxSheetCols || len(req.Rows) > analysis.MaxSheetRows {
-		writeError(w, 400, "编辑表尺寸超出限制")
+		writeMessage(w, 400, "service.analysisWorkspace.editingTableSizeExceedsLimit")
 		return
 	}
 	for _, col := range req.Columns {
 		if !analysis.NameValid(col) {
-			writeError(w, 400, "列标题无效")
+			writeMessage(w, 400, "service.analysisWorkspace.invalidColumnHeader")
 			return
 		}
 	}
 	id := randomID()
 	err := a.editAnalysis(wb, func(v *analysis.Workspace) error {
 		if len(v.Sheets) >= analysis.MaxSheets {
-			return errors.New("最多创建40张编辑表")
+			return i18n.Error("service.analysisWorkspace.upEditingTablesCanBe")
 		}
 		s := analysis.Sheet{ID: id, Name: req.Name, Columns: req.Columns, Rows: [][]string{}, Updated: time.Now().UTC().Format(time.RFC3339)}
 		if err := s.Paste(0, 0, req.Rows); err != nil {
@@ -163,7 +164,7 @@ func (a *App) handleAnalysisCreate(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]string{"id": id})
@@ -184,18 +185,18 @@ func (a *App) handleAnalysisEdit(w http.ResponseWriter, r *http.Request) {
 		Value string `json:"value"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	err := a.editAnalysis(wb, func(v *analysis.Workspace) error {
 		s := v.Sheet(req.ID)
 		if s == nil {
-			return errors.New("工作表不存在")
+			return i18n.Error("service.analysisWorkspace.worksheetDoesNotExist")
 		}
 		return s.Edit(req.Row, req.Col, req.Value)
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]bool{"saved": true})
@@ -216,18 +217,18 @@ func (a *App) handleAnalysisPaste(w http.ResponseWriter, r *http.Request) {
 		Rows [][]string `json:"rows"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	err := a.editAnalysis(wb, func(v *analysis.Workspace) error {
 		s := v.Sheet(req.ID)
 		if s == nil {
-			return errors.New("工作表不存在")
+			return i18n.Error("service.analysisWorkspace.worksheetDoesNotExist")
 		}
 		return s.Paste(req.Row, req.Col, req.Rows)
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]bool{"saved": true})
@@ -248,20 +249,20 @@ func (a *App) handleAnalysisColumns(w http.ResponseWriter, r *http.Request) {
 		WorkbookKey      string   `json:"workbookKey,omitempty"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	if len(req.Columns) < 1 || len(req.Columns) > analysis.MaxSheetCols {
-		writeError(w, 400, "列数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.invalidColumnCount")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，列未修改")
+		writeMessage(w, 409, "service.analysisWorkspace.workbookSwitchedColumnsHaveNot")
 		return
 	}
 	for _, x := range req.Columns {
 		if !analysis.NameValid(x) {
-			writeError(w, 400, "列名称无效")
+			writeMessage(w, 400, "service.analysisWorkspace.invalidColumnName")
 			return
 		}
 	}
@@ -269,7 +270,7 @@ func (a *App) handleAnalysisColumns(w http.ResponseWriter, r *http.Request) {
 	err := a.editAnalysis(wb, func(v *analysis.Workspace) error {
 		s := v.Sheet(req.ID)
 		if s == nil {
-			return errors.New("工作表不存在")
+			return i18n.Error("service.analysisWorkspace.worksheetDoesNotExist")
 		}
 		if req.ExpectedRevision != nil && s.Revision != *req.ExpectedRevision {
 			return errAnalysisRevision
@@ -278,7 +279,7 @@ func (a *App) handleAnalysisColumns(w http.ResponseWriter, r *http.Request) {
 			if len(row) > len(req.Columns) {
 				for _, x := range row[len(req.Columns):] {
 					if x != "" {
-						return errors.New("不能删除含有数据的列")
+						return i18n.Error("service.analysisWorkspace.cannotDeleteColumnsContainingData")
 					}
 				}
 			}
@@ -295,11 +296,11 @@ func (a *App) handleAnalysisColumns(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, errAnalysisRevision) {
-		writeError(w, 409, "列标题已由其他操作更新，请重新载入")
+		writeMessage(w, 409, "service.analysisWorkspace.columnHeadersHaveUpdatedOther")
 		return
 	}
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"saved": true, "revision": revision})
@@ -321,15 +322,15 @@ func (a *App) handleAnalysisReport(w http.ResponseWriter, r *http.Request) {
 		Book        string         `json:"book,omitempty"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint || req.Book != "" && req.Book != sourceBookID(wb) {
-		writeError(w, 409, "工作簿已切换，报表未保存")
+		writeMessage(w, 409, "service.analysisWorkspace.workbookSwitchedReportNotSaved")
 		return
 	}
 	if !analysis.NameValid(req.Name) {
-		writeError(w, 400, "报表名称无效")
+		writeMessage(w, 400, "service.analysisWorkspace.reportNameInvalid")
 		return
 	}
 	id := req.ID
@@ -344,13 +345,13 @@ func (a *App) handleAnalysisReport(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 		if len(v.Reports) >= analysis.MaxReports {
-			return errors.New("保存报表数量超过80")
+			return i18n.Error("service.analysisWorkspace.savedReportsExceed")
 		}
 		v.Reports = append(v.Reports, analysis.Report{ID: id, Name: req.Name, Query: req.Query, Updated: time.Now().UTC().Format(time.RFC3339)})
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]string{"id": id})
@@ -369,7 +370,7 @@ func (a *App) handleAnalysisDelete(w http.ResponseWriter, r *http.Request) {
 		Kind string `json:"kind"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisWorkspace.parameterInvalid")
 		return
 	}
 	err := a.editAnalysis(wb, func(v *analysis.Workspace) error {
@@ -396,10 +397,10 @@ func (a *App) handleAnalysisDelete(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		return errors.New("对象不存在")
+		return i18n.Error("service.analysisWorkspace.objectDoesNotExist")
 	})
 	if err != nil {
-		writeError(w, 404, err.Error())
+		writeFailure(w, 404, err)
 		return
 	}
 	writeJSON(w, map[string]bool{"deleted": true})
@@ -418,11 +419,11 @@ func (a *App) handleAnalysisDashboardOrder(w http.ResponseWriter, r *http.Reques
 		IDs []string `json:"ids"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数格式无效")
+		writeMessage(w, 400, "service.analysisWorkspace.invalidParameterFormat")
 		return
 	}
 	if len(req.IDs) > analysis.MaxReports {
-		writeError(w, 400, "仪表盘顺序超出限制")
+		writeMessage(w, 400, "service.analysisWorkspace.dashboardOrderExceedsLimit")
 		return
 	}
 	err := a.editAnalysis(wb, func(ws *analysis.Workspace) error {
@@ -433,7 +434,7 @@ func (a *App) handleAnalysisDashboardOrder(w http.ResponseWriter, r *http.Reques
 		seen := make(map[string]bool, len(req.IDs))
 		for _, id := range req.IDs {
 			if !known[id] || seen[id] {
-				return errors.New("报表顺序包含重复或不存在的标识")
+				return i18n.Error("service.analysisWorkspace.reportSequenceContainsDuplicateOr")
 			}
 			seen[id] = true
 		}
@@ -441,7 +442,7 @@ func (a *App) handleAnalysisDashboardOrder(w http.ResponseWriter, r *http.Reques
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]bool{"saved": true})

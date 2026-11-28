@@ -2,6 +2,7 @@
  * Shared dropdown menu positioning, dialog light-dismiss, and in-app ask/confirm
  * modal dialogs (replacing native browser prompt/confirm).
  */
+import { t as localize } from './i18n.ts';
 import type { ToastTone } from '../contracts/common.ts';
 import { isComposing } from './display-format.ts';
 import { requireEl } from './dom.ts';
@@ -321,7 +322,7 @@ function createDialogFrame(title: string, className: string) {
   const body = makeEl('div', 'dialog-body');
   const actions = makeEl('div', 'dialog-actions');
   const close = makeEl('button', 'dialog-close', '×');
-  close.setAttribute('aria-label', '关闭');
+  close.setAttribute('aria-label', localize('ui.common.close'));
   head.append(makeEl('div', 'dialog-title', title), close);
   body.append(actions);
   dialog.append(head, body);
@@ -362,7 +363,7 @@ export function askOverlay(options: AskOverlayOptions): Promise<AskOverlayResult
     placeholder = '',
     maxLength = 0,
     inputMode = 'text',
-    confirmLabel = '确定',
+    confirmLabel = localize('ui.overlays.ok'),
     alternative = '',
     validate,
   } = options;
@@ -402,7 +403,7 @@ export function askOverlay(options: AskOverlayOptions): Promise<AskOverlayResult
       finish({ value: trimmed });
     };
     const other = alternative ? makeEl('button', 'mini-button ask-alternative', alternative) : null;
-    const cancel = makeEl('button', 'mini-button', '取消');
+    const cancel = makeEl('button', 'mini-button', localize('ui.common.cancel'));
     const ok = makeEl('button', 'primary-button', confirmLabel);
     cancel.dataset.no = '';
     ok.dataset.yes = '';
@@ -427,7 +428,7 @@ export function askOverlay(options: AskOverlayOptions): Promise<AskOverlayResult
 }
 
 export function confirmOverlay(options: ConfirmOverlayOptions): Promise<boolean> {
-  const { title, message = '', confirmLabel = '确定', danger = false } = options;
+  const { title, message = '', confirmLabel = localize('ui.overlays.ok'), danger = false } = options;
   return new Promise<boolean>((resolve) => {
     const { dialog, body, actions, close } = createDialogFrame(title, 'ask-confirm');
     dialog.dataset.lightDismiss = '';
@@ -436,7 +437,7 @@ export function confirmOverlay(options: ConfirmOverlayOptions): Promise<boolean>
       result = next;
       dialog.close();
     };
-    const cancel = makeEl('button', 'mini-button', '取消');
+    const cancel = makeEl('button', 'mini-button', localize('ui.common.cancel'));
     const ok = makeEl('button', `primary-button${danger ? ' danger' : ''}`, confirmLabel);
     cancel.dataset.no = '';
     ok.dataset.yes = '';

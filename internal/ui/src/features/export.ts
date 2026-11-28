@@ -2,6 +2,7 @@
  * ExcelLens Export Center. A bounded progress API controls a streaming Go job.
  * No workbook cell data is copied into the browser to build the export.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, ApiClient, HttpError, ToastFn } from '../contracts/common.ts';
 import type { SourceCapabilities } from '../contracts/formats.ts';
 import { beginActivity } from '../core/activity.ts';
@@ -166,7 +167,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     const serial = this.serial;
     const popup = window.open('about:blank', '_blank');
     if (!popup) {
-      this.toast('请允许打开明细标签页', 'warning');
+      this.toast(localize('ui.export.allowDetailsTabBeOpened'), 'warning');
       return;
     }
     popup.opener = null;
@@ -233,7 +234,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
 
   open(scope = '', selection: ClipboardSnapshot | null = null): void {
     if (!this.s.opened || !this.s.sheet) {
-      this.toast('请先打开工作簿', 'warning');
+      this.toast(localize('ui.export.openWorkbookFirst'), 'warning');
       return;
     }
     const hasRange =
@@ -282,14 +283,14 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     const rangeLabel = requireEl('exportRangeLabel');
     rangeLabel.textContent =
       activeScope === 'all'
-        ? `${this.s.sheets.length} 个工作表`
+        ? localize('ui.export.worksheet', { count: this.s.sheets.length })
         : activeScope === 'filtered'
-          ? `已筛选：${filteredRows.toLocaleString()} 行`
+          ? localize('ui.export.filtersAppliedRows', { filteredRows: filteredRows.toLocaleString(interfaceLocale()) })
           : activeScope === 'visible'
-            ? `${sheet} · 当前可见行`
+            ? localize('ui.export.currentlyVisibleRows', { sheet })
             : activeScope === 'selection'
               ? `${sheet} · ${range.start}:${range.end}`
-              : `${sheet} · ${this.s.dimension || '已用区域'}`;
+              : `${sheet} · ${this.s.dimension || localize('ui.export.usedAreas')}`;
 
     const styleOK = (fmt === 'xlsx' || fmt === 'html') && this.sourceCapabilities().styled;
     stylesEl.disabled = !styleOK;
@@ -306,23 +307,23 @@ export class ExportCenter implements ExportCenterClipboardBridge {
 
     let advisory = '';
     if (activeScope === 'all') {
-      advisory = '导出整本工作簿会为尚未索引的工作表建立索引，大表可能生成较大文件。';
+      advisory = localize('ui.export.exportingEntireWorkbookWillCreate');
     } else if (activeScope === 'filtered') {
-      advisory = '导出全部筛选匹配行（含手动隐藏的行），保持当前排序。';
+      advisory = localize('ui.export.exportAllFilteredMatchingRows');
     } else if (activeScope === 'visible') {
-      advisory = '导出当前可见行（含可见的冻结标题），保持当前排序。';
+      advisory = localize('ui.export.exportCurrentlyVisibleRowsIncluding');
     }
     if (formulaUnsafe) {
-      advisory += ' 为避免公式引用错位，该范围的 XLSX 仅支持导出缓存值。';
+      advisory += ` ${localize('ui.export.avoidFormulaReferenceErrorsThis')}`;
     }
     if (fmt === 'html') {
-      advisory += ' HTML 仅包含基础样式且上限为 15 万格；如需完整格式请选择 XLSX。';
+      advisory += ` ${localize('ui.export.htmlContainsOnlyBasicStyles')}`;
     }
     if (fmt === 'jsonl') {
-      advisory += ' 每行输出一条 JSON 记录，包含行号、地址、公式、缓存值与类型。';
+      advisory += ` ${localize('ui.export.oneJsonRecordOutputEach')}`;
     }
     if (modeEl.value === 'formula' && fmt === 'xlsx') {
-      advisory += ' 仅导出单个工作表时，跨表公式可能失效；如需保留跨表引用请选择整个工作簿。';
+      advisory += ` ${localize('ui.export.whenExportingOnlySingleWorksheet')}`;
     }
     requireEl('exportAdvisory').textContent = this.generated ? '' : advisory.trim();
 
@@ -342,7 +343,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     }
     const startBtn = requireButton('exportStartBtn');
     startBtn.disabled = locked;
-    startBtn.textContent = this.generated ? '重新导出' : '开始导出';
+    startBtn.textContent = this.generated ? localize('ui.export.reExport') : localize('ui.export.startingExportProcess');
   }
 
   async start(): Promise<void> {
@@ -353,11 +354,11 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     }
     const scope = requireSelect('exportScope').value;
     if (scope === 'selection' && this.copySelection && !this.copySelection.current()) {
-      this.toast('选区已变化，请重新选择导出范围', 'warning');
+      this.toast(localize('ui.export.selectionChangedReselectExportRange'), 'warning');
       return;
     }
     if (scope === 'selection' && this.s.multiRanges.length) {
-      this.toast('导出选区请保留一个连续区域', 'warning');
+      this.toast(localize('ui.export.keepContiguousAreaWhenExporting'), 'warning');
       return;
     }
     const range = this.range();
@@ -398,7 +399,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     label: string,
   ): Promise<boolean> {
     if (this.running || this.busy) {
-      this.toast('已有导出正在处理，请完成或取消后重试', 'warning');
+      this.toast(localize('ui.export.thereAlreadyExportsProcessComplete'), 'warning');
       this.openDialog('exportDialog');
       return false;
     }
@@ -431,7 +432,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     this.pending = ctrl;
     const current = (): boolean =>
       ticket === this.serial && book === this.s.workbookKey && !ctrl.signal.aborted;
-    const activity = beginActivity('正在生成导出文件', { slot: 'exportActivity' });
+    const activity = beginActivity(localize('ui.common.generatingExportFileProgress'), { slot: 'exportActivity' });
     this.activity = activity;
     this.snapshot = label;
     this.failures = 0;
@@ -466,8 +467,8 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     } catch (e: unknown) {
       if (current()) {
         const msg = errorMessage(e);
-        this.toast(`导出失败：${msg}`, 'error');
-        requireEl('exportStage').textContent = `导出失败：${msg}`;
+        this.toast(localize('ui.export.exportFailed', { msg }), 'error');
+        requireEl('exportStage').textContent = localize('ui.export.exportFailed', { msg });
       }
     } finally {
       if (!this.running || ticket !== this.serial) activity?.end();
@@ -513,7 +514,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
     this.running = true;
     this.snapshot = `${item.file}${item.sheet ? ` · ${item.sheet}` : ''}`;
     this.resultSource = this.snapshot;
-    this.activity = beginActivity('正在生成导出文件', { slot: 'exportActivity' });
+    this.activity = beginActivity(localize('ui.common.generatingExportFileProgress'), { slot: 'exportActivity' });
     if (item.mode) requireSelect('exportFormat').value = item.mode;
     if (item.scope) requireSelect('exportScope').value = item.scope;
     requireInput('exportRecoverable').checked = true;
@@ -552,7 +553,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
       if (!current()) return;
       this.failures = 0;
       requireButton('exportRetryBtn').hidden = true;
-      this.activity ??= beginActivity('正在生成导出文件', { slot: 'exportActivity' });
+      this.activity ??= beginActivity(localize('ui.common.generatingExportFileProgress'), { slot: 'exportActivity' });
       this.activity?.job({
         doneRows: data.doneRows,
         totalRows: data.totalRows,
@@ -563,9 +564,9 @@ export class ExportCenter implements ExportCenterClipboardBridge {
       const total = data.totalRows || 0;
       const pct = Math.max(0, Math.min(100, data.progress || 0));
       requireEl('exportBar').style.width = `${pct}%`;
-      requireEl('exportStage').textContent = data.stage || '处理中';
+      requireEl('exportStage').textContent = data.stage || localize('ui.export.processing');
       requireEl('exportPercent').textContent = `${pct.toFixed(1)}%`;
-      requireEl('exportDetails').textContent = `${done.toLocaleString()} / ${total.toLocaleString()} 行 · 已用 ${((data.elapsedMs || 0) / 1000).toFixed(1)} 秒`;
+      requireEl('exportDetails').textContent = localize('ui.export.rowsUsedSeconds', { done: done.toLocaleString(interfaceLocale()), total: total.toLocaleString(interfaceLocale()), elapsedMs: ((data.elapsedMs || 0) / 1000).toFixed(1) });
       if (data.status === 'done') {
         this.running = false;
         requireButton('exportCancelBtn').hidden = true;
@@ -577,7 +578,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
         requireEl('exportFileDetails').textContent =
           `${data.fileName} · ${this.formatBytes(data.size)}`;
         requireEl('exportSnapshot').textContent = this.resultSource
-          ? `来源：${this.resultSource}`
+          ? localize('ui.export.source', { resultSource: this.resultSource })
           : '';
         this.refresh();
         return;
@@ -586,7 +587,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
         this.running = false;
         requireButton('exportCancelBtn').hidden = true;
         requireEl('exportStage').textContent =
-          data.status === 'cancelled' ? '导出已取消' : `导出失败：${data.error || '未知错误'}`;
+          data.status === 'cancelled' ? localize('ui.export.exportCanceled') : localize('ui.export.exportFailed68a0afc', { detail: data.error || localize('ui.export.unknownError') });
         this.refresh();
         return;
       }
@@ -599,11 +600,11 @@ export class ExportCenter implements ExportCenterClipboardBridge {
         this.running = false;
         requireButton('exportCancelBtn').hidden = true;
         requireButton('exportRetryBtn').hidden = true;
-        requireEl('exportStage').textContent = '导出任务已失效，请重新导出';
+        requireEl('exportStage').textContent = localize('ui.export.exportTaskBecomeInvalidRe');
         this.refresh();
         return;
       }
-      requireEl('exportStage').textContent = `状态读取失败：${errorMessage(err)}`;
+      requireEl('exportStage').textContent = localize('ui.export.failedReadStatus', { detail: errorMessage(err) });
       requireButton('exportRetryBtn').hidden = false;
       // A transport failure says nothing about the server job's completion.
       // Keep cancellation and the task identity, with bounded automatic retries.
@@ -640,7 +641,7 @@ export class ExportCenter implements ExportCenterClipboardBridge {
         body: JSON.stringify({ id: job }),
       });
       if (ticket === this.serial && job === this.job) {
-        requireEl('exportStage').textContent = '正在取消...';
+        requireEl('exportStage').textContent = localize('ui.export.canceling');
         this.failures = 0;
         void this.poll();
       }

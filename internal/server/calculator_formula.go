@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"iter"
 	"math/big"
@@ -13,6 +13,7 @@ import (
 
 	"excellens/internal/calculator"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -41,7 +42,7 @@ func formulaCellNumber(wb *workbook.Workbook, cell workbook.CellData) (*big.Rat,
 
 func formulaCellValue(wb *workbook.Workbook, cell workbook.CellData) (calculator.FormulaValue, error) {
 	if cell.CacheMissing {
-		return calculator.FormulaValue{}, errors.New("#VALUE! 公式缺少保存结果")
+		return calculator.FormulaValue{}, i18n.Error("service.calculatorFormula.valueFormulaLacksSavedResults")
 	}
 	if cell.Type == "e" {
 		return calculator.FormulaValue{}, fmt.Errorf("%s: %s", cell.Raw, cell.Ref)
@@ -117,7 +118,7 @@ func formulaRangeMetadata(ctx context.Context, wb *workbook.Workbook, idx *workb
 	}
 	value.At = func(i int) (calculator.FormulaValue, error) {
 		if i < 0 || i >= value.Rows*value.Cols {
-			return calculator.FormulaValue{}, errors.New("#REF! 下标越界")
+			return calculator.FormulaValue{}, i18n.Error("service.calculatorFormula.refSubscriptOutRange")
 		}
 		rr, cc := r1+i/value.Cols, c1+i%value.Cols
 		position := idx.FindRowOffset(rr)
@@ -147,7 +148,7 @@ func loadFormulaRange(ctx context.Context, wb *workbook.Workbook, idx *workbook.
 	}
 	size := int64(c2-c1+1) * int64(r2-r1+1)
 	if size > 8192 {
-		return nil, errors.New("#NUM! 文本范围超过8192格")
+		return nil, i18n.Error("service.calculatorFormula.textRangeNumExceedsCells")
 	}
 	select {
 	case calculatorScanSlots <- struct{}{}:
@@ -176,7 +177,7 @@ func loadFormulaRange(ctx context.Context, wb *workbook.Workbook, idx *workbook.
 			}
 			textBytes += len(value.Text)
 			if textBytes > 64<<10 {
-				return errors.New("#NUM! 文本范围过大")
+				return i18n.Error("service.calculatorFormula.numTextRangeTooLarge")
 			}
 			out[(row.Number-r1)*(c2-c1+1)+cell.Col-c1] = value
 		}
@@ -196,7 +197,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 		Sheet       string `json:"sheet"`
 	}
 	if decodeCalculator(w, r, &req) != nil {
-		writeError(w, 400, "公式无效")
+		writeMessage(w, 400, "service.calculatorFormula.invalidFormula")
 		return
 	}
 	wb := a.currentWorkbook()
@@ -207,7 +208,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 	ctx := calculator.WithDateSystem(r.Context(), wb != nil && wb.Date1904)
 	result, err := calculator.Formula(ctx, req.Expression, func(sheet, start, end string) (calculator.RangeValue, error) {
 		if wb == nil || req.WorkbookKey == "" || wb.Fingerprint != req.WorkbookKey || a.currentWorkbook() != wb {
-			return calculator.RangeValue{}, errors.New("工作簿已切换")
+			return calculator.RangeValue{}, i18n.Error("service.calculatorFormula.workbookSwitched")
 		}
 		resolved = true
 		if sheet == "" {
@@ -224,7 +225,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !ok {
-			return calculator.RangeValue{}, fmt.Errorf("工作表 %s 不存在", sheet)
+			return calculator.RangeValue{}, i18n.Error("service.calculatorFormula.worksheetDoesNotExist", i18n.Args{"sheet": sheet})
 		}
 		idx := wb.GetCachedIndex(meta.Path)
 		if idx == nil {
@@ -258,7 +259,7 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err != nil || col > formats.ExcelColumns || row > workbook.MaxRowsForIndex(idx) {
-			return calculator.RangeValue{}, errors.New("引用超出范围")
+			return calculator.RangeValue{}, i18n.Error("service.calculatorFormula.referenceOutRange")
 		}
 		if end == "" {
 			finish := func(value calculator.RangeValue) (calculator.RangeValue, error) {
@@ -300,11 +301,11 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 		}
 		endCol, endRow, err := workbook.ParseCellRef(end)
 		if err != nil {
-			return calculator.RangeValue{}, errors.New("引用无效")
+			return calculator.RangeValue{}, i18n.Error("service.calculatorFormula.invalidReference")
 		}
 		scanCells += int64(max(row, endRow)-min(row, endRow)+1) * int64(max(col, endCol)-min(col, endCol)+1)
 		if scanCells > 4000000 {
-			return calculator.RangeValue{}, errors.New("公式引用范围超过400万格")
+			return calculator.RangeValue{}, i18n.Error("service.calculatorFormula.formulaReferenceExceedsMillionCells")
 		}
 		var once sync.Once
 		var summary calculator.RangeValue
@@ -331,16 +332,22 @@ func (a *App) handleCalculatorFormula(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 422, err.Error())
+			switch i18n.ErrorKey(err) {
+			case "service.calculatorFormula.workbookSwitched", "service.calculatorFormula.worksheetDoesNotExist",
+				"service.calculatorFormula.referenceOutRange", "service.calculatorFormula.invalidReference",
+				"service.calculatorFormula.formulaReferenceExceedsMillionCells":
+				err = i18n.Wrap("service.calculatorFormula.referenceError", err)
+			}
+			writeFailure(w, 422, err)
 		}
 		return
 	}
 	if resolved && a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换")
+		writeFailure(w, 409, i18n.Wrap("service.calculatorFormula.referenceError", i18n.Error("service.calculatorFormula.workbookSwitched")))
 		return
 	}
 	writeJSON(w, struct {
 		calculator.Result
 		Suggestions []conversionSuggestion `json:"suggestions,omitempty"`
-	}{result, calculationSuggestions(result)})
+	}{result, calculationSuggestions(result, responseLocale(w))})
 }

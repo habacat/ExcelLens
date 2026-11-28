@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"slices"
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -36,7 +37,7 @@ func (a *App) buildRelationSource(ctx context.Context, book *workbook.Workbook, 
 			}
 			sheet := workspace.Sheet(strings.TrimPrefix(ref.Source, "scratch:"))
 			if sheet == nil || analysisSheetStamp(sheet) != stamp {
-				return errors.New("关联来源分析表已修改或移除，请重新预检")
+				return i18n.Error("service.relationSource.associatedSourceAnalysisTableModified")
 			}
 		}
 		return ctx.Err()

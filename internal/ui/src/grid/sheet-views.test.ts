@@ -342,7 +342,9 @@ test('an expired filter during visible-row preparation restores source order whi
         readonly settings?: AxisViewSettings;
       }) => {
         prepared.push(options);
-        if (prepared.length === 1) throw new Error('筛选结果已失效，请重新筛选');
+        if (prepared.length === 1) {
+          throw Object.assign(new Error('Filter expired'), { code: 'service.filter.expired' });
+        }
         h.S.rowVisibility = new RowVisibility(80);
         h.S.rowView = makeRowViewState({ id: 'rebuilt' });
         return h.S.rowView;

@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"strconv"
 	"strings"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -41,7 +42,7 @@ func (a *App) readerClipboard(ctx context.Context, wb *workbook.Workbook, meta w
 			switch {
 			case c.HasFormula:
 				if c.Formula == "" {
-					return nil, errors.New("来源公式缺少表达式")
+					return nil, i18n.Error("service.clipboardReader.sourceFormulaLacksExpression")
 				}
 				v.Kind, v.Raw = "formula", "="+strings.TrimPrefix(c.Formula, "=")
 			case c.Type == "s" || c.Type == "inlineStr" || c.Type == "str" || c.Type == "text":

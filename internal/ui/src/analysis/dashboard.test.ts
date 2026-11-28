@@ -32,7 +32,7 @@ function setup(fields: readonly AnalysisField[], templates: readonly AnalysisTem
       sourceScope: { version: 1, mode: 'filtered', fingerprint: 'book' },
     },
     activeResultQuery: null,
-    templateCategory: '全部',
+    templateCategory: 'all',
     templateText: '',
   };
   const toasts: { readonly msg: string; readonly tone: string | undefined }[] = [];
@@ -121,7 +121,7 @@ test('template application never substitutes an unrelated numeric field when val
   ]);
   try {
     h.dashboard.applyTemplate({
-      category: '财务',
+      category: 'finance',
       icon: '¥',
       title: '机构费用执行',
       description: '测试模板',
@@ -154,9 +154,9 @@ test('monthly date template derives yearmonth transform and runs when row and me
   ]);
   try {
     h.dashboard.applyTemplate({
-      category: '财务',
+      category: 'finance',
       icon: '¥',
-      title: '月度发生额趋势',
+      title: 'Monthly activity',
       description: '测试月度趋势',
       row: ['日期'],
       col: [],
@@ -164,6 +164,7 @@ test('monthly date template derives yearmonth transform and runs when row and me
       aggregate: 'sum',
       chart: 'line',
       top: 12,
+      dateGrouping: 'yearmonth',
     });
     assert.equal(h.runs(), 1);
     assert.ok(h.state.query);
@@ -180,7 +181,7 @@ test('monthly date template derives yearmonth transform and runs when row and me
 test('template gallery filters by category and keyword search', () => {
   const templates: readonly AnalysisTemplate[] = [
     {
-      category: '财务',
+      category: 'finance',
       icon: '¥',
       title: '费用趋势',
       description: '按月汇总费用',
@@ -192,7 +193,7 @@ test('template gallery filters by category and keyword search', () => {
       top: 20,
     },
     {
-      category: '审计',
+      category: 'audit',
       icon: '!',
       title: '异常排查',
       description: '定位高额单据',
@@ -210,11 +211,11 @@ test('template gallery filters by category and keyword search', () => {
     assert.equal(document.getElementById('analysisTemplateCategories')?.children.length, 3);
     assert.equal(document.getElementById('analysisTemplateGrid')?.children.length, 2);
 
-    h.state.templateCategory = '审计';
+    h.state.templateCategory = 'audit';
     h.dashboard.renderTemplates();
     assert.equal(document.getElementById('analysisTemplateGrid')?.children.length, 1);
 
-    h.state.templateCategory = '全部';
+    h.state.templateCategory = 'all';
     h.state.templateText = '费用';
     h.dashboard.renderTemplates();
     assert.equal(document.getElementById('analysisTemplateGrid')?.children.length, 1);

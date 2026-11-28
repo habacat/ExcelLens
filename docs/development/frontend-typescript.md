@@ -44,6 +44,8 @@ JSON 进入传输层时为 `unknown`。调用方传入解码器取得类型化�
 
 ## 三、构建产物、嵌入方式与开发命令
 
+界面文案使用统一的[离线消息目录](localization.md)。
+
 所有前端脚本统一维护在 [`package.json`](../../package.json) 与 `tools/frontend/`：
 
 | 命令 | 作用 |

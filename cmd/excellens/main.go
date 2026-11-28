@@ -162,12 +162,15 @@ func main() {
 		return openDirectory(filepath.Join(root, kind))
 	}
 	options := tray.Options{
-		Address:          url,
-		OnOpen:           openViewer,
-		OnOpenProgram:    func() error { return openProgramDirectory(openDirectory) },
-		RibbonLayout:     app.RibbonLayout,
-		SetRibbonLayout:  app.SetRibbonLayout,
-		OnClearAllCaches: app.ClearAllCaches,
+		Address:           url,
+		Locale:            app.DisplayLocale,
+		LanguageChoice:    app.DisplayLanguageChoice,
+		SetLanguageChoice: app.SetDisplayLanguage,
+		OnOpen:            openViewer,
+		OnOpenProgram:     func() error { return openProgramDirectory(openDirectory) },
+		RibbonLayout:      app.RibbonLayout,
+		SetRibbonLayout:   app.SetRibbonLayout,
+		OnClearAllCaches:  app.ClearAllCaches,
 		OnChooseFile: func(path string) error {
 			id, err := app.PreparePathForLaunch(path)
 			if err != nil {
@@ -184,7 +187,7 @@ func main() {
 		OnClearCache:         app.ClearUnusedCaches,
 		OnClearTemp:          app.ClearUnusedUploads,
 		ContextMenuInstalled: shellmenu.IsInstalled,
-		OnInstallContextMenu: shellmenu.Install,
+		OnInstallContextMenu: func() error { return shellmenu.Install(app.DisplayLocale()) },
 		OnRemoveContextMenu:  shellmenu.Uninstall,
 	}
 	if err := tray.Run(ctx, options); err != nil {

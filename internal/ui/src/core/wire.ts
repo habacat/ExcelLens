@@ -2,20 +2,21 @@
  * Compact viewport wire protocol decoder (`compact=1` responses from `/api/sheet`
  * and `/api/preview`). Reconstructs full `RowData` and `CellData` models.
  */
+import { t as localize } from './i18n.ts';
 import { decodeCompactRowWire } from './http-decoders.generated.ts';
 import type { CellData, RowData } from '../contracts/workbook.ts';
 import { columnName } from './cell-address.ts';
 
 export function unpackWireRows(rows: unknown): RowData[] {
-  if (!Array.isArray(rows)) throw new Error('工作表响应缺少行列表');
+  if (!Array.isArray(rows)) throw new Error(localize('ui.wire.worksheetResponseLacksRowList'));
   return rows.map((input: unknown) => {
     const row = decodeCompactRowWire(input);
-    if (!Number.isSafeInteger(row.n) || row.n < 1 || !row.c) throw new Error('工作表行坐标或单元格列表无效');
+    if (!Number.isSafeInteger(row.n) || row.n < 1 || !row.c) throw new Error(localize('ui.wire.worksheetRowCoordinatesOrCell'));
     const suffix = String(row.n);
     const cells: CellData[] = row.c.map((value) => {
-      if (!Number.isSafeInteger(value.c) || value.c < 1) throw new Error('工作表列坐标无效');
+      if (!Number.isSafeInteger(value.c) || value.c < 1) throw new Error(localize('ui.wire.worksheetColumnCoordinatesInvalid'));
       const flags = value.k ?? 0;
-      if (!Number.isInteger(flags) || flags < 0 || flags > 255) throw new Error('工作表单元格标志无效');
+      if (!Number.isInteger(flags) || flags < 0 || flags > 255) throw new Error(localize('ui.wire.worksheetCellFlagInvalid'));
       const cell: CellData = {
         col: value.c,
         ref: value.r ?? `${columnName(value.c)}${suffix}`,
@@ -33,7 +34,7 @@ export function unpackWireRows(rows: unknown): RowData[] {
       if (value.o) cell.valueColor = value.o;
       if (value.h) {
         const kind = value.h.kind;
-        if (kind !== 'internal' && kind !== 'external') throw new Error('工作表超链接类型无效');
+        if (kind !== 'internal' && kind !== 'external') throw new Error(localize('ui.wire.invalidWorksheetHyperlinkType'));
         cell.hyperlink = { ...value.h, kind };
       }
       if (value.x) cell.richText = value.x;

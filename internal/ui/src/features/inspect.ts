@@ -3,6 +3,7 @@
  * Performs a single read-only Go scan with bounded result previews and O(1)
  * decoration of mounted grid cells. Results remain navigable across sheets.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { InspectResponse } from '../contracts/features.ts';
 import type { SearchHit } from '../contracts/workbook.ts';
@@ -112,11 +113,11 @@ export class SelectionInspector {
 
   open(mode = 'formulas'): void {
     if (!this.state.indexReady) {
-      this.toast('请先打开工作表', 'warning');
+      this.toast(localize('ui.common.openWorksheetFirst'), 'warning');
       return;
     }
     if (this.state.multiRanges.length) {
-      this.toast('定位检查请选择一个连续区域', 'warning');
+      this.toast(localize('ui.inspect.selectContiguousAreaLocationCheck'), 'warning');
       return;
     }
     const range = this.state.range;
@@ -126,7 +127,7 @@ export class SelectionInspector {
       (!range || range.col1 !== range.col2 || Math.abs(range.row2 - range.row1) + 1 > this.largeDataRows)
     ) {
       this.toast(
-        `超大表请先选取不超过${this.largeDataRows.toLocaleString('zh-CN')}行的单列区域，再运行查重`,
+        localize('ui.inspect.selectUpRowsOneColumn', { largeDataRows: this.largeDataRows.toLocaleString(interfaceLocale()) }),
         'warning',
       );
       return;
@@ -166,7 +167,7 @@ export class SelectionInspector {
 
     if (mode === 'duplicates') {
       const col = this.parseColumn(requireInput('inspectColumn').value);
-      if (!col) throw new Error('请输入有效列名，例如 A 或 AGZ');
+      if (!col) throw new Error(localize('ui.inspect.enterValidColumnNameSuch'));
       col1 = col;
       col2 = col;
       if (s.range && s.range.col1 === s.range.col2 && s.range.col1 === col) {
@@ -222,14 +223,15 @@ export class SelectionInspector {
   }
 
   cancel(): void {
+    const wasRunning = this.abort !== null;
     this.serial++;
     this.abort?.abort();
     this.abort = null;
     requireButton('inspectCancel').hidden = true;
     requireButton('inspectRun').disabled = false;
     const progress = requireEl('inspectProgress');
-    if (progress.textContent.includes('正在')) {
-      progress.textContent = '已取消本次检查';
+    if (wasRunning) {
+      progress.textContent = localize('ui.inspect.thisCheckCanceled');
     }
   }
 
@@ -251,7 +253,7 @@ export class SelectionInspector {
       ticket === this.serial && !abort.signal.aborted && book === this.state.workbookKey;
     requireButton('inspectRun').disabled = true;
     requireButton('inspectCancel').hidden = false;
-    requireEl('inspectProgress').textContent = '正在检查源数据…';
+    requireEl('inspectProgress').textContent = localize('ui.inspect.checkingSourceData');
     try {
       const key = JSON.stringify([book, opt]);
       let res = this.cache.get(key);
@@ -276,10 +278,10 @@ export class SelectionInspector {
       this.current = -1;
       this.showCount = 0;
       const dupSummary =
-        res.mode === 'duplicates' ? `${res.duplicateGroups || 0} 组重复 · ` : '';
-      const truncSummary = res.truncated ? ` · 仅列出前 ${this.matches.length} 条` : '';
+        res.mode === 'duplicates' ? `${localize('ui.inspect.groupsDuplicates', { duplicateGroups: res.duplicateGroups || 0 })} ` : '';
+      const truncSummary = res.truncated ? ` ${localize('ui.inspect.onlyFirstItemsListed', { count: this.matches.length })}` : '';
       requireEl('inspectProgress').textContent =
-        `${opt.start}:${opt.end} · 共 ${(res.matched || 0).toLocaleString()} 格 · ${dupSummary}${res.durationMs || 0} 毫秒${truncSummary}`;
+        localize('ui.inspect.totalCellsMilliseconds', { start: opt.start, end: opt.end, matched: (res.matched || 0).toLocaleString(interfaceLocale()), dupSummary, durationMs: res.durationMs || 0, truncSummary });
       requireEl('inspectResultList').replaceChildren();
       this.appendMore();
       this.onChange();
@@ -311,7 +313,7 @@ export class SelectionInspector {
       const ref = document.createElement('strong');
       ref.textContent = hit.ref;
       const preview = document.createElement('span');
-      preview.textContent = hit.formula || hit.value || '（空白）';
+      preview.textContent = hit.formula || hit.value || localize('ui.common.empty');
       btn.append(ref, preview);
       btn.title = hit.formula || hit.value || hit.ref;
       btn.addEventListener('click', () => {
@@ -328,21 +330,21 @@ export class SelectionInspector {
     if (!this.matches.length) {
       const empty = document.createElement('div');
       empty.className = 'inspect-empty';
-      empty.textContent = '没有找到符合条件的单元格';
+      empty.textContent = localize('ui.inspect.noCellsThatMeetCriteria');
       list.append(empty);
     }
   }
 
   async copyResults(): Promise<void> {
     if (!this.matches.length) {
-      this.toast('没有可复制的匹配结果', 'warning');
+      this.toast(localize('ui.inspect.noMatchingResultsCopy'), 'warning');
       return;
     }
     const text = this.matches
       .map((hit) => `${this.sheet}!${hit.ref}\t${(hit.value ?? '').replace(/[\t\r\n]/g, ' ')}`)
       .join('\n');
     if ((await this.copy(text)) === false) return;
-    this.toast(`已复制 ${this.matches.length} 条结果（制表符分隔）`, 'success');
+    this.toast(localize('ui.inspect.rowsResultsHaveCopiedTab', { count: this.matches.length }), 'success');
   }
 
   async navigateHit(index: number): Promise<void> {

@@ -2,6 +2,7 @@
  * Sheet tab bar editing controls: add-sheet button, context menu for
  * new/copy/rename/delete sheet actions, and unique 31-char sheet naming.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle } from '../contracts/common.ts';
 import type { EditSheetMeta, EditStructure } from '../contracts/edit.ts';
 import { requireButton, requireEl } from '../core/dom.ts';
@@ -145,7 +146,7 @@ export class EditSheetTabs {
           direct: true,
         }),
       true,
-      '正在更新工作表',
+      localize('ui.editSheetTabs.updatingWorksheets'),
     );
   }
 }

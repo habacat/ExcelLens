@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"regexp"
@@ -9,6 +10,44 @@ import (
 
 	"excellens/internal/formats"
 )
+
+func TestLocalizedIndexKeepsRequestFieldsSeparate(t *testing.T) {
+	first, err := IndexLocalized("first-token", true, 17, "ru")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := IndexLocalized("second-token", false, 19, "ru")
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstHead, firstBody, ok := bytes.Cut(first, []byte("</head>"))
+	secondHead, secondBody, secondOK := bytes.Cut(second, []byte("</head>"))
+	if !ok || !secondOK || !bytes.Equal(firstBody, secondBody) || bytes.Contains(firstBody, []byte("__LANGUAGE_MESSAGES__")) {
+		t.Fatal("unexpected localized body")
+	}
+	if !strings.Contains(string(firstHead), `lang="ru" data-ribbon-layout="true" data-cache-epoch="17"`) ||
+		!strings.Contains(string(firstHead), `content="first-token"`) ||
+		!strings.Contains(string(secondHead), `lang="ru" data-ribbon-layout="false" data-cache-epoch="19"`) ||
+		!strings.Contains(string(secondHead), `content="second-token"`) {
+		t.Fatal("request fields were not applied independently")
+	}
+}
+
+func BenchmarkLocalizedIndex(b *testing.B) {
+	const token = "0123456789abcdef0123456789abcdef"
+	page, err := IndexLocalized(token, true, 17, "ru")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.SetBytes(int64(len(page)))
+	for b.Loop() {
+		page, err := IndexLocalized(token, true, 17, "ru")
+		if err != nil || len(page) == 0 {
+			b.Fatal(err)
+		}
+	}
+}
 
 func TestEmbeddedProductionAssetsAndDeniedPaths(t *testing.T) {
 	for _, name := range []string{"app.js", "storage-recovery.js", "style.css", "icon.svg", "home.css", "home-texture.svg", "home-opening-texture.svg"} {
@@ -119,7 +158,7 @@ func TestIndexLoadsSingleVersionedBundleAfterDialogs(t *testing.T) {
 }
 
 func TestRecoveryIndexLoadsSingleVersionedBundle(t *testing.T) {
-	pageBytes, err := RecoveryIndex("recovery-token")
+	pageBytes, err := RecoveryIndex("recovery-token", "zh-Hans")
 	if err != nil {
 		t.Fatal(err)
 	}

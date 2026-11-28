@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"io"
 	"iter"
 	"net/http"
@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
-var errAnalysisSourceReleased = errors.New("分析来源快照已失效，请重新捕获")
+var errAnalysisSourceReleased = i18n.Error("service.analysisSourceView.analysisSourceSnapshotBecomeInvalid")
 
 // Each pool entry, job, request and export owns an independent lease. The row
 // plan borrows the immutable selection until the final lease is closed.
@@ -124,20 +125,20 @@ func decodeAnalysisSourceRequest(w http.ResponseWriter, r *http.Request, dst any
 
 func (a *App) captureAnalysisSource(wb *workbook.Workbook, req analysisSourceCaptureRequest) (*analysisSourceSnapshot, error) {
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) || !strings.HasPrefix(req.Source, "wb:") {
-		return nil, errors.New("分析来源已切换，请重新捕获")
+		return nil, i18n.Error("service.analysisSourceView.analysisSourceSwitchedCaptureAgain")
 	}
 	meta, ok := wb.FindSheet(strings.TrimPrefix(req.Source, "wb:"))
 	if !ok {
-		return nil, errors.New("分析源工作表不存在")
+		return nil, i18n.Error("service.analysisSourceView.analysisSourceWorksheetDoesNot")
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		return nil, errors.New("请先打开并索引来源工作表")
+		return nil, i18n.Error("service.analysisSourceView.openIndexSourceWorksheetFirst")
 	}
 	if req.Mode == "visible" && req.ViewID == "" || req.Mode == "filtered" && req.FilterID == "" {
-		return nil, errors.New("分析范围缺少成功的筛选或显隐视图")
+		return nil, i18n.Error("service.analysisSourceView.analysisRangeLacksSuccessfulFilters")
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
@@ -153,7 +154,7 @@ func (a *App) captureAnalysisSource(wb *workbook.Workbook, req analysisSourceCap
 	if snapshot.filter != nil {
 		spec := newFilterSpec(snapshot.filter.Spec.Rules, snapshot.filter.Spec.options())
 		if !spec.active() {
-			return nil, errors.New("筛选快照缺少可重放规则，不能伪装成完整源表")
+			return nil, i18n.Error("service.analysisSourceView.filteredSnapshotLacksReplayableRules")
 		}
 		f := sourceview.FilterSpec(spec)
 		scope.Filter = &f
@@ -168,7 +169,7 @@ func (a *App) captureAnalysisSource(wb *workbook.Workbook, req analysisSourceCap
 		c1, r1, err1 := workbook.ParseCellRef(req.Start)
 		c2, r2, err2 := workbook.ParseCellRef(req.End)
 		if err1 != nil || err2 != nil {
-			return nil, errors.New("分析选区地址无效")
+			return nil, i18n.Error("service.analysisSourceView.analyzedSelectionAddressInvalid")
 		}
 		scope.Selection = &sourceview.Selection{StartRow: r1, EndRow: r2, StartColumn: min(c1, c2), EndColumn: max(c1, c2), VisualStart: req.VisualStart, VisualEnd: req.VisualEnd}
 		if snapshot.filter == nil {
@@ -196,18 +197,18 @@ func (a *App) handleAnalysisSourceCapture(w http.ResponseWriter, r *http.Request
 	}
 	var req analysisSourceCaptureRequest
 	if err := decodeAnalysisSourceRequest(w, r, &req); err != nil {
-		writeError(w, 400, "分析来源参数无效")
+		writeMessage(w, 400, "service.analysisSourceView.analysisSourceParametersInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	snapshot, err := a.captureAnalysisSource(wb, req)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
 	if err = a.storeAnalysisSource(r.Context(), snapshot); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": snapshot.data.id, "source": req.Source, "sourceScope": snapshot.data.scope, "rows": snapshot.data.plan.Len(), "workbookKey": wb.Fingerprint, "book": sourceBookID(wb)})
@@ -217,7 +218,7 @@ func (a *App) storeAnalysisSource(ctx context.Context, snapshot *analysisSourceS
 	a.analysisMu.Lock()
 	defer a.analysisMu.Unlock()
 	if a.currentWorkbook() != snapshot.data.wb || ctx.Err() != nil {
-		return errors.New("工作簿已切换或来源捕获已取消")
+		return i18n.Error("service.analysisSourceView.workbookSwitchedOrSourceCapture")
 	}
 	if a.analysisSources == nil {
 		a.analysisSources = make(map[string]*analysisSourceSnapshot)
@@ -249,12 +250,12 @@ func (a *App) handleAnalysisSourceRestore(w http.ResponseWriter, r *http.Request
 		Scope       sourceview.Scope `json:"sourceScope"`
 	}
 	if decodeAnalysisSourceRequest(w, r, &req) != nil {
-		writeError(w, 400, "保存的分析范围无效")
+		writeMessage(w, 400, "service.analysisSourceView.savedAnalysisRangeInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "工作簿已切换，未恢复分析范围")
+		writeMessage(w, 409, "service.analysisSourceView.workbookSwitchedAnalysisRangeNot")
 		return
 	}
 	releaseSlot, err := a.acquireAnalysisQuerySlot(r.Context(), req.Source, req.Scope.Filter != nil)
@@ -265,19 +266,19 @@ func (a *App) handleAnalysisSourceRestore(w http.ResponseWriter, r *http.Request
 	a.cacheMu.RLock()
 	if a.currentWorkbook() != wb {
 		a.cacheMu.RUnlock()
-		writeError(w, 409, "工作簿已切换，未恢复分析范围")
+		writeMessage(w, 409, "service.analysisSourceView.workbookSwitchedAnalysisRangeNot")
 		return
 	}
 	snapshot, err := a.restoreAnalysisSource(r.Context(), wb, req.Source, req.Scope)
 	a.cacheMu.RUnlock()
 	releaseSlot()
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
 	if err = a.storeAnalysisSource(r.Context(), snapshot); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": snapshot.data.id, "source": req.Source, "sourceScope": snapshot.data.scope, "rows": snapshot.data.plan.Len(), "workbookKey": wb.Fingerprint, "book": sourceBookID(wb)})
@@ -292,7 +293,7 @@ func (a *App) handleAnalysisSourceClear(w http.ResponseWriter, r *http.Request) 
 		ID string `json:"id"`
 	}
 	if err := decodeAnalysisSourceRequest(w, r, &req); err != nil {
-		writeError(w, 400, "来源快照标识无效")
+		writeMessage(w, 400, "service.analysisSourceView.invalidSourceSnapshotIdentifier")
 		return
 	}
 	a.analysisMu.Lock()
@@ -308,7 +309,7 @@ func (a *App) analysisSourceSnapshot(id string, wb *workbook.Workbook) (*analysi
 	defer a.analysisMu.Unlock()
 	snapshot := a.analysisSources[id]
 	if snapshot == nil || snapshot.data.wb != wb || a.currentWorkbook() != wb {
-		return nil, errors.New("分析来源快照已失效或来源已切换，请重新捕获")
+		return nil, i18n.Error("service.analysisSourceView.analysisSourceSnapshotBecomeInvalid27c8e9f")
 	}
 	return snapshot.retain()
 }
@@ -322,11 +323,11 @@ func (a *App) restoreAnalysisSource(ctx context.Context, wb *workbook.Workbook, 
 	}
 	meta, ok := wb.FindSheet(strings.TrimPrefix(source, "wb:"))
 	if !ok {
-		return nil, errors.New("分析源工作表不存在")
+		return nil, i18n.Error("service.analysisSourceView.analysisSourceWorksheetDoesNot")
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		return nil, errors.New("分析源工作表尚未索引")
+		return nil, i18n.Error("service.analysisSourceView.analysisSourceWorksheetsHaveNot")
 	}
 	if err = wb.CheckSourceUnchanged(); err != nil {
 		return nil, err

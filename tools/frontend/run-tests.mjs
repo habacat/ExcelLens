@@ -25,7 +25,7 @@ if (tests.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...tests], {
+const result = spawnSync(process.execPath, ['--import', './tools/frontend/test-language.mjs', '--test', '--test-reporter=spec', ...tests], {
   cwd: root,
   stdio: 'inherit',
 });

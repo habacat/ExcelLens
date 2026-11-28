@@ -3,6 +3,7 @@
  * snapshots, budget-aware progressive copying, cut/portable markup hooks, and
  * audit evidence/qualified-address copying.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ClipboardLimits } from '../contracts/formats.ts';
 import type {
   CellData,
@@ -147,7 +148,7 @@ export class GridClipboard {
     this.d = deps;
   }
 
-  async copyText(value: string | null | undefined, successMessage = '已复制'): Promise<boolean> {
+  async copyText(value: string | null | undefined, successMessage = localize('ui.common.copiedSuccessfully')): Promise<boolean> {
     const { toast } = this.d;
     const text = value ?? '';
     try {
@@ -163,7 +164,7 @@ export class GridClipboard {
         helper.select();
         try {
           if (!execLegacyCopy()) {
-            throw new Error('浏览器未能写入剪贴板');
+            throw new Error(localize('ui.gridClipboard.browserFailedWriteClipboard'));
           }
         } finally {
           helper.remove();
@@ -172,7 +173,7 @@ export class GridClipboard {
       toast(successMessage, 'success');
       return true;
     } catch (error: unknown) {
-      toast(`复制失败：${errorMessage(error)}`, 'error');
+      toast(localize('ui.gridClipboard.copyFailed', { detail: errorMessage(error) }), 'error');
       return false;
     }
   }
@@ -190,7 +191,7 @@ export class GridClipboard {
             'text/html': new Blob([content.html], { type: 'text/html' }),
           }),
         ]);
-        if (!cut) toast('已复制', 'success');
+        if (!cut) toast(localize('ui.common.copiedSuccessfully'), 'success');
         return true;
       } catch {
         // Some browsers only allow HTML during a native copy event.
@@ -208,7 +209,7 @@ export class GridClipboard {
     document.addEventListener('copy', onCopy, true);
     try {
       if (execLegacyCopy() && copyState.rich) {
-        if (!cut) toast('已复制', 'success');
+        if (!cut) toast(localize('ui.common.copiedSuccessfully'), 'success');
         return true;
       }
     } catch {
@@ -216,9 +217,9 @@ export class GridClipboard {
     } finally {
       document.removeEventListener('copy', onCopy, true);
     }
-    if (cut) throw new Error('浏览器未写入剪切区域，请重新剪切');
+    if (cut) throw new Error(localize('ui.gridClipboard.browserDidNotWriteCut'));
     const copied = await this.copyText(content.text);
-    if (copied) toast('已复制为纯文本，当前浏览器未写入表格格式', 'warning');
+    if (copied) toast(localize('ui.gridClipboard.copiedAsPlainTextNot'), 'warning');
     return copied;
   }
 
@@ -270,7 +271,7 @@ export class GridClipboard {
     } = {},
   ): ClipboardSnapshot {
     const {
-      purpose = '复制',
+      purpose = localize('ui.gridClipboard.copy'),
       limits = this.d.fileFormats.clipboard,
       withMerges = false,
     } = options;
@@ -278,17 +279,17 @@ export class GridClipboard {
     const editCopy = getEditCopy?.();
     const frozenPanes = getFrozenPanes();
     if (!S.indexReady || !S.selected || !S.sheet || S.sheetLoadingEpoch) {
-      throw new Error('请先选择一个已加载的单元格或区域');
+      throw new Error(localize('ui.gridClipboard.selectLoadedCellOrRegion'));
     }
     if (editCopy?.grid.active && (editCopy.grid.stale || editCopy.pending || editCopy.abort)) {
-      throw new Error('请先确认当前编辑修订');
+      throw new Error(localize('ui.gridClipboard.confirmCurrentEditingRevisionsFirst'));
     }
     if (S.multiRanges.length) {
-      throw new Error(`请选择一个连续区域进行${purpose}`);
+      throw new Error(localize('ui.gridClipboard.chooseContinuousArea', { purpose }));
     }
     const visibility = S.rowVisibility;
     let area = MultiSelection.areas(S, true).at(-1);
-    if (!area) throw new Error('请先选择一个已加载的单元格或区域');
+    if (!area) throw new Error(localize('ui.gridClipboard.selectLoadedCellOrRegion'));
     if (withMerges && !S.filtered) area = mergedCells.expand(area, visibility);
     if (withMerges && S.filtered && !S.range) {
       const m = mergedCells.at(S.selected.row, S.selected.col);
@@ -302,13 +303,13 @@ export class GridClipboard {
       ? visibility.selectionCount(area, S.filtered, excluded)
       : MultiSelection.rowCount(area, S.filtered, excluded);
     const colCount = col2 - col1 + 1;
-    if (rowCount < 1) throw new Error('选区没有可见行');
+    if (rowCount < 1) throw new Error(localize('ui.gridClipboard.noVisibleRowsSelectionArea'));
     if (
       limits &&
       (rowCount > limits.rows || colCount > limits.columns || rowCount * colCount > limits.cells)
     ) {
       throw new Error(
-        `${purpose}最多${limits.rows}行、${limits.columns}列、${limits.cells}格，请缩小选区`,
+        localize('ui.gridClipboard.canHaveMaximumRowsColumns', { purpose, rows: limits.rows, columns: limits.columns, cells: limits.cells }),
       );
     }
     const sheet = S.sheet;
@@ -368,7 +369,7 @@ export class GridClipboard {
         S.sortHeaderBySheet.get(sheet) ||
         S.source?.tableHeader?.row ||
         1,
-      label: `${sheet} · ${points.start}:${points.end} · ${rowCount}行 × ${colCount}列`,
+      label: localize('ui.gridClipboard.rowsColumns', { sheet, start: points.start, end: points.end, rowCount, colCount }),
       readTSV: (): Promise<string> => {
         const params = rangeParams();
         params.set('format', 'tsv');
@@ -385,7 +386,7 @@ export class GridClipboard {
           force = false,
           portable = false,
         } = readOpts;
-        if (!current()) throw new Error('来源或选区已变化，请重新选择');
+        if (!current()) throw new Error(localize('ui.gridClipboard.sourceOrSelectionChangedReselect'));
         if (rowCount === 1 && colCount === 1 && !headerRow && !force && !portable) {
           const cell: CellData = { ...selected };
           if (!richText) delete cell.richText;
@@ -407,13 +408,13 @@ export class GridClipboard {
         if (headerRow) params.set('headerRow', String(headerRow));
         const payload = await api(`/api/range?${params.toString()}`, { signal }, decodeClipboardPayload);
         if (!current()) {
-          const err = new Error('复制已取消，来源或选区已变化');
+          const err = new Error(localize('ui.gridClipboard.copyCanceledSourceOrSelection'));
           err.name = 'AbortError';
           throw err;
         }
         if (payload.book !== book || payload.workbookKey !== workbookKey || payload.sheet !== sheet ||
             payload.startCol !== col1 || payload.endCol !== col2) {
-          throw new Error('选区来源已变化，请重新选择');
+          throw new Error(localize('ui.gridClipboard.sourceSelectionChangedReselect'));
         }
         const activeEdit = getEditCopy?.();
         if (activeEdit?.grid.active) {
@@ -436,7 +437,7 @@ export class GridClipboard {
 
   async copySelection(plain = false, cut = false): Promise<boolean | undefined> {
     const { fileFormats, toast, getEditCopy, getExportCenter } = this.d;
-    const activity = beginActivity(cut ? '正在剪切选区' : '正在复制选区');
+    const activity = beginActivity(cut ? localize('ui.gridClipboard.selectingArea') : localize('ui.gridClipboard.copyingArea'));
     const editCopy = getEditCopy?.();
     const ranges = editCopy?.grid.active ? editCopy.grid.ranges : null;
     const epoch = ranges ? (ranges.copyEpoch = (ranges.copyEpoch || 0) + 1) : 0;
@@ -456,17 +457,17 @@ export class GridClipboard {
         () => this.copyGridPayload(snapshot, false, false, null, 0),
         async () => {
           const text = await snapshot.readTSV();
-          return snapshot.current() ? this.copyText(text, '已复制为纯文本') : false;
+          return snapshot.current() ? this.copyText(text, localize('ui.gridClipboard.copiedAsPlainText')) : false;
         },
         () => {
           const exportCenter = getExportCenter?.();
           if (!exportCenter) return;
           if (exportCenter.running || exportCenter.busy) {
-            toast('导出中心正在处理任务，请在完成后导出选区', 'warning');
+            toast(localize('ui.gridClipboard.exportCenterProcessingTaskExport'), 'warning');
             return;
           }
           exportCenter.open('selection', snapshot);
-          toast('选区超过复制容量，可导出为文件', 'warning');
+          toast(localize('ui.gridClipboard.selectionExceedsCopyCapacityCan'), 'warning');
         },
       );
     } catch (err: unknown) {
@@ -508,7 +509,7 @@ export class GridClipboard {
         : initial;
     if (!snapshot.current() || (ranges && ranges.copyEpoch !== epoch)) return false;
     if (cut && !typed) {
-      throw new Error('剪切需要一个连续、完整可见且未超出编辑容量的工作表区域');
+      throw new Error(localize('ui.gridClipboard.cuttableAreaMustBeContinuous'));
     }
     const content = buildClipboard(
       payload,
@@ -532,7 +533,7 @@ export class GridClipboard {
       );
     }
     if ((typed || payload.portable) && utf8Length(html) > fileFormats.clipboard.htmlBytes) {
-      throw Object.assign(new Error('复制内容超过本次容量'), { status: 413 });
+      throw Object.assign(new Error(localize('ui.gridClipboard.copiedContentExceedsCurrentCapacity')), { status: 413 });
     }
     const notices = [...content.notices];
     if (payload.portableNotice) notices.push(payload.portableNotice);
@@ -557,17 +558,17 @@ export class GridClipboard {
     const { S, toast } = this.d;
     const c = S.selected;
     if (!c) {
-      toast('请先选中一个单元格', 'warning');
+      toast(localize('ui.gridClipboard.selectCellFirst'), 'warning');
       return undefined;
     }
     const text = [
-      `工作簿：${S.fileName}`,
-      `工作表：${S.sheet ?? ''}`,
-      `单元格：${c.ref}`,
-      `显示值：${c.display}`,
-      `缓存原始值：${c.raw}`,
-      `公式：${c.formula ?? '（非公式单元格）'}`,
-      `标识：${c.cacheMissing ? '公式缺少缓存值' : '只读读取原文件保存的值（未重算）'}`,
+      localize('ui.gridClipboard.workbook', { fileName: S.fileName }),
+      localize('ui.gridClipboard.worksheet', { detail: S.sheet ?? '' }),
+      localize('ui.gridClipboard.cell', { ref: c.ref }),
+      localize('ui.gridClipboard.displayValue', { display: c.display }),
+      localize('ui.gridClipboard.originalValuesCached', { raw: c.raw }),
+      localize('ui.gridClipboard.formula', { detail: c.formula ?? localize('ui.gridClipboard.nonFormulaCells') }),
+      localize('ui.gridClipboard.identifier', { detail: c.cacheMissing ? localize('ui.gridClipboard.formulaLacksCacheValue') : localize('ui.gridClipboard.readingValuesSavedFromOriginal') }),
     ].join('\n');
     return this.copyText(text);
   }
@@ -575,7 +576,7 @@ export class GridClipboard {
   copyQualifiedAddress(): Promise<boolean> | undefined {
     const { S, toast } = this.d;
     if (!S.selected) {
-      toast('请先选择单元格', 'warning');
+      toast(localize('ui.gridClipboard.chooseCellsFirst'), 'warning');
       return undefined;
     }
     const sheet = `'${(S.sheet ?? '').replaceAll("'", "''")}'`;

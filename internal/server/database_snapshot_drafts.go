@@ -3,9 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+
 	"path/filepath"
 
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 	"excellens/internal/recovery"
 )
@@ -60,7 +61,7 @@ func (a *App) snapshotDraftReferences(ctx context.Context, key string) ([]string
 			}
 			data, err := store.Load(entry.Owner, kind, entry.Backup)
 			if err != nil {
-				return nil, fmt.Errorf("页面恢复记录：%w", err)
+				return nil, i18n.Wrap("service.databaseSnapshotDrafts.pageRecordRestoration", err)
 			}
 			for id, raw := range data.Records {
 				if err := validateRecovery(kind, recovery.Change{Key: id, Data: raw}); err != nil {

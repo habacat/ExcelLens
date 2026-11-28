@@ -14,6 +14,7 @@ import (
 
 	excelExport "excellens/internal/export"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -104,14 +105,14 @@ func (a *App) handleOpenAuditReport(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "报告参数无效")
+		writeMessage(w, 400, "service.auditReport.reportParametersInvalid")
 		return
 	}
 	a.mu.RLock()
 	job := a.exports[req.ID]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, 404, "报告已过期")
+		writeMessage(w, 404, "service.auditReport.reportExpired")
 		return
 	}
 	job.mu.RLock()
@@ -119,12 +120,12 @@ func (a *App) handleOpenAuditReport(w http.ResponseWriter, r *http.Request) {
 	path := job.FilePath
 	job.mu.RUnlock()
 	if !ready {
-		writeError(w, 409, "报告尚未生成")
+		writeMessage(w, 409, "service.auditReport.reportNotGeneratedYet")
 		return
 	}
 	id, err := a.rootApp().OpenPathForLaunch(path)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]string{"url": "/?session=" + id})
@@ -145,7 +146,7 @@ func versionPairs(req versionRequest, left, right *workbook.Workbook) ([]version
 		l, okL := left.FindSheet(req.LeftSheet)
 		r, okR := right.FindSheet(req.RightSheet)
 		if !okL || !okR {
-			return nil, errors.New("请选择两侧的源工作表")
+			return nil, i18n.Error("service.auditReport.selectSourceWorksheetOnBoth")
 		}
 		return []versionPair{{l.Name, r.Name}}, nil
 	}
@@ -177,31 +178,31 @@ func (a *App) handleVersionCompare(w http.ResponseWriter, r *http.Request) {
 	}
 	var req versionRequest
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "版本比较参数无效")
+		writeMessage(w, 400, "service.auditReport.versionComparisonParametersInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	primary := a.currentWorkbook()
 	if primary == nil || sourceBookID(primary) != req.PrimaryBook || primary.Fingerprint != req.WorkbookKey {
-		writeError(w, 409, "当前工作簿已变化")
+		writeMessage(w, 409, "service.auditReport.currentWorkbookChanged")
 		return
 	}
 	left, right := a.resolveReconcileBook(req.LeftBook), a.resolveReconcileBook(req.RightBook)
 	if left == nil || right == nil || left.SourceInfo.Incomplete || right.SourceInfo.Incomplete || left.ArchiveOrigin != nil && left.ArchiveOrigin.Partial || right.ArchiveOrigin != nil && right.ArchiveOrigin.Partial {
-		writeError(w, 409, "比较需要两个可用且完整的来源")
+		writeMessage(w, 409, "service.auditReport.comparisonRequiresTwoAvailableComplete")
 		return
 	}
 	if v := req.Alignment; v != nil {
 		if req.LeftSheet == "" || req.RightSheet == "" || len(v.Keys) < 1 || len(v.Keys) > reconcile.MaxKeys ||
 			v.Left.Book != req.LeftBook || v.Right.Book != req.RightBook || v.Left.Source != "wb:"+req.LeftSheet || v.Right.Source != "wb:"+req.RightSheet || v.Left.Stamp == "" || v.Right.Stamp == "" {
-			writeError(w, 400, "请读取所选两张工作表的字段并确认业务主键")
+			writeMessage(w, 400, "service.auditReport.readFieldsTwoSelectedWorksheets")
 			return
 		}
 	}
 	pairs, err := versionPairs(req, left, right)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	release := a.pinWorkbooks(left, right)

@@ -2,6 +2,7 @@
  * Workbook I/O lifecycle: sheet tabs & picker rendering, status bootstrap,
  * file upload/opening, workbook handoff/reset across panels, and index progress.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type {
   ActivityHandle,
   ApiClient,
@@ -17,6 +18,7 @@ import { beginActivity } from '../core/activity.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireDialog, requireEl } from '../core/dom.ts';
 import type { FileFormats } from '../core/formats.ts';
+import { collapseBannerToBadgeMotion, enterMotion, stopMotion } from '../core/motion.ts';
 import type { TransportService } from '../core/transport.ts';
 import type { WorkbookState } from './state.ts';
 import { decodeOpenResult, decodeWorkbookStatus } from '../core/workbook-response.ts';
@@ -106,7 +108,7 @@ export interface WorkbookIODeps {
   readonly toast: (message: string, tone?: 'info' | 'success' | 'warning' | 'error') => void;
   readonly fmtBytes: (value: unknown) => string;
   readonly fileFormats: FileFormats;
-  readonly setStatus: (text: string) => void;
+  readonly setStatus: (text: string, hidden?: boolean) => void;
   readonly showWelcome: () => void;
   readonly showWorkspace: () => void;
   readonly loadStylePalette: () => Promise<void>;
@@ -125,18 +127,124 @@ export interface WorkbookIODeps {
   readonly panels: WorkbookIOPanels;
 }
 
-export function renderSourceIntegrity(source: SourceInfo | null | undefined): void {
+interface SourceIntegrityState {
+  message: string;
+  key: string;
+  dismissedKey: string;
+}
+
+const sourceIntegrityStates = new WeakMap<HTMLElement, SourceIntegrityState>();
+
+function integrityState(notice: HTMLElement): SourceIntegrityState {
+  let state = sourceIntegrityStates.get(notice);
+  if (!state) {
+    state = { message: '', key: '', dismissedKey: '' };
+    sourceIntegrityStates.set(notice, state);
+  }
+  return state;
+}
+
+export function renderSourceIntegrity(
+  source: SourceInfo | null | undefined,
+  workbookKey = '',
+): void {
   const notice = requireEl('sourceIntegrityNotice');
+  const badge = document.getElementById('sourceIntegrityBadge');
+  const state = integrityState(notice);
+  stopMotion(notice);
+  stopMotion(badge);
   const integrity =
     source?.archiveNotice ||
-    (source?.incomplete ? source.notice || '当前数据为不完整片段，不能代表全量账目。' : '');
+    (source?.incomplete ? source.notice || localize('ui.gridWorkbookIo.currentDataIncompleteFragmentCannot') : '');
   const message = [integrity, source?.presentationNotice].filter(Boolean).join('；');
   requireEl('sourceIntegrityMessage').textContent = message;
   const retainBtn = document.getElementById('retainDatabaseSnapshot');
   if (retainBtn) {
     retainBtn.hidden = !source?.databaseSnapshot?.legacy || source.databaseSnapshot.retained;
   }
-  notice.hidden = !message;
+  if (!message) {
+    state.message = '';
+    state.key = '';
+    state.dismissedKey = '';
+    notice.hidden = true;
+    if (badge) {
+      badge.hidden = true;
+      badge.setAttribute('aria-expanded', 'false');
+    }
+    return;
+  }
+  const key = `${workbookKey}|${message}`;
+  state.message = message;
+  state.key = key;
+  const collapsed = Boolean(state.dismissedKey && state.dismissedKey === key);
+  if (!collapsed) state.dismissedKey = '';
+  notice.hidden = collapsed;
+  if (badge) {
+    badge.hidden = !collapsed;
+    badge.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+
+export function hideSourceIntegrity(): void {
+  const notice = requireEl('sourceIntegrityNotice');
+  const badge = document.getElementById('sourceIntegrityBadge');
+  const state = integrityState(notice);
+  stopMotion(notice);
+  stopMotion(badge);
+  state.message = '';
+  state.key = '';
+  state.dismissedKey = '';
+  notice.hidden = true;
+  if (badge) {
+    badge.hidden = true;
+    badge.setAttribute('aria-expanded', 'false');
+  }
+}
+
+export function collapseSourceIntegrity(): void {
+  const notice = requireEl('sourceIntegrityNotice');
+  const badge = document.getElementById('sourceIntegrityBadge');
+  const state = integrityState(notice);
+  if (!state.message || notice.hidden) return;
+  const from = notice.getBoundingClientRect();
+  state.dismissedKey = state.key;
+  stopMotion(notice);
+  notice.hidden = true;
+  if (badge) {
+    badge.hidden = false;
+    badge.setAttribute('aria-expanded', 'false');
+    collapseBannerToBadgeMotion(from, badge, 'source-integrity-flight');
+  }
+}
+
+export function expandSourceIntegrity(): void {
+  const notice = requireEl('sourceIntegrityNotice');
+  const badge = document.getElementById('sourceIntegrityBadge');
+  const state = integrityState(notice);
+  if (!state.message) return;
+  stopMotion(badge);
+  state.dismissedKey = '';
+  if (badge) {
+    badge.hidden = true;
+    badge.setAttribute('aria-expanded', 'true');
+  }
+  notice.hidden = false;
+  enterMotion(notice, { distance: -6, duration: 150 });
+}
+
+export function bindSourceIntegrityControls(): void {
+  const closeBtn = document.getElementById('sourceIntegrityCloseBtn');
+  const badge = document.getElementById('sourceIntegrityBadge');
+  closeBtn?.addEventListener('click', () => {
+    const moveFocus = document.activeElement === closeBtn;
+    collapseSourceIntegrity();
+    if (moveFocus) badge?.focus();
+  });
+  badge?.addEventListener('click', () => {
+    const moveFocus = document.activeElement === badge;
+    expandSourceIntegrity();
+    if (moveFocus) closeBtn?.focus();
+  });
 }
 
 export class WorkbookIO {
@@ -157,13 +265,13 @@ export class WorkbookIO {
         stats.done,
         stats.total,
         progress.stage,
-        `${stats.done.toLocaleString()} / ${stats.total.toLocaleString()} 行`,
+        localize('ui.gridWorkbookIo.row', { done: stats.done.toLocaleString(interfaceLocale()), total: stats.total.toLocaleString(interfaceLocale()) }),
       );
     } else {
       activity?.report(
         progress.doneBytes,
         progress.totalBytes,
-        progress.stage || '正在建立索引',
+        progress.stage || localize('ui.gridWorkbookIo.creatingIndexes'),
         progress.totalBytes > 0
           ? `${fmtBytes(progress.doneBytes)} / ${fmtBytes(progress.totalBytes)}`
           : '',
@@ -189,7 +297,7 @@ export class WorkbookIO {
       button.textContent = sheet.name;
       button.title =
         (sheet.sourceName || sheet.name) +
-        (sheet.state && sheet.state !== 'visible' ? '（隐藏工作表）' : '');
+        (sheet.state && sheet.state !== 'visible' ? localize('ui.gridWorkbookIo.hiddenWorksheets') : '');
       button.setAttribute('role', 'tab');
       button.setAttribute('aria-selected', S.sheet === sheet.name ? 'true' : 'false');
       button.addEventListener('click', () => {
@@ -260,7 +368,7 @@ export class WorkbookIO {
     if (!shown) {
       const empty = document.createElement('div');
       empty.className = 'dialog-summary';
-      empty.textContent = '没有匹配的工作表';
+      empty.textContent = localize('ui.gridWorkbookIo.noMatchingWorksheetsFound');
       fragment.appendChild(empty);
     }
     list.replaceChildren(fragment);
@@ -289,12 +397,12 @@ export class WorkbookIO {
       panels,
     } = this.d;
     const launch = Boolean(session?.nativeLaunch || session?.restoring);
-    const activity = launch ? beginActivity('正在打开文件', { priority: 2 }) : null;
+    const activity = launch ? beginActivity(localize('ui.common.openingFile'), { priority: 2 }) : null;
     if (launch) {
       S.opening = true;
       requireButton('openBtn').disabled = true;
       requireButton('chooseFileBtn').disabled = true;
-      activity?.stage('正在打开文件', 0, 60);
+      activity?.stage(localize('ui.common.openingFile'), 0, 60);
     }
     try {
       const data = await api('/api/status', undefined, decodeWorkbookStatus);
@@ -317,14 +425,14 @@ export class WorkbookIO {
           const welcomeError = requireEl('welcomeError');
           welcomeError.textContent = data.error;
           welcomeError.hidden = false;
-          setStatus('打开失败');
+          setStatus(localize('ui.gridWorkbookIo.notOpenFile'));
         } else {
-          setStatus('等待选择文件');
+          setStatus(localize('ui.gridWorkbookIo.chooseFileOpen'), S.indexReady);
         }
         return;
       }
       S.opened = true;
-      activity?.stage('正在准备工作表', 60, 65);
+      activity?.stage(localize('ui.common.preparingScheduleProgress'), 60, 65);
       S.sheets = data.sheets ? [...data.sheets] : [];
       S.activeTab = typeof data.activeTab === 'number' && Number.isInteger(data.activeTab)
         ? data.activeTab
@@ -366,7 +474,7 @@ export class WorkbookIO {
         );
       } else {
         this.renderSheetTabs();
-        setStatus('工作簿中没有工作表');
+        setStatus(localize('ui.gridWorkbookIo.noWorksheetsWorkbook'));
       }
       panels.bookmarkCenter?.load(true).catch(() => {
         // Ignore initial bookmark load errors.
@@ -377,7 +485,7 @@ export class WorkbookIO {
     } catch (error: unknown) {
       showWelcome();
       void panels.recentManager?.load();
-      setStatus('本机服务连接失败');
+      setStatus(localize('ui.gridWorkbookIo.localServiceConnectionFailed'));
       toast(errorMessage(error), 'error');
     } finally {
       activity?.end();
@@ -405,15 +513,15 @@ export class WorkbookIO {
     if (!S.opening && this.canOpenWorkbook()) requireEl('fileInput').click();
   }
 
-  canOpenWorkbook(action = '切换文件'): boolean {
+  canOpenWorkbook(action = localize('ui.gridWorkbookIo.switchFile')): boolean {
     const { S, toast, panels } = this.d;
     if (S.opening) return false;
     if (panels.editCopy?.grid.active && panels.editCopy.grid.blocked) {
-      toast('请先确认当前单元格的输入');
+      toast(localize('ui.gridWorkbookIo.confirmInputCurrentCellFirst'));
       return false;
     }
     if (panels.analytics?.hasUnsaved()) {
-      toast(`分析表仍有未保存内容，请先在分析中重试保存，再${action}`, 'warning');
+      toast(localize('ui.gridWorkbookIo.analysisTableStillUnsavedContent', { action }), 'warning');
       return false;
     }
     return true;
@@ -432,14 +540,14 @@ export class WorkbookIO {
     requireButton('chooseFileBtn').disabled = true;
     requireButton('homeBtn').disabled = true;
     requireEl('welcomeError').hidden = true;
-    setStatus('正在打开文件');
-    const activity = beginActivity('正在打开文件', { priority: 2 });
-    activity?.stage('正在打开文件', 0, 60);
+    setStatus(localize('ui.common.openingFile'));
+    const activity = beginActivity(localize('ui.common.openingFile'), { priority: 2 });
+    activity?.stage(localize('ui.common.openingFile'), 0, 60);
     try {
       await session?.ready;
       const data = await load(activity);
       if (!current()) return false;
-      activity?.stage('正在准备工作表', 60, 65);
+      activity?.stage(localize('ui.common.preparingScheduleProgress'), 60, 65);
       await this.acceptOpenedWorkbook(data, {
         fallbackName: name,
         fallbackSize: size,
@@ -452,7 +560,7 @@ export class WorkbookIO {
       const welcomeError = requireEl('welcomeError');
       welcomeError.textContent = errorMessage(error);
       welcomeError.hidden = false;
-      setStatus('打开失败');
+      setStatus(localize('ui.gridWorkbookIo.notOpenFile'));
       throw error;
     } finally {
       activity?.end();
@@ -469,7 +577,7 @@ export class WorkbookIO {
     await getWorkbookReady?.();
     if (S.opening) return undefined;
     if (!fileFormats.supports(file.name)) {
-      toast('请选择受支持的数据文件或压缩包', 'warning');
+      toast(localize('ui.gridWorkbookIo.selectSupportedDataFileOr'), 'warning');
       return undefined;
     }
     return this.openWorkbook(
@@ -486,7 +594,7 @@ export class WorkbookIO {
     data: WorkbookStatusResponse,
     options: AcceptWorkbookOptions = {},
   ): Promise<void> {
-    if (!data.opened && !data.archiveOnly) throw new Error(data.error || '服务未确认工作簿已打开');
+    if (!data.opened && !data.archiveOnly) throw new Error(data.error || localize('ui.gridWorkbookIo.serviceDidNotConfirmThat'));
     const { fallbackName = '', fallbackSize = 0, activity, revisionRef = '' } = options;
     const {
       S,
@@ -503,7 +611,7 @@ export class WorkbookIO {
     panels.archiveCenter?.use(data.archive);
     if (data.archiveOnly) {
       panels.archiveCenter?.present(data.archive);
-      setStatus('请选择压缩包内的文件');
+      setStatus(localize('ui.gridWorkbookIo.chooseFileWithinCompressedPackage'));
       return;
     }
     S.opened = true;
@@ -577,7 +685,7 @@ export class WorkbookIO {
       await selectSheet(active.name, revisionRef, false, null, activity);
     } else {
       this.renderSheetTabs();
-      setStatus('工作簿中没有工作表');
+      setStatus(localize('ui.gridWorkbookIo.noWorksheetsWorkbook'));
     }
     panels.bookmarkCenter?.load(true).catch(() => {
       // Ignore initial bookmark load errors.

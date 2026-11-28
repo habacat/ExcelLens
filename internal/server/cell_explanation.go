@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -41,7 +42,7 @@ type cellExplanationResponse struct {
 	PresentationNotice string                 `json:"presentationNotice,omitempty"`
 }
 
-var errCellExplanationCapacity = errors.New("单元格信息超过读取容量，请使用选区或流式导出")
+var errCellExplanationCapacity = i18n.Error("service.cellExplanation.cellInformationExceedsReadingCapacity")
 
 // The ordinary GET /api/cell remains a source-coordinate lookup for references.
 // Explanation is an explicit operation bound to the accepted visible snapshot.
@@ -54,39 +55,39 @@ func (a *App) handleCellExplanation(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CellExplanationRequestBytes))
 	var req cellExplanationRequest
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.WorkbookKey == "" || req.Book == "" || req.Sheet == "" || req.ViewID == "" || req.PinnedThroughRow < 0 || req.PinnedThroughRow > 30 {
-		writeError(w, 400, "单元格信息参数无效，请重新选择")
+		writeMessage(w, 400, "service.cellExplanation.cellInformationParameterInvalidReselect")
 		return
 	}
 	col, row, err := workbook.ParseCellRef(req.Ref)
 	if err != nil || req.Ref != workbook.ColumnName(col)+strconv.Itoa(row) {
-		writeError(w, 400, "单元格地址无效")
+		writeMessage(w, 400, "service.cellExplanation.cellAddressInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "单元格来源已切换，请重新打开信息")
+		writeMessage(w, 409, "service.cellExplanation.cellSourceSwitchedReopenInformation")
 		return
 	}
 	releaseCapture := a.lockCacheRead()
 	defer releaseCapture()
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.cellExplanation.worksheetDoesNotExist")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先完成工作表索引")
+		writeMessage(w, 409, "service.cellExplanation.completeWorksheetIndexingFirst")
 		return
 	}
 	source, ok := formats.Lookup(wb.Format)
 	if !ok || row > source.MaxRows || col > source.MaxColumns {
-		writeError(w, 400, "单元格超出源格式范围")
+		writeMessage(w, 400, "service.cellExplanation.cellExceedsSourceFormatRange")
 		return
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer snapshot.close()
@@ -101,7 +102,7 @@ func (a *App) handleCellExplanation(w http.ResponseWriter, r *http.Request) {
 		valid := a.wb == wb && !a.maintenance && view != nil && view.data == snapshot.visible.data && wb.GetCachedIndex(meta.Path) == idx
 		a.mu.RUnlock()
 		if !valid {
-			return errors.New("单元格来源或视图已变化，请重新打开信息")
+			return i18n.Error("service.cellExplanation.cellSourceOrViewChanged")
 		}
 		return wb.CheckSourceUnchanged()
 	}
@@ -113,7 +114,7 @@ func (a *App) handleCellExplanation(w http.ResponseWriter, r *http.Request) {
 	defer releaseQuery()
 	if err := current(); err != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 		}
 		return
 	}
@@ -136,7 +137,7 @@ func (a *App) handleCellExplanation(w http.ResponseWriter, r *http.Request) {
 	}
 	if changed := current(); changed != nil {
 		if r.Context().Err() == nil {
-			writeError(w, 409, changed.Error())
+			writeFailure(w, 409, changed)
 		}
 		return
 	}
@@ -145,7 +146,7 @@ func (a *App) handleCellExplanation(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errCellExplanationCapacity) {
 			status = 413
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -170,7 +171,7 @@ func readCellExplanation(ctx context.Context, wb *workbook.Workbook, idx *workbo
 		for _, cell := range source.Cells {
 			if cell.Col == col {
 				if source.Number != row || cell.Ref != req.Ref {
-					return nil, errors.New("单元格源坐标不一致，请重新建立索引")
+					return nil, i18n.Error("service.cellExplanation.cellSourceCoordinatesInconsistentRe")
 				}
 				result.Cell = cell
 			}

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -42,7 +43,7 @@ func readViews(path string) (savedViews, error) {
 	}
 	var stored savedViews
 	if len(b) > 1<<20 || json.Unmarshal(b, &stored) != nil || stored.Version != 1 || stored.Sheets == nil {
-		return v, errors.New("冻结布局文件损坏或版本不兼容")
+		return v, i18n.Error("service.viewstate.layoutFileCorruptedOrVersion")
 	}
 	for sheet, p := range stored.Sheets {
 		if validateFreeze(p) {
@@ -110,7 +111,7 @@ func nativeFrozenPane(wb *workbook.Workbook, meta workbook.SheetMeta) freezeSett
 func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.viewstate.noWorkbookOpen")
 		return
 	}
 	var sheet string
@@ -124,13 +125,13 @@ func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 			Cols  int    `json:"cols"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&input); err != nil {
-			writeError(w, http.StatusBadRequest, "冻结设置无效")
+			writeMessage(w, http.StatusBadRequest, "service.viewstate.freezeSettingsNotEffective")
 			return
 		}
 		sheet = input.Sheet
 		requested = freezeSettings{Rows: input.Rows, Cols: input.Cols}
 		if !validateFreeze(requested) {
-			writeError(w, http.StatusBadRequest, "冻结行数最多30、列数最多12，不能为负数")
+			writeMessage(w, http.StatusBadRequest, "service.viewstate.maximumNumberFrozenRowsMaximum")
 			return
 		}
 	} else {
@@ -139,30 +140,30 @@ func (a *App) handleView(w http.ResponseWriter, r *http.Request) {
 	}
 	meta, ok := wb.FindSheet(sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.viewstate.unableFindSpecifiedWorksheet")
 		return
 	}
 	a.viewMu.Lock()
 	defer a.viewMu.Unlock()
 	if a.currentWorkbook() != wb {
-		writeError(w, http.StatusConflict, "工作簿已切换")
+		writeMessage(w, http.StatusConflict, "service.viewstate.workbookSwitched")
 		return
 	}
 	path, unlock, err := lockWorkbookSetting(r.Context(), "frozen-panes", wb.Fingerprint)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	defer unlock()
 	views, err := readViews(path)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodPost {
 		views.Sheets[meta.Name] = requested
 		if err := writeWorkbookSetting(path, views); err != nil {
-			writeError(w, http.StatusInternalServerError, "保存冻结设置失败："+err.Error())
+			writeMessage(w, http.StatusInternalServerError, "service.viewstate.failedSaveFreezingSettings", i18n.Args{"detail": err})
 			return
 		}
 		writeJSON(w, map[string]any{"sheet": meta.Name, "rows": requested.Rows, "cols": requested.Cols, "source": "saved"})

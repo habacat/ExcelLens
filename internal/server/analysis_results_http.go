@@ -3,12 +3,13 @@ package server
 import (
 	"bytes"
 	"encoding/csv"
-	"errors"
+
 	"net/http"
 	"strings"
 	"time"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 )
 
 func (a *App) handleAnalysisDrill(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,7 @@ func (a *App) handleAnalysisDrill(w http.ResponseWriter, r *http.Request) {
 		Limit          int            `json:"limit"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "下钻参数无效")
+		writeMessage(w, 400, "service.analysisResultsHttp.drillDownParameterInvalid")
 		return
 	}
 	if req.Query.HeaderRow == 0 && !strings.HasPrefix(req.Query.Source, "append:") {
@@ -40,13 +41,13 @@ func (a *App) handleAnalysisDrill(w http.ResponseWriter, r *http.Request) {
 	case a.analysisSem <- struct{}{}:
 		defer func() { <-a.analysisSem }()
 	case <-r.Context().Done():
-		writeError(w, 408, "下钻已取消")
+		writeMessage(w, 408, "service.analysisResultsHttp.drillDownCanceled")
 		return
 	}
 	rebuildFilter := req.JobID == "" && req.Query.SourceScope != nil && req.Query.SourceScope.Filter != nil
 	release, err := a.acquireAnalysisQuerySlot(r.Context(), req.Query.Source, rebuildFilter)
 	if err != nil {
-		writeError(w, 408, "下钻已取消")
+		writeMessage(w, 408, "service.analysisResultsHttp.drillDownCanceled")
 		return
 	}
 	defer release()
@@ -57,7 +58,7 @@ func (a *App) handleAnalysisDrill(w http.ResponseWriter, r *http.Request) {
 		release()
 	}
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	defer src.close()
@@ -73,7 +74,7 @@ func (a *App) handleAnalysisDrill(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := analysis.DrillScope(r.Context(), req.Query, src.fields, req.Keys, column, req.Offset, clamp(req.Limit, 1, 100), src.scan)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, out)
@@ -92,18 +93,18 @@ func (a *App) handleAnalysisMaterialize(w http.ResponseWriter, r *http.Request) 
 		Name  string `json:"name"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisResultsHttp.parameterInvalid")
 		return
 	}
 	job := a.getAnalysisJob(req.JobID)
 	if job == nil || job.Workbook != wb {
-		writeError(w, 404, "分析任务不存在")
+		writeMessage(w, 404, "service.analysisResultsHttp.analysisTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
 	if job.Status != "done" {
 		job.mu.RUnlock()
-		writeError(w, 409, "分析尚未完成")
+		writeMessage(w, 409, "service.analysisResultsHttp.analysisNotCompletedYet")
 		return
 	}
 	result := job.Result
@@ -111,7 +112,7 @@ func (a *App) handleAnalysisMaterialize(w http.ResponseWriter, r *http.Request) 
 	fieldNames := job.SourceFields
 	job.mu.RUnlock()
 	if !analysis.NameValid(req.Name) {
-		writeError(w, 400, "新工作表名称无效")
+		writeMessage(w, 400, "service.analysisResultsHttp.invalidNewWorksheetName")
 		return
 	}
 	// A single cross-tab representation is shared by screen, XLSX export and
@@ -128,23 +129,23 @@ func (a *App) handleAnalysisMaterialize(w http.ResponseWriter, r *http.Request) 
 	grid := analysis.BuildPivotTable(q, result, fieldNames)
 	cols, rows := grid.Headers, grid.Rows
 	if len(cols) > analysis.MaxSheetCols {
-		writeError(w, 400, "结果列数超过编辑表限制")
+		writeMessage(w, 400, "service.analysisResultsHttp.numberResultColumnsExceedsEditing")
 		return
 	}
 	if len(rows) > analysis.MaxSheetRows {
-		writeError(w, 400, "透视结果超过编辑表行数限制")
+		writeMessage(w, 400, "service.analysisResultsHttp.numberVisibleRowsExceedsEditing")
 		return
 	}
 	id := randomID()
 	err := a.editAnalysis(wb, func(ws *analysis.Workspace) error {
 		if len(ws.Sheets) >= analysis.MaxSheets {
-			return errors.New("编辑表数量超过限制")
+			return i18n.Error("service.analysisResultsHttp.editingTableQuantitiesExceedsLimit")
 		}
 		ws.Sheets = append(ws.Sheets, analysis.Sheet{ID: id, Name: req.Name, Columns: cols, Rows: rows, Updated: time.Now().UTC().Format(time.RFC3339)})
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]string{"id": id})
@@ -171,13 +172,13 @@ func (a *App) handleAnalysisExport(w http.ResponseWriter, r *http.Request) {
 	}
 	job := a.getAnalysisJob(r.URL.Query().Get("id"))
 	if job == nil || job.Workbook != a.currentWorkbook() {
-		writeError(w, 404, "分析任务不存在")
+		writeMessage(w, 404, "service.analysisResultsHttp.analysisTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
 	if job.Status != "done" {
 		job.mu.RUnlock()
-		writeError(w, 409, "分析未完成")
+		writeMessage(w, 409, "service.analysisResultsHttp.analysisNotCompleted")
 		return
 	}
 	result := job.Result
@@ -200,7 +201,7 @@ func (a *App) handleAnalysisExport(w http.ResponseWriter, r *http.Request) {
 		// appears to the user as a seemingly valid, truncated Excel file.
 		var buf bytes.Buffer
 		if err := analysis.ExportPivotXLSX(&buf, grid); err != nil {
-			writeError(w, 500, err.Error())
+			writeFailure(w, 500, err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -209,7 +210,7 @@ func (a *App) handleAnalysisExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if format != "" && format != "csv" {
-		writeError(w, 400, "仅支持CSV或XLSX")
+		writeMessage(w, 400, "service.analysisResultsHttp.onlySupportsCsvOrXlsx")
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -249,11 +250,11 @@ func (a *App) handleAnalysisMaterializeDetail(w http.ResponseWriter, r *http.Req
 		Limit          int            `json:"limit"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "明细提取条件无效")
+		writeMessage(w, 400, "service.analysisResultsHttp.invalidExtractionConditions")
 		return
 	}
 	if !analysis.NameValid(req.Name) {
-		writeError(w, 400, "工作表名称无效")
+		writeMessage(w, 400, "service.analysisResultsHttp.invalidWorksheetName")
 		return
 	}
 	if req.Query.HeaderRow == 0 && !strings.HasPrefix(req.Query.Source, "append:") {
@@ -263,20 +264,20 @@ func (a *App) handleAnalysisMaterializeDetail(w http.ResponseWriter, r *http.Req
 		req.Limit = 10000
 	}
 	if req.Limit < 1 || req.Limit > 10000 {
-		writeError(w, 400, "最多提取10,000行，请缩小范围")
+		writeMessage(w, 400, "service.analysisResultsHttp.extractMaximumRowsNarrowRange")
 		return
 	}
 	select {
 	case a.analysisSem <- struct{}{}:
 		defer func() { <-a.analysisSem }()
 	case <-r.Context().Done():
-		writeError(w, 408, "明细提取已取消")
+		writeMessage(w, 408, "service.analysisResultsHttp.detailExtractionCanceled")
 		return
 	}
 	rebuildFilter := req.JobID == "" && req.Query.SourceScope != nil && req.Query.SourceScope.Filter != nil
 	release, err := a.acquireAnalysisQuerySlot(r.Context(), req.Query.Source, rebuildFilter)
 	if err != nil {
-		writeError(w, 408, "明细提取已取消")
+		writeMessage(w, 408, "service.analysisResultsHttp.detailExtractionCanceled")
 		return
 	}
 	defer release()
@@ -287,7 +288,7 @@ func (a *App) handleAnalysisMaterializeDetail(w http.ResponseWriter, r *http.Req
 	}
 	if err != nil {
 		a.cacheMu.RUnlock()
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	selected := req.Keys != nil && len(req.Query.Columns) > 0
@@ -302,19 +303,19 @@ func (a *App) handleAnalysisMaterializeDetail(w http.ResponseWriter, r *http.Req
 	src.close()
 	a.cacheMu.RUnlock()
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	id := randomID()
 	err = a.editAnalysis(wb, func(ws *analysis.Workspace) error {
 		if len(ws.Sheets) >= analysis.MaxSheets {
-			return errors.New("编辑表数量超过40")
+			return i18n.Error("service.analysisResultsHttp.editingTablesExceeds")
 		}
 		ws.Sheets = append(ws.Sheets, analysis.Sheet{ID: id, Name: req.Name, Columns: cols, Rows: rows, Updated: time.Now().UTC().Format(time.RFC3339)})
 		return nil
 	})
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": id, "rows": len(rows), "truncated": truncated})

@@ -16,6 +16,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'headers'> {
 
 export interface HttpError extends Error {
   status?: number;
+  code?: string;
 }
 
 export type JsonDecoder<T> = (value: unknown) => T;

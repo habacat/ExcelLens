@@ -77,6 +77,7 @@
   --faint: color-mix(in srgb, var(--muted) 86%, var(--surface));
   --danger: #ffb4b4; --danger-soft: #452d32; --danger-line: #79515a;
   --warn: #f0d49a; --warn-soft: #423823; --warn-line: #75623f;
+  --warn-badge-bg: #d9a036; --warn-badge-ink: #1f1606; --warn-badge-line: #f0c25e;
   --ok: #b3e6c8; --ok-soft: #263e32; --ok-line: #496c56;
   --mark: #e0a243;
   --hover: color-mix(in srgb, var(--ink) 9%, transparent);

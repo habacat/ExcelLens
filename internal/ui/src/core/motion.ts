@@ -8,6 +8,7 @@ export interface MotionOptions {
 }
 
 const active = new WeakMap<Element, Animation>();
+const ghosts = new WeakMap<Element, HTMLElement>();
 
 function reduced(): boolean {
   return typeof window !== 'undefined' &&
@@ -20,6 +21,12 @@ export function stopMotion(node: Element | null | undefined): void {
   const animation = active.get(node);
   active.delete(node);
   animation?.cancel();
+  const ghost = ghosts.get(node);
+  if (ghost) {
+    ghosts.delete(node);
+    ghost.remove();
+    if (node instanceof HTMLElement) node.style.removeProperty('opacity');
+  }
 }
 
 function timing(style: CSSStyleDeclaration, token: string, fallback: number): number {
@@ -88,5 +95,111 @@ export function exitMotion(
       return true;
     },
     () => false,
+  );
+}
+
+export function collapseBannerToBadgeMotion(
+  from: DOMRect,
+  target: HTMLElement | null | undefined,
+  ghostClass: string,
+): void {
+  stopMotion(target);
+  if (!target || reduced() || from.width <= 0 || from.height <= 0) return;
+  if (typeof target.animate !== 'function') return;
+  const to = target.getBoundingClientRect();
+  if (to.width <= 0 || to.height <= 0) return;
+
+  const ghost = document.createElement('span');
+  ghost.className = ghostClass;
+  ghost.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(ghost);
+  ghosts.set(target, ghost);
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const token = (name: string, fallback: string): string =>
+    rootStyle.getPropertyValue(name).trim() || fallback;
+  const warnSoft = token('--warn-soft', '#fff5d9');
+  const warnLine = token('--warn-line', '#ecd596');
+  const badgeBg = token('--warn-badge-bg', '#f6c445');
+  const badgeLine = token('--warn-badge-line', '#d49b1a');
+
+  const midW = Math.min(from.width * 0.28, Math.max(to.width * 3.5, 56));
+  const midH = Math.max(to.height + 4, Math.min(from.height * 0.68, 24));
+  const midLeft = to.left + (from.left - to.left) * 0.24;
+  const midTop = to.top + (from.top - to.top) * 0.42;
+
+  target.style.opacity = '0';
+  const flight = ghost.animate(
+    [
+      {
+        left: `${from.left}px`,
+        top: `${from.top}px`,
+        width: `${from.width}px`,
+        height: `${from.height}px`,
+        borderRadius: '3px',
+        backgroundColor: warnSoft,
+        borderColor: warnLine,
+        opacity: 0.96,
+        offset: 0,
+      },
+      {
+        left: `${midLeft}px`,
+        top: `${midTop}px`,
+        width: `${midW}px`,
+        height: `${midH}px`,
+        borderRadius: '12px',
+        backgroundColor: badgeBg,
+        borderColor: badgeLine,
+        opacity: 1,
+        offset: 0.48,
+      },
+      {
+        left: `${to.left}px`,
+        top: `${to.top}px`,
+        width: `${to.width}px`,
+        height: `${to.height}px`,
+        borderRadius: '50%',
+        backgroundColor: badgeBg,
+        borderColor: badgeLine,
+        opacity: 1,
+        offset: 1,
+      },
+    ],
+    {
+      duration: 240,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'forwards',
+    },
+  );
+  active.set(target, flight);
+  flight.finished.then(
+    () => {
+      if (active.get(target) !== flight) return;
+      stopMotion(target);
+      if (target.hidden) return;
+      const pop = target.animate(
+        [
+          { transform: 'scale(0.78)' },
+          { transform: 'scale(1.18)', offset: 0.55 },
+          { transform: 'scale(1)' },
+        ],
+        {
+          duration: 150,
+          easing: 'cubic-bezier(0.2, 0.75, 0.25, 1)',
+        },
+      );
+      active.set(target, pop);
+      pop.finished.then(
+        () => {
+          if (active.get(target) === pop) active.delete(target);
+        },
+        () => {
+          // Cancelled animations are expected and ignored.
+        },
+      );
+    },
+    () => {
+      // Cancelled animations are cleaned up via stopMotion.
+    },
   );
 }

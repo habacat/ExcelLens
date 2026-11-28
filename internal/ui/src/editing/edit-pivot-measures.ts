@@ -2,6 +2,7 @@
  * Pivot table data measures editor: field/aggregation rows, reordering,
  * custom captions, and multi-measure values-axis placement.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { PivotInfo } from '../contracts/edit.ts';
 import { requireEl, requireSelect } from '../core/dom.ts';
 import type { PivotLayout } from './edit-pivot.ts';
@@ -23,17 +24,17 @@ export interface PivotMeasuresOwner {
 }
 
 const AGGREGATE_METHODS: Readonly<Record<string, string>> = {
-  sum: '求和',
-  count: '计数',
-  average: '平均值',
-  min: '最小值',
-  max: '最大值',
-  product: '乘积',
-  countNums: '数值计数',
-  stdDev: '样本标准差',
-  stdDevp: '总体标准差',
-  var: '样本方差',
-  varp: '总体方差',
+  sum: localize('ui.common.sum'),
+  count: localize('ui.common.count'),
+  average: localize('ui.editPivotMeasures.averageValue'),
+  min: localize('ui.editPivotMeasures.minimumValue'),
+  max: localize('ui.editPivotMeasures.maximumValue'),
+  product: localize('ui.editPivotMeasures.product'),
+  countNums: localize('ui.editPivotMeasures.numericalCounts'),
+  stdDev: localize('ui.editPivotMeasures.sampleStandardDeviation'),
+  stdDevp: localize('ui.editPivotMeasures.overallStandardDeviation'),
+  var: localize('ui.editPivotMeasures.sampleVariance'),
+  varp: localize('ui.editPivotMeasures.overallVariance'),
 };
 
 export class PivotMeasures {
@@ -97,8 +98,8 @@ export class PivotMeasures {
     if (this.positionBinding === binding) return;
     this.positionBinding = binding;
     requireSelect('editCopyPivotValuesAxis').value = this.axis.axis;
-    const options = fields.map((name, i) => new Option(`${name}之前`, String(i)));
-    options.push(new Option(fields.length ? '最后' : '首位', String(fields.length)));
+    const options = fields.map((name, i) => new Option(localize('ui.editPivotMeasures.before', { name }), String(i)));
+    options.push(new Option(fields.length ? localize('ui.editPivotMeasures.last') : localize('ui.editPivotMeasures.firstPosition'), String(fields.length)));
     const posSelect = requireSelect('editCopyPivotValuesPosition');
     posSelect.replaceChildren(...options);
     posSelect.value = String(this.axis.position);
@@ -113,8 +114,8 @@ export class PivotMeasures {
       row.className = 'edit-pivot-measure';
       const field = document.createElement('select');
       const method = document.createElement('select');
-      field.setAttribute('aria-label', `值字段 ${i + 1}`);
-      method.setAttribute('aria-label', `汇总方式 ${i + 1}`);
+      field.setAttribute('aria-label', localize('ui.editPivotMeasures.valueField', { i: i + 1 }));
+      method.setAttribute('aria-label', localize('ui.editPivotMeasures.aggregationMethod', { i: i + 1 }));
       if (i === 0) {
         field.id = 'editCopyPivotData';
         method.id = 'editCopyPivotAggregate';
@@ -126,15 +127,15 @@ export class PivotMeasures {
       const customize = document.createElement('details');
       customize.className = 'edit-measure-caption';
       const summary = document.createElement('summary');
-      summary.textContent = item.caption || '自定义标题';
+      summary.textContent = item.caption || localize('ui.common.customTitle');
       const input = document.createElement('input');
       input.maxLength = 255;
-      input.placeholder = '自动标题';
+      input.placeholder = localize('ui.editPivotMeasures.automaticTitle');
       input.value = item.caption || '';
-      input.setAttribute('aria-label', `值字段标题 ${i + 1}`);
+      input.setAttribute('aria-label', localize('ui.editPivotMeasures.valueFieldTitle', { i: i + 1 }));
       input.oninput = (): void => {
         item.caption = input.value || undefined;
-        summary.textContent = item.caption || '自定义标题';
+        summary.textContent = item.caption || localize('ui.common.customTitle');
       };
       const change = (): void => {
         if (item.field !== field.value) item.sourceIndex = -1;
@@ -142,7 +143,7 @@ export class PivotMeasures {
         item.aggregate = method.value;
         delete item.caption;
         input.value = '';
-        summary.textContent = '自定义标题';
+        summary.textContent = localize('ui.common.customTitle');
         this.editor.controls();
       };
       field.onchange = change;
@@ -160,12 +161,12 @@ export class PivotMeasures {
         this.draw();
         this.editor.controls();
       };
-      const up = this.layout.action(`上移值字段 ${item.field}`, 'm6 14 6-6 6 6', () => move(-1));
+      const up = this.layout.action(localize('ui.editPivotMeasures.upwardValueField', { field: item.field }), 'm6 14 6-6 6 6', () => move(-1));
       up.disabled = i === 0;
-      const down = this.layout.action(`下移值字段 ${item.field}`, 'm6 10 6 6 6-6', () => move(1));
+      const down = this.layout.action(localize('ui.editPivotMeasures.downwardValueField', { field: item.field }), 'm6 10 6 6 6-6', () => move(1));
       down.disabled = i === this.items.length - 1;
       const remove = this.layout.action(
-        `移除值字段 ${item.field}`,
+        localize('ui.editPivotMeasures.removeValueField', { field: item.field }),
         'm7 7 10 10 M17 7 7 17',
         () => {
           this.items.splice(i, 1);
@@ -180,7 +181,7 @@ export class PivotMeasures {
       root.append(row);
     }
     requireSelect('editCopyPivotAddMeasure').replaceChildren(
-      new Option('添加值字段…', ''),
+      new Option(localize('ui.editPivotMeasures.addValueFields'), ''),
       ...availableFields.map((f) => new Option(f, f)),
     );
     this.positions();

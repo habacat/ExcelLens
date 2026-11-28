@@ -16,6 +16,7 @@ import (
 
 	"excellens/internal/checkpoint"
 	excelExport "excellens/internal/export"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -76,75 +77,75 @@ func (a *App) handleExportStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var req exportRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
-		writeError(w, 400, "导出参数无效")
+		writeMessage(w, 400, "service.export.invalidExportParameters")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "请先打开工作簿")
+		writeMessage(w, 409, "service.export.openWorkbookFirst")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint || req.Book != "" && req.Book != sourceBookID(wb) {
-		writeError(w, 409, "工作簿已切换，请重新选择导出范围")
+		writeMessage(w, 409, "service.export.workbookSwitchedSelectExportRange")
 		return
 	}
 	if req.Recoverable && (req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb)) {
-		writeError(w, 409, "导出来源已切换，请重新选择范围")
+		writeMessage(w, 409, "service.export.sourceExportSwitchedReselectRange")
 		return
 	}
 	if req.Scope != "all" && req.Scope != "sheet" && req.Scope != "selection" && req.Scope != "filtered" && req.Scope != "visible" {
-		writeError(w, 400, "请选择导出范围")
+		writeMessage(w, 400, "service.export.selectExportRange")
 		return
 	}
 	if req.Scope != "all" {
 		if _, ok := wb.FindSheet(req.Sheet); !ok {
-			writeError(w, 404, "工作表不存在")
+			writeMessage(w, 404, "service.export.worksheetDoesNotExist")
 			return
 		}
 	}
 	switch req.Format {
 	case "csv", "tsv", "jsonl", "html", "xlsx", "zipcsv":
 	default:
-		writeError(w, 400, "不支持的导出格式")
+		writeMessage(w, 400, "service.export.unsupportedExportFormats")
 		return
 	}
 	if req.Scope == "all" && req.Format != "zipcsv" && req.Format != "xlsx" {
-		writeError(w, 400, "全部工作表请选择 XLSX 或 ZIP/CSV")
+		writeMessage(w, 400, "service.export.allWorksheetsSelectXlsxOr")
 		return
 	}
 	if req.Scope == "filtered" && req.FilterID == "" {
-		writeError(w, 400, "当前没有活动的筛选结果")
+		writeMessage(w, 400, "service.export.thereNoActiveFilterResults")
 		return
 	}
 	if req.Scope == "visible" && req.ViewID == "" {
-		writeError(w, 400, "当前可见行导出缺少视图快照")
+		writeMessage(w, 400, "service.export.currentlyVisibleRowExportLacks")
 		return
 	}
 	if req.ViewID != "" && req.Scope != "visible" && req.Scope != "selection" && req.Scope != "filtered" {
-		writeError(w, 400, "可见行视图不适用于此导出范围")
+		writeMessage(w, 400, "service.export.visibleRowViewNotApplicable")
 		return
 	}
 	if req.Scope == "selection" {
 		if _, _, err := workbook.ParseCellRef(req.Start); err != nil {
-			writeError(w, 400, "选区起点无效")
+			writeMessage(w, 400, "service.export.invalidSelectionStartPoint")
 			return
 		}
 		if _, _, err := workbook.ParseCellRef(req.End); err != nil {
-			writeError(w, 400, "选区终点无效")
+			writeMessage(w, 400, "service.export.invalidSelectionEndpoint")
 			return
 		}
 	}
 	if req.Mode == "formula" && (req.Scope == "filtered" || req.Scope == "selection" || req.Scope == "visible") && req.Format == "xlsx" {
-		writeError(w, 400, "筛选/选区导出会移动坐标，不能安全保留原公式引用，请改为缓存值")
+		writeMessage(w, 400, "service.export.exportingFilteringSelectionWillMove")
 		return
 	}
 	if req.Scope == "selection" && req.FilterID == "" && req.ViewID == "" && (req.VisualStart != 0 || req.VisualEnd != 0) {
-		writeError(w, 400, "筛选选区缺少筛选结果标识")
+		writeMessage(w, 400, "service.export.filteredSelectionLacksFilterResult")
 		return
 	}
 	rows, err := a.captureExportRows(wb, req)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	defer func() { rows.close() }()
@@ -158,7 +159,7 @@ func (a *App) handleExportStart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"jobId": job.ID})
 }
 
-var errExportBusy = errors.New("已有两个导出任务正在运行，请先完成或取消其中一个")
+var errExportBusy = i18n.Error("service.export.thereTwoExportTasksProgress")
 
 // All generated and source exports share admission, cancellation, history,
 // download tickets and disk publication; new features do not get extra slots.
@@ -166,7 +167,7 @@ func (a *App) newExportJob(wb *workbook.Workbook, format string) (*ExportJob, er
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.wb != wb || a.maintenance {
-		return nil, errors.New("工作簿已切换或正在维护缓存")
+		return nil, i18n.Error("service.export.workbookSwitchedOrCurrentlyUnder")
 	}
 	job, err := a.exports.startLocked(wb, format)
 	if err == nil {
@@ -206,7 +207,7 @@ func (jobs exportController) startLocked(wb *workbook.Workbook, format string) (
 		return nil, errExportBusy
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &ExportJob{ID: randomID(), Ticket: randomID() + randomID(), Status: "queued", Stage: "等待导出槽位", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), wb: wb, Format: format}
+	job := &ExportJob{ID: randomID(), Ticket: randomID() + randomID(), Status: "queued", Stage: "stage.task.waitingForExportSlots", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), wb: wb, Format: format}
 	jobs[job.ID] = job
 	// Trim history in batches, keeping recent download tickets. A displayed
 	// terminal status can precede deferred cleanup: only done confirms exit.
@@ -238,7 +239,7 @@ func (a *App) writeExportStartError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errExportBusy) {
 		status = http.StatusTooManyRequests
 	}
-	writeError(w, status, err.Error())
+	writeFailure(w, status, err)
 }
 
 func (a *App) runExport(req exportRequest, rows *exportRowSource, job *ExportJob) {
@@ -277,7 +278,7 @@ func (a *App) runExport(req exportRequest, rows *exportRowSource, job *ExportJob
 	}
 	job.mu.Lock()
 	job.TotalRows = total
-	job.Stage = "正在写入文件"
+	job.Stage = "stage.task.writingToFile"
 	job.mu.Unlock()
 	if req.Recoverable {
 		a.runNewCheckpointExport(req, selections, job)
@@ -320,7 +321,7 @@ func sourceExportName(sourceName, scope, sheet, id, format string) string {
 func (job *ExportJob) complete(total int64) {
 	job.mu.Lock()
 	job.Status = "done"
-	job.Stage = "导出完成"
+	job.Stage = "stage.task.exportCompleted"
 	job.Progress = 100
 	job.DoneRows = total
 	job.Finished = time.Now()
@@ -332,9 +333,9 @@ func (job *ExportJob) fail(err error) {
 	defer job.mu.Unlock()
 	job.Finished = time.Now()
 	if errors.Is(err, context.Canceled) && !errors.Is(err, checkpoint.ErrUncertain) {
-		job.Status, job.Stage = "cancelled", "已取消"
+		job.Status, job.Stage = "cancelled", "stage.task.cancelled"
 	} else {
-		job.Status, job.Stage, job.Error = "failed", "导出失败", err.Error()
+		job.Status, job.Stage, job.Error = "failed", "stage.task.exportFailed", err.Error()
 	}
 }
 
@@ -403,11 +404,11 @@ func (a *App) handleExportStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.exports[r.URL.Query().Get("id")]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, 404, "导出任务不存在")
+		writeMessage(w, 404, "service.export.exportTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
-	resp := map[string]any{"id": job.ID, "status": job.Status, "stage": job.Stage, "error": job.Error, "progress": job.Progress, "doneRows": job.DoneRows, "totalRows": job.TotalRows, "size": job.Size, "fileName": job.FileName, "elapsedMs": time.Since(job.Started).Milliseconds()}
+	resp := map[string]any{"id": job.ID, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "error": job.Error, "progress": job.Progress, "doneRows": job.DoneRows, "totalRows": job.TotalRows, "size": job.Size, "fileName": job.FileName, "elapsedMs": time.Since(job.Started).Milliseconds()}
 	if job.TaskID != "" {
 		resp["taskId"], resp["recoverable"] = job.TaskID, true
 	}
@@ -432,14 +433,14 @@ func (a *App) handleExportCancel(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, 400, "请求无效")
+		writeMessage(w, 400, "service.export.requestInvalid")
 		return
 	}
 	a.mu.RLock()
 	job := a.exports[req.ID]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, 404, "导出任务不存在")
+		writeMessage(w, 404, "service.export.exportTaskDoesNotExist")
 		return
 	}
 	job.cancel()
@@ -483,7 +484,7 @@ func (a *App) handleExportFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	dir := ExportDir()
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	var cmd *exec.Cmd
@@ -495,7 +496,7 @@ func (a *App) handleExportFolder(w http.ResponseWriter, r *http.Request) {
 		cmd = exec.Command("xdg-open", dir)
 	}
 	if err := cmd.Start(); err != nil {
-		writeError(w, 500, "打开导出目录失败："+err.Error())
+		writeMessage(w, 500, "service.export.failedOpenExportDirectory", i18n.Args{"detail": err})
 		return
 	}
 	go func() { _ = cmd.Wait() }()

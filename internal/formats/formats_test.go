@@ -18,7 +18,7 @@ func TestEntryPointsAgreeOnExtensions(t *testing.T) {
 			t.Fatalf("unexpected support for %q", ext)
 		}
 	}
-	parts := strings.Split(DialogFilter(), "\x00")
+	parts := strings.Split(DialogFilter("Supported data files", "All files"), "\x00")
 	if len(parts) != 6 || parts[4] != "" || parts[5] != "" {
 		t.Fatal("Windows filter is not paired and double-NUL terminated")
 	}

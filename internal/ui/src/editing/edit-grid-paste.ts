@@ -3,6 +3,7 @@
  * detection, SHA-256 native paste lookup, filtered/hidden-row paste destination
  * resolution, and portable range paste execution.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle } from '../contracts/common.ts';
 import type {
   EditAddress,
@@ -166,7 +167,7 @@ export function identifyPasteClipboard(
   const attr = /\bdata-excellens-range=["']([a-zA-Z0-9+/=]+)["']/.exec(html);
   const encoded = attr?.[1];
   if (encoded) {
-    if (encoded.length > 2 * limit) throw new Error('复制区域超过编辑容量');
+    if (encoded.length > 2 * limit) throw new Error(localize('ui.editGridPaste.copiedAreaExceedsEditingCapacity'));
     const text = new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)));
     const parsed: unknown = JSON.parse(text);
     if (isPortableClipboard(parsed)) return { portable: parsed };
@@ -196,18 +197,18 @@ export async function resolvePasteDestination(
   const size = filter ? ranges.view.visibleSelection().rows : bottom - top + 1;
   const selected = size > 1 || right > left;
   if (selected && (size % height || (right - left + 1) % width)) {
-    throw new Error('请选择一个粘贴起点或与复制区域匹配的矩形');
+    throw new Error(localize('ui.editGridPaste.selectRectanglePasteOrMatch'));
   }
   const h = selected ? size : height;
   const w = selected ? right - left + 1 : width;
   if (h * w > ranges.owner.limits.batchCells) {
-    throw new Error('区域超出一次编辑容量，请缩小范围');
+    throw new Error(localize('ui.common.selectedAreaExceedsMaximumEditing'));
   }
   const rows = filter
     ? await ranges.view.pasteRows(h)
     : Array.from({ length: h }, (_, i) => top + i);
   if (rows.length !== h || new Set(rows).size !== h) {
-    throw new Error('筛选后的可见行不足，无法粘贴整个区域');
+    throw new Error(localize('ui.editGridPaste.numberVisibleRowsAfterFiltering'));
   }
   const shape = ranges.grid.shape;
   if (
@@ -216,7 +217,7 @@ export async function resolvePasteDestination(
     left < shape.firstCol ||
     left + w - 1 > shape.cols
   ) {
-    throw new Error('选区超出可编辑区域');
+    throw new Error(localize('ui.common.electionDistrictExtendsBeyondEditable'));
   }
   return { rows, width: w, left };
 }
@@ -232,9 +233,9 @@ async function askVisibleOnly(
   if (!rows && !cols) return false;
   const dialog = requireDialog('editPasteHiddenRows');
   const size = (h: number, w: number): string =>
-    rows && cols ? `${h} 行 × ${w} 列` : rows ? `${h} 行` : `${w} 列`;
-  requireButton('editPasteVisible').textContent = `仅粘贴可见的 ${size(rows, cols)}`;
-  requireButton('editPasteAllRows').textContent = `粘贴全部 ${size(r.rows, r.cols)}`;
+    rows && cols ? localize('ui.editGridPaste.rowsColumns', { h, w }) : rows ? localize('ui.editGridPaste.moving', { h }) : localize('ui.editGridPaste.column', { w });
+  requireButton('editPasteVisible').textContent = localize('ui.editGridPaste.onlyPasteable', { size: size(rows, cols) });
+  requireButton('editPasteAllRows').textContent = localize('ui.editGridPaste.pastingAll', { size: size(r.rows, r.cols) });
   dialog.returnValue = 'cancel';
   activity?.pause();
   try {
@@ -268,7 +269,7 @@ export async function pastePortableRange(
   const firstRow = rows[0];
   const lastRow = rows.at(-1);
   if (firstRow === undefined || lastRow === undefined) {
-    throw new Error('筛选后的可见行不足，无法粘贴整个区域');
+    throw new Error(localize('ui.editGridPaste.numberVisibleRowsAfterFiltering'));
   }
   const cell = (r: number, c: number): string => `${ranges.owner.colName(c)}${r}`;
   const range = `${cell(firstRow, left)}:${cell(ranges.view.mappedRows() ? firstRow : lastRow, left + width - 1)}`;

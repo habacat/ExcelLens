@@ -2,19 +2,20 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"log"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
-var errRelationBudgetFull = errors.New("关联结果占用已满，请关闭不用的结果后重试")
+var errRelationBudgetFull = i18n.Error("service.relationSnapshot.associatedResultsFullCloseUnused")
 
 type relationInputs = taskmanager.Lease[relationInputData]
 type relationSnapshot = taskmanager.Lease[relationSnapshotData]
@@ -43,22 +44,22 @@ func (a *App) reserveRelationBytes(bytes int64) (func(), error) {
 // objects before queue admission; indexing/source reads occur only in a worker.
 func (a *App) pinRelationInputs(primary *workbook.Workbook, refs [2]reconcileSourceRef, query reconcile.RelationQuery) (*relationInputs, error) {
 	if primary == nil || len(query.Keys) < 1 || len(query.Keys) > reconcile.MaxKeys || len(query.LeftColumns) > formats.RelationColumns || len(query.RightColumns) > formats.RelationColumns || len(query.LeftColumns)+len(query.RightColumns) == 0 {
-		return nil, errors.New("关联来源或字段参数无效")
+		return nil, i18n.Error("service.relationSnapshot.invalidAssociatedSourceOrField")
 	}
 	input := relationInputData{primary: primary, refs: refs, query: query, bytes: 8192}
 	for i, ref := range refs {
 		if len(ref.Source) > 512 || len(ref.Stamp) > 128 || ref.HeaderRow < 0 || ref.HeaderRow > formats.ExternalRows || !(strings.HasPrefix(ref.Source, "wb:") && len(ref.Source) > 3 || strings.HasPrefix(ref.Source, "scratch:") && len(ref.Source) > 8) || strings.HasPrefix(ref.Source, "scratch:") && ref.HeaderRow != 0 {
-			return nil, errors.New("关联来源或表头参数无效")
+			return nil, i18n.Error("service.relationSnapshot.invalidAssociatedSourceOrHeader")
 		}
 		input.books[i] = a.resolveReconcileBook(ref.Book)
 		if input.books[i] == nil {
-			return nil, errors.New("关联来源已关闭或移除，请重新选择")
+			return nil, i18n.Error("service.relationSnapshot.associatedSourcesHaveClosedOr")
 		}
 		input.bytes += int64(len(ref.Book)+len(ref.Source)+len(ref.Stamp)) * 3
 	}
 	for _, pair := range query.Keys {
 		if len(pair.Mode) > 16 || pair.Left < 1 || pair.Left > formats.ExcelColumns || pair.Right < 1 || pair.Right > formats.ExcelColumns {
-			return nil, errors.New("关联键参数无效")
+			return nil, i18n.Error("service.relationSnapshot.invalidAssociatedKeyParameters")
 		}
 	}
 	input.query.Keys = slices.Clone(query.Keys)
@@ -74,7 +75,7 @@ func (a *App) pinRelationInputs(primary *workbook.Workbook, refs [2]reconcileSou
 
 func relationSourceHeapBytes(source reconcile.Source) (int64, error) {
 	if source.RetainedBytes < 0 || source.RetainedBytes > formats.RelationSnapshotBytes || len(source.Info.Fields) > formats.ExcelColumns {
-		return 0, errors.New("关联来源驻留容量无效")
+		return 0, i18n.Error("service.relationSnapshot.associatedSourceResidencyCapacityInvalid")
 	}
 	// Include the original and cloned descriptor slices, allocation classes and
 	// independent header strings. File-backed sources retain no whole value table.
@@ -86,7 +87,7 @@ func relationSourceHeapBytes(source reconcile.Source) (int64, error) {
 	for _, field := range info.Fields {
 		bytes += int64(len(field.Name)+len(field.RawName)+len(field.HeaderHash))*3 + 192
 		if bytes > formats.RelationSnapshotBytes {
-			return 0, errors.New("关联来源快照超过驻留容量，请减少字段")
+			return 0, i18n.Error("service.relationSnapshot.associatedSourceSnapshotsExceedStorage")
 		}
 	}
 	return bytes, nil
@@ -127,7 +128,7 @@ func (a *App) prepareRelationSnapshot(ctx context.Context, inputs *relationInput
 	var retained int64
 	charge := func(bytes int64) error {
 		if bytes < 0 || bytes > formats.RelationSnapshotBytes-retained {
-			return errors.New("关联快照超过驻留容量，请减少结果字段")
+			return i18n.Error("service.relationSnapshot.associatedSnapshotsExceedStorageCapacity")
 		}
 		release, err := a.reserveRelationBytes(bytes)
 		if err != nil {

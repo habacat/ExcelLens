@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -15,23 +16,23 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 	root := a.rootApp()
 	if r.Method == http.MethodGet {
 		if !root.storageView.TryRLock() {
-			writeError(w, 409, "数据传输进行中，请稍后再打开快照列表")
+			writeMessage(w, 409, "service.databaseSnapshots.dataTransferProgressOpenSnapshot")
 			return
 		}
 		defer root.storageView.RUnlock()
 		items, err := workbook.ListDatabaseSnapshots(r.Context())
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		roots, err := dataRoots()
 		if err != nil {
-			writeError(w, 500, err.Error())
+			writeFailure(w, 500, err)
 			return
 		}
 		stages, err := roots.SnapshotStages(r.Context(), false)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		policy, err := loadSnapshotPolicy(roots.Config)
@@ -56,11 +57,11 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Action == "policy" {
 		if req.Policy == nil || !req.Policy.valid() {
-			writeError(w, 400, "容量与复核天数无效")
+			writeMessage(w, 400, "service.databaseSnapshots.capacityReviewDaysInvalid")
 			return
 		}
 		if !root.storageMu.TryLock() {
-			writeError(w, 409, "另一项数据管理操作正在进行")
+			writeMessage(w, 409, "service.databaseSnapshots.anotherDataManagementOperationProgress")
 			return
 		}
 		defer root.storageMu.Unlock()
@@ -71,7 +72,7 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		writeJSON(w, req.Policy)
@@ -79,7 +80,7 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 	}
 	path := workbook.DatabaseSnapshotPath(req.Key)
 	if path == "" {
-		writeError(w, 400, "数据库快照标识无效")
+		writeMessage(w, 400, "service.databaseSnapshots.databaseSnapshotIdentifierInvalid")
 		return
 	}
 	ctx := r.Context()
@@ -90,14 +91,14 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 		}
 		wb, err := a.openDatabaseSnapshot(ctx, path, req.Key)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		a.writeWorkbookStatus(w, wb)
 	case "verify", "export":
 		evidence, err := workbook.VerifiedDatabaseEvidence(ctx, req.Key)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		if req.Action == "export" {
@@ -109,23 +110,23 @@ func (a *App) handleDatabaseSnapshots(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"key": req.Key, "verified": true, "verifiedAt": time.Now().UTC(), "evidence": evidence})
 	case "retain":
 		if !root.storageMu.TryLock() {
-			writeError(w, 409, "另一项数据管理操作正在进行")
+			writeMessage(w, 409, "service.databaseSnapshots.anotherDataManagementOperationProgress")
 			return
 		}
 		defer root.storageMu.Unlock()
 		old, err := workbook.OpenDatabaseSnapshot(ctx, workbook.LegacyDatabaseSnapshotPath(req.Key))
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		wb, err := old.RetainLegacyDatabaseSnapshot(ctx)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		writeJSON(w, map[string]string{"key": wb.Fingerprint, "name": wb.DisplayName})
 	default:
-		writeError(w, 400, "请选择数据库快照操作")
+		writeMessage(w, 400, "service.databaseSnapshots.selectDatabaseSnapshotOperation")
 	}
 }
 
@@ -144,7 +145,7 @@ func loadSnapshotPolicy(config string) (snapshotPolicy, error) {
 	var p snapshotPolicy
 	_, err := readSavedConfig(snapshotPolicyPath(config), 4096, &p)
 	if err == nil && !p.valid() {
-		err = errors.New("快照容量或复核提醒设置无效")
+		err = i18n.Error("service.databaseSnapshots.snapshotCapacityOrReviewReminder")
 	}
 	return p, err
 }
@@ -161,7 +162,7 @@ func (a *App) openDatabaseSnapshot(ctx context.Context, path, key string) (*work
 		return nil, err
 	}
 	if wb.Fingerprint != key {
-		return nil, errors.New("数据库快照身份与选择不一致")
+		return nil, i18n.Error("service.databaseSnapshots.identityDatabaseSnapshotDoesNot")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -169,7 +170,7 @@ func (a *App) openDatabaseSnapshot(ctx context.Context, path, key string) (*work
 	a.archiveMu.Lock()
 	if a.archiveView != archive || !a.installWorkbook(wb, expected, true) {
 		a.archiveMu.Unlock()
-		return nil, errors.New("工作簿已切换")
+		return nil, i18n.Error("service.databaseSnapshots.workbookSwitched")
 	}
 	view, job := a.detachArchiveLocked()
 	a.archiveMu.Unlock()

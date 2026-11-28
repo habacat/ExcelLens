@@ -1,8 +1,7 @@
 package server
 
 import (
-	"errors"
-
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -35,13 +34,13 @@ func (a *App) captureExportRows(wb *workbook.Workbook, req exportRequest) (*expo
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		return nil, errors.New("导出工作表不存在")
+		return nil, i18n.Error("service.exportRows.exportWorksheetDoesNotExist")
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		return nil, errors.New("请先打开并索引工作表")
+		return nil, i18n.Error("service.exportRows.openIndexWorksheetFirst")
 	}
 	snapshot, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, req.ViewID)
 	if err != nil {
@@ -51,7 +50,7 @@ func (a *App) captureExportRows(wb *workbook.Workbook, req exportRequest) (*expo
 	if req.Scope == "filtered" {
 		if snapshot.filter == nil {
 			out.close()
-			return nil, errors.New("完整筛选导出缺少匹配结果")
+			return nil, i18n.Error("service.exportRows.completeFilterExportLacksMatching")
 		}
 		return out, nil
 	}

@@ -9,6 +9,7 @@
 ```text
 cmd/excellens              启动、单实例、托盘与本机服务装配
 internal/formats           格式支持名单、源类型语义、容量和显示能力
+internal/i18n              界面语言匹配、离线消息目录及可本地化的诊断
 internal/valueconv         显式日期/时间解析；只处理调用方给出的短文本
 internal/sourceview        声明式来源范围、筛选/排序和显隐设置；不读工作簿
 internal/conditional       条件表达式求值引擎、成本规划与滑动窗口、完整性校验统计磁盘索引及跨工作簿容量预算
@@ -54,7 +55,7 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 | 包 | 可以依赖 |
 | --- | --- |
-| fileidentity / filelock / browserlease / formats / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
+| fileidentity / filelock / browserlease / formats / i18n / buildinfo / valueconv / searchdsl / branding / instance / recovery | 不依赖其他项目包 |
 | sourceview | formats |
 | checkpoint | formats、filelock |
 | editdoc | checkpoint、formats |
@@ -68,9 +69,9 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | styles | formats、excelformula |
 | taskmanager | Go 标准库（无内部依赖） |
 | workbook | conditional、excelformula、rowindex、styles、fileidentity、formats、localstore（快照暂存租约）、searchdsl、sourceview、searchresults |
-| onlinedb | formats |
+| onlinedb | formats、i18n |
 | savedconfig | Go 标准库 |
-| transferjobs | localstore、savedconfig |
+| transferjobs | localstore、savedconfig、i18n |
 | searchresults | formats、separated |
 | searchservice | workbook、checkpoint、formats、searchresults |
 | archives | formats、workbook |
@@ -81,11 +82,11 @@ tools/qa                   专项回归、可选性能和私有样本检查
 | printing | workbook、formats（源打印快照及统一分页容量） |
 | clustering | workbook、formats（公共投影排序及统一候选容量） |
 | composition | workbook、sourceview、formats（只读联合来源及逐格追溯，不拥有源生命周期或持久化） |
-| ui | formats、buildinfo |
-| shellmenu | formats |
-| tray | branding、formats、workbook、buildinfo |
-| localstore | filelock、formats |
-| server | localstore、browserlease、transferjobs、savedconfig、searchservice、searchresults、taskmanager、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile 和 UI；不反向依赖 tray/shellmenu |
+| ui | formats、buildinfo、i18n |
+| shellmenu | formats、i18n |
+| tray | branding、formats、workbook、buildinfo、i18n |
+| localstore | filelock、formats、i18n |
+| server | localstore、browserlease、transferjobs、savedconfig、searchservice、searchresults、taskmanager、格式、数据、声明式来源、归档、分析、公式、导出、转换、checkpoint、editdoc、editfile、i18n 和 UI；不反向依赖 tray/shellmenu |
 
 ### 备份、来源与任务
 
@@ -99,9 +100,13 @@ tools/qa                   专项回归、可选性能和私有样本检查
 
 ### 服务入口和前端组件
 
+Go 服务渲染页面语言，Windows 托盘共用本地语言偏好。应用文案和具名参数由[消息目录](localization.md)维护。源值、公式、名称和地址由各自的数据模型提供。
+
 浏览器每 30 秒续租。关闭通知带当前文档代次所绑定的标识，服务端保留 45 秒供刷新接管；未收到关闭通知的会话在连续 10 分钟无活动后到期。服务每 10 秒回收一次，在途请求持有会话至结束。网格背景的窗格裁切和遮罩绘制由 `grid-backdrop.js` 接收可见尺寸，滚动仅更新显示。
 
 网格正文和冻结窗格通过 `multiselection.js` 判定单元格是否在选区内。`range-frame.js` 按当前缩放、滚动位置、冻结边界和可用视口绘制外框。一个连续区域最多生成四段轮廓，冻结分界线和屏外裁切处只绘制实际可见的选区边。选择端点、框选底色和显示角标都留在视图层，工作簿的单元格格式仍由格式适配器提供。
+
+`grid-borders.ts` 先裁决相邻单元格的共享边，再按顶点四向边线决定交点如何衔接。网格、行头、冻结窗格、快速滚动绘制和分页预览复用交点规则。冻结视口读取相邻边界的样式，分隔线单独绘制，窗格裁剪沿用原有单元格尺寸。
 
 原生文件打开入口先分配独立会话，该会话的首次 API 调用再读取文件。网页等待任务由当前文档的 `activity.js` 持有。一次任务可以连续跨过传输、解析、索引和显示阶段，轮询、取消和迟到响应均使用原任务句柄。已有进度区可接入同一指示器，空闲文档不订阅其他页的任务。`motion.css` 负责控件与弹层的时序，网格坐标和大小直接更新。
 

@@ -1,6 +1,7 @@
 /**
  * Chart image (PNG / SVG) + exact-data ZIP package export modal controller.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ActivityService, ToastFn } from '../contracts/common.ts';
 import type { ChartExportLimits } from '../contracts/formats.ts';
 import { beginActivity } from '../core/activity.ts';
@@ -56,7 +57,7 @@ interface AcceptedChartExport {
 }
 
 function makeAbortError(): Error {
-  const err = new Error('图表导出已取消');
+  const err = new Error(localize('ui.chartExport.chartExportCanceled'));
   err.name = 'AbortError';
   return err;
 }
@@ -115,7 +116,7 @@ export class ChartExportController {
     this.activity = activity;
     this.overrides = overrides;
     if (!limits.types.length || !limits.scales.length || !limits.dataBytes || !limits.packageBytes) {
-      throw new Error('图表导出容量不可用');
+      throw new Error(localize('ui.chartExport.chartExportCapacityUnavailable'));
     }
 
     const dialog = document.createElement('dialog');
@@ -123,10 +124,10 @@ export class ChartExportController {
     dialog.className = 'chart-export-dialog';
     dialog.setAttribute('aria-labelledby', 'chartExportTitle');
     // Static template only. Captured source labels below use textContent.
-    dialog.innerHTML = `<div class="chart-export-head"><h3 id="chartExportTitle">导出图片</h3><button id="chartExportClose" type="button" class="mini-button" aria-label="关闭图表导出">关闭</button></div>
-      <form id="chartExportForm"><fieldset id="chartExportOptions"><label>格式<select id="chartExportType" class="field-control"></select></label><label>宽度（像素）<input id="chartExportWidth" class="field-control" type="number" step="1"></label><label>高度（像素）<input id="chartExportHeight" class="field-control" type="number" step="1"></label><label>PNG 倍率<select id="chartExportScale" class="field-control"></select></label><label>背景<select id="chartExportBackground" class="field-control"><option value="captured">当前配色</option><option value="white">白底</option></select></label></fieldset>
-      <div class="chart-export-actions"><button id="chartExportBuild" class="mini-button" type="submit">生成图片</button><button id="chartExportCancel" class="mini-button" type="button" hidden>取消</button></div></form>
-      <p id="chartExportStatus" class="chart-export-status" role="status" aria-live="polite"></p><div id="chartExportResult" class="chart-export-result" hidden><p id="chartExportPackageInfo"></p><div class="chart-export-actions"><a id="chartExportImageDownload" class="mini-button">下载图片</a><a id="chartExportDownload" class="mini-button" download="ExcelLens-Chart.zip">下载ZIP</a></div><div class="chart-export-preview"><img id="chartExportPreview" alt="待导出图表预览"></div></div>`;
+    dialog.innerHTML = `<div class="chart-export-head"><h3 id="chartExportTitle">${localizeHTML('ui.chartExport.exportImage')}</h3><button id="chartExportClose" type="button" class="mini-button" aria-label="${localizeHTML('ui.chartExport.disableChartExport')}">${localizeHTML('ui.chartExport.close')}</button></div>
+      <form id="chartExportForm"><fieldset id="chartExportOptions"><label>${localizeHTML('ui.chartExport.format')}<select id="chartExportType" class="field-control"></select></label><label>${localizeHTML('ui.chartExport.widthPixels')}<input id="chartExportWidth" class="field-control" type="number" step="1"></label><label>${localizeHTML('ui.chartExport.heightPixels')}<input id="chartExportHeight" class="field-control" type="number" step="1"></label><label>${localizeHTML('ui.chartExport.pngMagnification')}<select id="chartExportScale" class="field-control"></select></label><label>${localizeHTML('ui.chartExport.background')}<select id="chartExportBackground" class="field-control"><option value="captured">${localizeHTML('ui.chartExport.currentColorScheme')}</option><option value="white">${localizeHTML('ui.chartExport.whiteBackground')}</option></select></label></fieldset>
+      <div class="chart-export-actions"><button id="chartExportBuild" class="mini-button" type="submit">${localizeHTML('ui.chartExport.generateImage')}</button><button id="chartExportCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.chartExport.cancel')}</button></div></form>
+      <p id="chartExportStatus" class="chart-export-status" role="status" aria-live="polite"></p><div id="chartExportResult" class="chart-export-result" hidden><p id="chartExportPackageInfo"></p><div class="chart-export-actions"><a id="chartExportImageDownload" class="mini-button">${localizeHTML('ui.chartExport.downloadImage')}</a><a id="chartExportDownload" class="mini-button" download="ExcelLens-Chart.zip">${localizeHTML('ui.chartExport.downloadZip')}</a></div><div class="chart-export-preview"><img id="chartExportPreview" alt="${localizeHTML('ui.chartExport.previewImage')}"></div></div>`;
     document.body.append(dialog);
     this.dialog = dialog;
 
@@ -156,7 +157,7 @@ export class ChartExportController {
     requireButton('chartExportCancel').addEventListener('click', () => this.cancel());
     requireFieldSet('chartExportOptions').addEventListener('change', () => {
       this.controls();
-      if (this.accepted) this.status('设置已更改，下载仍为上次结果。');
+      if (this.accepted) this.status(localize('ui.chartExport.settingsHaveChangedDownloadStill'));
     });
     for (const id of ['chartExportImageDownload', 'chartExportDownload'] as const) {
       requireAnchor(id).addEventListener('click', (event: MouseEvent) => {
@@ -197,10 +198,10 @@ export class ChartExportController {
   open(input: ChartExportOpenInput): boolean {
     if (this.dialog.open) return false;
     try {
-      if (!input.current()) throw new Error('图表结果已变化，请重新打开导出');
+      if (!input.current()) throw new Error(localize('ui.chartExport.chartResultsHaveChangedReopen'));
       const drawing = (this.overrides?.snapshot ?? chartSnapshot)(input.canvas);
       if (drawing?.result !== input.expectedResult || drawing.mode !== input.mode) {
-        throw new Error('图表尚未完成更新，请稍后重试');
+        throw new Error(localize('ui.chartExport.chartNotUpdatedYetTry'));
       }
       const captureInput =
         input.kind === 'analysis'
@@ -270,14 +271,14 @@ export class ChartExportController {
 
   cancel(): void {
     this.stop();
-    this.status(this.accepted ? '已取消，保留上次结果。' : '已取消');
+    this.status(this.accepted ? localize('ui.chartExport.cancelledRetainingPreviousResults') : localize('ui.common.canceled'));
     this.controls();
   }
 
   specification(): ChartExportSpec {
     const readDigits = (id: string): number => {
       const value = requireInput(id).value.trim();
-      if (!/^\d+$/.test(value)) throw new Error('请输入整数图片尺寸');
+      if (!/^\d+$/.test(value)) throw new Error(localize('ui.chartExport.enterIntegerImageSize'));
       return Number(value);
     };
     const type = parseExportType(requireSelect('chartExportType').value);
@@ -308,10 +309,10 @@ export class ChartExportController {
     this.abort = ctrl;
     this.busy = true;
     this.controls();
-    this.status('正在生成…');
+    this.status(localize('ui.chartExport.generating'));
     const activity = this.activity
-      ? this.activity.begin('正在生成图表文件', { signal: ctrl.signal })
-      : beginActivity('正在生成图表文件', { signal: ctrl.signal });
+      ? this.activity.begin(localize('ui.chartExport.chartFileBeingGenerated'), { signal: ctrl.signal })
+      : beginActivity(localize('ui.chartExport.chartFileBeingGenerated'), { signal: ctrl.signal });
     const current = (): boolean =>
       serial === this.serial &&
       !ctrl.signal.aborted &&
@@ -353,7 +354,8 @@ export class ChartExportController {
         throw chartExportCapacityError();
       }
       const descFn = this.overrides?.descriptions ?? chartExportDescriptions;
-      const text = `ExcelLens 图表导出包\n\n${payload.chart.title}\n来源：${payload.chart.source}\n指标：${payload.chart.metric}\n单位：${payload.chart.unit}\n\n${descFn(payload).join('\n')}\n\nchart.${spec.type}：可嵌入报告的图片。\nexact-data.json：版本1；保留源身份/查询/字段、完整已接受结果、原始和派生精确字符串、缺值/错误状态、图形选择索引及显示/输出设置。不要把近似绘图值替代此文件中的exact。\nJSON数值字符串与前导零编号保持原样，分数不转换为浮点。\nREADME.txt：范围及说明。\n\n本包不重新查询源表；前 N 项、首层或选区限制仍存在。SVG 使用系统字体，不携带外部资源；图片长标签可能截短或以替代符呈现控制字符，JSON 保留完整原文。\n`;
+      const text = `${localize('ui.chartExport.excellensChartExportPackageSource', { title: payload.chart.title, source: payload.chart.source, metric: payload.chart.metric, unit: payload.chart.unit, descFn: descFn(payload).join('\n'), type: spec.type })}
+`;
       const encoder = new TextEncoder();
       const bytes = new Uint8Array(await image.arrayBuffer());
       await checkpoint();
@@ -383,14 +385,14 @@ export class ChartExportController {
       requireAnchor('chartExportDownload').href = this.accepted.packageURL;
       const previewImg = requireImage('chartExportPreview');
       previewImg.src = this.accepted.imageURL;
-      previewImg.alt = `${payload.chart.title}（导出预览）`;
+      previewImg.alt = localize('ui.chartExport.exportPreview', { title: payload.chart.title });
       requireEl('chartExportResult').hidden = false;
       this.revoke(previous);
       this.status('');
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
         this.status(
-          `${errorMessage(error)}${this.accepted ? '（保留上次结果）' : ''}`,
+          `${errorMessage(error)}${this.accepted ? localize('ui.common.keepPreviousResult') : ''}`,
           true,
         );
       }

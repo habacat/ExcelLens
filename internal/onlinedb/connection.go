@@ -17,6 +17,7 @@ import (
 	"unicode"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/go-sql-driver/mysql"
@@ -146,7 +147,7 @@ func configure(cfg *Config) (Engine, Protocol, error) {
 		}
 	}
 	if engine.ID == "" {
-		return Engine{}, Protocol{}, errors.New("请选择数据库类型")
+		return Engine{}, Protocol{}, i18n.Error("diagnostic.onlinedb.connection.chooseDatabaseType")
 	}
 	var proto Protocol
 	for _, candidate := range engine.Protocols {
@@ -156,7 +157,7 @@ func configure(cfg *Config) (Engine, Protocol, error) {
 		}
 	}
 	if proto.ID == "" {
-		return engine, proto, errors.New("当前数据库不提供该协议")
+		return engine, proto, i18n.Error("diagnostic.onlinedb.connection.thisProtocolNotAvailableCurrent")
 	}
 	cfg.Host = strings.TrimSpace(cfg.Host)
 	if strings.HasPrefix(cfg.Host, "[") && strings.HasSuffix(cfg.Host, "]") {
@@ -170,16 +171,16 @@ func configure(cfg *Config) (Engine, Protocol, error) {
 	cfg.Database, cfg.Schema = strings.TrimSpace(cfg.Database), strings.TrimSpace(cfg.Schema)
 	if cfg.User == "" || len(cfg.User) > 512 || len(cfg.Database) > 384 || len(cfg.Schema) > 512 || len(cfg.Password) > 4096 ||
 		strings.ContainsFunc(cfg.User+cfg.Database+cfg.Schema, unicode.IsControl) {
-		return engine, proto, errors.New("请填写有效的用户名、数据库和架构")
+		return engine, proto, i18n.Error("diagnostic.onlinedb.connection.fillValidUsernameDatabaseSchema")
 	}
 	if engine.ID == "oracle" && (cfg.Database == "" || strings.ContainsAny(cfg.Database, "/=?&(),\\")) {
-		return engine, proto, errors.New("请输入 Oracle 服务名或 SID")
+		return engine, proto, i18n.Error("diagnostic.onlinedb.connection.enterOracleServiceNameOr")
 	}
 	if cfg.TLS == "" {
 		cfg.TLS = "verify"
 	}
 	if cfg.TLS != "verify" && cfg.TLS != "plain" {
-		return engine, proto, errors.New("请选择 TLS 或普通 TCP")
+		return engine, proto, i18n.Error("diagnostic.onlinedb.connection.selectTlsOrRegularTcp")
 	}
 	if cfg.Port == 0 {
 		cfg.Port = proto.PlainPort
@@ -188,7 +189,7 @@ func configure(cfg *Config) (Engine, Protocol, error) {
 		}
 	}
 	if cfg.Port < 1 || cfg.Port > 65535 {
-		return engine, proto, errors.New("端口须在 1 至 65535 之间")
+		return engine, proto, i18n.Error("diagnostic.onlinedb.connection.portMustBeBetween")
 	}
 	return engine, proto, nil
 }
@@ -201,19 +202,19 @@ func databaseHost(host string) (string, error) {
 		if ascii, err := idna.Lookup.ToASCII(host); err == nil && len(ascii) <= 253 {
 			for _, label := range strings.Split(strings.TrimSuffix(ascii, "."), ".") {
 				if label == "" || len(label) > 63 || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-					return "", errors.New("请输入有效的域名或 IP 地址")
+					return "", i18n.Error("diagnostic.onlinedb.connection.enterValidDomainNameOr")
 				}
 			}
 			return ascii, nil
 		}
 	}
-	return "", errors.New("请输入有效的域名或 IP 地址，端口请单独填写")
+	return "", i18n.Error("diagnostic.onlinedb.connection.enterValidDomainNameOr2ff4eb8")
 }
 
 func databaseTLS(cfg Config) (*tls.Config, error) {
 	if cfg.TLS == "plain" {
 		if cfg.CA != "" {
-			return nil, errors.New("自定义 CA 证书需要使用 TLS")
+			return nil, i18n.Error("diagnostic.onlinedb.connection.customCaCertificatesRequireTls")
 		}
 		return nil, nil
 	}
@@ -224,14 +225,14 @@ func databaseTLS(cfg Config) (*tls.Config, error) {
 	secure := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
 	if cfg.CA != "" {
 		if len(cfg.CA) > formats.DatabaseCertificateBytes {
-			return nil, errors.New("CA 证书超过 64 KB")
+			return nil, i18n.Error("diagnostic.onlinedb.connection.caCertificateExceedsKb")
 		}
 		pool, err := x509.SystemCertPool()
 		if err != nil || pool == nil {
 			pool = x509.NewCertPool()
 		}
 		if !pool.AppendCertsFromPEM([]byte(cfg.CA)) {
-			return nil, errors.New("无法读取 CA 证书，请选择 PEM 格式")
+			return nil, i18n.Error("diagnostic.onlinedb.connection.unableReadCaCertificateSelect")
 		}
 		secure.RootCAs = pool
 	}
@@ -313,7 +314,7 @@ func openDriver(cfg Config, proto Protocol, secure *tls.Config) (*sql.DB, error)
 			Auth:        clickhouse.Auth{Database: cfg.Database, Username: cfg.User, Password: cfg.Password},
 			DialTimeout: connectTimeout, ReadTimeout: 45 * time.Second, BlockBufferSize: 1, HttpHeaders: headers}), nil
 	}
-	return nil, errors.New("数据库类型无效")
+	return nil, i18n.Error("diagnostic.onlinedb.connection.invalidDatabaseType")
 }
 
 // Driver messages can include a DSN, user name, or query data. Report only
@@ -330,15 +331,15 @@ func databaseError(err error, fallback string) error {
 	case errors.Is(err, context.Canceled):
 		return context.Canceled
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &network) && network.Timeout():
-		return errors.New("数据库访问超时，请核对网络和服务器状态")
+		return i18n.Error("diagnostic.onlinedb.connection.databaseAccessTimedOutCheck")
 	case errors.As(err, &unknown), errors.As(err, &hostname), errors.As(err, &invalid):
-		return errors.New("TLS 证书验证失败，请核对服务器名称或提供受信任的 CA")
+		return i18n.Error("diagnostic.onlinedb.connection.tlsCertificateVerificationFailedVerify")
 	case errors.Is(err, syscall.ECONNREFUSED):
-		return errors.New("服务器拒绝连接，请核对地址、端口和服务状态")
+		return i18n.Error("diagnostic.onlinedb.connection.serverRefusesConnectionVerifyAddress")
 	case errors.As(err, &my) && (my.Number == 1044 || my.Number == 1045),
 		errors.As(err, &pg) && strings.HasPrefix(pg.Code, "28"),
 		errors.As(err, &ms) && ms.Number == 18456:
-		return errors.New("账户验证失败，请核对用户名、密码和数据库访问权限")
+		return i18n.Error("diagnostic.onlinedb.connection.accountVerificationFailedVerifyUsername")
 	}
 	return errors.New(fallback)
 }

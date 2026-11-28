@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"io"
 	"net/http"
 	"strings"
@@ -12,6 +12,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -54,17 +55,17 @@ func (a *App) handleAnalysisTreeStart(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.AnalysisTreeRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, 400, "层级展开参数无效")
+		writeMessage(w, 400, "service.analysisTree.hierarchicalExpansionParametersInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "层级透视来源已切换，请重新运行分析")
+		writeMessage(w, 409, "service.analysisTree.sourceHierarchyPerspectiveSwitchedRun")
 		return
 	}
 	job, err := a.startAnalysisTree(wb, req.JobID, req.Path)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]string{"jobId": job.ID})
@@ -78,24 +79,24 @@ func (a *App) startAnalysisTree(wb *workbook.Workbook, rootID string, path []str
 	defer a.analysisMu.Unlock()
 	root := a.analysisJobs[rootID]
 	if root == nil || a.currentWorkbook() != wb {
-		return nil, errors.New("透视根结果已过期，请重新运行分析")
+		return nil, i18n.Error("service.analysisTree.perspectiveRootResultExpiredRun")
 	}
 	root.mu.RLock()
 	defer root.mu.RUnlock()
 	if root.Workbook != wb || root.Status != "done" || root.Result.Tree == nil || root.Query.Layout != "tree" {
-		return nil, errors.New("请先完成层级透视分析，再展开分组")
+		return nil, i18n.Error("service.analysisTree.completeHierarchicalPerspectiveAnalysisFirst")
 	}
 	if err := analysis.ValidateTreePath(root.Query, path); err != nil {
 		return nil, err
 	}
 	if len(path) == 0 {
-		return nil, errors.New("根层已在原结果中，请选择要展开的分组")
+		return nil, i18n.Error("service.analysisTree.rootLevelAlreadyOriginalResult")
 	}
 	pathBytes := 0
 	for _, key := range path {
 		pathBytes += len(key)
 		if pathBytes > formats.AnalysisTreePathBytes {
-			return nil, errors.New("展开路径文本超出容量，请使用较短的分类字段")
+			return nil, i18n.Error("service.analysisTree.expandedPathTextExceedsCapacity")
 		}
 	}
 	active := 0
@@ -107,11 +108,11 @@ func (a *App) startAnalysisTree(wb *workbook.Workbook, rootID string, path []str
 		}
 	}
 	if active >= formats.AnalysisTreeActiveTasks {
-		return nil, errors.New("已有层级正在展开，请完成或取消后重试")
+		return nil, i18n.Error("service.analysisTree.thereAlreadyLevelsBeingExpanded")
 	}
 	for len(a.analysisTreeJobs) >= formats.AnalysisTreeTasks {
 		if !a.evictAnalysisTreeLocked("") {
-			return nil, errors.New("层级任务已满，请稍后重试")
+			return nil, i18n.Error("service.analysisTree.levelTaskFullTryAgain")
 		}
 	}
 	var rows *analysisSourceSnapshot
@@ -123,7 +124,7 @@ func (a *App) startAnalysisTree(wb *workbook.Workbook, rootID string, path []str
 			return nil, err
 		}
 	} else if root.Query.SourceScope != nil || root.Query.Composition != nil {
-		return nil, errors.New("根结果的来源范围已释放，请重新运行分析")
+		return nil, i18n.Error("service.analysisTree.sourceRangeRootResultReleased")
 	}
 	if strings.HasPrefix(root.Query.Source, "wb:") {
 		meta, found := wb.FindSheet(strings.TrimPrefix(root.Query.Source, "wb:"))
@@ -132,7 +133,7 @@ func (a *App) startAnalysisTree(wb *workbook.Workbook, rootID string, path []str
 		}
 		if idx == nil {
 			rows.close()
-			return nil, errors.New("根结果的来源索引已失效，请重新运行分析")
+			return nil, i18n.Error("service.analysisTree.sourceIndexRootResultBecome")
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -201,7 +202,7 @@ func (a *App) runAnalysisTree(job *analysisTreeTask) {
 	if strings.HasPrefix(job.Query.Source, "wb:") {
 		meta, found := job.Workbook.FindSheet(strings.TrimPrefix(job.Query.Source, "wb:"))
 		if !found || job.Workbook.GetCachedIndex(meta.Path) != job.Index {
-			a.finishAnalysisTree(job, analysis.Result{}, errors.New("来源索引已变化，未发布层级结果"))
+			a.finishAnalysisTree(job, analysis.Result{}, i18n.Error("service.analysisTree.sourceIndexChangedNoPublished"))
 			return
 		}
 		if err := job.Workbook.CheckSourceUnchanged(); err != nil {
@@ -224,7 +225,7 @@ func (a *App) runAnalysisTree(job *analysisTreeTask) {
 	}
 	defer source.close()
 	if source.stamp() != job.SourceStamp {
-		a.finishAnalysisTree(job, analysis.Result{}, errors.New("来源数据已变化，请重新运行层级透视"))
+		a.finishAnalysisTree(job, analysis.Result{}, i18n.Error("service.analysisTree.sourceDataChangedRunHierarchical"))
 		return
 	}
 	scan := source.scan
@@ -240,7 +241,7 @@ func (a *App) finishAnalysisTree(job *analysisTreeTask, result analysis.Result, 
 	if err == nil {
 		encoded, err = json.Marshal(result)
 		if err == nil && cap(encoded) > formats.AnalysisTreeResultBytes {
-			err = errors.New("此层级结果超过16 MiB保留预算，请缩小范围")
+			err = i18n.Error("service.analysisTree.resultsAtThisLevelExceed")
 		}
 	}
 	a.analysisMu.Lock()
@@ -289,19 +290,19 @@ func (a *App) handleAnalysisTreeStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	a.analysisMu.Unlock()
 	if job == nil {
-		writeError(w, 404, "层级展开任务已过期或已清除")
+		writeMessage(w, 404, "service.analysisTree.hierarchicalExpansionTaskExpiredOr")
 		return
 	}
-	stage := "正在按路径聚合当前层"
+	stage := "stage.task.aggregatingCurrentLayersPath"
 	switch job.Status {
 	case "queued":
-		stage = "等待展开当前层"
+		stage = "stage.task.waitForTheCurrentLayerTo"
 	case "done":
-		stage = "当前层已完成"
+		stage = "stage.task.currentLayerCompleted"
 	case "error", "cancelled":
-		stage = "当前层已停止"
+		stage = "stage.task.currentLayerStopped"
 	}
-	payload := map[string]any{"status": job.Status, "error": job.Error, "stage": stage, "progress": job.Progress, "total": job.Total, "rootJobId": job.RootID, "path": job.Path, "result": job.Result}
+	payload := map[string]any{"status": job.Status, "error": job.Error, "stage": responseLocale(w).Stage(stage), "progress": job.Progress, "total": job.Total, "rootJobId": job.RootID, "path": job.Path, "result": job.Result}
 	job.mu.RUnlock()
 	writeJSON(w, payload)
 }
@@ -324,7 +325,7 @@ func (a *App) changeAnalysisTree(w http.ResponseWriter, r *http.Request, discard
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.ID == "" {
-		writeError(w, 400, "层级任务标识无效")
+		writeMessage(w, 400, "service.analysisTree.hierarchicalTaskIdentifierInvalid")
 		return
 	}
 	a.analysisMu.Lock()

@@ -14,6 +14,7 @@ if (![tsc, eslint].every(bin => existsSync(new URL('../../' + bin, import.meta.u
 }
 
 for (const args of [
+  ['tools/frontend/generate-messages.mjs', '--check'],
   ['tools/frontend/generate-http.mjs', '--check'],
   [tsc, '-p', 'tsconfig.json', '--noEmit'],
   [tsc, '-p', 'tsconfig.app.json', '--noEmit'],

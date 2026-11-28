@@ -27,7 +27,7 @@ func (a *App) runNewCheckpointExport(req exportRequest, selections []excelExport
 	run := &taskCheckpointRun{store: store, lease: lease, release: a.pinWorkbooks(job.wb)}
 	defer run.close()
 	job.mu.Lock()
-	job.TaskID, job.checkpoint, job.Stage = lease.Snapshot().ID, run, "保存导出范围"
+	job.TaskID, job.checkpoint, job.Stage = lease.Snapshot().ID, run, "stage.task.saveExportRange"
 	job.mu.Unlock()
 	if err := captureExportCheckpoint(job.ctx, job.wb, lease, selections); err != nil {
 		job.fail(err)
@@ -73,7 +73,7 @@ func (a *App) queueCheckpointExport(w http.ResponseWriter, r *http.Request, wb *
 			return
 		}
 		job.mu.Lock()
-		job.Status, job.Stage = "running", "恢复导出"
+		job.Status, job.Stage = "running", "stage.task.restoreExport"
 		job.mu.Unlock()
 		a.cacheMu.RLock()
 		defer a.cacheMu.RUnlock()
@@ -106,12 +106,12 @@ func (a *App) finishCheckpointExport(job *ExportJob, lease *checkpoint.Lease) {
 	for _, s := range input.selections {
 		total += s.RowCount()
 	}
-	progress(excelExport.ResumeDoneRows(journal.State(), input.selections), total, "恢复已确认进度")
+	progress(excelExport.ResumeDoneRows(journal.State(), input.selections), total, "stage.task.confirmedProgressOfRestoration")
 	if err := excelExport.Resume(job.ctx, job.wb, input.selections, journal.spec.Options, journal, progress); err != nil {
 		job.fail(err)
 		return
 	}
-	progress(total, total, "组装导出文件")
+	progress(total, total, "stage.task.assemblyExportFile")
 	name := sourceExportName(journal.SourceName(), journal.spec.Scope, journal.spec.Sheets[0].Name, job.ID, journal.spec.Options.Format)
 	err = publishExportFile(job, name, func(tmp *os.File) error {
 		if err := excelExport.AssembleResume(job.ctx, tmp, job.wb, input.selections, journal.spec.Options, journal); err != nil {

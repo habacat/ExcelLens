@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -52,11 +53,11 @@ func readLayouts(path string) (workbookLayouts, error) {
 		return out, err
 	}
 	if len(b) > 2<<20 {
-		return out, errors.New("本机布局文件超过大小上限")
+		return out, i18n.Error("service.layout.localLayoutFileExceedsMaximum")
 	}
 	var found workbookLayouts
 	if json.Unmarshal(b, &found) != nil || found.Version != 1 || found.Sheets == nil {
-		return out, errors.New("本机布局文件损坏或版本不兼容")
+		return out, i18n.Error("service.layout.localLayoutFileDamagedOr")
 	}
 	for name, layout := range found.Sheets {
 		clean := sheetLayout{Rows: make(map[string]int), Cols: make(map[string]int), ColumnVisibility: make(map[string]bool)}
@@ -146,11 +147,11 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.layout.noWorkbookOpen")
 		return
 	}
 	if key := r.Header.Get("X-ExcelLens-Workbook"); key != "" && key != wb.Fingerprint {
-		writeError(w, http.StatusConflict, "工作簿已切换，请重新调整显示设置")
+		writeMessage(w, http.StatusConflict, "service.layout.workbookSwitchedAdjustDisplaySettings")
 		return
 	}
 	sheet := r.URL.Query().Get("sheet")
@@ -166,13 +167,13 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPost {
 		if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&input); err != nil {
-			writeError(w, 400, "尺寸设置无效")
+			writeMessage(w, 400, "service.layout.invalidSizeSettings")
 			return
 		}
 		sheet = input.Sheet
 		source, ok := formats.Lookup(wb.Format)
 		if !ok {
-			writeError(w, 400, "工作簿来源格式无效")
+			writeMessage(w, 400, "service.layout.workbookSourceFormatInvalid")
 			return
 		}
 		if (input.Kind == "font" && !validFontOverride(input.Font)) ||
@@ -182,30 +183,30 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			(input.Kind == "col" && input.Index > source.MaxColumns) ||
 			(input.Kind == "row" && input.Index > source.MaxRows) ||
 			(input.Kind != "font" && input.Kind != "visibility" && !validLayoutSize(input.Kind, input.Index, input.Size)) {
-			writeError(w, 400, "显示设置不在允许范围内")
+			writeMessage(w, 400, "service.layout.displaySettingsNotWithinAllowed")
 			return
 		}
 	}
 	meta, ok := wb.FindSheet(sheet)
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.layout.worksheetDoesNotExist")
 		return
 	}
 	a.viewMu.Lock()
 	defer a.viewMu.Unlock()
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换")
+		writeMessage(w, 409, "service.layout.workbookSwitched")
 		return
 	}
 	path, unlock, err := lockWorkbookSetting(r.Context(), "layouts", wb.Fingerprint)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	defer unlock()
 	all, err := readLayouts(path)
 	if err != nil {
-		writeError(w, 500, "读取布局失败："+err.Error())
+		writeMessage(w, 500, "service.layout.failedReadLayout", i18n.Args{"detail": err})
 		return
 	}
 	layout := all.Sheets[meta.Name]
@@ -236,7 +237,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			}
 			all.Sheets[meta.Name] = layout
 			if err := writeWorkbookSetting(path, all); err != nil {
-				writeError(w, 500, "保存列显隐设置失败："+err.Error())
+				writeMessage(w, 500, "service.layout.failedSaveColumnDisplaySettings", i18n.Args{"detail": err})
 				return
 			}
 			writeJSON(w, layout)
@@ -246,7 +247,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			layout.Font = input.Font
 			all.Sheets[meta.Name] = layout
 			if err := writeWorkbookSetting(path, all); err != nil {
-				writeError(w, 500, "保存字体显示设置失败："+err.Error())
+				writeMessage(w, 500, "service.layout.failedSetFontDisplaySaved", i18n.Args{"detail": err})
 				return
 			}
 			writeJSON(w, layout)
@@ -265,12 +266,12 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 			target[key] = input.Size
 		}
 		if len(layout.Rows)+len(layout.Cols) > 3000 {
-			writeError(w, 400, "单个工作表尺寸覆盖数量超过限制")
+			writeMessage(w, 400, "service.layout.sizeSingleWorksheetExceedsLimit")
 			return
 		}
 		all.Sheets[meta.Name] = layout
 		if err := writeWorkbookSetting(path, all); err != nil {
-			writeError(w, 500, "保存行列尺寸失败："+err.Error())
+			writeMessage(w, 500, "service.layout.failedSaveRowColumnSize", i18n.Args{"detail": err})
 			return
 		}
 	}
@@ -278,7 +279,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 		idx := wb.GetCachedIndex(meta.Path)
 		source, err := wb.SourceLayoutContext(r.Context(), meta, idx)
 		if err != nil {
-			writeError(w, 500, "读取原始行列尺寸失败："+err.Error())
+			writeMessage(w, 500, "service.layout.failedReadOriginalRowColumn", i18n.Args{"detail": err})
 			return
 		}
 		layout.SourceRows, layout.SourceCols, layout.SourceGridLines = source.Rows, source.Cols, source.GridLines
@@ -292,7 +293,7 @@ func (a *App) handleLayout(w http.ResponseWriter, r *http.Request) {
 		if idx != nil {
 			ranges, err := wb.SourceHiddenColumns(meta, idx)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				writeError(w, 500, "读取原始列显隐信息失败："+err.Error())
+				writeMessage(w, 500, "service.layout.failedReadOriginalColumnDisplay", i18n.Args{"detail": err})
 				return
 			}
 			layout.SourceHidden = ranges

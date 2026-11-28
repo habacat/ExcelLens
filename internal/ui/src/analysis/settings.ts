@@ -1,6 +1,7 @@
 /**
  * Analysis number presentation settings modal controller.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { AnalysisDisplayConfig, AnalysisDisplayOptions } from '../contracts/analysis.ts';
 import type { ApiClient, HttpError, ToastFn } from '../contracts/common.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -107,7 +108,7 @@ export class AnalysisSettings {
     for (const [id, value] of previews) {
       const node = requireEl(id);
       node.textContent = formatAnalysisNumber({ display: value, exact: value }, options);
-      node.title = `精确值：${value}`;
+      node.title = localize('ui.settings.exactValue', { value });
     }
   }
 
@@ -132,7 +133,7 @@ export class AnalysisSettings {
       config.revision < 0 ||
       !isValidAnalysisNumberOptions(config.options)
     ) {
-      throw new Error('分析显示设置响应无效');
+      throw new Error(localize('ui.settings.analysisDisplaySettingsInvalid'));
     }
     this.config = config;
     const changed = JSON.stringify(getAnalysisNumberOptions()) !== JSON.stringify(config.options);
@@ -147,7 +148,7 @@ export class AnalysisSettings {
     const serial = ++this.serial;
     this.config = null;
     this.busy(true);
-    this.status('正在读取设置…');
+    this.status(localize('ui.settings.readingSettings'));
     try {
       const config = await this.api('/api/settings/analysis-display', undefined, decodeAnalysisDisplayConfig);
       if (serial !== this.serial) return;
@@ -158,7 +159,7 @@ export class AnalysisSettings {
       if (serial === this.serial) {
         const message = errorMessage(error);
         this.status(message, true);
-        if (!this.dialog.open) this.toast(`显示设置未能载入：${message}`, 'warning');
+        if (!this.dialog.open) this.toast(localize('ui.settings.displaySettingsFailedLoad', { message }), 'warning');
       }
     } finally {
       if (serial === this.serial) this.busy(false);
@@ -172,7 +173,7 @@ export class AnalysisSettings {
     const expectedRevision = this.config.revision;
     this.saving = true;
     this.busy(true);
-    this.status('正在保存…');
+    this.status(localize('ui.settings.savingCurrently'));
     try {
       const config = await this.api('/api/settings/analysis-display', {
         method: 'POST',
@@ -180,9 +181,9 @@ export class AnalysisSettings {
       }, decodeAnalysisDisplayConfig);
       if (serial !== this.serial) return;
       this.accept(config);
-      this.status('已保存');
+      this.status(localize('ui.common.saved'));
       this.dialog.close();
-      this.toast('分析显示设置已保存', 'success');
+      this.toast(localize('ui.settings.analysisDisplaySettingsHaveSaved'), 'success');
     } catch (error: unknown) {
       if (serial === this.serial) {
         const status = getHttpStatus(error);

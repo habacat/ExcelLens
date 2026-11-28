@@ -4,7 +4,7 @@ package localstore
 import (
 	"context"
 	"errors"
-	"fmt"
+
 	"io/fs"
 	"os"
 	"path"
@@ -12,12 +12,13 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 func ConfigDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil || base == "" {
-		return "", errors.New("无法定位用户配置目录")
+		return "", i18n.Error("diagnostic.localstore.catalog.unableLocateUserConfigurationDirectory")
 	}
 	return filepath.Join(base, "ExcelLens"), nil
 }
@@ -28,29 +29,30 @@ type Roots struct {
 }
 
 type group struct {
-	name, kind, base string
-	parts            []string
-	backup           bool
+	name, kind i18n.Key
+	base       string
+	parts      []string
+	backup     bool
 }
 
 func (r Roots) groups() []group {
 	rows := []group{
-		{"工作簿索引", "可重建缓存", "local", []string{"cache"}, false},
-		{"条件统计缓存", "可重建缓存", "local", []string{formats.ConditionalStatsDirectory}, false},
-		{"数据库快照", "审计来源", "local", []string{formats.DatabaseSnapshotDirectory}, true},
-		{"上传副本", "来源副本", "local", []string{"temp"}, true},
-		{"导出文件", "工作成果", "local", []string{"exports"}, true},
-		{"计算历史", "工作成果", "local", []string{"calculator"}, true},
-		{"最近文件", "使用记录", "local", []string{"recent.json"}, true},
-		{"审计标记", "工作成果", "config", []string{"annotations"}, true},
-		{"布局与偏好", "用户设置", "config", []string{"layouts", "frozen-panes", "settings", "row-views", "named-views"}, true},
-		{"分析表与核查方案", "工作成果", "config", []string{"workspaces", "recipes", "compositions", "snapshots"}, true},
-		{"编辑历史与生成副本", "工作成果", "config", []string{"edit-documents", "edit-revisions", "edit-files"}, true},
-		{"任务与页面恢复", "工作成果", "config", []string{"task-checkpoints", "recovery", "source-locations", "task-portability"}, true},
-		{"运行日志", "诊断记录", "config", []string{"logs"}, false},
+		{"service.storageInventory.workbookIndexes", "service.storageInventory.rebuildableCache", "local", []string{"cache"}, false},
+		{"service.storageInventory.conditionalStatistics", "service.storageInventory.rebuildableCache", "local", []string{formats.ConditionalStatsDirectory}, false},
+		{"service.storageInventory.databaseSnapshots", "service.storageInventory.auditSource", "local", []string{formats.DatabaseSnapshotDirectory}, true},
+		{"service.storageInventory.uploadedCopies", "service.storageInventory.sourceCopy", "local", []string{"temp"}, true},
+		{"service.storageInventory.exports", "service.storageInventory.workProduct", "local", []string{"exports"}, true},
+		{"service.storageInventory.calculationHistory", "service.storageInventory.workProduct", "local", []string{"calculator"}, true},
+		{"service.storageInventory.recentFiles", "service.storageInventory.usageHistory", "local", []string{"recent.json"}, true},
+		{"service.storageInventory.auditMarks", "service.storageInventory.workProduct", "config", []string{"annotations"}, true},
+		{"service.storageInventory.layoutAndPreferences", "service.storageInventory.userSettings", "config", []string{"layouts", "frozen-panes", "settings", "row-views", "named-views"}, true},
+		{"service.storageInventory.analysisAndPlans", "service.storageInventory.workProduct", "config", []string{"workspaces", "recipes", "compositions", "snapshots"}, true},
+		{"service.storageInventory.editHistoryAndOutputs", "service.storageInventory.workProduct", "config", []string{"edit-documents", "edit-revisions", "edit-files"}, true},
+		{"service.storageInventory.taskAndPageRecovery", "service.storageInventory.workProduct", "config", []string{"task-checkpoints", "recovery", "source-locations", "task-portability"}, true},
+		{"service.storageInventory.logs", "service.storageInventory.diagnostics", "config", []string{"logs"}, false},
 	}
 	if !sameDirectory(r.Local, r.Config) {
-		rows = append(rows, group{"旧版标记与布局", "旧版工作成果", "local", []string{"annotations", "layouts"}, true})
+		rows = append(rows, group{"service.storageInventory.legacyMarksAndLayout", "service.storageInventory.legacyWorkProduct", "local", []string{"annotations", "layouts"}, true})
 	}
 	return rows
 }
@@ -87,7 +89,7 @@ func openDirectory(name string) (*os.Root, error) {
 		return nil, err
 	}
 	if !st.IsDir() {
-		return nil, fmt.Errorf("目录不是普通目录：%s", name)
+		return nil, i18n.Error("diagnostic.localstore.catalog.directoryNotRegularDirectory", i18n.Args{"name": name})
 	}
 	return os.OpenRoot(name)
 }
@@ -138,7 +140,7 @@ func (r Roots) walk(ctx context.Context, g group, forBackup bool, visit func(*os
 				return err
 			}
 			if !st.Mode().IsRegular() {
-				return fmt.Errorf("无法核对非常规文件：%s", name)
+				return i18n.Error("diagnostic.localstore.catalog.unableVerifyUnconventionalFiles", i18n.Args{"name": name})
 			}
 			return visit(root, name, st)
 		})
@@ -149,10 +151,10 @@ func (r Roots) walk(ctx context.Context, g group, forBackup bool, visit func(*os
 	return nil
 }
 
-func (r Roots) Inventory(ctx context.Context) []Usage {
+func (r Roots) Inventory(ctx context.Context, locale i18n.Locale) []Usage {
 	var rows []Usage
 	for _, g := range r.groups() {
-		u := Usage{Name: g.name, Kind: g.kind}
+		u := Usage{Name: locale.Text(g.name), Kind: locale.Text(g.kind)}
 		for _, p := range g.parts {
 			u.Paths = append(u.Paths, filepath.Join(r.directory(g.base), p))
 		}
@@ -167,13 +169,13 @@ func (r Roots) Inventory(ctx context.Context) []Usage {
 			return nil
 		})
 		if err != nil {
-			u.Error = err.Error()
+			u.Error = locale.ErrorText(err)
 		}
 		rows = append(rows, u)
 	}
 	stagePath := filepath.Join(r.Local, formats.DatabaseSnapshotDirectory)
 	stages, err := r.SnapshotStages(ctx, false)
-	usage := Usage{Name: "数据库快照暂存", Kind: "采集暂存", Paths: []string{stagePath}}
+	usage := Usage{Name: locale.Text("service.storageInventory.snapshotStaging"), Kind: locale.Text("service.storageInventory.staging"), Paths: []string{stagePath}}
 	for _, stage := range stages {
 		usage.Bytes += stage.Bytes
 		usage.Allocated += stage.allocated
@@ -183,7 +185,7 @@ func (r Roots) Inventory(ctx context.Context) []Usage {
 		}
 	}
 	if err != nil {
-		usage.Error = err.Error()
+		usage.Error = locale.ErrorText(err)
 	}
 	return append(rows, usage)
 }

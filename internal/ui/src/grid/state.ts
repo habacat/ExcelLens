@@ -63,6 +63,10 @@ export interface GridCellElement
   _xlborderBottom?: string;
   _xlborderRightParts?: BorderLayerElement | null;
   _xlborderBottomParts?: BorderLayerElement | null;
+  _xlCornerCap?: HTMLSpanElement | null;
+  _xlCornerKey?: string;
+  _xlInnerCorners?: HTMLSpanElement | null;
+  _xlInnerCornerKey?: string;
   _xlOuterLeft?: string;
   _xlOuterTop?: string;
   _xlColumnLeft?: number;
@@ -85,7 +89,6 @@ export interface GridRowElement extends HTMLDivElement {
   _xlLayoutVersion?: string;
   _xlGridKey?: string;
   _xlHeavy?: boolean;
-  _xlHeaderSeam?: string;
 }
 
 export interface RenderMetrics {

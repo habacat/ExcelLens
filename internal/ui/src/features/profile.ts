@@ -2,6 +2,7 @@
  * Explicit, source-bound range profiling dialog. Exact statistics stay in the
  * accepted model; display preferences and layout changes never re-query the source.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { AnalysisDisplayOptions } from '../contracts/analysis.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { ProfileResponse } from '../contracts/features.ts';
@@ -121,7 +122,7 @@ export class ProfileCenter {
     });
     requireButton('profileCancelBtn').addEventListener('click', () => {
       this.cancel();
-      this.status('已取消分析');
+      this.status(localize('ui.profile.analysisCanceled'));
     });
     const dialog = requireDialog('profileDialog');
     dialog.addEventListener('close', () => {
@@ -230,11 +231,11 @@ export class ProfileCenter {
 
   open(): void {
     if (!this.enabled()) {
-      this.toast('请先完成工作表加载', 'warning');
+      this.toast(localize('ui.profile.completeWorksheetLoadingFirst'), 'warning');
       return;
     }
     if (this.s.multiRanges.length) {
-      this.toast('详细分析请选择一个连续区域', 'warning');
+      this.toast(localize('ui.profile.detailedAnalysisSelectContiguousRange'), 'warning');
       return;
     }
     this.clear();
@@ -316,11 +317,11 @@ export class ProfileCenter {
     requireButton('profileAnalyzeBtn').disabled = true;
     requireButton('profileCancelBtn').hidden = false;
     requireEl('profileDetail').setAttribute('aria-busy', 'true');
-    this.status(input.includeDistribution ? '正在计算分布…' : '正在分析…');
+    this.status(input.includeDistribution ? localize('ui.profile.calculatingDistributions') : localize('ui.common.analyzing'));
     try {
       const body = JSON.stringify(input);
       if (new TextEncoder().encode(body).length > this.limits.requestBytes) {
-        throw new Error('分析请求超过容量');
+        throw new Error(localize('ui.profile.analysisRequestExceedsCapacity'));
       }
       const data = await this.api('/api/profile', {
         method: 'POST',
@@ -360,16 +361,16 @@ export class ProfileCenter {
     const detail = document.createDocumentFragment();
 
     const fields: [string, number | string][] = [
-      ['总格数', d.total],
-      ['数值', d.number],
-      ['空白', d.blank],
-      ['不同值', `${d.uniqueTruncated ? '≥ ' : ''}${d.unique.toLocaleString('zh-CN')}`],
+      [localize('ui.profile.totalRows'), d.total],
+      [localize('ui.common.numericalValues'), d.number],
+      [localize('ui.common.blank'), d.blank],
+      [localize('ui.profile.differentValues'), `${d.uniqueTruncated ? '≥ ' : ''}${d.unique.toLocaleString(interfaceLocale())}`],
     ];
     const extras: readonly (readonly [string, number])[] = [
-      ['其他值', d.text],
-      ['公式', d.formulas],
-      ['缺少公式结果', d.cacheMissing],
-      ['错误', d.errors],
+      [localize('ui.profile.otherValues'), d.text],
+      [localize('ui.common.formula'), d.formulas],
+      [localize('ui.profile.missingFormulaResults'), d.cacheMissing],
+      [localize('ui.common.errors'), d.errors],
     ];
     for (const [label, value] of extras) {
       if (value) fields.push([label, value]);
@@ -377,7 +378,7 @@ export class ProfileCenter {
     for (const [label, value] of fields) {
       const box = makeEl('div', 'profile-stat');
       box.append(
-        makeEl('div', 'profile-number', typeof value === 'number' ? value.toLocaleString('zh-CN') : value),
+        makeEl('div', 'profile-number', typeof value === 'number' ? value.toLocaleString(interfaceLocale()) : value),
         makeEl('div', 'profile-caption', label),
       );
       summary.append(box);
@@ -395,23 +396,23 @@ export class ProfileCenter {
       detail.append(node);
     };
 
-    heading('数值统计');
+    heading(localize('ui.profile.numericalStatistics'));
     const numericPairs: readonly (readonly [string, string])[] = [
-      ['合计', d.sumExact],
-      ['平均', d.averageExact],
-      ['最小', d.minimumExact],
-      ['最大', d.maximumExact],
+      [localize('ui.common.total'), d.sumExact],
+      [localize('ui.common.average'), d.averageExact],
+      [localize('ui.common.minimum'), d.minimumExact],
+      [localize('ui.common.maximum'), d.maximumExact],
     ];
     for (const [label, value] of numericPairs) line(label, value, true);
 
     if (d.distribution) {
-      heading('分位数');
-      if (!d.number) detail.append(makeEl('p', '', '无可用数值'));
+      heading(localize('ui.profile.quantiles'));
+      if (!d.number) detail.append(makeEl('p', '', localize('ui.profile.noAvailableValues')));
       for (const q of d.distribution.quantiles) {
-        line(q.percent === 50 ? '中位数' : `${q.percent}%分位`, q.value, true);
+        line(q.percent === 50 ? localize('ui.profile.median') : localize('ui.profile.percentile', { percent: q.percent }), q.value, true);
       }
       if (d.distribution.bins.length) {
-        heading('数值分布');
+        heading(localize('ui.profile.valueDistribution'));
         const bins = makeEl('div', 'profile-bins');
         for (const bin of d.distribution.bins) {
           let lower = this.format(bin.lower);
@@ -433,7 +434,7 @@ export class ProfileCenter {
           row.append(
             label,
             meter,
-            makeEl('span', 'profile-bin-count', bin.count.toLocaleString('zh-CN')),
+            makeEl('span', 'profile-bin-count', bin.count.toLocaleString(interfaceLocale())),
           );
           bins.append(row);
         }
@@ -442,9 +443,9 @@ export class ProfileCenter {
     }
 
     if (d.topValues.length) {
-      heading(d.uniqueTruncated ? '常见值（部分）' : '常见值');
+      heading(d.uniqueTruncated ? localize('ui.profile.commonValuesPartial') : localize('ui.profile.commonValues'));
       for (const value of d.topValues) {
-        line(value.value || '（空白）', `${value.count.toLocaleString('zh-CN')} 次`);
+        line(value.value || localize('ui.common.empty'), localize('ui.profile.pages', { count: value.count.toLocaleString(interfaceLocale()) }));
       }
     }
 
@@ -465,8 +466,8 @@ export class ProfileCenter {
       }
       detail.append(holder);
     };
-    refs('错误单元格', d.errorRefs);
-    refs('缺少公式结果', d.missingRefs);
+    refs(localize('ui.profile.errorCells'), d.errorRefs);
+    refs(localize('ui.profile.missingFormulaResults'), d.missingRefs);
     if (d.warning) detail.append(makeEl('p', 'profile-warning', d.warning));
 
     this.page = d;

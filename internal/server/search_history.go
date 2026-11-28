@@ -40,7 +40,7 @@ func (a *App) handleSearchHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeFailure(w, http.StatusInternalServerError, err)
 		return
 	}
 	type pathWithTime struct {

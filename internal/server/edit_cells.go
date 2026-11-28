@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"slices"
 	"strings"
@@ -10,6 +10,7 @@ import (
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -246,7 +247,7 @@ func (a *App) editCommit(ctx context.Context, doc *editdoc.Document, layout edit
 		return plan, err
 	}, func(rule editdoc.Rule) (*editdoc.Rule, error) {
 		if !a.validEditProof(doc, req.Proof, rule) {
-			return nil, errors.New("请重新预览当前修订的数据规则")
+			return nil, i18n.Error("service.editCells.previewCurrentDataRulesAgain")
 		}
 		var err error
 		f, err = openEditBase(ctx, doc)

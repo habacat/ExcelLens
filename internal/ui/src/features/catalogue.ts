@@ -1,3 +1,4 @@
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import { decodeCatalogueJobStatus } from '../core/http-decoders.generated.ts';
 import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
@@ -64,10 +65,10 @@ export interface CatalogueResolveResponse {
 
 export function catalogueItemLabel(item: Pick<CatalogueListItem, 'status' | 'kind'>): string {
   return item.status === 'ready'
-    ? '可定位'
+    ? localize('ui.catalogue.positionable')
     : item.kind === 'table' && item.status === 'unresolved'
-      ? '待确认'
-      : '不可定位';
+      ? localize('ui.catalogue.pendingConfirmation')
+      : localize('ui.catalogue.nonLocatable');
 }
 
 export const CatalogueModel = Object.freeze({
@@ -132,7 +133,7 @@ export class Catalogue {
       !Number.isSafeInteger(this.limits.searchBytes) ||
       this.limits.searchBytes < 1
     ) {
-      throw new Error('目录显示容量配置无效');
+      throw new Error(localize('ui.catalogue.invalidCapacityConfigurationDirectoryDisplay'));
     }
 
     const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
@@ -144,14 +145,14 @@ export class Catalogue {
       requestIdentity: () => this.s.workbookKey,
       sleep,
       endpoint: '/api/catalogue',
-      label: '目录读取',
+      label: localize('ui.catalogue.catalogReading'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
       onProgress: (status) => {
         const done = status.doneBytes ?? 0;
         const total = status.totalBytes ?? 0;
         this.status(
-          (status.stage || '正在读取') + (total > 0 ? ` · ${Math.round((done / total) * 100)}%` : ''),
+          (status.stage || localize('ui.catalogue.readingProgress')) + (total > 0 ? ` · ${Math.round((done / total) * 100)}%` : ''),
         );
       },
     });
@@ -211,7 +212,7 @@ export class Catalogue {
     dialog.setAttribute('aria-labelledby', 'catalogueTitle');
     // Static markup only. Workbook names, definitions and reasons never enter HTML.
     dialog.innerHTML =
-      '<div class="dialog-head"><div id="catalogueTitle" class="dialog-title">名称与表目录</div><button id="catalogueClose" class="dialog-close" type="button" aria-label="关闭名称与表目录">×</button></div><p id="catalogueSource" class="catalogue-source"></p><div class="catalogue-tools"><input id="catalogueSearch" class="field-control" type="search" placeholder="搜索名称或工作表" aria-label="搜索名称或工作表"><select id="catalogueKind" class="field-control" aria-label="目录类型"><option value="">全部类型</option><option value="name">定义名称</option><option value="table">表对象</option></select><select id="catalogueSheet" class="field-control" aria-label="目录工作表"></select><button id="catalogueRefresh" class="mini-button" type="button">重新读取</button></div><div class="catalogue-main"><div class="catalogue-master"><div id="catalogueList" class="catalogue-list" role="listbox" aria-label="名称与表对象" tabindex="0"></div><div class="catalogue-paging"><button id="cataloguePrev" class="mini-button" type="button">上一页</button><span id="catalogueCount"></span><button id="catalogueNext" class="mini-button" type="button">下一页</button></div></div><section id="catalogueDetail" class="catalogue-detail" aria-label="目录定义详情"></section></div><div class="catalogue-footer"><p id="catalogueStatus" class="catalogue-status" role="status" aria-live="polite"></p><button id="catalogueCancel" class="mini-button" type="button" hidden>取消读取</button><div class="catalogue-confirm"><select id="catalogueTargetSheet" class="field-control" aria-label="要确认的表对象工作表"></select><button id="catalogueOpenSheet" class="mini-button" type="button">打开工作表</button><button id="catalogueConfirm" class="mini-button" type="button">确认表对象</button></div></div>';
+      `<div class="dialog-head"><div id="catalogueTitle" class="dialog-title">${localizeHTML('ui.catalogue.nameTableDirectory')}</div><button id="catalogueClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.catalogue.closeNameTableDirectory')}">×</button></div><p id="catalogueSource" class="catalogue-source"></p><div class="catalogue-tools"><input id="catalogueSearch" class="field-control" type="search" placeholder="${localizeHTML('ui.catalogue.searchNameOrWorksheet')}" aria-label="${localizeHTML('ui.catalogue.searchNameOrWorksheet')}"><select id="catalogueKind" class="field-control" aria-label="${localizeHTML('ui.catalogue.catalogTypes')}"><option value="">${localizeHTML('ui.catalogue.allTypes')}</option><option value="name">${localizeHTML('ui.catalogue.defineName')}</option><option value="table">${localizeHTML('ui.catalogue.tableObjects')}</option></select><select id="catalogueSheet" class="field-control" aria-label="${localizeHTML('ui.catalogue.catalogWorksheet')}"></select><button id="catalogueRefresh" class="mini-button" type="button">${localizeHTML('ui.catalogue.readAgain')}</button></div><div class="catalogue-main"><div class="catalogue-master"><div id="catalogueList" class="catalogue-list" role="listbox" aria-label="${localizeHTML('ui.catalogue.nameTableObject')}" tabindex="0"></div><div class="catalogue-paging"><button id="cataloguePrev" class="mini-button" type="button">${localizeHTML('ui.catalogue.previousPage')}</button><span id="catalogueCount"></span><button id="catalogueNext" class="mini-button" type="button">${localizeHTML('ui.catalogue.nextPage')}</button></div></div><section id="catalogueDetail" class="catalogue-detail" aria-label="${localizeHTML('ui.catalogue.directoryDefinitionDetails')}"></section></div><div class="catalogue-footer"><p id="catalogueStatus" class="catalogue-status" role="status" aria-live="polite"></p><button id="catalogueCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.catalogue.cancelReading')}</button><div class="catalogue-confirm"><select id="catalogueTargetSheet" class="field-control" aria-label="${localizeHTML('ui.catalogue.tableObjectWorksheetBeConfirmed')}"></select><button id="catalogueOpenSheet" class="mini-button" type="button">${localizeHTML('ui.catalogue.openWorksheet')}</button><button id="catalogueConfirm" class="mini-button" type="button">${localizeHTML('ui.catalogue.confirmTableObject')}</button></div></div>`;
     document.body.append(dialog);
     return dialog;
   }
@@ -233,7 +234,7 @@ export class Catalogue {
 
   private validSource(value: { readonly workbookKey?: string; readonly book?: string }): void {
     if (value.workbookKey !== this.s.workbookKey || value.book !== this.s.book) {
-      throw new Error('目录来源已切换，请重新读取');
+      throw new Error(localize('ui.catalogue.catalogSourceSwitchedReadAgain'));
     }
   }
 
@@ -259,8 +260,8 @@ export class Catalogue {
       !enabled || this.busy || !target || target !== this.s.sheet || !this.s.indexReady;
     confirmBtn.title =
       target === this.s.sheet && this.s.indexReady
-        ? '核对这张工作表真实声明的表对象'
-        : '先打开并完成索引，再确认这张表的对象';
+        ? localize('ui.catalogue.verifyTableObjectExplicitlyStated')
+        : localize('ui.catalogue.openCompleteIndexFirstThen');
     requireButton('catalogueOpenSheet').disabled = !target || this.busy || !this.canNavigate();
     requireButton('cataloguePrev').disabled = this.busy || !this.page || this.offset === 0;
     requireButton('catalogueNext').disabled =
@@ -272,8 +273,8 @@ export class Catalogue {
     const target = requireSelect('catalogueTargetSheet');
     const chosen = filter.value;
     filter.replaceChildren(
-      new Option('全部作用域与表', ''),
-      new Option('工作簿名称', 'workbook:'),
+      new Option(localize('ui.catalogue.allScopesTables'), ''),
+      new Option(localize('ui.catalogue.workbookName'), 'workbook:'),
     );
     target.replaceChildren();
     for (const sheet of this.s.sheets) {
@@ -287,11 +288,11 @@ export class Catalogue {
 
   async open(search = ''): Promise<void> {
     if (!this.s.opened || !this.supported()) {
-      this.toast('当前来源没有工作簿名称或表对象目录', 'warning');
+      this.toast(localize('ui.catalogue.currentSourceDoesNotHave'), 'warning');
       return;
     }
     this.sheets();
-    requireEl('catalogueSource').textContent = this.s.fileName || '当前工作簿';
+    requireEl('catalogueSource').textContent = this.s.fileName || localize('ui.common.currentWorkbook');
     if (search) requireInput('catalogueSearch').value = search;
     if (!this.dialog.open) this.dialog.showModal();
     this.controls();
@@ -343,7 +344,7 @@ export class Catalogue {
     this.detailController?.abort();
     this.jobs.cancelMain();
     this.busy = false;
-    this.status('已取消读取，原目录保留');
+    this.status(localize('ui.catalogue.readingCanceledButOriginalDirectory'));
     this.controls();
   }
 
@@ -361,7 +362,7 @@ export class Catalogue {
     ++this.detailRequest;
     this.busy = true;
     this.controls();
-    this.status(mode === 'confirm' ? '正在确认表对象…' : '正在读取名称与表定义…');
+    this.status(mode === 'confirm' ? localize('ui.catalogue.confirmingTableObjects') : localize('ui.catalogue.readingNamesTableDefinitions'));
     const current = (): boolean =>
       request === this.request && identity === this.identity() && this.dialog.open;
     let owned = '';
@@ -405,7 +406,7 @@ export class Catalogue {
   async loadPage(offset: number): Promise<void> {
     if (!this.job || !this.dialog.open || this.busy) return;
     if (new TextEncoder().encode(requireInput('catalogueSearch').value).length > this.limits.searchBytes) {
-      this.status('搜索文字超过容量，请缩短后重试', true);
+      this.status(localize('ui.catalogue.searchTextExceedsCapacityShorten'), true);
       return;
     }
     const serial = ++this.pageRequest;
@@ -418,8 +419,8 @@ export class Catalogue {
     this.detailController?.abort();
     this.item = null;
     this.selected = '';
-    requireEl('catalogueDetail').textContent = '选择条目查看原始定义和定位范围';
-    requireEl('catalogueList').replaceChildren(makeEl('div', 'catalogue-empty', '正在读取目录…'));
+    requireEl('catalogueDetail').textContent = localize('ui.catalogue.selectItemViewOriginalDefinition');
+    requireEl('catalogueList').replaceChildren(makeEl('div', 'catalogue-empty', localize('ui.catalogue.readingDirectory')));
     try {
       const page = await this.readPage(job, offset, controller.signal);
       if (
@@ -458,7 +459,7 @@ export class Catalogue {
       sheet: scope.startsWith('sheet:') ? scope.slice(6) : '',
     });
     if (new TextEncoder().encode(searchVal).length > this.limits.searchBytes) {
-      throw new Error('搜索文字超过容量，请缩短后重试');
+      throw new Error(localize('ui.catalogue.searchTextExceedsCapacityShorten'));
     }
     const page = await this.api(`/api/catalogue/items?${q.toString()}`, {
       signal,
@@ -476,7 +477,7 @@ export class Catalogue {
       page.previous > offset ||
       (page.next > page.matched && page.items.length > 0)
     ) {
-      throw new Error('目录分页响应无效');
+      throw new Error(localize('ui.catalogue.directoryPaginationResponseInvalid'));
     }
     return page;
   }
@@ -486,7 +487,7 @@ export class Catalogue {
     this.offset = offset;
     this.renderList();
     this.controls();
-    this.status((page.complete ? '' : '目录尚不完整。') + page.notices.join('；'));
+    this.status((page.complete ? '' : localize('ui.catalogue.tableContentsNotYetComplete')) + page.notices.join('；'));
   }
 
   private renderList(): void {
@@ -500,8 +501,8 @@ export class Catalogue {
           'div',
           'catalogue-empty',
           page.total
-            ? '没有符合条件的名称或表对象'
-            : '没有已读取的名称或表对象。可在下方确认当前工作表。',
+            ? localize('ui.catalogue.thereNoMatchingNamesOr')
+            : localize('ui.catalogue.noReadOnlyNamesOr'),
         ),
       );
     }
@@ -512,14 +513,14 @@ export class Catalogue {
       button.setAttribute('role', 'option');
       button.setAttribute('aria-selected', String(this.selected === item.id));
       button.tabIndex = -1;
-      const name = makeEl('span', 'catalogue-item-name', item.name || '未能读取名称');
-      name.title = item.shortened ? '完整名称请查看条目详情' : item.name;
+      const name = makeEl('span', 'catalogue-item-name', item.name || localize('ui.catalogue.unableReadName'));
+      name.title = item.shortened ? localize('ui.catalogue.referEntryDetailsFullName') : item.name;
       const meta = makeEl('span', 'catalogue-item-meta');
       meta.append(
         makeEl(
           'span',
           'catalogue-item-scope',
-          `${item.kind === 'table' ? '表对象' : '名称'} · ${item.scope || item.sheet || (item.unknownScope ? '作用域未能读取' : '工作簿')}${item.hidden ? ' · 隐藏' : ''}`,
+          `${item.kind === 'table' ? localize('ui.catalogue.tableObjects') : localize('ui.catalogue.name')} · ${item.scope || item.sheet || (item.unknownScope ? localize('ui.catalogue.scopeNotReadable') : localize('ui.common.workbook'))}${item.hidden ? ` ${localize('ui.catalogue.hide')}` : ''}`,
         ),
         makeEl('span', 'catalogue-item-state', catalogueItemLabel(item)),
       );
@@ -554,7 +555,7 @@ export class Catalogue {
       button.tabIndex = chosen ? 0 : -1;
       if (chosen && focus) button.focus({ preventScroll: true });
     }
-    requireEl('catalogueDetail').textContent = '正在读取定义…';
+    requireEl('catalogueDetail').textContent = localize('ui.catalogue.readingDefinitions');
     try {
       const data = await this.api(
         `/api/catalogue/detail?${new URLSearchParams({ id: job, item: id }).toString()}`,
@@ -571,7 +572,7 @@ export class Catalogue {
         return;
       }
       this.validSource(data);
-      if (data.item?.id !== id) throw new Error('目录条目响应无效');
+      if (data.item?.id !== id) throw new Error(localize('ui.catalogue.directoryEntryResponseInvalid'));
       this.item = data.item;
       this.columnOffset = 0;
       if (
@@ -598,24 +599,24 @@ export class Catalogue {
     body.replaceChildren();
     if (!item) return;
     body.append(
-      makeEl('h3', '', item.name || '未能读取名称'),
+      makeEl('h3', '', item.name || localize('ui.catalogue.unableReadName')),
       makeEl(
         'p',
         'catalogue-reason',
-        `${item.kind === 'table' ? '表对象' : '定义名称'} · ${item.scope || item.sheet || (item.scopeId ? '作用域未能读取' : '工作簿')}${item.hidden ? ' · 隐藏' : ''}`,
+        `${item.kind === 'table' ? localize('ui.catalogue.tableObjects') : localize('ui.catalogue.defineName')} · ${item.scope || item.sheet || (item.scopeId ? localize('ui.catalogue.scopeNotReadable') : localize('ui.common.workbook'))}${item.hidden ? ` ${localize('ui.catalogue.hide')}` : ''}`,
       ),
     );
     body.append(
-      makeEl('h4', '', '原始定义'),
-      makeEl('pre', 'catalogue-definition', item.definition || '没有可读取的文本定义'),
+      makeEl('h4', '', localize('ui.catalogue.originalDefinitions')),
+      makeEl('pre', 'catalogue-definition', item.definition || localize('ui.catalogue.noTextDefinitionsBeRead')),
     );
-    if (item.comment) body.append(makeEl('h4', '', '注释'), makeEl('p', '', item.comment));
-    body.append(makeEl('p', 'catalogue-reason', item.reason || '已确认固定范围，可按源坐标定位。'));
+    if (item.comment) body.append(makeEl('h4', '', localize('ui.catalogue.notes')), makeEl('p', '', item.comment));
+    body.append(makeEl('p', 'catalogue-reason', item.reason || localize('ui.catalogue.fixedRangeConfirmedCanBe')));
 
     const areas = makeEl('div', 'catalogue-areas');
     const pick = makeEl('select', 'field-control');
     pick.id = 'catalogueArea';
-    pick.setAttribute('aria-label', '选择定位区域');
+    pick.setAttribute('aria-label', localize('ui.catalogue.selectPositioningArea'));
     for (const [index, area] of (item.areas ?? []).entries()) {
       pick.append(
         new Option(
@@ -624,7 +625,7 @@ export class Catalogue {
         ),
       );
     }
-    const go = makeEl('button', 'primary-button compact', '定位区域');
+    const go = makeEl('button', 'primary-button compact', localize('ui.catalogue.locationArea'));
     go.id = 'catalogueLocate';
     go.type = 'button';
     go.disabled = item.status !== 'ready' || !item.areas?.length;
@@ -638,7 +639,7 @@ export class Catalogue {
     if (item.tokenHex) {
       const details = makeEl('details');
       details.append(
-        makeEl('summary', '', '原始公式标记'),
+        makeEl('summary', '', localize('ui.catalogue.originalFormulaMarkings')),
         makeEl('pre', 'catalogue-definition', item.tokenHex),
       );
       body.append(details);
@@ -648,7 +649,7 @@ export class Catalogue {
         makeEl(
           'h4',
           '',
-          `表头 ${item.table.headerRows} 行，合计 ${item.table.totalRows} 行，${item.table.columns?.length ?? 0} 列`,
+          localize('ui.catalogue.headerRowsTotalRowsColumns', { headerRows: item.table.headerRows, totalRows: item.table.totalRows, detail: item.table.columns?.length ?? 0 }),
         ),
       );
       this.renderColumns(body, item.table.columns ?? []);
@@ -661,7 +662,7 @@ export class Catalogue {
   ): void {
     const size = this.limits.pageRows;
     const table = makeEl('table', 'catalogue-columns');
-    table.setAttribute('aria-label', '表对象列定义');
+    table.setAttribute('aria-label', localize('ui.catalogue.tableObjectColumnDefinition'));
     const rows = makeEl('tbody');
     for (const [index, column] of columns.slice(this.columnOffset, this.columnOffset + size).entries()) {
       const tr = makeEl('tr');
@@ -672,8 +673,8 @@ export class Catalogue {
     body.append(table);
     if (columns.length > size) {
       const paging = makeEl('div', 'catalogue-paging');
-      const prev = makeEl('button', 'mini-button', '上一页列');
-      const next = makeEl('button', 'mini-button', '下一页列');
+      const prev = makeEl('button', 'mini-button', localize('ui.catalogue.previousPageColumn'));
+      const next = makeEl('button', 'mini-button', localize('ui.catalogue.nextPageColumn'));
       prev.type = 'button';
       next.type = 'button';
       prev.disabled = this.columnOffset === 0;
@@ -782,7 +783,7 @@ export class Catalogue {
       const arrived = await this.navigateArea(area, current);
       if (current() && arrived) {
         this.toast(
-          `已定位：${area.sheet}!${area.start}${area.end === area.start ? '' : `:${area.end}`}`,
+          localize('ui.catalogue.positioned', { sheet: area.sheet, start: area.start, detail: area.end === area.start ? '' : `:${area.end}` }),
           'success',
         );
       }

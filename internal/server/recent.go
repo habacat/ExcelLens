@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"os"
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -226,7 +227,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		ID     string `json:"id"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, req.Body, 4<<10)).Decode(&input) != nil {
-		writeError(w, 400, "历史记录操作参数无效")
+		writeMessage(w, 400, "service.recent.historicalOperationParametersInvalid")
 		return
 	}
 	var r recentFile
@@ -245,7 +246,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if target < 0 {
-		writeError(w, 404, "找不到这条最近打开记录")
+		writeMessage(w, 404, "service.recent.unableFindThisMostRecently")
 		return
 	}
 	item := r.Items[target]
@@ -253,7 +254,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 	case "remove":
 		r.Items = append(r.Items[:target], r.Items[target+1:]...)
 		if err := writeRecents(r); err != nil {
-			writeError(w, 500, "无法保存历史记录")
+			writeMessage(w, 500, "service.recent.unableSaveHistory")
 			return
 		}
 		writeJSON(w, map[string]any{"removed": true})
@@ -263,21 +264,21 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		r.Items[target].Pinned = pinned
 		sortedRecents(r.Items)
 		if err := writeRecents(r); err != nil {
-			writeError(w, 500, "无法保存置顶状态")
+			writeMessage(w, 500, "service.recent.unableSavePinnedStatus")
 			return
 		}
 		writeJSON(w, map[string]any{"pinned": pinned})
 		return
 	case "open":
 		if !recentDatabase(item) && !workbook.SupportedExtensions(filepath.Ext(item.Path)) {
-			writeError(w, 400, "记录中的文件类型不受支持")
+			writeMessage(w, 400, "service.recent.fileTypeRecordNotSupported")
 			return
 		}
 		checkPath := item.Path
 		if recentDatabase(item) {
 			wb, err := a.openDatabaseSnapshot(req.Context(), recentDatabasePath(item), item.Fingerprint)
 			if err != nil {
-				writeError(w, 400, fmt.Sprintf("无法打开数据库快照：%v", err))
+				writeMessage(w, 400, "service.recent.unableOpenDatabaseSnapshot", i18n.Args{"detail": err})
 				return
 			}
 			a.writeWorkbookStatus(w, wb)
@@ -288,7 +289,7 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		}
 		st, err := os.Stat(checkPath)
 		if err != nil || !st.Mode().IsRegular() {
-			writeError(w, 404, "文件已移动或不存在。可以从列表移除该记录，或重新选择文件。")
+			writeMessage(w, 404, "service.recent.fileMovedOrDoesNot")
 			return
 		}
 		var wb *workbook.Workbook
@@ -301,16 +302,16 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 			wb, err = a.openPathAs(item.Path, item.Name)
 		}
 		if err != nil {
-			writeError(w, 400, fmt.Sprintf("无法打开最近文件：%v", err))
+			writeMessage(w, 400, "service.recent.unableOpenLatestFile", i18n.Args{"detail": err})
 			return
 		}
 		if wb == nil || wb != a.currentWorkbook() {
-			writeError(w, http.StatusConflict, "工作簿已切换，请重新打开最近文件")
+			writeMessage(w, http.StatusConflict, "service.recent.workbookSwitchedReopenLastFile")
 			return
 		}
 		memberStat, statErr := os.Stat(wb.Path)
 		if statErr != nil {
-			writeError(w, 404, "刚打开的源文件已移动或删除，请重新选择")
+			writeMessage(w, 404, "service.recent.newlyOpenedSourceFileMoved")
 			return
 		}
 		status := openedWorkbook(wb, workbookDisplayName(wb), memberStat.Size())
@@ -318,6 +319,6 @@ func (a *App) handleRecent(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, status)
 		return
 	default:
-		writeError(w, 400, "不支持的历史记录操作")
+		writeMessage(w, 400, "service.recent.unsupportedHistoryOperations")
 	}
 }

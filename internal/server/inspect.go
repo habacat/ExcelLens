@@ -35,24 +35,24 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
-		writeError(w, http.StatusBadRequest, "检查条件无效")
+		writeMessage(w, http.StatusBadRequest, "service.inspect.invalidCheckConditions")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.inspect.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(request.Sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "工作表不存在")
+		writeMessage(w, http.StatusNotFound, "service.inspect.worksheetDoesNotExist")
 		return
 	}
 	startCol, startRow, err1 := workbook.ParseCellRef(request.Start)
 	endCol, endRow, err2 := workbook.ParseCellRef(request.End)
 	selectionStart, selectionEnd := startRow, endRow
 	if err1 != nil || err2 != nil {
-		writeError(w, http.StatusBadRequest, "检查范围地址无效")
+		writeMessage(w, http.StatusBadRequest, "service.inspect.invalidVerificationScopeAddress")
 		return
 	}
 	if startRow > endRow {
@@ -67,22 +67,22 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 		limit = 600
 	}
 	if limit < 1 || limit > 2500 {
-		writeError(w, http.StatusBadRequest, "结果数量限制无效")
+		writeMessage(w, http.StatusBadRequest, "service.inspect.invalidResultQuantityLimit")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换")
+		writeMessage(w, 409, "service.inspect.workbookSwitched")
 		return
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, http.StatusConflict, "工作表索引未准备好")
+		writeMessage(w, http.StatusConflict, "service.inspect.worksheetIndexNotReady")
 		return
 	}
 	if mode == "duplicates" && request.FilterID == "" && request.ViewID == "" && endRow-startRow+1 > formats.LargeDataRows {
-		writeError(w, http.StatusBadRequest, "超大范围不支持整列查重，请先选取不超过500万行的区域")
+		writeMessage(w, http.StatusBadRequest, "service.inspect.largeRangesDoNotSupport")
 		return
 	}
 	opt := workbook.InspectOptions{Mode: mode, FirstRow: startRow, LastRow: endRow,
@@ -91,17 +91,17 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 	if request.FilterID != "" || visual {
 		selection, err := a.selectionSnapshot(wb, idx, meta.Path, request.FilterID, request.ViewID)
 		if err != nil {
-			writeError(w, http.StatusConflict, err.Error())
+			writeFailure(w, http.StatusConflict, err)
 			return
 		}
 		defer selection.close()
 		numbers, err := analysisSelectionRows(idx, selection.filter, selectionStart, selectionEnd, request.analysisSelectionCoordinates, 12_000_000/(endCol-startCol+1), selection.visible)
 		if err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 		if request.SkipThroughRow < 0 || request.SkipThroughRow > workbook.MaxRowsForIndex(idx) {
-			writeError(w, 400, "表头行无效")
+			writeMessage(w, 400, "service.inspect.headerRowInvalid")
 			return
 		}
 		kept := numbers[:0]
@@ -112,7 +112,7 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 		}
 		numbers = kept
 		if mode == "duplicates" && len(numbers) > formats.LargeDataRows {
-			writeError(w, 400, "超大范围不支持整列查重，请先选取不超过500万行的区域")
+			writeMessage(w, 400, "service.inspect.largeRangesDoNotSupport")
 			return
 		}
 		sort.Ints(numbers)
@@ -134,7 +134,7 @@ func (a *App) handleInspect(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, context.Canceled) {
 			return
 		}
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeFailure(w, http.StatusBadRequest, err)
 		return
 	}
 	writeJSON(w, map[string]any{

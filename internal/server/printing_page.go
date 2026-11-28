@@ -3,18 +3,18 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
+
 	"slices"
 	"sort"
 	"strconv"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/printing"
 	"excellens/internal/workbook"
 )
 
-var errPrintPageCapacity = errors.New("本页内容超过预览容量，请减少每页行列或缩小打印范围")
+var errPrintPageCapacity = i18n.Error("service.printingPage.contentOnThisPageExceeds")
 
 type printPageRect struct {
 	X      int64 `json:"x,string"`
@@ -263,7 +263,7 @@ func readPrintPage(ctx context.Context, job *printTask, snapshot *printSnapshot,
 				}
 				key := [2]int{row.Number, col.Number}
 				if _, exists := covered[key]; exists {
-					return nil, errors.New("源合并区域重叠，无法可靠生成本页预览")
+					return nil, i18n.Error("service.printingPage.sourceMergeRegionsOverlapMaking")
 				}
 				covered[key] = len(merges)
 			}
@@ -285,7 +285,7 @@ func readPrintPage(ctx context.Context, job *printTask, snapshot *printSnapshot,
 	slices.Sort(rowNumbers)
 	slices.Sort(colNumbers)
 	if len(rowNumbers) == 0 || len(colNumbers) == 0 {
-		return nil, errors.New("本页没有可读取的源行列，未生成空白成功结果")
+		return nil, i18n.Error("service.printingPage.noSourceRowsAvailableOn")
 	}
 	content := &printPageContent{Page: page, Rows: rows, Columns: columns, Cells: []printPageCell{}, Styles: make(map[int]workbook.VisualStyle), Notices: []string{}}
 	notice := func(text string) {
@@ -332,7 +332,7 @@ func readPrintPage(ctx context.Context, job *printTask, snapshot *printSnapshot,
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("读取打印页源内容失败：%w", err)
+		return nil, i18n.Wrap("service.printingPage.failedReadPrintPageSource", err)
 	}
 	visual := func(row, col int) workbook.VisualStyle {
 		cell := data[[2]int{row, col}]

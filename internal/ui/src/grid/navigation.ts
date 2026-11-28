@@ -2,6 +2,7 @@
  * Worksheet cell/range navigation, Name Box range parsing, keyboard movement,
  * data-edge jump, browsing history, hyperlink traversal, and selection updates.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { CellPoint, CellRef, MergeRange, SelectionArea } from '../contracts/common.ts';
 import type { CellData, CellHyperlink } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -63,7 +64,7 @@ export interface GridNavigationDeps {
   readonly fileFormats: FileFormats;
   readonly mergedCells: MergedCells;
   readonly toast: (message: string, tone?: 'info' | 'success' | 'warning' | 'error') => void;
-  readonly setStatus: (text: string) => void;
+  readonly setStatus: (text: string, hidden?: boolean) => void;
   readonly colName: (col: number) => string;
   readonly parseColumn: (text: string) => number;
   readonly parseRef: (text: string | null | undefined) => CellRef | null;
@@ -247,7 +248,7 @@ export class GridNavigation {
         await panels.catalogueCenter.open(value);
         return;
       }
-      toast('地址无效：支持 A1、A1:D50、B:B、3:5、Sheet1!A1:B9', 'warning');
+      toast(localize('ui.navigation.invalidAddressSupportsA1A1'), 'warning');
       return;
     }
     let sheet = S.sheet ?? '';
@@ -256,7 +257,7 @@ export class GridNavigation {
         (item) => item.name.toLocaleLowerCase() === parsed.sheet.toLocaleLowerCase(),
       );
       if (!target) {
-        toast(`找不到工作表：${parsed.sheet}`, 'error');
+        toast(localize('ui.navigation.worksheetNotFound', { sheet: parsed.sheet }), 'error');
         return;
       }
       sheet = target.name;
@@ -264,7 +265,7 @@ export class GridNavigation {
     if (!sheet) return;
     const multiple = parsed.start.ref !== parsed.end.ref;
     if (S.filtered && sheet === S.sheet && multiple) {
-      toast('筛选视图请按可见行拖选；名称框矩形范围使用源行号', 'warning');
+      toast(localize('ui.navigation.filterViewDragSelectionRows'), 'warning');
       return;
     }
     if (!(await this.navigateToCell(sheet, parsed.start.ref))) return;
@@ -273,7 +274,7 @@ export class GridNavigation {
     if (sheet !== S.sheet || S.selected?.ref !== expectedRef) return;
     if (multiple) {
       if (S.filtered) {
-        toast('筛选视图不支持直接按源行号选中矩形；请清除筛选后重试', 'warning');
+        toast(localize('ui.navigation.filteringViewDoesNotSupport'), 'warning');
         return;
       }
       this.extendRange(
@@ -332,7 +333,7 @@ export class GridNavigation {
     if (link.kind === 'internal') {
       const target = S.sheets.find((item) => item.name === link.sheet);
       if (!target || !parseRef(link.ref) || !link.ref) {
-        toast('跳转目标已失效', 'error');
+        toast(localize('ui.navigation.jumpTargetExpired'), 'error');
         return;
       }
       this.markHyperlinkVisited(source);
@@ -349,7 +350,7 @@ export class GridNavigation {
         window.open(target.href, '_blank', 'noopener,noreferrer');
         this.markHyperlinkVisited(source);
       } catch {
-        toast('不支持该超链接协议', 'warning');
+        toast(localize('ui.navigation.thisHyperlinkProtocolNotSupported'), 'warning');
       }
     }
   }
@@ -426,8 +427,8 @@ export class GridNavigation {
     if (!keepSelection || !S.range) requireInput('nameBox').value = normalizedRef;
     panels.formulaInspector?.show(normalized, sheet);
     const formulaVal = requireEl('formulaValue');
-    formulaVal.textContent = normalized.cacheMissing ? '无缓存' : normalized.display;
-    formulaVal.title = `保存结果：${normalized.cacheMissing ? '无缓存' : normalized.display}\n原始值：${normalized.raw}`;
+    formulaVal.textContent = normalized.cacheMissing ? localize('ui.common.noCachingAvailable') : normalized.display;
+    formulaVal.title = localize('ui.navigation.saveResultsOriginalValues', { detail: normalized.cacheMissing ? localize('ui.common.noCachingAvailable') : normalized.display, raw: normalized.raw });
     requireButton('tracePrecedentsBtn').disabled = !normalized.hasFormula || !normalized.formula;
     requireButton('traceDependentsBtn').disabled = false;
     requireButton('cellDetailBtn').disabled = false;
@@ -654,7 +655,7 @@ export class GridNavigation {
     if (!current()) return false;
     let parsed = parseRef(ref);
     if (!parsed) {
-      toast(`无法定位单元格：${ref}`, 'error');
+      toast(localize('ui.navigation.unableLocateCell', { ref }), 'error');
       return false;
     }
     if (S.selected && !S.historyNavigating) this.recordVisit(S.selected.sheet, S.selected.ref);
@@ -670,7 +671,7 @@ export class GridNavigation {
         return false;
       }
       if (!current() || epoch !== S.sheetEpoch) return false;
-      toast(`已临时显示第 ${parsed.row} 行`, 'info');
+      toast(localize('ui.navigation.rowTemporarilyDisplayed', { row: parsed.row }), 'info');
     }
     const merged = activeMerge(parsed.row, parsed.col);
     if (merged) {
@@ -687,7 +688,7 @@ export class GridNavigation {
         visual = await this.locateFilteredVisual(parsed.row, pinned.rows);
         if (!viewCurrent()) return false;
         if (!visual) {
-          toast('该单元格所在行被筛选条件隐藏；可清除筛选后定位', 'warning');
+          toast(localize('ui.navigation.rowContainingThisCellHidden'), 'warning');
           return false;
         }
       }
@@ -695,7 +696,7 @@ export class GridNavigation {
       await loadViewport(true);
       if (!viewCurrent()) return false;
       if (filteredBody && S.rowNumberByVisual.get(visual) !== parsed.row) {
-        toast('尚未读取目标行，请重试定位', 'warning');
+        toast(localize('ui.navigation.targetRowNotReadYet'), 'warning');
         return false;
       }
       const cell =
@@ -720,17 +721,17 @@ export class GridNavigation {
     const { S, parseRef, showWorkspace, activeMerge, colName, ensureExtent, panels } = this.d;
     if (!guard() || !S.opened) return false;
     if (S.opening || S.sheetLoadingEpoch || S.filterJob || panels.rowViews?.busy) {
-      throw new Error('请先完成当前工作表加载、筛选或行显隐更新');
+      throw new Error(localize('ui.navigation.completeLoadingCurrentWorksheetFiltering'));
     }
     const target = S.sheets.find((sheet) => sheet.name === area?.sheet);
     const start = parseRef(area?.start);
     const end = parseRef(area?.end);
     if (!target || !start || !end || end.row < start.row || end.col < start.col) {
-      throw new Error('目录定位范围无效，请重新读取目录');
+      throw new Error(localize('ui.navigation.directoryPositioningRangeInvalidRead'));
     }
     const multiple = start.ref !== end.ref;
     if (multiple && (target.name === S.sheet ? S.filtered : Boolean(S.filtersBySheet.get(target.name)))) {
-      throw new Error('该表处于筛选视图，请先清除筛选，再按源坐标选择整个区域');
+      throw new Error(localize('ui.navigation.thisTableFilterViewClear'));
     }
     showWorkspace();
     await this.navigateToCell(target.name, start.ref, false, guard);
@@ -739,7 +740,7 @@ export class GridNavigation {
     const anchor = merge ? `${colName(merge.col)}${merge.row}` : start.ref;
     if (S.selected.ref !== anchor) return false;
     if (multiple) {
-      if (S.filtered) throw new Error('该表处于筛选视图，请先清除筛选后重试');
+      if (S.filtered) throw new Error(localize('ui.navigation.thisTableFilteredViewClear'));
       ensureExtent(end.row, end.col);
       S.multiRanges = [];
       this.extendRange({ row: start.row, col: start.col, visual: start.row }, end.row, end.col);
@@ -886,11 +887,11 @@ export class GridNavigation {
     const { S, api, toast, setStatus } = this.d;
     if (!S.indexReady || !S.selected || !S.sheet) return;
     if (S.largeData && (direction === 'up' || direction === 'down')) {
-      toast('超大数据模式关闭纵向 Ctrl+方向键扫描；请使用地址框或 Ctrl+Home / Ctrl+End 定位', 'warning');
+      toast(localize('ui.navigation.ultraLargeDataModeTurn'), 'warning');
       return;
     }
     if (S.filtered) {
-      toast('数据边界快捷导航暂不适用于排序/筛选视图；请先清除筛选', 'warning');
+      toast(localize('ui.navigation.quickNavigationDataBoundariesNot'), 'warning');
       return;
     }
     const sheet = S.sheet;
@@ -904,7 +905,7 @@ export class GridNavigation {
     S.navigationAbort = abort;
     const ticket = ++S.navigationTicket;
     const origin = S.selected.ref;
-    setStatus(`正在查找 ${direction === 'up' || direction === 'down' ? '列' : '行'}数据边界…`);
+    setStatus(localize('ui.navigation.searchingDataBoundaries', { detail: direction === 'up' || direction === 'down' ? localize('ui.common.column') : localize('ui.navigation.row') }));
     try {
       const params = new URLSearchParams({ sheet, ref: origin, direction });
       const result = await api(`/api/navigate?${params.toString()}`, {
@@ -923,7 +924,7 @@ export class GridNavigation {
     } finally {
       if (ticket === S.navigationTicket) {
         S.navigationAbort = null;
-        setStatus(`已打开 · ${sheet}`);
+        setStatus(localize('ui.navigation.opened', { sheet }), true);
       }
     }
   }
@@ -981,7 +982,7 @@ export class GridNavigation {
       v2 = visualIndex || Number(rowNode?.dataset.visualIndex) || 0;
       if (!v2 && row === S.selected?.row) v2 = S.selectedVisualIndex;
       if (!v1 || !v2) {
-        toast('当前筛选行位置尚未加载，请先滚动到目标行', 'warning');
+        toast(localize('ui.navigation.currentFilterRowPositionNot'), 'warning');
         return;
       }
     }
@@ -1001,8 +1002,8 @@ export class GridNavigation {
       : MultiSelection.rowCount(S.range, S.filtered, pinnedRows);
     const cols = Math.abs(S.range.col1 - S.range.col2) + 1;
     requireEl('selectionStatus').textContent = S.multiRanges.length
-      ? `${S.multiRanges.length + 1} 处选区`
-      : `${rows}行 × ${cols}列 · ${(rows * cols).toLocaleString()}格`;
+      ? localize('ui.navigation.votingDistrictLocatedAt', { count: S.multiRanges.length + 1 })
+      : localize('ui.navigation.rowsColumnsCells', { rows, cols, detail: (rows * cols).toLocaleString(interfaceLocale()) });
     applySelectionClasses();
     panels.selectionStats?.schedule();
   }
@@ -1014,7 +1015,7 @@ export class GridNavigation {
     const visual = visualIndex || row;
     this.selectCell(this.cellAt(row, 1), row, 1, ref, visual);
     S.wholeRowSelected = true;
-    requireEl('selectionStatus').textContent = `第 ${row} 行（整行）`;
+    requireEl('selectionStatus').textContent = localize('ui.navigation.rowAtPositionEntireRow', { row });
     S.range = {
       row1: row,
       row2: row,

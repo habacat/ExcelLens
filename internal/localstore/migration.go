@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
+
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"excellens/internal/i18n"
 )
 
 type Migration struct {
@@ -30,7 +32,7 @@ func legacyName(name string) bool {
 // is absent. Caller serializes reads and writes for this file.
 func (r Roots) Adopt(ctx context.Context, kind, name string) (bool, error) {
 	if (kind != "annotations" && kind != "layouts" && kind != "frozen-panes") || !legacyName(name) {
-		return false, errors.New("旧版文件名无效")
+		return false, i18n.Error("diagnostic.localstore.migration.oldVersionFileNameInvalid")
 	}
 	for _, dir := range []string{r.Config, filepath.Join(r.Config, kind)} {
 		st, err := os.Lstat(dir)
@@ -38,13 +40,13 @@ func (r Roots) Adopt(ctx context.Context, kind, name string) (bool, error) {
 			return false, err
 		}
 		if err == nil && !st.IsDir() {
-			return false, fmt.Errorf("设置目录不是普通目录：%s", dir)
+			return false, i18n.Error("diagnostic.localstore.migration.setDirectoryNotRegularDirectory", i18n.Args{"dir": dir})
 		}
 	}
 	target := filepath.Join(r.Config, kind, name)
 	if st, err := os.Lstat(target); err == nil {
 		if !st.Mode().IsRegular() {
-			return false, fmt.Errorf("设置不是普通文件：%s", target)
+			return false, i18n.Error("diagnostic.localstore.migration.settingNotRegularFile", i18n.Args{"target": target})
 		}
 		return false, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -97,7 +99,7 @@ func (r Roots) Adopt(ctx context.Context, kind, name string) (bool, error) {
 		return false, err
 	}
 	if check != rec {
-		return false, errors.New("旧版设置复制校验失败")
+		return false, i18n.Error("diagnostic.localstore.migration.failedCopySettingsFromOlder")
 	}
 	if err := publishNew(tmp.Name(), target); errors.Is(err, os.ErrExist) {
 		return false, nil
@@ -112,7 +114,7 @@ func (r Roots) MigrateLegacy(ctx context.Context) (Migration, error) {
 }
 func (r Roots) MigrateLegacyWith(ctx context.Context, options TransferOptions) (Migration, error) {
 	ctx = options.start(ctx)
-	phase(ctx, "迁入旧设置", 0, 0)
+	phase(ctx, "stage.task.migratingToOldSettings", 0, 0)
 	var report Migration
 	if err := r.migrateFrozen(ctx, &report); err != nil {
 		return report, err

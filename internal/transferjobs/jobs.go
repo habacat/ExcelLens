@@ -7,12 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 )
 
 type Result struct {
-	Message   string `json:"message,omitempty"`
-	Candidate string `json:"candidate,omitempty"`
+	Message   string       `json:"message,omitempty"`
+	Candidate string       `json:"candidate,omitempty"`
+	Notice    i18n.Message `json:"-"`
 }
 type Job struct {
 	Result
@@ -24,7 +26,22 @@ type Job struct {
 	Error       string              `json:"error,omitempty"`
 	Started     time.Time           `json:"started"`
 	Finished    time.Time           `json:"finished,omitzero"`
+	failure     error
 }
+
+func (j Job) Localized(locale i18n.Locale) Job {
+	j.Progress = j.Progress.Localized(locale)
+	if j.Notice.Key != "" {
+		j.Message = j.Notice.Text(locale)
+	}
+	if j.failure == context.Canceled {
+		j.Error = locale.Text("service.transfer.cancelled")
+	} else if j.failure != nil {
+		j.Error = locale.ErrorText(j.failure)
+	}
+	return j
+}
+
 type Manager struct {
 	mu             sync.Mutex
 	jobs           []Job
@@ -58,7 +75,7 @@ func (s *Manager) Start(file, id, action string, run func(context.Context, local
 		return empty, errors.New("另一项数据传输正在进行")
 	}
 	s.load(file)
-	job := Job{ID: id, Action: action, State: "running", Transaction: "preparing", Started: time.Now().UTC(), Progress: localstore.Progress{Phase: "准备"}}
+	job := Job{ID: id, Action: action, State: "running", Transaction: "preparing", Started: time.Now().UTC(), Progress: localstore.ProgressForStage("stage.task.preparation")}
 	jobs := append([]Job{job}, s.jobs[:min(len(s.jobs), 31)]...)
 	s.save(file, jobs)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -91,7 +108,7 @@ func (s *Manager) Start(file, id, action string, run func(context.Context, local
 		current.Transaction = "finished"
 		current.Finished = time.Now().UTC()
 		if err != nil {
-			current.State, current.Error = "failed", err.Error()
+			current.State, current.Error, current.failure = "failed", err.Error(), err
 			if errors.Is(err, context.Canceled) {
 				current.State = "cancelled"
 				if err == context.Canceled {
@@ -99,6 +116,9 @@ func (s *Manager) Start(file, id, action string, run func(context.Context, local
 				}
 			}
 		} else {
+			if result.Notice.Key != "" {
+				result.Message = result.Notice.Text(i18n.Default)
+			}
 			current.State, current.Result = "done", result
 		}
 		s.save(file, s.jobs)

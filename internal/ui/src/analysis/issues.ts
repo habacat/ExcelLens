@@ -1,6 +1,7 @@
 /**
  * Analysis issues inspection, extraction, and CSV export modal controller.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type {
   AnalysisIssue,
   AnalysisQuery,
@@ -38,9 +39,9 @@ export interface AnalysisIssuesOptions {
 }
 
 const KIND_LABELS: Readonly<Record<string, string>> = {
-  conversion: '转换失败',
-  number: '未计入数值聚合',
-  missing_cache: '公式缺缓存',
+  conversion: localize('ui.issues.conversionFailure'),
+  number: localize('ui.issues.notIncludedNumericalAggregations'),
+  missing_cache: localize('ui.issues.formulaNotCached'),
 };
 
 export class AnalysisIssues {
@@ -111,7 +112,7 @@ export class AnalysisIssues {
     const total = this.total(snapshot?.result);
     const button = requireButton('analysisIssuesOpen');
     button.hidden = !total;
-    button.textContent = `核对项目 ${total.toLocaleString()}`;
+    button.textContent = localize('ui.issues.verificationItem', { total: total.toLocaleString(interfaceLocale()) });
     button.disabled = !total;
   }
 
@@ -130,15 +131,15 @@ export class AnalysisIssues {
     const issues = result.issues ?? [];
     const total = this.total(result);
     requireEl('analysisIssuesSummary').textContent =
-      `共 ${total.toLocaleString()} 项；显示 ${issues.length} 项${result.issuesTruncated ? '（样例）' : ''}。同一源行可能有多项。`;
+      localize('ui.issues.totalItemsDisplayedItemsShown', { total: total.toLocaleString(interfaceLocale()), count: issues.length, detail: result.issuesTruncated ? localize('ui.issues.example') : '' });
     requireEl('analysisIssuesTextNote').textContent =
-      '原文最多显示512字符；编辑表最多10,000项，完整原文可导出CSV。';
+      localize('ui.issues.originalTextCanDisplayUp');
 
     const table = requireEl('analysisIssuesTable');
     table.replaceChildren();
     const head = document.createElement('thead');
     const tr = document.createElement('tr');
-    for (const label of ['源位置', '参与字段', '类别', '原文片段', '步骤输入', '当前值', '原因']) {
+    for (const label of [localize('ui.issues.sourceLocation'), localize('ui.issues.participatingFields'), localize('ui.common.categories'), localize('ui.issues.originalFragment'), localize('ui.issues.stepInput'), localize('ui.issues.currentValue'), localize('ui.issues.reason')]) {
       const th = document.createElement('th');
       th.textContent = label;
       tr.append(th);
@@ -153,8 +154,8 @@ export class AnalysisIssues {
       const jump = document.createElement('button');
       jump.type = 'button';
       jump.className = 'analysis-drill-link';
-      jump.textContent = (issue.sourceColumn ? columnName(issue.sourceColumn) : '行 ') + String(issue.row);
-      jump.title = '转到来源位置';
+      jump.textContent = (issue.sourceColumn ? columnName(issue.sourceColumn) : `${localize('ui.issues.row')} `) + String(issue.row);
+      jump.title = localize('ui.issues.goSourceLocation');
       jump.onclick = (): void => {
         if (this.current(snapshot)) {
           this.close();
@@ -180,7 +181,7 @@ export class AnalysisIssues {
         issue.original,
         issue.input,
         issue.value,
-        issue.reason + (issue.textTruncated ? '（内容已截取）' : ''),
+        issue.reason + (issue.textTruncated ? localize('ui.issues.contentTruncated') : ''),
       ];
       for (const text of cells) {
         const td = document.createElement('td');
@@ -200,7 +201,7 @@ export class AnalysisIssues {
     if (this.busy || !this.current(snapshot)) return;
     // Close the native modal before opening the app's naming prompt.
     this.close();
-    const name = await this.askName('提取异常核对表', `异常核对 ${new Date().toLocaleDateString('zh-CN')}`);
+    const name = await this.askName(localize('ui.issues.extractExceptionVerificationForm'), localize('ui.issues.exceptionalCheckOn', { value: new Date().toLocaleDateString('zh-CN') }));
     if (!name || !this.current(snapshot)) return;
     this.busy = true;
     try {
@@ -211,7 +212,7 @@ export class AnalysisIssues {
       if (!this.current(snapshot)) return;
       await this.onMaterialized(data);
       this.toast(
-        `已提取 ${data.rows.toLocaleString()} / ${data.total.toLocaleString()} 项${data.truncated ? '；达到容量上限，完整清单请导出CSV' : ''}`,
+        localize('ui.issues.itemsHaveExtractedFrom', { rows: data.rows.toLocaleString(interfaceLocale()), total: data.total.toLocaleString(interfaceLocale()), detail: data.truncated ? localize('ui.issues.ifCapacityLimitReachedExport') : '' }),
         data.truncated ? 'warning' : 'success',
       );
     } catch (error: unknown) {

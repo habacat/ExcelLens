@@ -2,6 +2,7 @@
  * Conditional formatting presentation helpers and serialized stats request queue.
  * Derived presentation never replaces source values, source types, or style IDs.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   CellData,
   ConditionalPresentation,
@@ -87,9 +88,9 @@ export function applyConditionalNotice(
   if (enabled) {
     if (cell?.conditional?.notice) notices.push(cell.conditional.notice);
     if (row?.presentationNotice) notices.push(row.presentationNotice);
-    if (cell?.conditional?.style?.rotation) notices.push('条件格式文字旋转尚未显示');
+    if (cell?.conditional?.style?.rotation) notices.push(localize('ui.conditional.conditionalFormattingTextRotationNot'));
     if ((conditionalFont(cell).underline || base?.underlineStyle || '').endsWith('Accounting')) {
-      notices.push('会计下划线按文字下划线显示');
+      notices.push(localize('ui.conditional.accountingUnderlineDisplayedAsText'));
     }
   }
   const text = [...new Set(notices)].join('；');

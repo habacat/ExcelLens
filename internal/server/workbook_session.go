@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"path/filepath"
 	"sync"
 
 	"excellens/internal/archives"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -15,7 +16,7 @@ import (
 type workbookSession struct {
 	mu           sync.RWMutex
 	wb           *workbook.Workbook
-	startupError string
+	startupError error
 	launchPath   string // native open reserved for this page's first request
 	maintenance  bool
 }
@@ -28,7 +29,7 @@ func (s *workbookSession) currentWorkbook() *workbook.Workbook {
 
 func (a *App) OpenPath(filePath string) error {
 	if a.rootApp().restoreState.pending() {
-		return errors.New("请先完成恢复事务")
+		return i18n.Error("service.workbookSession.completeRestorationProcessFirst")
 	}
 	_, err := a.openPathAs(filePath, "")
 	return err
@@ -42,7 +43,7 @@ func (a *App) openPathAs(filePath, displayName string) (*workbook.Workbook, erro
 	wb, release, err := a.openPinnedWorkbook(filePath)
 	if err != nil {
 		a.mu.Lock()
-		a.startupError = err.Error()
+		a.startupError = err
 		a.mu.Unlock()
 		return nil, err
 	}
@@ -90,7 +91,7 @@ func (a *App) installWorkbook(wb, expected *workbook.Workbook, guarded bool) boo
 		})
 	}
 	a.wb = wb
-	a.startupError = ""
+	a.startupError = nil
 	a.exports = make(exportController)
 	a.mu.Unlock()
 	a.analysisMu.Unlock()

@@ -3,6 +3,7 @@
  * floating read-only spreadsheet calculator.
  */
 
+import { t as localize } from '../core/i18n.ts';
 export interface CalculatorSourceRef {
   readonly workbookKey: string;
   readonly sheet: string;
@@ -166,7 +167,7 @@ export class FormulaTable {
   }
 
   ensure(index: number): CalculatorRowState {
-    if (!Number.isSafeInteger(index) || index < 0) throw new Error('行号无效');
+    if (!Number.isSafeInteger(index) || index < 0) throw new Error(localize('ui.calculatorModel.invalidRowNumbers'));
     let row = this.rows.get(index);
     if (!row) {
       row = createEmptyRow();
@@ -210,7 +211,7 @@ export class FormulaTable {
   }
 
   setNote(index: number, text: string): void {
-    if (text.length > 4096) throw new Error('备注过长');
+    if (text.length > 4096) throw new Error(localize('ui.calculatorModel.notesTooLong'));
     const row = this.ensure(index);
     if (row.note === text) return;
     row.note = text;
@@ -219,7 +220,7 @@ export class FormulaTable {
   }
 
   edit(index: number, text: string, source: CalculatorSourceRef): CalculatorRowState {
-    if (text.length > 4096) throw new Error('公式过长');
+    if (text.length > 4096) throw new Error(localize('ui.calculatorModel.formulaTooLong'));
     const row = this.ensure(index);
     if (row.text === text) return row;
     if (!row.text || !row.source?.workbookKey) row.source = { ...source };
@@ -265,7 +266,7 @@ export class FormulaTable {
         data.text.length > 4096 ||
         data.note.length > 4096
       ) {
-        throw new Error('计算表恢复内容无效');
+        throw new Error(localize('ui.calculatorModel.calculatedTableRecoveryContentInvalid'));
       }
       let source: CalculatorSourceRef | null = null;
       if (data.source != null) {
@@ -274,7 +275,7 @@ export class FormulaTable {
           typeof data.source.workbookKey !== 'string' ||
           typeof data.source.sheet !== 'string'
         ) {
-          throw new Error('计算表恢复内容无效');
+          throw new Error(localize('ui.calculatorModel.calculatedTableRecoveryContentInvalid'));
         }
         source = { workbookKey: data.source.workbookKey, sheet: data.source.sheet };
       }

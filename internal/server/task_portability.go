@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"fmt"
+
 	"os"
 
 	"excellens/internal/checkpoint"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -176,7 +177,7 @@ func (a *App) proveLegacyTask(ctx context.Context, m checkpoint.Manifest) error 
 		return err
 	}
 	if missing {
-		return fmt.Errorf("旧索引无法核验：%w", os.ErrNotExist)
+		return i18n.Wrap("service.taskPortability.oldIndexesCannotBeVerified", os.ErrNotExist)
 	}
 	return nil
 }

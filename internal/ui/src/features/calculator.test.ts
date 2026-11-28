@@ -1,21 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { ApiRequestOptions } from '../contracts/common.ts';
 import { FormulaInput } from '../editing/formula-entry-model.ts';
 import { createInitialWorkbookState } from '../grid/state.ts';
-import { installDom } from '../test-helpers/dom-mock.ts';
+import { installDom, readIndexHtml } from '../test-helpers/dom-mock.ts';
 import {
   GridInteractions,
   makeDefaultGridInteractionsDeps,
 } from '../test-helpers/grid-fixture.ts';
 import { Calculator } from './calculator.ts';
 import type { CalculatorRowRecord, CalculatorSuggestion } from './calculator-model.ts';
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const INDEX_HTML = fs.readFileSync(path.join(HERE, '../../web/index.html'), 'utf8');
 
 const tick = (): Promise<void> =>
   new Promise((resolve) => {
@@ -273,7 +267,7 @@ test('the window contains just a formula/result table and title controls', () =>
     assert.equal(document.getElementById('calculatorHistoryBtn'), null);
     assert.equal(document.getElementById('calculatorCopyProcess'), null);
     assert.match(
-      INDEX_HTML,
+      readIndexHtml(),
       /role="columnheader">公式<\/span><span role="columnheader">结果<\/span>/,
     );
     assert.equal(h.calc.picking, false);

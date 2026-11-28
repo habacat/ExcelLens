@@ -3,6 +3,7 @@
  * A task can span multiple requests and polling intervals without sharing
  * clocks or progress across tabs.
  */
+import { t as localize } from './i18n.ts';
 import type {
   ActivityBeginOptions,
   ActivityHandle,
@@ -215,7 +216,7 @@ export class ActivityQueue {
         : (chosen.value ?? 0) / 100;
       const percent = Math.floor(chosen.from + (chosen.to - chosen.from) * fraction);
       const approximate = estimated || chosen.from !== 0 || chosen.to !== 100;
-      const value = chosen.detail || `${approximate ? '约 ' : ''}${percent}%`;
+      const value = chosen.detail || `${approximate ? `${localize('ui.activity.zero')} ` : ''}${percent}%`;
       this.paint({
         owner: chosen,
         remaining,
@@ -255,37 +256,37 @@ const QUIET_ROUTES = new Set([
 ]);
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
-  edits: '正在处理编辑副本',
-  analysis: '正在读取分析数据',
-  export: '正在生成导出文件',
-  archive: '正在读取压缩包',
-  sheet: '正在读取单元格',
-  cell: '正在读取单元格',
-  range: '正在读取选区',
-  filter: '正在筛选数据',
-  search: '正在搜索',
-  profile: '正在统计数据',
-  inspect: '正在检查数据',
-  calculator: '正在计算',
-  clipboard: '正在准备复制内容',
-  print: '正在准备打印',
-  printing: '正在准备打印',
-  layout: '正在读取工作表布局',
-  navigate: '正在定位单元格',
-  catalogue: '正在读取工作表目录',
-  reconcile: '正在核对数据',
-  autofit: '正在测量列宽',
-  'data-rules': '正在读取数据规则',
-  'row-view': '正在更新可见行',
-  recipes: '正在处理分析方案',
+  edits: localize('ui.activity.processingEditingCopy'),
+  analysis: localize('ui.activity.readingAnalysisData'),
+  export: localize('ui.common.generatingExportFileProgress'),
+  archive: localize('ui.activity.compressedFilesBeingRead'),
+  sheet: localize('ui.activity.cellsBeingRead'),
+  cell: localize('ui.activity.cellsBeingRead'),
+  range: localize('ui.activity.readingSelectionArea'),
+  filter: localize('ui.common.filteringDataProgress'),
+  search: localize('ui.common.searching'),
+  profile: localize('ui.activity.collectingStatistics'),
+  inspect: localize('ui.activity.checkingData'),
+  calculator: localize('ui.activity.calculating'),
+  clipboard: localize('ui.activity.contentPreparationProgress'),
+  print: localize('ui.activity.printingProgress'),
+  printing: localize('ui.activity.printingProgress'),
+  layout: localize('ui.activity.readingWorksheetLayoutProgress'),
+  navigate: localize('ui.activity.locatingCells'),
+  catalogue: localize('ui.activity.readingWorksheetDirectory'),
+  reconcile: localize('ui.activity.verifyingData'),
+  autofit: localize('ui.activity.measuringColumnWidth'),
+  'data-rules': localize('ui.activity.readingDataRules'),
+  'row-view': localize('ui.activity.visibleRowsBeingUpdated'),
+  recipes: localize('ui.activity.processingAnalysisPlan'),
 };
 
 const EDIT_LABELS: Readonly<Record<string, string>> = {
-  start: '正在准备编辑副本',
-  save: '正在生成副本',
-  commit: '正在应用修改',
-  open: '正在打开副本',
-  download: '正在读取副本',
+  start: localize('ui.activity.copyPreparationProgress'),
+  save: localize('ui.activity.generatingCopy'),
+  commit: localize('ui.activity.applyingModifications'),
+  open: localize('ui.activity.openingCopy'),
+  download: localize('ui.activity.readingCopy'),
 };
 
 export function requestLabel(url: string, method = 'GET'): string {
@@ -301,7 +302,7 @@ export function requestLabel(url: string, method = 'GET'): string {
     return '';
   }
   const [group = '', action = ''] = basePath.split('/');
-  return (group === 'edits' ? EDIT_LABELS[action] : undefined) || GROUP_LABELS[group] || '正在处理请求';
+  return (group === 'edits' ? EDIT_LABELS[action] : undefined) || GROUP_LABELS[group] || localize('ui.activity.processingRequest');
 }
 
 export function createActivityService(

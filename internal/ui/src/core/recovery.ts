@@ -2,6 +2,7 @@
  * Per-page persistent draft recovery journal (separate from source files and
  * saved analysis data). Only a synced server receipt clears matching pending input.
  */
+import { interfaceLocale, t as localize } from './i18n.ts';
 import type { ApiClient, HttpError, SessionService } from '../contracts/common.ts';
 import { errorMessage } from './display-format.ts';
 import { decodeRecoveryListResponse, decodeRecoverySaveResponse } from './http-decoders.generated.ts';
@@ -234,7 +235,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
     } catch (error: unknown) {
       this.loading = false;
       this.blocked = true;
-      this.error = `恢复副本未载入：${errorMessage(error)}`;
+      this.error = localize('ui.recovery.recoveryCopyNotLoaded', { detail: errorMessage(error) });
       this.notify();
       return false;
     }
@@ -249,7 +250,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
       !isPlainRecord(snapshot.records) ||
       Object.keys(snapshot.records).length > 20000
     ) {
-      throw new Error('恢复副本结构无效');
+      throw new Error(localize('ui.recovery.recoveryCopyStructureInvalid'));
     }
   }
 
@@ -309,7 +310,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
       const n = utf8Bytes(JSON.stringify(entry)) + 1;
       if (entries.length && (size + n > 48 * 1024 || entries.length >= 128)) break;
       if (n > 64 * 1024) {
-        const error: HttpError = new Error('单条恢复内容过长，请缩短公式或备注');
+        const error: HttpError = new Error(localize('ui.recovery.singleRecoveryContentTooLong'));
         error.status = 413;
         throw error;
       }
@@ -358,7 +359,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
             clearTimeout(timeout);
           }
           if (!Number.isSafeInteger(meta.revision) || meta.revision !== sent.request.revision + 1) {
-            throw new Error('恢复保存确认版本无效');
+            throw new Error(localize('ui.recovery.invalidConfirmationVersionRecoverySaved'));
           }
           this.revision = meta.revision;
           this.failures = 0;
@@ -372,7 +373,7 @@ export class RecoveryJournal<TRecord = Record<string, unknown>> {
         }
         return !this.dirty;
       } catch (error: unknown) {
-        this.error = `恢复未保存：${errorMessage(error)}`;
+        this.error = localize('ui.recovery.restoringUnsaved', { detail: errorMessage(error) });
         this.failures++;
         const status = getHttpStatus(error);
         this.blocked = status !== undefined && [400, 409, 413, 422].includes(status);
@@ -456,7 +457,7 @@ function previewLine(kind: RecoveryKind, key: string, value: unknown): string {
   const num = (field: string): number => (typeof rec[field] === 'number' ? rec[field] : Number(rec[field] ?? 0));
   if (kind === 'calculator') {
     const note = str('note');
-    return `第${Number(key) + 1}行　${str('text')}${note ? `　备注：${note}` : ''}`;
+    return localize('ui.recovery.rowColumnColumn', { key: Number(key) + 1, str: str('text'), detail: note ? `　${localize('ui.recovery.notes', { note })}` : '' });
   }
   return `${str('book')} / ${str('id')} / ${num('row') + 1},${num('col') + 1}　${str('value')}`;
 }
@@ -483,7 +484,7 @@ export function showRecoveryDialog<TRecord>(
   heading.textContent = options.title;
   const close = document.createElement('button');
   close.type = 'button';
-  close.textContent = '关闭';
+  close.textContent = localize('ui.common.close');
   close.onclick = (): void => el.close();
   head.append(heading, close);
 
@@ -497,22 +498,22 @@ export function showRecoveryDialog<TRecord>(
   tools.className = 'recovery-tools';
   const retry = document.createElement('button');
   retry.type = 'button';
-  retry.textContent = '重试保存';
+  retry.textContent = localize('ui.recovery.retrySaving');
   const fork = document.createElement('button');
   fork.type = 'button';
-  fork.textContent = '另存本页副本';
+  fork.textContent = localize('ui.recovery.saveCopyThisPage');
   tools.append(retry, fork);
 
   const list = document.createElement('div');
   list.className = 'recovery-list';
-  list.textContent = '正在读取恢复副本…';
+  list.textContent = localize('ui.recovery.readingRestoreCopies');
   const preview = document.createElement('pre');
   preview.className = 'recovery-preview';
   preview.hidden = true;
   const load = document.createElement('button');
   load.type = 'button';
   load.className = 'recovery-load';
-  load.textContent = '载入副本';
+  load.textContent = localize('ui.recovery.loadDuplicate');
   load.hidden = true;
 
   let selected: RecoveryListEntry | null = null;
@@ -523,10 +524,10 @@ export function showRecoveryDialog<TRecord>(
     status.textContent =
       journal.error ||
       (journal.dirty
-        ? '本页还有未确认输入'
+        ? localize('ui.recovery.thereStillUnconfirmedInputsOn')
         : journal.records.size
-          ? '本页恢复副本已保存'
-          : '本页暂无输入');
+          ? localize('ui.recovery.recoveryCopyOnThisPage')
+          : localize('ui.recovery.noInputAvailableOnThis'));
     retry.disabled = busy;
     fork.disabled = busy || !journal.records.size;
     load.disabled = busy || !selected;
@@ -565,9 +566,9 @@ export function showRecoveryDialog<TRecord>(
       if (!selected) return;
       const result = await journal.importCopy(selected);
       status.textContent =
-        `已载入${result.count}条` +
-        (result.skipped ? `；保留本页同格草稿${result.skipped}条` : '') +
-        (result.saved ? '；恢复副本已保存' : `；${journal.error}`);
+        localize('ui.recovery.loadedItems', { count: result.count }) +
+        (result.skipped ? localize('ui.recovery.retainSameNumberDraftsOn', { skipped: result.skipped }) : '') +
+        (result.saved ? localize('ui.recovery.restoreCopySaved') : `；${journal.error}`);
     });
   };
 
@@ -593,7 +594,7 @@ export function showRecoveryDialog<TRecord>(
       list.replaceChildren();
       const entries = data.entries ?? [];
       if (!entries.length) {
-        list.textContent = '暂无恢复副本';
+        list.textContent = localize('ui.recovery.noRecoveryCopyAvailable');
         return;
       }
       for (const entry of entries) {
@@ -601,9 +602,9 @@ export function showRecoveryDialog<TRecord>(
         button.type = 'button';
         button.className = 'recovery-entry';
         button.textContent =
-          new Date(entry.updated).toLocaleString() +
-          (entry.backup ? '　备份' : '') +
-          (entry.owner === journal.owner ? '　本页' : '') +
+          new Date(entry.updated).toLocaleString(interfaceLocale()) +
+          (entry.backup ? `　${localize('ui.recovery.backUp')}` : '') +
+          (entry.owner === journal.owner ? `　${localize('ui.recovery.thisPage')}` : '') +
           `　${Math.ceil(entry.bytes / 1024)} KiB`;
         button.onclick = (): void => {
           void run(async () => {
@@ -611,7 +612,7 @@ export function showRecoveryDialog<TRecord>(
             selected = null;
             load.hidden = true;
             preview.hidden = false;
-            preview.textContent = '正在读取…';
+            preview.textContent = localize('ui.common.reading');
             const copy = await journal.api(
               `/api/recovery?kind=${journal.kind}&owner=${encodeURIComponent(entry.owner)}${entry.backup ? '&backup=1' : ''}`,
             );
@@ -620,7 +621,8 @@ export function showRecoveryDialog<TRecord>(
             selected = entry;
             const items = Object.entries(copy.records);
             preview.textContent = (
-              `${items.length}条输入${copy.recovered ? '（已找回中断前的完整记录）' : ''}\n` +
+              `${localize('ui.recovery.inputItems', { count: items.length, detail: copy.recovered ? localize('ui.recovery.fullRecordRecoveredBeforeInterruption') : '' })}
+` +
               items
                 .slice(0, 5)
                 .map(([key, v]) => previewLine(journal.kind, key, v))

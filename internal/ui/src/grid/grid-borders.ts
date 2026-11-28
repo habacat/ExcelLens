@@ -14,10 +14,61 @@ const RANKS: Readonly<Record<string, number>> = {
   ridge: 2,
 };
 
+export interface ParsedBorder {
+  readonly css: string;
+  readonly width: number;
+  readonly kind: string;
+  readonly color: string;
+  readonly score: number;
+}
+
+export interface BorderCorner {
+  readonly width: number;
+  readonly height: number;
+  readonly kind: 'solid' | 'double';
+  readonly color: string;
+}
+
+export interface InnerBorderCorner {
+  readonly corner: BorderCorner;
+  readonly rightOffset?: number;
+  readonly bottomOffset?: number;
+}
+
+const BORDER_CSS_PATTERN = /^([\d.]+)px\s+(solid|double|dashed|dotted|groove|ridge)\s+(.+)$/i;
+
 const weights = new Map<string, number>();
+const parsedBorders = new Map<string, ParsedBorder | null>();
+
+export function parseBorder(value: string | undefined): ParsedBorder | null {
+  if (!value || value === '0px' || value === 'none') return null;
+  const cached = parsedBorders.get(value);
+  if (cached !== undefined) return cached;
+  const match = BORDER_CSS_PATTERN.exec(value);
+  let result: ParsedBorder | null = null;
+  if (match?.[1] && match[2] && match[3]) {
+    const width = Number(match[1]);
+    const color = match[3].trim();
+    if (width > 0 && color) {
+      const kind = match[2].toLowerCase();
+      result = {
+        css: value,
+        width,
+        kind,
+        color,
+        score: width * 100 + (RANKS[kind] ?? 1),
+      };
+    }
+  }
+  if (parsedBorders.size >= 512) parsedBorders.clear();
+  parsedBorders.set(value, result);
+  return result;
+}
 
 function score(value: string | undefined): number {
   if (!value) return 0;
+  const parsed = parseBorder(value);
+  if (parsed) return parsed.score;
   const cached = weights.get(value);
   if (cached !== undefined) return cached;
   const parts = value.split(/\s+/);
@@ -41,6 +92,45 @@ export function resolveBorders(
   return {
     right: chooseBorder(current.borderRight, right.borderLeft),
     bottom: chooseBorder(current.borderBottom, below.borderTop),
+  };
+}
+
+/**
+ * Resolves the 2D corner cap needed at a 4-seam vertex where `east` (horizontal)
+ * and `south` (vertical) meet inside the bottom-right corner of the cell owning
+ * `north` (right seam) and `west` (bottom seam).
+ *
+ * Returns `null` when either `east` or `south` is absent or when `north`/`west`
+ * already solidly covers the `[X - south.width, X] x [Y - east.width, Y]` junction.
+ */
+export function resolveBorderCorner(
+  north?: string,
+  west?: string,
+  east?: string,
+  south?: string,
+): BorderCorner | null {
+  const e = parseBorder(east);
+  const s = parseBorder(south);
+  if (!e || !s) return null;
+  const winner = s.score > e.score ? s : e;
+  const doubleCorner = e.kind === 'double' && s.kind === 'double' && e.width >= 2 && s.width >= 2;
+  const n = parseBorder(north);
+  const w = parseBorder(west);
+  const coveredBy = (existing: ParsedBorder | null, requiredSpan: number): boolean => {
+    if (!existing || existing.width < requiredSpan) return false;
+    if (doubleCorner) return existing.kind === 'double' && existing.score >= winner.score;
+    if (existing.kind !== 'solid') return false;
+    return (
+      existing.score >= winner.score ||
+      existing.color.toLowerCase() === winner.color.toLowerCase()
+    );
+  };
+  if (coveredBy(n, s.width) || coveredBy(w, e.width)) return null;
+  return {
+    width: s.width,
+    height: e.width,
+    kind: doubleCorner ? 'double' : 'solid',
+    color: winner.color,
   };
 }
 
@@ -78,11 +168,13 @@ export function paintBorder(
   stroke: string | readonly BorderSegment[],
   offset: (index: number) => number,
   crossing = '',
+  insetStroke = false,
 ): void {
   const mixed = Array.isArray(stroke);
   const property: 'borderRight' | 'borderBottom' = side === 'right' ? 'borderRight' : 'borderBottom';
   const insetDefault = !mixed && !stroke && Boolean(crossing) && crossing !== '0px';
-  const value = mixed || insetDefault ? '0px' : (stroke as string);
+  const insetSolid = !mixed && insetStroke && Boolean(stroke) && stroke !== '0px';
+  const value = mixed || insetDefault || insetSolid ? '0px' : (stroke as string);
 
   if (property === 'borderRight') {
     if (node._xlborderRight !== value) {
@@ -99,7 +191,7 @@ export function paintBorder(
   let layer: BorderLayerElement | null | undefined =
     property === 'borderRight' ? node._xlborderRightParts : node._xlborderBottomParts;
 
-  if (!mixed && !insetDefault) {
+  if (!mixed && !insetDefault && !insetSolid) {
     if (layer) {
       layer.remove();
       if (property === 'borderRight') node._xlborderRightParts = null;
@@ -116,10 +208,24 @@ export function paintBorder(
     else node._xlborderBottomParts = layer;
   }
 
-  const className = insetDefault ? `grid-default-${side}` : 'grid-border-segments';
+  const className = insetDefault
+    ? `grid-default-${side}`
+    : insetSolid
+      ? 'grid-inset-border'
+      : 'grid-border-segments';
   if (layer.className !== className) {
     layer.className = className;
-    if (insetDefault && layer.children.length) layer.replaceChildren();
+    if (!mixed && layer.children.length) layer.replaceChildren();
+    if (!insetSolid) {
+      layer.style.removeProperty('border-right');
+      layer.style.removeProperty('border-bottom');
+    }
+  }
+  if (insetSolid) {
+    const strokeCss = stroke as string;
+    if (layer.style[property] !== strokeCss) layer.style[property] = strokeCss;
+    layer.style.removeProperty(property === 'borderRight' ? 'border-bottom' : 'border-right');
+    return;
   }
   if (insetDefault || !Array.isArray(stroke)) return;
 
@@ -148,6 +254,92 @@ export function paintBorder(
   while (layer.children.length > segments.length) {
     layer.lastChild?.remove();
   }
+}
+
+function applyCornerStyle(cap: HTMLElement, corner: BorderCorner): void {
+  if (corner.kind === 'double') {
+    cap.style.backgroundColor = '';
+    cap.style.borderRight = '';
+    cap.style.borderBottom = '';
+    cap.style.borderTop = `${corner.height}px double ${corner.color}`;
+    cap.style.borderLeft = `${corner.width}px double ${corner.color}`;
+  } else {
+    cap.style.borderTop = '';
+    cap.style.borderLeft = '';
+    cap.style.borderRight = `${corner.width}px solid transparent`;
+    cap.style.borderBottom = `${corner.height}px solid transparent`;
+    cap.style.backgroundColor = corner.color;
+  }
+}
+
+export function paintBorderCorner(
+  node: GridCellElement,
+  corner: BorderCorner | null,
+): void {
+  if (!corner) {
+    if (node._xlCornerCap) {
+      node._xlCornerCap.remove();
+      node._xlCornerCap = null;
+      node._xlCornerKey = '';
+    }
+    return;
+  }
+  const key = `${corner.width}|${corner.height}|${corner.kind}|${corner.color}`;
+  let cap = node._xlCornerCap;
+  if (cap?.parentNode === node && node._xlCornerKey === key) return;
+  if (cap?.parentNode !== node) {
+    cap = document.createElement('span');
+    cap.className = 'grid-border-corner';
+    cap.setAttribute('aria-hidden', 'true');
+    node.appendChild(cap);
+    node._xlCornerCap = cap;
+  }
+  applyCornerStyle(cap, corner);
+  node._xlCornerKey = key;
+}
+
+export function paintInnerBorderCorners(
+  node: GridCellElement,
+  corners: readonly InnerBorderCorner[],
+): void {
+  if (!corners.length) {
+    if (node._xlInnerCorners) {
+      node._xlInnerCorners.remove();
+      node._xlInnerCorners = null;
+      node._xlInnerCornerKey = '';
+    }
+    return;
+  }
+  const key = corners
+    .map(
+      ({ corner, rightOffset, bottomOffset }) =>
+        `${corner.width},${corner.height},${corner.kind},${corner.color},${rightOffset ?? ''},${bottomOffset ?? ''}`,
+    )
+    .join(';');
+  let layer = node._xlInnerCorners;
+  if (layer?.parentNode === node && node._xlInnerCornerKey === key) return;
+  if (layer?.parentNode !== node) {
+    layer = document.createElement('span');
+    layer.className = 'grid-border-corners';
+    layer.setAttribute('aria-hidden', 'true');
+    node.appendChild(layer);
+    node._xlInnerCorners = layer;
+  }
+  corners.forEach(({ corner, rightOffset, bottomOffset }, i) => {
+    const existing = layer.children[i];
+    const cap =
+      existing instanceof HTMLElement
+        ? existing
+        : layer.appendChild(document.createElement('i'));
+    if (cap.className !== 'grid-border-corner') cap.className = 'grid-border-corner';
+    applyCornerStyle(cap, corner);
+    cap.style.right = rightOffset !== undefined ? `calc(100% - ${rightOffset}px)` : '0';
+    cap.style.bottom = bottomOffset !== undefined ? `calc(100% - ${bottomOffset}px)` : '0';
+  });
+  while (layer.children.length > corners.length) {
+    layer.lastChild?.remove();
+  }
+  node._xlInnerCornerKey = key;
 }
 
 export type BorderSideCapitalized = 'Top' | 'Bottom' | 'Left' | 'Right';
@@ -198,9 +390,13 @@ export function usedBorderWidth(
 }
 
 export const GridBorders = Object.freeze({
+  parse: parseBorder,
   choose: chooseBorder,
   resolve: resolveBorders,
+  corner: resolveBorderCorner,
   runs: borderRuns,
   paint: paintBorder,
+  paintCorner: paintBorderCorner,
+  paintInnerCorners: paintInnerBorderCorners,
   usedWidth: usedBorderWidth,
 });

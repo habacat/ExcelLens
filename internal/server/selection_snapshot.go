@@ -1,8 +1,7 @@
 package server
 
 import (
-	"errors"
-
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -34,18 +33,18 @@ func (a *App) selectionSnapshot(wb *workbook.Workbook, idx *workbook.SheetIndex,
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != wb || wb.GetCachedIndex(path) != idx {
-		return selectionSnapshot{}, errors.New("选区来源已变化，请重新选择")
+		return selectionSnapshot{}, i18n.Error("service.selectionSnapshot.sourceSelectionChangedReselect")
 	}
 	if filterID == "" {
 		return selectionSnapshot{}, nil
 	}
 	filter := a.filterResults[filterID]
 	if filter == nil || filter.SheetPath != path {
-		return selectionSnapshot{}, errors.New("筛选结果已失效，请重新筛选")
+		return selectionSnapshot{}, i18n.Error("service.filter.expired")
 	}
 	copy := filter.snapshot()
 	if copy == nil {
-		return selectionSnapshot{}, errors.New("筛选结果已释放，请重新筛选")
+		return selectionSnapshot{}, i18n.Error("service.selectionSnapshot.filterResultsHaveReleasedFilter")
 	}
 	return selectionSnapshot{filter: copy}, nil
 }

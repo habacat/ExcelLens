@@ -4,8 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"encoding/json"
-	"errors"
-	"fmt"
+
 	"strconv"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -183,7 +183,7 @@ func (a *App) checkEditStyleProof(doc *editdoc.Document, proof string, changes [
 	for _, c := range changes {
 		if c.Value.Style != "" || c.Value.NumberStyle != "" || c.Value.BuiltinFormat != 0 {
 			if !a.validEditProof(doc, proof, changes) {
-				return errors.New("格式变更需要当前修订的预览，请重新预览")
+				return i18n.Error("service.editClipboard.formatChangesRequireCurrentPreview")
 			}
 			break
 		}
@@ -323,7 +323,7 @@ func (a *App) previewEditRule(ctx context.Context, doc *editdoc.Document, layout
 		rule.First = strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(rule.First), "="))
 	} else if rule.Type == "list" {
 		if strings.Contains(rule.First, ",") {
-			return editBatchPreview{}, errors.New("列表选项每行一项，选项中不能含逗号")
+			return editBatchPreview{}, i18n.Error("service.editClipboard.listOptionsIncludeOneItem")
 		}
 		choices := strings.Split(strings.ReplaceAll(rule.First, "\r\n", "\n"), "\n")
 		rule.First = editfile.ListFormula(choices)
@@ -349,17 +349,17 @@ func (a *App) planClipboard(ctx context.Context, doc *editdoc.Document, layout e
 	if clip == nil || clip.Format != editClipboardFormat || clip.Version != 2 || clip.Cols <= 0 || clip.Cols > formats.ExcelColumns ||
 		clip.Rows <= 0 || clip.Rows > formats.EditBatchCells/clip.Cols || len(clip.Cells) != clip.Rows*clip.Cols ||
 		clip.Start.Row < 1 || clip.Start.Row > formats.ExternalRows-clip.Rows+1 || clip.Start.Col < 1 || clip.Start.Col > formats.ExcelColumns-clip.Cols+1 {
-		return editBatchPreview{}, errors.New("请选择从编辑副本复制的有类型数据")
+		return editBatchPreview{}, i18n.Error("service.editClipboard.selectTypedDataCopiedFrom")
 	}
 	switch req.Mode {
 	case "values":
 	case "formulas":
 		if layout.XLSX == nil {
-			return editBatchPreview{}, errors.New("此格式只能保存文本字段")
+			return editBatchPreview{}, i18n.Error("service.editClipboard.thisFormatCanOnlySave")
 		}
 	case "styles", "all":
 		if layout.XLSX == nil || clip.Source != doc.Base.Source.Stamp || !hmac.Equal([]byte(clip.Proof), []byte(a.editClipboardProof(*clip))) {
-			return editBatchPreview{}, errors.New("粘贴单元格格式需要从同一工作簿重新复制")
+			return editBatchPreview{}, i18n.Error("service.editClipboard.cellFormatNeedsBeCopied")
 		}
 	default:
 		return editBatchPreview{}, editdoc.ErrInvalid
@@ -368,7 +368,7 @@ func (a *App) planClipboard(ctx context.Context, doc *editdoc.Document, layout e
 	if req.Mode == "all" && req.End != "" {
 		end, err := editAddress(first.Sheet, req.End)
 		if err != nil || end.Row < last.Row || end.Col < last.Col || (end.Row-first.Row+1)%clip.Rows != 0 || (end.Col-first.Col+1)%clip.Cols != 0 {
-			return editBatchPreview{}, errors.New("选择与复制区域匹配的矩形")
+			return editBatchPreview{}, i18n.Error("service.editClipboard.selectRectangleThatMatchesSelection")
 		}
 		last = end
 	}
@@ -400,7 +400,7 @@ func (a *App) planClipboard(ctx context.Context, doc *editdoc.Document, layout e
 		switch mode {
 		case "values":
 			if c.Value == nil {
-				return preview, fmt.Errorf("%s%d 当前没有可复制的结果", workbook.ColumnName(clip.Start.Col+col), clip.Start.Row+r)
+				return preview, i18n.Error("service.editClipboard.noResultsAvailableCopying", i18n.Args{"columnName": workbook.ColumnName(clip.Start.Col + col), "start": clip.Start.Row + r})
 			}
 			v = *c.Value
 			if v.Kind == "missing" {

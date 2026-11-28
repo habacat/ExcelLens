@@ -2,8 +2,8 @@
 
 package shellmenu
 
-import "errors"
+import "excellens/internal/i18n"
 
-func IsInstalled() bool { return false }
-func Install() error    { return errors.New("仅 Windows 支持右键菜单集成") }
-func Uninstall() error  { return errors.New("仅 Windows 支持右键菜单集成") }
+func IsInstalled() bool         { return false }
+func Install(i18n.Locale) error { return i18n.Error("native.shell.windowsOnly") }
+func Uninstall() error          { return i18n.Error("native.shell.windowsOnly") }

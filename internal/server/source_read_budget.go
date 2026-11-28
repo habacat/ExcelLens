@@ -2,13 +2,14 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
+
 	"unicode/utf8"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
-var errSourceReadCapacity = errors.New("源行超过单次读取容量，请使用选区或流式导出")
+var errSourceReadCapacity = i18n.Error("service.sourceReadBudget.sourceRowExceedsSingleRead")
 
 // Match this build's replacement-rune encoding without rewriting source text.
 var jsonInvalidUTF8Bytes = func() int {
@@ -39,11 +40,11 @@ func sourceRowsWithinBudget(idx *workbook.SheetIndex, numbers []int, limit int64
 
 func sourceRowByteLength(idx *workbook.SheetIndex, at int) (int64, error) {
 	if at < 0 || at >= idx.RowCount() {
-		return 0, errors.New("源行索引位置无效")
+		return 0, i18n.Error("service.sourceReadBudget.invalidSourceRowIndexPosition")
 	}
 	offset := idx.RowAt(at)
 	if offset.Start < 0 || offset.End < offset.Start || offset.End > idx.XMLSize {
-		return 0, errors.New("源行缓存范围无效")
+		return 0, i18n.Error("service.sourceReadBudget.sourceRowCacheRangeInvalid")
 	}
 	return offset.End - offset.Start, nil
 }

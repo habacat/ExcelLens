@@ -1,6 +1,7 @@
 /**
  * Keyboard-first command & worksheet palette (Ctrl+K).
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ToastFn } from '../contracts/common.ts';
 import type { SheetMeta } from '../contracts/workbook.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
@@ -184,7 +185,7 @@ export class CommandPalette {
       for (const sheet of this.sheets()) {
         if (sheet.name.toLocaleLowerCase().includes(query)) {
           this.visible.push({
-            name: `打开工作表：${sheet.name}`,
+            name: localize('ui.commandPalette.openWorksheet', { name: sheet.name }),
             run: () => this.selectSheet(sheet.name),
           });
         }
@@ -218,7 +219,7 @@ export class CommandPalette {
     if (!this.visible.length) {
       const empty = doc.createElement('div');
       empty.className = 'command-empty';
-      empty.textContent = '没有匹配的功能或工作表';
+      empty.textContent = localize('ui.commandPalette.noMatchingFunctionsOrWorksheets');
       fragment.append(empty);
     }
     list.replaceChildren(fragment);

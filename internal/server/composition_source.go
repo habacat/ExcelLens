@@ -3,8 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
+
 	"iter"
 	"slices"
 	"strconv"
@@ -12,12 +11,13 @@ import (
 
 	"excellens/internal/composition"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
-var errCompositionSourceReleased = errors.New("多表来源快照已释放")
+var errCompositionSourceReleased = i18n.Error("service.compositionSource.multiTableSourceSnapshotsHave")
 
 type compositionSourceInfo struct {
 	Ref    sourceview.TableRef `json:"ref"`
@@ -103,7 +103,7 @@ func (a *App) captureComposition(ctx context.Context, input sourceview.Append) (
 	for i, input := range definition.Inputs {
 		wb := a.resolveReconcileBook(input.Ref.Book)
 		if wb == nil || wb.Fingerprint != input.Ref.Fingerprint {
-			return nil, fmt.Errorf("第%d份来源已关闭或发生变化，请重新选择", i+1)
+			return nil, i18n.Error("service.compositionSource.thSourceClosedOrChanged", i18n.Args{"value": i + 1})
 		}
 		data.books[i] = wb
 	}
@@ -122,7 +122,7 @@ func (a *App) captureComposition(ctx context.Context, input sourceview.Append) (
 			data.release = append(data.release, release)
 		}
 		if weight > formats.CompositionSourceBytes-retainedBytes {
-			return nil, errors.New("多表来源快照超过容量，请减少来源或字段")
+			return nil, i18n.Error("service.compositionSource.multiTableSourceSnapshotExceeds")
 		}
 		retainedBytes += weight
 		sources[i] = source
@@ -159,7 +159,7 @@ func (a *App) captureComposition(ctx context.Context, input sourceview.Append) (
 // for composition, because it cannot carry complete formula/cache state.
 func (a *App) compositionSource(ctx context.Context, wb *workbook.Workbook, ref sourceview.TableRef) (composition.Source, compositionSourceInfo, func(), int64, error) {
 	if wb == nil || sourceBookID(wb) != ref.Book || wb.Fingerprint != ref.Fingerprint {
-		return composition.Source{}, compositionSourceInfo{}, nil, 0, errors.New("多表来源身份不一致")
+		return composition.Source{}, compositionSourceInfo{}, nil, 0, i18n.Error("service.compositionSource.multiTableSourcesHaveInconsistent")
 	}
 	metadata, err := a.buildReconcileSourceWithHeaderBudget(ctx, wb, reconcileSourceRef{Book: ref.Book, Source: ref.Source, HeaderRow: ref.HeaderRow, Stamp: ref.Stamp}, nil, formats.CompositionSourceRowBytes)
 	if err != nil {
@@ -185,11 +185,11 @@ func (a *App) compositionSource(ctx context.Context, wb *workbook.Workbook, ref 
 	}
 	meta, found := wb.FindSheet(strings.TrimPrefix(ref.Source, "wb:"))
 	if !found {
-		return composition.Source{}, info, nil, 0, errors.New("多表源工作表不存在")
+		return composition.Source{}, info, nil, 0, i18n.Error("service.compositionSource.multiTableSourceWorksheetsDo")
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		return composition.Source{}, info, nil, 0, errors.New("多表来源索引未就绪")
+		return composition.Source{}, info, nil, 0, i18n.Error("service.compositionSource.multiTableSourceIndexesNot")
 	}
 	maxRow, maxCol := idx.MaxRow, max(1, idx.MaxCol)
 	rows := func() iter.Seq[workbook.SourceRowReference] {
@@ -233,7 +233,7 @@ func (a *App) compositionSource(ctx context.Context, wb *workbook.Workbook, ref 
 			return err
 		}
 		if wb.GetCachedIndex(meta.Path) != idx || sourceBookID(wb) != ref.Book {
-			return errors.New("多表来源索引或身份已变化")
+			return i18n.Error("service.compositionSource.multiTableSourceIndexOr")
 		}
 		return wb.CheckSourceUnchanged()
 	}
@@ -260,11 +260,11 @@ func (a *App) compositionSource(ctx context.Context, wb *workbook.Workbook, ref 
 				if row.Position >= 0 {
 					length, err := sourceRowByteLength(idx, row.Position)
 					if err != nil || idx.RowAt(row.Position).Number != row.Number {
-						referenceError = errors.New("多表源行索引坐标无效")
+						referenceError = i18n.Error("service.compositionSource.multiSheetSourceRowIndex")
 						return
 					}
 					if length > formats.CompositionSourceRowBytes {
-						referenceError = errors.New("多表来源单行超过读取容量，未截断数据")
+						referenceError = i18n.Error("service.compositionSource.singleRowMultiTableSource")
 						return
 					}
 				}
@@ -292,7 +292,7 @@ func (a *App) compositionScratch(ctx context.Context, wb *workbook.Workbook, ref
 	}
 	sheet := workspace.Sheet(strings.TrimPrefix(ref.Source, "scratch:"))
 	if sheet == nil || analysisSheetStamp(sheet) != ref.Stamp {
-		return composition.Source{}, 0, errors.New("分析表内容已变化，请重新选择多表来源")
+		return composition.Source{}, 0, i18n.Error("service.compositionSource.contentAnalysisTableChangedReselect")
 	}
 	// loadAnalysis decoded a private immutable snapshot. No editing API receives
 	// this object; later saves do not mutate this task's captured strings.
@@ -303,7 +303,7 @@ func (a *App) compositionScratch(ctx context.Context, wb *workbook.Workbook, ref
 			weight += int64(len(text))*5/4 + 16
 		}
 		if weight > formats.CompositionSourceBytes {
-			return composition.Source{}, 0, errors.New("多表分析表快照超过容量")
+			return composition.Source{}, 0, i18n.Error("service.compositionSource.snapshotMultiTableAnalysisTable")
 		}
 	}
 	scan := func(ctx context.Context, columns []int, visit func(composition.SourceRow) error) error {
@@ -314,7 +314,7 @@ func (a *App) compositionScratch(ctx context.Context, wb *workbook.Workbook, ref
 			cells := make([]workbook.CellData, 0, len(columns))
 			for _, column := range columns {
 				if column < 1 || column > len(sheet.Columns) {
-					return errors.New("多表分析表字段无效")
+					return i18n.Error("service.compositionSource.fieldsMultiTableAnalysisInvalid")
 				}
 				if column <= len(row) {
 					cells = append(cells, workbook.CellData{Ref: workbook.ColumnName(column) + strconv.Itoa(position+1), Col: column, Raw: row[column-1], Display: row[column-1], Type: "s"})

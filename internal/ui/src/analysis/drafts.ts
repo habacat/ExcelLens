@@ -2,6 +2,7 @@
  * Unsaved analysis edits stay separate from the last durable server snapshot.
  * Acknowledging an older request must never erase a newer draft.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { AnalysisCellChange } from '../contracts/analysis.ts';
 
 export interface AnalysisDraftRecord {
@@ -80,7 +81,7 @@ export class AnalysisDrafts {
         Array.from(raw.value).length > 4000 ||
         this.key(raw.book, raw.id, raw.row, raw.col) !== key
       ) {
-        throw new Error('分析草稿恢复内容无效');
+        throw new Error(localize('ui.drafts.analysisDraftRecoveryContentInvalid'));
       }
       validated.push([
         key,

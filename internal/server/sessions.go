@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"fmt"
+
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/browserlease"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -40,8 +41,8 @@ func validSessionID(id string) bool {
 }
 
 var (
-	errSessionExpired = errors.New("页面会话已过期，请刷新页面并重新打开文件")
-	errPageReplaced   = errors.New("此页面的会话已由其他页面接管，请刷新页面")
+	errSessionExpired = i18n.Error("service.sessions.pageSessionExpiredRefreshPage")
+	errPageReplaced   = i18n.Error("service.sessions.sessionOnThisPageTaken")
 )
 
 type sessionAccess struct {
@@ -55,7 +56,7 @@ type sessionAccess struct {
 // includes native opens, uploads and streaming downloads.
 func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*browserSession, error) {
 	if !validSessionID(id) {
-		return nil, errors.New("无效的页面会话标识")
+		return nil, i18n.Error("service.sessions.invalidPageSessionIdentifier")
 	}
 	a.sessionGate.RLock()
 	defer a.sessionGate.RUnlock()
@@ -70,7 +71,7 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 			return nil, errSessionExpired
 		}
 		if a.pageCountLocked(now) >= maxBrowserSessions {
-			return nil, fmt.Errorf("同时打开的页面已达 %d 个，请关闭旧页面并稍后重试", maxBrowserSessions)
+			return nil, i18n.Error("service.sessions.numberPagesOpenedSimultaneouslyReached", i18n.Args{"maxBrowserSessions": maxBrowserSessions})
 		}
 		if len(a.sessions) >= 2*maxBrowserSessions {
 			var oldest *browserSession
@@ -97,10 +98,10 @@ func (a *App) acquireSession(id, launchPath string, access sessionAccess) (*brow
 		a.sessions[id] = s
 	}
 	if s.lease.Idle(now) && s.retained(now) && access.generation != 0 && a.pageCountLocked(now) >= maxBrowserSessions {
-		return nil, fmt.Errorf("同时打开的页面已达 %d 个", maxBrowserSessions)
+		return nil, i18n.Error("service.sessions.numberOpenPagesReached", i18n.Args{"maxBrowserSessions": maxBrowserSessions})
 	}
 	if s.saved != nil && a.restoreActive.Load() {
-		return nil, errors.New("迁入备份进行中，请稍后查看结果")
+		return nil, i18n.Error("service.sessions.migrationBackupProgressWaitResults")
 	}
 	if access.background && !s.lease.Unattended(now) {
 		return nil, errPageReplaced
@@ -148,7 +149,7 @@ func (a *App) newBrowserSession(launchPath string) (*browserSession, error) {
 			defer func() { child.mu.Lock(); child.launchPath = ""; child.mu.Unlock() }()
 			if err := child.OpenPath(launchPath); err != nil {
 				child.mu.Lock()
-				child.startupError = err.Error()
+				child.startupError = err
 				child.mu.Unlock()
 			}
 		})
@@ -217,12 +218,12 @@ func (a *App) runSessionReaper(stop <-chan struct{}, ticks <-chan time.Time) {
 // reads the native file. Only the new tab waits, outside the sessions lock.
 func (a *App) PreparePathForLaunch(path string) (string, error) {
 	if a.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.sessions.completeRestorationProcessFirst")
 	}
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
 	if a.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.sessions.completeRestorationProcessFirst")
 	}
 	id := randomID()
 	s, err := a.acquireSession(id, path, sessionAccess{})
@@ -238,12 +239,12 @@ func (a *App) PreparePathForLaunch(path string) (string, error) {
 // A normal app/tray launch supplies no workbook and always opens the home page.
 func (a *App) OpenPathForLaunch(path string) (string, error) {
 	if a.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.sessions.completeRestorationProcessFirst")
 	}
 	a.cacheResetMu.RLock()
 	defer a.cacheResetMu.RUnlock()
 	if a.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.sessions.completeRestorationProcessFirst")
 	}
 	id := randomID()
 	session, err := a.acquireSession(id, "", sessionAccess{})
@@ -283,7 +284,7 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 				a.handleExit(w, r)
 				return
 			}
-			writeError(w, 503, "恢复事务尚未完成，请打开本地数据")
+			writeMessage(w, 503, "service.sessions.restorationProcessNotCompleteOpen")
 			return
 		}
 		if r.URL.Path == "/api/background" {
@@ -317,12 +318,12 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 			defer a.cacheResetMu.RUnlock()
 			if a.restoreState.pending() {
 				w.Header().Set("X-ExcelLens-Recovery", "required")
-				writeError(w, 503, "恢复事务尚未完成，请打开本地数据")
+				writeMessage(w, 503, "service.sessions.restorationProcessNotCompleteOpen")
 				return
 			}
 		}
 		if epoch := r.Header.Get("X-ExcelLens-Cache-Epoch"); epoch != "" && epoch != strconv.FormatUint(a.cacheEpoch.Load(), 10) {
-			writeError(w, http.StatusConflict, "全部缓存已清理，请返回首页重新打开文件")
+			writeMessage(w, http.StatusConflict, "service.sessions.allCacheClearedReturnHomepage")
 			return
 		}
 		id := r.Header.Get("X-ExcelLens-Session")
@@ -341,14 +342,14 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 				return
 			}
 			if !validSessionID(id) || !validSessionID(page) {
-				writeError(w, 400, "页面租约标识无效")
+				writeMessage(w, 400, "service.sessions.pageLeaseIdentifierInvalid")
 				return
 			}
 			switch r.URL.Path {
 			case "/api/session/attach":
 				gen, err := strconv.ParseUint(r.Header.Get("X-ExcelLens-Generation"), 10, 53)
 				if err != nil || gen == 0 {
-					writeError(w, 400, "页面租约序号无效")
+					writeMessage(w, 400, "service.sessions.pageLeaseSerialNumberInvalid")
 					return
 				}
 				access.background = r.Header.Get("X-ExcelLens-Background") == "1"
@@ -379,7 +380,7 @@ func (a *App) routeSessions(defaultRoutes http.Handler) http.Handler {
 			} else if errors.Is(err, errPageReplaced) {
 				status = http.StatusConflict
 			}
-			writeError(w, status, err.Error())
+			writeFailure(w, status, err)
 			return
 		}
 		defer a.releaseSession(session)

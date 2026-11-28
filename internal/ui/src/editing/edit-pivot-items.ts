@@ -1,6 +1,7 @@
 /**
  * Pivot table calculated-item editor sub-controller.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { PivotCalculatedItem, PivotInfo } from '../contracts/edit.ts';
 import { requireButton, requireEl, requireInput, requireSelect } from '../core/dom.ts';
 
@@ -76,7 +77,7 @@ export class PivotCalculatedItems {
     const saved = this.saved();
     this.save.disabled =
       !field || !name || formula.length < 2 || !formula.startsWith('=') || saved?.formula === formula;
-    this.save.textContent = saved ? '更新项目' : '添加项目';
+    this.save.textContent = saved ? localize('ui.editPivotItems.updateProject') : localize('ui.editPivotItems.addItems');
     this.remove.hidden = !saved;
   }
 }

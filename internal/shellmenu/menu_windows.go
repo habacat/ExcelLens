@@ -5,13 +5,13 @@
 package shellmenu
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"syscall"
 	"unsafe"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 const (
@@ -91,7 +91,7 @@ func readString(key uintptr, name string) (string, error) {
 		return "", syscall.Errno(r)
 	}
 	if typ != regSZ || size > 65536 || size < 2 {
-		return "", fmt.Errorf("无效注册表字符串")
+		return "", i18n.Error("diagnostic.shellmenu.menuWindows.invalidRegistryString")
 	}
 	data := make([]uint16, (size+1)/2)
 	r, _, _ = regQueryValueEx.Call(key, uintptr(unsafe.Pointer(n)), 0, uintptr(unsafe.Pointer(&typ)), uintptr(unsafe.Pointer(&data[0])), uintptr(unsafe.Pointer(&size)))
@@ -126,7 +126,7 @@ func IsInstalled() bool {
 	}
 	return true
 }
-func Install() error {
+func Install(locale i18n.Locale) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -138,9 +138,9 @@ func Install() error {
 	for _, ext := range formats.Extensions() {
 		root, err := createKey(keyPath(ext))
 		if err != nil {
-			return fmt.Errorf("注册 %s 菜单失败: %w", ext, err)
+			return i18n.Wrap("diagnostic.shellmenu.menuWindows.registrationMenuFailed", err, i18n.Args{"ext": ext})
 		}
-		e := setString(root, "MUIVerb", "使用 ExcelLens 打开")
+		e := setString(root, "MUIVerb", locale.Text("native.shell.open"))
 		if e == nil {
 			e = setString(root, "Icon", `"`+exe+`",0`)
 		}
@@ -169,7 +169,7 @@ func Uninstall() error {
 		}
 		r, _, _ := regDeleteTree.Call(hkcu, uintptr(unsafe.Pointer(key)))
 		if r != 0 && r != uintptr(syscall.ERROR_FILE_NOT_FOUND) {
-			return fmt.Errorf("移除 %s 菜单失败: %w", ext, syscall.Errno(r))
+			return i18n.Wrap("diagnostic.shellmenu.menuWindows.failedRemoveMenu", syscall.Errno(r), i18n.Args{"ext": ext})
 		}
 	}
 	shChangeNotify.Call(shcneAssocChanged, shcnfIDList, 0, 0)

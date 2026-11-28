@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { RowData } from '../contracts/workbook.ts';
 import { installDom } from '../test-helpers/dom-mock.ts';
 import { makeCellData, makeDefaultViewportPipelineDeps } from '../test-helpers/grid-fixture.ts';
-import { borderRuns, paintBorder } from './grid-borders.ts';
+import { borderRuns, paintBorder, parseBorder, resolveBorderCorner } from './grid-borders.ts';
 import { MergedCells } from './merges.ts';
 import type { GridCellElement } from './state.ts';
 import { ViewportPipeline } from './viewport-pipeline.ts';
@@ -332,6 +332,249 @@ test('a long shared edge preserves partial neighbor styles and removes segments 
     paintBorder(cell, 'bottom', black, offset);
     assert.equal(cell.children.length, 0);
     assert.equal(cell.style.borderBottom, black);
+  } finally {
+    dom.restore();
+  }
+});
+
+test('resolveBorderCorner closes missing top-left junctions and skips covered or weaker intersections', () => {
+  assert.deepEqual(parseBorder('3px solid #000000'), {
+    css: '3px solid #000000',
+    width: 3,
+    kind: 'solid',
+    color: '#000000',
+    score: 305,
+  });
+  assert.equal(parseBorder('0px'), null);
+  assert.equal(parseBorder(''), null);
+
+  assert.deepEqual(resolveBorderCorner('', '', '3px solid #000000', '3px solid #000000'), {
+    width: 3,
+    height: 3,
+    kind: 'solid',
+    color: '#000000',
+  });
+  assert.deepEqual(resolveBorderCorner('', '', '3px solid #000000', '1px solid #000000'), {
+    width: 1,
+    height: 3,
+    kind: 'solid',
+    color: '#000000',
+  });
+  assert.deepEqual(resolveBorderCorner('', '', '3px double #112233', '3px double #112233'), {
+    width: 3,
+    height: 3,
+    kind: 'double',
+    color: '#112233',
+  });
+  assert.deepEqual(resolveBorderCorner('', '', '3px double #000000', '3px solid #000000'), {
+    width: 3,
+    height: 3,
+    kind: 'solid',
+    color: '#000000',
+  });
+  assert.equal(
+    resolveBorderCorner('3px solid #000000', '', '3px solid #000000', '3px solid #000000'),
+    null,
+    'an existing thick north edge already covers the corner',
+  );
+  assert.equal(
+    resolveBorderCorner('', '3px solid #000000', '3px solid #000000', '3px solid #000000'),
+    null,
+    'an existing thick west edge already covers the corner',
+  );
+  assert.equal(
+    resolveBorderCorner('3px solid #FF0000', '3px solid #FF0000', '1px solid #000000', '1px solid #000000'),
+    null,
+    'a weaker diagonal corner must not dent a thicker north/west border',
+  );
+  assert.deepEqual(
+    resolveBorderCorner('1px solid #888888', '1px solid #888888', '3px solid #000000', '3px solid #000000'),
+    {
+      width: 3,
+      height: 3,
+      kind: 'solid',
+      color: '#000000',
+    },
+    'a thicker diagonal corner extends over thinner north/west borders',
+  );
+});
+
+test('thick, double, and nested box top-left corners join cleanly and clear on reuse or style toggle', () => {
+  const { dom, S, pipeline, makeNode } = setupBorders();
+  try {
+    const thick = '3px solid #000000';
+    const thin = '1px solid #888888';
+    const dbl = '3px double #000000';
+    S.styles.push(
+      { background: '#FFC000', borderTop: thick, borderLeft: thick }, // style 2
+      { borderRight: thin, borderBottom: thin }, // style 3
+      { borderTop: dbl, borderLeft: dbl }, // style 4
+    );
+    const row1: RowData = { number: 1, cells: [makeCellData(2, 'N', { ref: 'B1' })] };
+    const row2: RowData = { number: 2, cells: [makeCellData(2, '[000', { ref: 'B2', style: 2 })] };
+    const a1 = makeNode(1, 1);
+    pipeline.appearance.updateSharedBorders(a1, null, row1, row1.cells[0], row1, null, row2, {
+      nextCol: 2,
+      belowRightCell: row2.cells[0],
+      mergeFree: true,
+    });
+    assert.equal(a1.style.borderRight, '0px');
+    assert.equal(a1.style.borderBottom, '0px');
+    assert.equal(a1._xlborderRightParts?.className, 'grid-default-right');
+    assert.equal(a1._xlborderBottomParts?.className, 'grid-default-bottom');
+    const thickCap = a1._xlCornerCap;
+    assert.ok(thickCap);
+    assert.equal(thickCap.className, 'grid-border-corner');
+    assert.equal(thickCap.style.borderRight, '3px solid transparent');
+    assert.equal(thickCap.style.borderBottom, '3px solid transparent');
+    assert.equal(thickCap.style.backgroundColor, '#000000');
+
+    // Thin explicit borders on A1 are inset so the 3x3 thick corner cap sits flush at the outer edge.
+    const thinA1 = makeCellData(1, '', { ref: 'A1', style: 3 });
+    pipeline.appearance.updateSharedBorders(a1, thinA1, row1, row1.cells[0], row1, null, row2, {
+      nextCol: 2,
+      belowRightCell: row2.cells[0],
+      mergeFree: true,
+    });
+    assert.equal(a1.style.borderRight, '0px');
+    assert.equal(a1.style.borderBottom, '0px');
+    const insetR = a1._xlborderRightParts;
+    const insetB = a1._xlborderBottomParts;
+    assert.equal(insetR.className, 'grid-inset-border');
+    assert.equal(insetR.style.borderRight, thin);
+    assert.equal(insetB.className, 'grid-inset-border');
+    assert.equal(insetB.style.borderBottom, thin);
+    const thinCap = a1._xlCornerCap;
+    assert.ok(thinCap);
+    assert.equal(thinCap.style.backgroundColor, '#000000');
+
+    // Double border corner uses border-top + border-left double miter.
+    const dblRow2: RowData = { number: 2, cells: [makeCellData(2, '', { ref: 'B2', style: 4 })] };
+    pipeline.appearance.updateSharedBorders(a1, null, row1, row1.cells[0], row1, null, dblRow2, {
+      nextCol: 2,
+      belowRightCell: dblRow2.cells[0],
+      mergeFree: true,
+    });
+    const dblCap = a1._xlCornerCap;
+    assert.ok(dblCap);
+    assert.equal(dblCap.style.borderTop, dbl);
+    assert.equal(dblCap.style.borderLeft, dbl);
+    assert.equal(dblCap.style.backgroundColor, '');
+
+    // Recycling for a plain diagonal neighbor clears the corner cap and restores normal seams.
+    pipeline.appearance.updateSharedBorders(a1, null, row1, null, row1, null, { number: 2, cells: [] }, {
+      nextCol: 2,
+      belowRightCell: null,
+      mergeFree: true,
+    });
+    assert.equal(a1._xlCornerCap, null);
+    assert.equal(a1.children.length, 0);
+    assert.equal(a1.style.borderRight, '');
+    assert.equal(a1.style.borderBottom, '');
+
+    // Disabling source styles removes the corner cap immediately.
+    pipeline.appearance.updateSharedBorders(a1, null, row1, row1.cells[0], row1, null, row2, {
+      nextCol: 2,
+      belowRightCell: row2.cells[0],
+      mergeFree: true,
+    });
+    assert.ok(a1._xlCornerCap);
+    S.showStyles = false;
+    pipeline.appearance.updateSharedBorders(a1, null, row1, row1.cells[0], row1, null, row2, {
+      nextCol: 2,
+      belowRightCell: row2.cells[0],
+      mergeFree: true,
+    });
+    assert.equal(a1._xlCornerCap, null);
+    assert.equal(a1.children.length, 0);
+  } finally {
+    dom.restore();
+  }
+});
+
+test('merged cells suppress phantom interior corners and close interior T-junction transitions', () => {
+  const dom = installDom({ fromIndexHtml: true });
+  try {
+    const merge = new MergedCells();
+    merge.load([
+      { row: 2, col: 1, endRow: 2, endCol: 2 }, // A2:B2 horizontal merge
+      { row: 4, col: 1, endRow: 5, endCol: 1 }, // A4:A5 vertical merge beside B4 (plain) & B5 (thick)
+      { row: 7, col: 1, endRow: 7, endCol: 2 }, // A7:B7 horizontal merge above A8 (plain) & B8 (thick)
+    ]);
+    const thick = '3px solid #000000';
+    const deps = makeDefaultViewportPipelineDeps({ mergedCells: merge });
+    deps.S.indexReady = true;
+    deps.S.showStyles = true;
+    deps.S.styles = [
+      {},
+      { borderTop: thick, borderBottom: thick, borderLeft: thick, borderRight: thick },
+    ];
+    const pipeline = new ViewportPipeline(deps);
+    const makeNode = (r: number, c: number): GridCellElement => {
+      const el = document.createElement('div') as GridCellElement;
+      el.dataset.row = String(r);
+      el.dataset.col = String(c);
+      return el;
+    };
+
+    const a2 = makeCellData(1, '', { ref: 'A2', style: 1 });
+    deps.S.cellMap.set('A2', a2);
+    const a1 = makeNode(1, 1);
+    pipeline.appearance.updateSharedBorders(
+      a1,
+      null,
+      { number: 1, cells: [] },
+      null,
+      { number: 1, cells: [] },
+      a2,
+      { number: 2, cells: [a2] },
+      { nextCol: 2, belowRightCell: null },
+    );
+    assert.equal(a1._xlCornerCap ?? null, null, 'horizontal merge A2:B2 has no interior vertical seam');
+
+    const b5 = makeCellData(2, '', { ref: 'B5', style: 1 });
+    deps.S.cellMap.set('B5', b5);
+    const a4 = makeNode(4, 1);
+    pipeline.appearance.updateSharedBorders(
+      a4,
+      null,
+      { number: 4, cells: [] },
+      null,
+      { number: 4, cells: [] },
+      null,
+      { number: 6, cells: [] },
+      { columns: [1, 2], firstRow: 4, lastRow: 5 },
+    );
+    const vLayer = a4._xlInnerCorners;
+    assert.ok(vLayer);
+    assert.equal(vLayer.className, 'grid-border-corners');
+    assert.equal(vLayer.children.length, 1);
+    const vCap = vLayer.children[0] as HTMLElement;
+    assert.equal(vCap.style.backgroundColor, '#000000');
+    assert.equal(vCap.style.right, '0');
+    assert.ok(vCap.style.bottom.startsWith('calc(100% - '));
+
+    const b8 = makeCellData(2, '', { ref: 'B8', style: 1 });
+    deps.S.cellMap.set('B8', b8);
+    const a7 = makeNode(7, 1);
+    pipeline.appearance.updateSharedBorders(
+      a7,
+      null,
+      { number: 7, cells: [] },
+      null,
+      { number: 7, cells: [] },
+      null,
+      { number: 8, cells: [b8] },
+      { columns: [1, 2], firstRow: 7, lastRow: 8 },
+    );
+    const hLayer = a7._xlInnerCorners;
+    assert.ok(hLayer);
+    assert.equal(hLayer.className, 'grid-border-corners');
+    assert.equal(hLayer.children.length, 1);
+    const hCap = hLayer.children[0] as HTMLElement;
+    assert.equal(hCap.style.backgroundColor, '#000000');
+    assert.equal(hCap.style.bottom, '0');
+    assert.ok(hCap.style.right.startsWith('calc(100% - '));
   } finally {
     dom.restore();
   }

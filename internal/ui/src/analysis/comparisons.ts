@@ -2,6 +2,7 @@
  * Presentation and explanation only; all ratios and prefixes come from the
  * exact Go aggregation result. No client arithmetic over rounded subtotals.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisCell,
   AnalysisMetric,
@@ -11,19 +12,19 @@ import type {
 } from '../contracts/analysis.ts';
 
 export const COMPARISON_MODES: readonly (readonly [ComparisonMode, string])[] = Object.freeze([
-  ['', '原始聚合'] as const,
-  ['percent_grand', '占范围总计'] as const,
-  ['percent_row', '占行合计'] as const,
-  ['percent_column', '占列合计'] as const,
-  ['running_total', '累计'] as const,
-  ['running_percent', '累计占比'] as const,
+  ['', localize('ui.comparisons.originalAggregation')] as const,
+  ['percent_grand', localize('ui.comparisons.totalPercentageRange')] as const,
+  ['percent_row', localize('ui.comparisons.totalOccupiedRows')] as const,
+  ['percent_column', localize('ui.comparisons.columnTotal')] as const,
+  ['running_total', localize('ui.comparisons.cumulative')] as const,
+  ['running_percent', localize('ui.comparisons.cumulativeProportion')] as const,
 ]);
 
 const MODE_LABELS = new Map<string, string>(COMPARISON_MODES);
 const STATE_LABELS = new Map<string, string>([
-  ['empty', '无有效值'],
-  ['empty_denominator', '分母无有效值'],
-  ['zero_denominator', '分母为0'],
+  ['empty', localize('ui.comparisons.noValidValues')],
+  ['empty_denominator', localize('ui.comparisons.denominatorNoValidValue')],
+  ['zero_denominator', localize('ui.comparisons.denominator')],
 ]);
 
 export interface ComparisonCellLike {
@@ -48,9 +49,9 @@ export function comparisonLabel(
   metric: Pick<AnalysisMetric, 'comparison' | 'comparisonAxis'> | null | undefined,
 ): string {
   if (!metric?.comparison) return '';
-  const base = MODE_LABELS.get(metric.comparison) ?? '未知比较方式';
+  const base = MODE_LABELS.get(metric.comparison) ?? localize('ui.comparisons.unknownComparisonMethod');
   return isRunningComparison(metric)
-    ? `${metric.comparisonAxis === 'columns' ? '沿列' : '沿行'}${base}`
+    ? `${metric.comparisonAxis === 'columns' ? localize('ui.comparisons.alongColumns') : localize('ui.comparisons.moveAlong')}${base}`
     : base;
 }
 
@@ -58,28 +59,28 @@ export function comparisonTitle(
   cell: AnalysisCell | ComparisonCellLike | null | undefined,
 ): string {
   const derived = cell?.comparison;
-  if (!derived) return cell?.exact ? `精确值：${cell.exact}` : '';
-  const kind = MODE_LABELS.get(derived.mode) ?? '指标比较';
+  if (!derived) return cell?.exact ? localize('ui.comparisons.exactValue', { exact: cell.exact }) : '';
+  const kind = MODE_LABELS.get(derived.mode) ?? localize('ui.comparisons.metricComparison');
   const items: string[] = [
-    kind + (derived.axis ? `（${derived.axis === 'columns' ? '沿列' : '沿行'}）` : ''),
+    kind + (derived.axis ? `（${derived.axis === 'columns' ? localize('ui.comparisons.alongColumns') : localize('ui.comparisons.moveAlong')}）` : ''),
   ];
   if (derived.status) {
-    items.push(STATE_LABELS.get(derived.status) ?? '比较结果不可用');
+    items.push(STATE_LABELS.get(derived.status) ?? localize('ui.comparisons.comparisonResultsUnavailable'));
   } else {
     items.push(
-      `${derived.percent ? '精确比值：' : '精确值：'}${derived.exact}${derived.percent ? '（1=100%）' : ''}`,
+      `${derived.percent ? localize('ui.comparisons.exactRatio') : localize('ui.comparisons.exactValue2674e22')}${derived.exact}${derived.percent ? '（1=100%）' : ''}`,
     );
   }
   const exactText = cell.exact ?? '';
-  items.push(`本分组原始聚合：${exactText === '' ? '无' : exactText}`);
+  items.push(localize('ui.comparisons.originalAggregationThisGroup', { detail: exactText === '' ? localize('ui.common.none') : exactText }));
   if (derived.numerator !== undefined) {
-    items.push(`${derived.axis ? '累计聚合：' : '分子：'}${derived.numerator || '无'}`);
+    items.push(`${derived.axis ? localize('ui.comparisons.cumulativeAggregation') : localize('ui.comparisons.numerator')}${derived.numerator || localize('ui.common.none')}`);
   }
   if (derived.denominator !== undefined) {
-    items.push(`完整范围分母：${derived.denominator || '无'}`);
+    items.push(localize('ui.comparisons.fullRangeDenominator', { denominator: derived.denominator || localize('ui.common.none') }));
   }
   if (derived.axis) {
-    items.push('来源明细仅查看当前分组；累计还包含此前分类');
+    items.push(localize('ui.comparisons.detailsSourceOnlyAvailableCurrent'));
   }
   return items.join('；');
 }
@@ -89,13 +90,13 @@ export function comparisonScope(
 ): string {
   const metrics = query?.metrics ?? [];
   if (!metrics.some((metric) => Boolean(metric.comparison))) return '';
-  const notes = ['占比使用完整范围分母；百分比精确值为比值，1=100%'];
+  const notes = [localize('ui.comparisons.percentageCalculationsUseFullRange')];
   if (query?.layout === 'tree') {
-    notes.push('每层范围为该父分组，子层占比不代表整个源表');
+    notes.push(localize('ui.comparisons.eachLayerCoversParentGroup'));
   }
   if (metrics.some(isRunningComparison)) {
     notes.push(
-      '累计按原始聚合排序后的全部分类计算，再截取前 N 项；沿列按列标签排序；明细点击只查看当前分组',
+      localize('ui.comparisons.calculateAllCategoriesChronologicalOrder'),
     );
   }
   if (
@@ -105,7 +106,7 @@ export function comparisonScope(
         ['average', 'distinct', 'min', 'max'].includes(metric.aggregate),
     )
   ) {
-    notes.push('平均、去重与极值按原聚合口径比较，占比不保证相加为100%');
+    notes.push(localize('ui.comparisons.averageDeduplicationExtremeValuesCompared'));
   }
   return notes.join('；');
 }

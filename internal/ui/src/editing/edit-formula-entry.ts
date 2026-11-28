@@ -3,6 +3,7 @@
  * cross-sheet formula editing, F4 absolute reference cycling, F2 point-key toggle,
  * local formula undo/redo journal, and live reference highlight areas.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { EditAddress } from '../contracts/edit.ts';
 import { parseRef } from '../core/cell-address.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -323,7 +324,7 @@ export class WorksheetFormulaEntry {
     next.focus({ preventScroll: true });
     next.setSelectionRange(start, end);
     d.field = next;
-    g.status(foreign ? `正在编辑 ${d.address.sheet}!${d.ref}` : '');
+    g.status(foreign ? localize('ui.editFormulaEntry.editingProgress', { sheet: d.address.sheet, ref: d.ref }) : '');
     g.schedulePosition();
     this.changed(next, true);
   }

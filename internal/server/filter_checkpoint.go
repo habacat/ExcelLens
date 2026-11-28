@@ -11,6 +11,7 @@ import (
 
 	"excellens/internal/checkpoint"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -80,7 +81,7 @@ func filterCheckpointSpecFor(m checkpoint.Manifest) (filterCheckpointSpec, error
 
 func (a *App) startCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *workbook.Workbook, req filterRequest) {
 	if req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "筛选来源已切换，请重新运行")
+		writeMessage(w, 409, "service.filterCheckpoint.filterSourceSwitchedRunProcess")
 		return
 	}
 	if !a.admitCheckpoint(w) {
@@ -95,7 +96,7 @@ func (a *App) startCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 		if errors.Is(err, checkpoint.ErrCapacity) {
 			checkpointHTTPError(w, err)
 		} else {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 		}
 		return
 	}
@@ -121,7 +122,7 @@ func (a *App) queueCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 	run := &taskCheckpointRun{store: store, lease: lease, release: release}
 	ctx, cancel := context.WithCancel(context.Background())
 	manifest := lease.Snapshot()
-	job := &FilterJob{ID: randomID(), TaskID: manifest.ID, Sheet: sheet, Status: "queued", Stage: "等待筛选任务", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), checkpoint: run}
+	job := &FilterJob{ID: randomID(), TaskID: manifest.ID, Sheet: sheet, Status: "queued", Stage: "stage.task.waitingForFilterTask", Started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), checkpoint: run}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
@@ -130,7 +131,7 @@ func (a *App) queueCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 			checkpointHTTPError(w, err)
 			return
 		}
-		writeError(w, 409, "筛选来源已切换或请求已取消，请重试")
+		writeMessage(w, 409, "service.filterCheckpoint.sourceFilterSwitchedOrRequest")
 		return
 	}
 	if !pruneFilterJobsLocked(a.filterJobs, formats.QueryTaskHistory) {
@@ -140,7 +141,7 @@ func (a *App) queueCheckpointFilter(w http.ResponseWriter, r *http.Request, wb *
 			checkpointHTTPError(w, err)
 			return
 		}
-		writeError(w, http.StatusTooManyRequests, "正在回收筛选任务，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.filterCheckpoint.screeningTaskBeingRecoveredTry")
 		return
 	}
 	for _, old := range a.filterJobs {
@@ -212,7 +213,7 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		if cursor.Index != "" && !policy.rebuild {
-			return failure(errors.New("筛选恢复所需索引已被清理，请重新运行"))
+			return failure(i18n.Error("service.filterCheckpoint.requiredIndexFilterRestorationCleared"))
 		}
 		releaseIndex, admissionErr := a.backgroundIndex(job.ctx)
 		if admissionErr != nil {
@@ -334,7 +335,7 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 	}
 	opts := spec.Filter.options()
 	opts.Phase = func(stage string, done, total int) { filterCheckpointProgress(job, stage, done, total, 85, 10) }
-	filterCheckpointProgress(job, "正在排序", 0, filtered.Len(), 75, 10)
+	filterCheckpointProgress(job, "stage.task.sortingInProgress", 0, filtered.Len(), 75, 10)
 	result, err := wb.SortFilteredRowOrder(job.ctx, idx, filtered, opts, func(done, total int) { filterCheckpointProgress(job, "正在排序", done, total, 75, 10) })
 	if err != nil {
 		return failure(err)
@@ -384,7 +385,7 @@ func (a *App) scanCheckpointFilter(wb *workbook.Workbook, job *FilterJob) (*work
 			return failure(err)
 		}
 		cursor = next
-		filterCheckpointProgress(job, "正在准备结果", end, result.Len(), 95, 4)
+		filterCheckpointProgress(job, "stage.task.preparingTheResults", end, result.Len(), 95, 4)
 	}
 	accepted = true
 	return result, idx, spec, nil

@@ -2,6 +2,7 @@
  * Bounded source field selection modal shared by append composition and
  * two-table relation workflows.
  */
+import { t as localize, th as localizeHTML } from './i18n.ts';
 import { labelColumn, searchFields, type SearchableField } from './composition-model.ts';
 import { requireButton, requireEl, requireInput } from './dom.ts';
 
@@ -59,7 +60,7 @@ export class FieldPicker {
     this.dialog.id = this.id;
     this.dialog.className = 'float-dialog field-picker';
     this.dialog.setAttribute('aria-labelledby', `${this.id}Title`);
-    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="${this.id}Title" class="dialog-title">选择字段</div><button class="dialog-close" aria-label="关闭字段选择" value="cancel">×</button></form><div class="field-picker-body"><input id="${this.id}Search" class="field-control" type="search" placeholder="搜索字段名或列字母" aria-label="搜索来源字段"><div id="${this.id}Tools" class="field-picker-tools" hidden></div><div id="${this.id}Items" class="field-picker-items"></div><div id="${this.id}Paging" class="field-picker-paging"></div><div id="${this.id}Status" role="status" aria-live="polite"></div><button id="${this.id}Apply" class="primary-button compact" type="button" hidden>确定</button></div>`;
+    this.dialog.innerHTML = `<form method="dialog" class="dialog-head"><div id="${this.id}Title" class="dialog-title">${localizeHTML('ui.fieldPicker.selectFields')}</div><button class="dialog-close" aria-label="${localizeHTML('ui.fieldPicker.disableFieldSelection')}" value="cancel">×</button></form><div class="field-picker-body"><input id="${this.id}Search" class="field-control" type="search" placeholder="${localizeHTML('ui.fieldPicker.searchFieldNamesOrColumn')}" aria-label="${localizeHTML('ui.fieldPicker.searchSourceFields')}"><div id="${this.id}Tools" class="field-picker-tools" hidden></div><div id="${this.id}Items" class="field-picker-items"></div><div id="${this.id}Paging" class="field-picker-paging"></div><div id="${this.id}Status" role="status" aria-live="polite"></div><button id="${this.id}Apply" class="primary-button compact" type="button" hidden>${localizeHTML('ui.fieldPicker.ok')}</button></div>`;
     document.body.append(this.dialog);
 
     requireInput(`${this.id}Search`).oninput = (): void => {
@@ -84,7 +85,7 @@ export class FieldPicker {
 
   open(config: FieldPickerConfig): void {
     if (!Number.isInteger(this.pageRows) || this.pageRows < 1 || !Array.isArray(config.fields)) {
-      throw new Error('字段选择容量无效');
+      throw new Error(localize('ui.fieldPicker.invalidFieldSelectionCapacity'));
     }
     ++this.serial;
     this.config = config;
@@ -92,7 +93,7 @@ export class FieldPicker {
     this.selected = new Set(config.selected ?? []);
     const searchInput = requireInput(`${this.id}Search`);
     searchInput.value = '';
-    requireEl(`${this.id}Title`).textContent = config.title || '选择字段';
+    requireEl(`${this.id}Title`).textContent = config.title || localize('ui.common.selectFields');
     requireEl(`${this.id}Status`).textContent = '';
     this.render();
     if (!this.dialog.open) this.dialog.showModal();
@@ -114,7 +115,7 @@ export class FieldPicker {
         this.selected.delete(column);
       } else {
         if (this.selected.size >= c.limit) {
-          requireEl(`${this.id}Status`).textContent = `最多选择 ${c.limit} 个字段`;
+          requireEl(`${this.id}Status`).textContent = localize('ui.fieldPicker.canSelectMaximumFields', { limit: c.limit });
           this.render();
           return;
         }
@@ -173,22 +174,22 @@ export class FieldPicker {
       host.append(node);
     };
 
-    if (!c.multiple && c.allowEmpty) append('空列', 0);
+    if (!c.multiple && c.allowEmpty) append(localize('ui.fieldPicker.emptyColumns'), 0);
     for (const field of items) {
       append(`${labelColumn(field.column)}　${field.name}`, field.column);
     }
     if (!items.length) {
       const empty = document.createElement('div');
       empty.className = 'field-picker-empty';
-      empty.textContent = '没有匹配字段';
+      empty.textContent = localize('ui.fieldPicker.noMatchingFields');
       host.append(empty);
     }
 
-    const previous = makeMiniButton('上一页', () => {
+    const previous = makeMiniButton(localize('ui.common.previousPage'), () => {
       --this.page;
       this.render();
     });
-    const next = makeMiniButton('下一页', () => {
+    const next = makeMiniButton(localize('ui.common.nextPage'), () => {
       ++this.page;
       this.render();
     });
@@ -202,21 +203,21 @@ export class FieldPicker {
     requireButton(`${this.id}Apply`).hidden = !c.multiple;
     if (c.multiple) {
       const count = document.createElement('span');
-      count.textContent = `已选 ${this.selected.size} / ${c.limit}`;
+      count.textContent = localize('ui.fieldPicker.selected', { size: this.selected.size, limit: c.limit });
       tools.append(
         count,
-        makeMiniButton('选择本页', () => {
+        makeMiniButton(localize('ui.fieldPicker.selectThisPage'), () => {
           const add = items.filter(
             (field) => !blocked.has(field.column) && !this.selected.has(field.column),
           );
           if (this.selected.size + add.length > c.limit) {
-            requireEl(`${this.id}Status`).textContent = `最多选择 ${c.limit} 个字段`;
+            requireEl(`${this.id}Status`).textContent = localize('ui.fieldPicker.canSelectMaximumFields', { limit: c.limit });
             return;
           }
           for (const field of add) this.selected.add(field.column);
           this.render();
         }),
-        makeMiniButton('清空本页', () => {
+        makeMiniButton(localize('ui.fieldPicker.clearThisPage'), () => {
           for (const field of items) this.selected.delete(field.column);
           this.render();
         }),

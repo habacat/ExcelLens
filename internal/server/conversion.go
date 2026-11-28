@@ -2,6 +2,7 @@ package server
 
 import (
 	"excellens/internal/calculator"
+	"excellens/internal/i18n"
 	"excellens/internal/valueconv"
 )
 
@@ -11,7 +12,13 @@ type conversionSuggestion struct {
 	Preview string `json:"preview"`
 }
 
-func calculationSuggestions(result calculator.Result) []conversionSuggestion {
+var conversionLabels = map[string]i18n.Key{
+	"date":     "service.conversion.toDate",
+	"time":     "service.conversion.toTime",
+	"datetime": "service.conversion.toDateTime",
+}
+
+func calculationSuggestions(result calculator.Result, locale i18n.Locale) []conversionSuggestion {
 	if result.Kind != "text" {
 		return nil
 	}
@@ -19,6 +26,5 @@ func calculationSuggestions(result calculator.Result) []conversionSuggestion {
 	if kind == "" {
 		return nil
 	}
-	label := map[string]string{"date": "转日期数值", "time": "转时间数值", "datetime": "转日期时间数值"}[kind]
-	return []conversionSuggestion{{Kind: kind, Label: label, Preview: preview}}
+	return []conversionSuggestion{{Kind: kind, Label: locale.Text(conversionLabels[kind]), Preview: preview}}
 }

@@ -2,6 +2,7 @@
  * Runtime owners are separate from durable query scopes. A late response is
  * still observed so its own ID can be released, never the newer owner's ID.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   CompositionDefinition,
   CompositionTaskResult,
@@ -59,10 +60,10 @@ export interface AnalysisSourcesOptions {
 }
 
 const MODE_LABELS: Readonly<Record<string, string>> = {
-  full: '完整源表',
-  filtered: '完整筛选结果',
-  visible: '当前可见行',
-  selection: '当前选区',
+  full: localize('ui.common.completeSourceTable'),
+  filtered: localize('ui.sources.completeFilteringResults'),
+  visible: localize('ui.sources.currentlyVisibleRows'),
+  selection: localize('ui.sources.currentSelection'),
 };
 
 function cloneValue<T>(value: T): T {
@@ -70,7 +71,7 @@ function cloneValue<T>(value: T): T {
 }
 
 function makeAbortError(): Error {
-  const err = new Error('来源选择已取消');
+  const err = new Error(localize('ui.sources.sourceSelectionCancelled'));
   err.name = 'AbortError';
   return err;
 }
@@ -80,12 +81,12 @@ export function sourceScopeKey(scope: SourceScope | null | undefined): string {
 }
 
 export function sourceScopeCaption(scope: SourceScope | null | undefined): string {
-  if (!scope) return MODE_LABELS.full ?? '完整源表';
+  if (!scope) return MODE_LABELS.full ?? localize('ui.common.completeSourceTable');
   const area = scope.selection;
-  const base = MODE_LABELS[scope.mode] ?? '保存的范围';
+  const base = MODE_LABELS[scope.mode] ?? localize('ui.sources.savedRange');
   return (
     base +
-    (area ? ` · 第${area.startColumn}–${area.endColumn}列 · 源行${area.startRow}至${area.endRow}` : '')
+    (area ? ` ${localize('ui.sources.columnSourceRows', { startColumn: area.startColumn, endColumn: area.endColumn, startRow: area.startRow, endRow: area.endRow })}` : '')
   );
 }
 
@@ -188,7 +189,7 @@ export class AnalysisSources {
 
     if (source.startsWith('append:')) {
       if (!composition || sourceScope || (mode && mode !== 'full') || !this.tasks) {
-        throw new Error('联合来源定义无效，请重新选择');
+        throw new Error(localize('ui.sources.combinedSourceDefinitionInvalidReselect'));
       }
       const data =
         prepared ??
@@ -210,7 +211,7 @@ export class AnalysisSources {
     } else if (mode && mode !== 'full') {
       const g = this.grid(mode);
       if (g.workbookKey !== c.bookKey || g.book !== c.book || g.source !== source) {
-        throw new Error('请返回工作簿，在此来源工作表选择范围');
+        throw new Error(localize('ui.sources.returnWorkbookSelectRangeOn'));
       }
       const data = await this.post('/api/analysis/source/capture', {
         ...g,
@@ -262,7 +263,7 @@ export class AnalysisSources {
       (needsBinding && (!id || !respScope))
     ) {
       this.release(record);
-      throw new Error('来源响应与所选范围不一致');
+      throw new Error(localize('ui.sources.sourceResponseDoesNotMatch'));
     }
     return record;
   }

@@ -13,6 +13,7 @@ import (
 	"excellens/internal/checkpoint"
 	excelExport "excellens/internal/export"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -80,7 +81,7 @@ func readExportCheckpointSelections(ctx context.Context, wb *workbook.Workbook, 
 			}
 		}
 		if idx == nil {
-			return nil, errors.New("导出恢复所需索引已被清理，请重新运行")
+			return nil, i18n.Error("service.exportCheckpointRows.requiredIndexesExportRecoveryHave")
 		}
 		candidate.selections = append(candidate.selections, excelExport.Selection{Sheet: meta, Index: idx, FirstRow: sheet.FirstRow, LastRow: sheet.LastRow, FirstCol: sheet.FirstCol, LastCol: sheet.LastCol, Filtered: sheet.Filtered, Compact: sheet.Compact})
 	}

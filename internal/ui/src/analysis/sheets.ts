@@ -2,6 +2,7 @@
  * Editable analysis scratch sheets controller: paged table editing, draft
  * staging, serialized revision-checked saves, undo/redo, and paste-special.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisCellChange,
   AnalysisSheetPage,
@@ -192,7 +193,7 @@ export class AnalysisSheetsController {
     const count = drafts.entries(state.fingerprint).length;
     setText(
       'analysisAutoSave',
-      this.pendingWrites ? '保存中…' : count ? `${count}格未保存` : '已保存',
+      this.pendingWrites ? localize('ui.sheets.savingProgress') : count ? localize('ui.sheets.cellsNotSaved', { count }) : localize('ui.common.saved'),
     );
     const retry = requireButton('analysisRetrySave');
     retry.hidden = !count || this.pendingWrites > 0;
@@ -211,7 +212,7 @@ export class AnalysisSheetsController {
     input.classList.toggle('is-unsaved', Boolean(draft));
     input.setAttribute('aria-invalid', draft ? 'true' : 'false');
     input.title = draft
-      ? `未保存草稿；当前已保存值：${saved}`
+      ? localize('ui.sheets.draftNotSavedCurrentlySaved', { saved })
       : (input.dataset.savedTitle ?? '');
     return draft;
   }
@@ -226,7 +227,7 @@ export class AnalysisSheetsController {
         try {
           return await run();
         } catch (err: unknown) {
-          toast(`保存失败：${errorMessage(err)}${drafts.size ? '；草稿已保留' : ''}`, 'error');
+          toast(localize('ui.sheets.saveFailed', { detail: errorMessage(err), detail2: drafts.size ? localize('ui.sheets.draftRemainsRetained') : '' }), 'error');
           throw err;
         } finally {
           --this.pendingWrites;
@@ -243,8 +244,8 @@ export class AnalysisSheetsController {
   async createSheet(): Promise<void> {
     const { state, post, askText, refreshWorkspace, setTab, toast } = this.d;
     const name = await askText(
-      '新建可编辑工作表',
-      `数据分析表 ${(state.workspace?.sheets.length ?? 0) + 1}`,
+      localize('ui.sheets.createNewEditableWorksheet'),
+      localize('ui.sheets.dataAnalysisTable', { detail: (state.workspace?.sheets.length ?? 0) + 1 }),
     );
     if (!name) return;
     try {
@@ -253,7 +254,7 @@ export class AnalysisSheetsController {
       state.sheetPage = 0;
       await refreshWorkspace();
       void setTab('sheets');
-      toast('已新建工作表', 'success');
+      toast(localize('ui.sheets.newWorksheetCreated'), 'success');
     } catch (err: unknown) {
       toast(errorMessage(err), 'error');
     }
@@ -285,7 +286,7 @@ export class AnalysisSheetsController {
       state.sheetAbortController = null;
       state.loadedSheet = null;
       state.gridData = null;
-      setText('analysisSheetTitle', '编辑工作表');
+      setText('analysisSheetTitle', localize('ui.sheets.editWorksheet'));
       for (const id of [
         'analysisPasteSpecial',
         'analysisUndo',
@@ -304,21 +305,21 @@ export class AnalysisSheetsController {
       glyph.setAttribute('aria-hidden', 'true');
       glyph.innerHTML = icon('header');
       const title = document.createElement('h3');
-      title.textContent = '暂无工作表';
+      title.textContent = localize('ui.sheets.noWorksheetAvailable');
       const actions = document.createElement('div');
       actions.className = 'analysis-sheet-empty-actions';
       const create = document.createElement('button');
       create.type = 'button';
       create.className = 'analysis-primary-button';
       create.innerHTML = icon('plus');
-      create.append('新建工作表');
+      create.append(localize('ui.sheets.createNewWorksheet'));
       create.addEventListener('click', () => {
         void this.createSheet();
       });
       const pivot = document.createElement('button');
       pivot.type = 'button';
       pivot.className = 'analysis-outline-button';
-      pivot.textContent = '转到透视分析';
+      pivot.textContent = localize('ui.sheets.goPivotAnalysis');
       pivot.addEventListener('click', () => {
         void setTab('pivot');
       });
@@ -327,7 +328,7 @@ export class AnalysisSheetsController {
       requireEl('analysisEditableGrid').replaceChildren(empty);
       const hint = document.createElement('div');
       hint.className = 'analysis-sheet-list-hint';
-      hint.textContent = '尚无编辑表';
+      hint.textContent = localize('ui.sheets.noEditTableAvailable');
       host.append(hint);
       return;
     }
@@ -370,14 +371,14 @@ export class AnalysisSheetsController {
     const { state, drafts, post } = this.d;
     if (!id || !changes.length) return undefined;
     if (guard && !guard()) {
-      throw makeHttpError('粘贴目标或版本已变化，请重新读取目标', 409);
+      throw makeHttpError(localize('ui.sheets.targetOrVersionChangedRe'), 409);
     }
     const book = state.fingerprint;
     const staged = drafts.stage(book, id, changes);
     const result = await this.queueWrite(async () => {
-      if (book !== state.fingerprint) throw new Error('工作簿已切换');
+      if (book !== state.fingerprint) throw new Error(localize('ui.common.workbookSwitched'));
       if (guard && !guard()) {
-        throw makeHttpError('粘贴目标或版本已变化，整批未写入；输入已保留', 409);
+        throw makeHttpError(localize('ui.sheets.targetOrVersionChangedEntire'), 409);
       }
       validateClipboardChanges(changes);
       // Resolve expected version INSIDE the serialized write queue.
@@ -451,7 +452,7 @@ export class AnalysisSheetsController {
               state.sheetPage = Math.floor(firstActive.row / this.sheetPageSize(id));
               void setTab('sheets');
               await this.loadSheet(id, state.sheetPage);
-              toast('版本冲突，草稿已保留；悬停可核对已保存值，再点击重试保存', 'warning');
+              toast(localize('ui.sheets.versionConflictsDraftsHaveRetained'), 'warning');
             }
             return;
           }
@@ -462,7 +463,7 @@ export class AnalysisSheetsController {
       }
     }
     if (book === state.fingerprint && !drafts.entries(book).length) {
-      toast('草稿已保存', 'success');
+      toast(localize('ui.sheets.draftSaved'), 'success');
     }
   }
 
@@ -490,7 +491,7 @@ export class AnalysisSheetsController {
         hist.undo = [];
         hist.redo = [];
         await this.loadSheet(id, state.sheetPage);
-        toast('编辑版本已变化，操作未执行，已重新载入', 'warning');
+        toast(localize('ui.sheets.editedVersionChangedOperationNot'), 'warning');
       } else {
         toast(errorMessage(err), 'error');
       }
@@ -550,7 +551,7 @@ export class AnalysisSheetsController {
         const th = document.createElement('th');
         const input = document.createElement('input');
         input.value = name;
-        input.title = '点击编辑列名，完成后自动保存';
+        input.title = localize('ui.sheets.clickEditColumnNamesWill');
         input.addEventListener('change', () => {
           const cols = [...data.columns];
           const trimmed = input.value.trim();
@@ -606,7 +607,7 @@ export class AnalysisSheetsController {
           input.value = saved;
           input.dataset.row = String(data.offset + i);
           input.dataset.col = String(j);
-          input.title = `${data.columns[j] ?? ''} · 第 ${data.offset + i + 1} 行`;
+          input.title = localize('ui.sheets.row', { detail: data.columns[j] ?? '', offset: data.offset + i + 1 });
           input.dataset.savedTitle = input.title;
           const draft = this.paintDraft(input, data.offset + i, j, saved);
           if (draft) input.value = draft.value;
@@ -623,7 +624,7 @@ export class AnalysisSheetsController {
       pagination.replaceChildren();
       const prev = document.createElement('button');
       prev.type = 'button';
-      prev.textContent = '‹ 上一页';
+      prev.textContent = localize('ui.sheets.previousPage');
       prev.disabled = page === 0;
       prev.onclick = (): void => {
         void (async () => {
@@ -634,11 +635,11 @@ export class AnalysisSheetsController {
       };
       pagination.append(prev);
       const span = document.createElement('span');
-      span.textContent = `第 ${page + 1} 页 · 已保存 ${fmtNum(data.total)} 行 · 每页 ${pageSize} 行`;
+      span.textContent = localize('ui.sheets.pageRowsSavedRowsPer', { page: page + 1, fmtNum: fmtNum(data.total), pageSize });
       pagination.append(span);
       const next = document.createElement('button');
       next.type = 'button';
-      next.textContent = '下一页 ›';
+      next.textContent = localize('ui.sheets.nextPage');
       const lastAllowed = Math.min(9999, Math.max(data.total, 1) + pageSize - 1);
       next.disabled = (page + 1) * pageSize > lastAllowed;
       next.onclick = (): void => {
@@ -735,7 +736,7 @@ export class AnalysisSheetsController {
           if (getHttpStatus(err) === 409 && state.loadedSheet === id) {
             state.undoHistory.delete(id);
             await this.loadSheet(id, state.sheetPage);
-            toast('版本冲突，草稿已保留；请核对已保存值后重试', 'warning');
+            toast(localize('ui.sheets.versionConflictDraftRetainedRechecke4119ef'), 'warning');
           }
         });
     });
@@ -777,9 +778,9 @@ export class AnalysisSheetsController {
         if (getHttpStatus(err) === 409 && state.loadedSheet === id) {
           state.undoHistory.delete(id);
           await this.loadSheet(id, state.sheetPage);
-          toast('版本冲突，粘贴草稿已保留；请核对后重试保存', 'warning');
+          toast(localize('ui.sheets.versionConflictDraftRetainedRecheck'), 'warning');
         } else {
-          toast(`粘贴未保存：${errorMessage(err)}`, 'error');
+          toast(localize('ui.sheets.pastingWithoutSaving', { detail: errorMessage(err) }), 'error');
         }
       });
     });
@@ -840,14 +841,14 @@ export class AnalysisSheetsController {
       decodeAnalysisSheetPage,
     );
     if (data.columns.length >= 80) {
-      toast('编辑工作表最多80列', 'warning');
+      toast(localize('ui.sheets.editWorksheetMaximumColumns'), 'warning');
       return;
     }
-    const name = await askText('添加新列', `字段${data.columns.length + 1}`);
+    const name = await askText(localize('ui.sheets.addNewColumn'), localize('ui.sheets.field', { count: data.columns.length + 1 }));
     if (!name) return;
     try {
       await this.queueWrite(async () => {
-        if (book !== state.fingerprint) throw new Error('工作簿已切换');
+        if (book !== state.fingerprint) throw new Error(localize('ui.common.workbookSwitched'));
         const result = await post('/api/analysis/sheet/columns', {
           id,
           workbookKey: book,
@@ -872,7 +873,7 @@ export class AnalysisSheetsController {
     const book = state.fingerprint;
     try {
       await this.queueWrite(async () => {
-        if (book !== state.fingerprint) throw new Error('工作簿已切换');
+        if (book !== state.fingerprint) throw new Error(localize('ui.common.workbookSwitched'));
         const result = await post('/api/analysis/sheet/rows', {
           id,
           workbookKey: book,
@@ -893,14 +894,14 @@ export class AnalysisSheetsController {
   async deleteSheet(): Promise<void> {
     const { state, post, askText, refreshWorkspace, setTab, toast } = this.d;
     if (this.hasUnsaved()) {
-      toast('仍有未保存的分析内容，请先重试保存', 'warning');
+      toast(localize('ui.common.thereStillAnalysisResultsThat'), 'warning');
       return;
     }
     const sheet = state.workspace?.sheets.find((s) => s.id === state.loadedSheet);
     if (!sheet) return;
-    const confirmation = await askText('确认删除编辑工作表', '', `输入“${sheet.name}”以确认`);
+    const confirmation = await askText(localize('ui.sheets.confirmDeleteEditWorksheet'), '', localize('ui.sheets.enterConfirm', { name: sheet.name }));
     if (confirmation !== sheet.name) {
-      if (confirmation !== null) toast('名称不匹配，已取消删除', 'warning');
+      if (confirmation !== null) toast(localize('ui.sheets.nameDoesNotMatchDeletion'), 'warning');
       return;
     }
     try {
@@ -908,7 +909,7 @@ export class AnalysisSheetsController {
       state.loadedSheet = null;
       await refreshWorkspace();
       void setTab('sheets');
-      toast('已删除所选工作表', 'success');
+      toast(localize('ui.sheets.selectedWorksheetDeleted'), 'success');
     } catch (e: unknown) {
       toast(errorMessage(e), 'error');
     }
@@ -920,24 +921,24 @@ export class AnalysisSheetsController {
 
   async navigateSheet(id: string, row: number, column: number): Promise<void> {
     const { state, open, setTab } = this.d;
-    if (this.hasUnsaved()) throw new Error('分析表仍有未保存内容，请先重试保存后再定位');
+    if (this.hasUnsaved()) throw new Error(localize('ui.sheets.analysisTableStillUnsavedContent'));
     if (!Number.isInteger(row) || !Number.isInteger(column) || row < 1 || column < 1) {
-      throw new Error('编辑表定位坐标无效');
+      throw new Error(localize('ui.sheets.editingTablePositioningCoordinatesIneffective'));
     }
     await open();
     const sheet = state.workspace?.sheets.find((s) => s.id === id);
     if (!state.opened || !sheet || row > sheet.rows || column > sheet.columns.length) {
-      throw new Error('编辑表或来源位置已变化');
+      throw new Error(localize('ui.sheets.tableOrSourceLocationChanged'));
     }
     state.loadedSheet = id;
     state.sheetPage = Math.floor((row - 1) / this.sheetPageSize(id));
     state.gridData = null;
     await setTab('sheets');
-    if (this.currentGridData()?.id !== id) throw new Error('编辑表读取失败，请重试定位');
+    if (this.currentGridData()?.id !== id) throw new Error(localize('ui.sheets.editingTableReadFailedTry'));
     const target = requireEl('analysisEditableGrid').querySelector<HTMLTextAreaElement>(
       `textarea[data-row="${row - 1}"][data-col="${column - 1}"]`,
     );
-    if (!target) throw new Error('未能读取所选来源位置');
+    if (!target) throw new Error(localize('ui.sheets.unableReadSelectedSourceLocation'));
     target.focus();
     target.scrollIntoView({ block: 'center', inline: 'nearest' });
   }
@@ -947,10 +948,10 @@ export class AnalysisSheetsController {
     const data = state.gridData;
     const id = state.loadedSheet;
     if (!state.opened || state.tab !== 'sheets' || !data || !id) {
-      throw new Error('请先打开独立编辑表');
+      throw new Error(localize('ui.sheets.openIndividualEditingTablesSeparately'));
     }
     if (data.id !== id) {
-      throw new Error('请先打开独立编辑表');
+      throw new Error(localize('ui.sheets.openIndividualEditingTablesSeparately'));
     }
     const book = state.fingerprint;
     const pathBook = state.book;
@@ -964,10 +965,10 @@ export class AnalysisSheetsController {
         previous.pathBook !== pathBook ||
         previous.page !== page
       ) {
-        throw new Error('目标表或页面已变化，请关闭后重新选择');
+        throw new Error(localize('ui.sheets.targetTableOrPageChanged'));
       }
     } else if (drafts.entries(book).some((entry) => entry.id === id)) {
-      throw new Error('此表还有未保存草稿，请先重试保存后再选择性粘贴');
+      throw new Error(localize('ui.sheets.thereStillUnsavedDraftsThis'));
     }
     const selected =
       previous ??
@@ -1007,7 +1008,7 @@ export class AnalysisSheetsController {
       state.loadedSheet !== previous.id ||
       state.sheetPage !== previous.page
     ) {
-      throw new Error('目标已变化，请关闭后重新选择');
+      throw new Error(localize('ui.sheets.targetChangedCloseReSelect'));
     }
     await this.flush();
     await this.loadSheet(previous.id, previous.page);

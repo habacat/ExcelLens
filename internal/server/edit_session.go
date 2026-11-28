@@ -15,6 +15,7 @@ import (
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -61,7 +62,7 @@ func (e *editController) withSourceCells(layout editfile.Layout, doc *editdoc.Do
 func editDirectory(subdir string) (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil || base == "" {
-		return "", errors.New("无法定位编辑副本目录")
+		return "", i18n.Error("service.editSession.unableLocateEditingCopyDirectory")
 	}
 	return filepath.Join(base, "ExcelLens", subdir), nil
 }
@@ -121,7 +122,7 @@ func (a *App) startEdit(ctx context.Context, store *checkpoint.Store, book strin
 	}
 	format := formats.EditExtension(filepath.Ext(wb.Path))
 	if format == "" || (wb.Format != format && !(wb.Format == "xlsx" && formats.EditOOXML(format))) || wb.SourceInfo.Incomplete || wb.ArchiveOrigin != nil {
-		return editdoc.Key{}, errors.New("当前来源不支持创建编辑副本")
+		return editdoc.Key{}, i18n.Error("service.editSession.currentSourceDoesNotSupport")
 	}
 	entries, err := listTaskCheckpoints(ctx, store)
 	if err != nil {
@@ -274,7 +275,7 @@ func editBasePaths() ([]string, error) {
 	paths := make([]string, 0, len(items))
 	for _, item := range items {
 		if item.Manifest == nil {
-			return nil, errors.New("编辑副本来源无法确认，临时文件未清理")
+			return nil, i18n.Error("service.editSession.editedCopySourceCannotBe")
 		}
 		entry, err := editdoc.EntryFromManifest(*item.Manifest)
 		if err != nil {

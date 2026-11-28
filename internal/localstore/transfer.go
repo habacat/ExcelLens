@@ -7,13 +7,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"excellens/internal/i18n"
 )
 
 type fileRecord struct {
@@ -47,7 +49,7 @@ func openRegular(root *os.Root, name string) (*os.File, fs.FileInfo, error) {
 			return nil, nil, err
 		}
 		if st.Mode()&os.ModeSymlink != 0 {
-			return nil, nil, fmt.Errorf("路径含链接：%s", p)
+			return nil, nil, i18n.Error("diagnostic.localstore.transfer.pathContainsLink", i18n.Args{"p": p})
 		}
 	}
 	f, err := root.Open(name)
@@ -62,7 +64,7 @@ func openRegular(root *os.Root, name string) (*os.File, fs.FileInfo, error) {
 	}
 	if !st.Mode().IsRegular() {
 		f.Close()
-		return nil, nil, fmt.Errorf("不是普通文件：%s", name)
+		return nil, nil, i18n.Error("diagnostic.localstore.transfer.notRegularFile", i18n.Args{"name": name})
 	}
 	return f, st, nil
 }
@@ -81,7 +83,7 @@ func readFile(ctx context.Context, root *os.Root, name string, dst io.Writer) (f
 	defer f.Close()
 	rec, err := digestCopy(ctx, f, dst)
 	if err == nil && rec.Bytes != st.Size() {
-		err = fmt.Errorf("文件大小已变化：%s", name)
+		err = i18n.Error("diagnostic.localstore.transfer.fileSizeChanged", i18n.Args{"name": name})
 	}
 	return rec, err
 }
@@ -106,14 +108,14 @@ func (r Roots) snapshot(ctx context.Context, dst *backupVolume) (map[string]file
 				defer f.Close()
 				expected, ok := dst.planned[key]
 				if !ok || expected.Bytes != st.Size() {
-					return fmt.Errorf("备份预算后文件发生变化：%s", name)
+					return i18n.Error("diagnostic.localstore.transfer.changesOccurredAfterBackupBudget", i18n.Args{"name": name})
 				}
 				hash := sha256.New()
 				count := &countWriter{}
 				err = dst.write(key, io.TeeReader(meteredReader(ctx, io.LimitReader(f, st.Size()+1)), io.MultiWriter(hash, count)))
 				rec = fileRecord{count.n, hex.EncodeToString(hash.Sum(nil))}
 				if err == nil && count.n != st.Size() {
-					err = fmt.Errorf("文件大小已变化：%s", name)
+					err = i18n.Error("diagnostic.localstore.transfer.fileSizeChanged", i18n.Args{"name": name})
 				}
 			}
 			if err == nil {
@@ -135,7 +137,7 @@ func (c *countWriter) Write(p []byte) (int, error) { c.n += int64(len(p)); retur
 
 func (r Roots) externalFolder(folder string) (string, error) {
 	if !filepath.IsAbs(folder) {
-		return "", errors.New("请选择已有目录的绝对路径")
+		return "", i18n.Error("diagnostic.localstore.transfer.selectAbsolutePathExistingDirectory")
 	}
 	real, err := filepath.EvalSymlinks(folder)
 	if err != nil {
@@ -143,11 +145,11 @@ func (r Roots) externalFolder(folder string) (string, error) {
 	}
 	st, err := os.Stat(real)
 	if err != nil || !st.IsDir() {
-		return "", errors.New("目录不可用")
+		return "", i18n.Error("diagnostic.localstore.transfer.catalogUnavailable")
 	}
 	for p := real; ; p = filepath.Dir(p) {
 		if sameDirectory(p, r.Config) || sameDirectory(p, r.Local) {
-			return "", errors.New("请选择 ExcelLens 数据目录以外的位置")
+			return "", i18n.Error("diagnostic.localstore.transfer.selectLocationOtherThanExcellens")
 		}
 		if p == filepath.Dir(p) {
 			break
@@ -174,7 +176,7 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 	if err := r.AdoptFrozen(ctx); err != nil {
 		return "", err
 	}
-	phase(ctx, "预算磁盘空间", 0, 0)
+	phase(ctx, "stage.task.budgetDiskSpace", 0, 0)
 	space, total, items, err := r.backupSpace(ctx, parent, options)
 	if err != nil {
 		return "", err
@@ -186,9 +188,9 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 	defer func() {
 		if cleanupErr := cleanup(); cleanupErr != nil {
 			if published != "" {
-				err = errors.Join(err, fmt.Errorf("备份已发布到 %s，清理暂存失败：%w", published, cleanupErr))
+				err = errors.Join(err, i18n.Wrap("diagnostic.localstore.transfer.backupPublishedCleaningCacheFailed", cleanupErr, i18n.Args{"published": published}))
 			} else {
-				err = errors.Join(err, fmt.Errorf("清理备份暂存 %s 失败：%w", stage, cleanupErr))
+				err = errors.Join(err, i18n.Wrap("diagnostic.localstore.transfer.failedCleanUpBackupCache", cleanupErr, i18n.Args{"stage": stage}))
 			}
 		}
 	}()
@@ -204,27 +206,27 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 	}
 	defer clear(volume.key)
 	volume.disk, volume.planned = space.targets["backup"], space.planned
-	phase(ctx, "复制", total, items)
+	phase(ctx, "stage.task.copying", total, items)
 	files, err := r.snapshot(ctx, &volume)
 	if err != nil {
 		return "", err
 	}
 	if len(files) != items {
-		return "", errors.New("备份预算后文件集合发生变化，请重试")
+		return "", i18n.Error("diagnostic.localstore.transfer.changesOccurredFileCollectionAfter")
 	}
 	total = 0
 	for _, f := range files {
 		total += f.Bytes
 	}
-	phase(ctx, "复核来源", total, len(files))
+	phase(ctx, "stage.task.reviewSource", total, len(files))
 	again, err := r.snapshot(ctx, nil)
 	if err != nil {
 		return "", err
 	}
 	if !maps.Equal(files, again) {
-		return "", errors.New("备份期间文件发生变化，请待保存完成后重试")
+		return "", i18n.Error("diagnostic.localstore.transfer.fileChangedDuringBackupTry")
 	}
-	phase(ctx, "校验备份", total, len(files))
+	phase(ctx, "stage.task.verifyBackup", total, len(files))
 	for name, want := range files {
 		if err := volume.verify(ctx, name, want, io.Discard); err != nil {
 			return "", err
@@ -236,7 +238,7 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 		return "", err
 	}
 	if len(data) > manifestLimit {
-		return "", errors.New("备份清单超过容量")
+		return "", i18n.Error("diagnostic.localstore.transfer.backupListExceedsCapacityLimit")
 	}
 	if err = volume.write("manifest.json", bytes.NewReader(data)); err != nil {
 		return "", err
@@ -246,7 +248,7 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 		return "", err
 	}
 	if !bytes.Equal(data, check) {
-		return "", errors.New("备份清单复核失败")
+		return "", i18n.Error("diagnostic.localstore.transfer.backupListReviewFailed")
 	}
 	if err = ctx.Err(); err != nil {
 		return "", err
@@ -259,7 +261,7 @@ func (r Roots) BackupWith(ctx context.Context, parent string, options TransferOp
 	}
 	out := filepath.Join(parent, strings.TrimPrefix(filepath.Base(stage), "."))
 	if _, err = os.Lstat(out); !errors.Is(err, os.ErrNotExist) {
-		return "", errors.New("备份目标已存在或不可用")
+		return "", i18n.Error("diagnostic.localstore.transfer.backupTargetAlreadyExistsOr")
 	}
 	if err = space.check(); err != nil {
 		return "", err
@@ -287,7 +289,7 @@ func checkParents(root *os.Root, rel string) error {
 		return err
 	}
 	if !st.IsDir() {
-		return fmt.Errorf("目标分类不是普通目录：%s", parent)
+		return i18n.Error("diagnostic.localstore.transfer.targetCategoryNotRegularDirectory", i18n.Args{"parent": parent})
 	}
 	return nil
 }

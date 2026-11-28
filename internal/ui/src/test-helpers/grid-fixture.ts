@@ -250,6 +250,7 @@ export function makeTestFrozenPanes(
     colName: columnName,
     bindResizeGrip: () => undefined,
     getVirtualScrollTop: () => 0,
+    paintRowHeaderBorder: () => undefined,
     updateSharedBorders: () => undefined,
     isPrecedent: () => false,
     isSearchMatch: () => false,

@@ -3,6 +3,7 @@
  * Pure string construction: never mutates the live grid, evaluates formulas,
  * or executes workbook HTML.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { HttpError } from '../contracts/common.ts';
 import type { ClipboardLimits, RichTextLimits } from '../contracts/formats.ts';
 import type {
@@ -54,7 +55,7 @@ export function configureClipboard(value: ClipboardLimits): void {
     value.htmlBytes,
   ];
   if (required.some((n) => !Number.isSafeInteger(n) || n < 1)) {
-    throw new Error('复制容量配置无效');
+    throw new Error(localize('ui.clipboard.invalidCopyCapacityConfiguration'));
   }
   configured = Object.freeze({ ...value });
 }
@@ -73,7 +74,7 @@ export function copyLimits(override?: Partial<ClipboardLimits> | null): Clipboar
     (limits.textBytes ?? 0) < 1 ||
     (limits.htmlBytes ?? 0) < 1
   ) {
-    throw new Error('复制容量配置尚未载入');
+    throw new Error(localize('ui.clipboard.copiedCapacityConfigurationNotLoaded'));
   }
   return {
     rows: limits.rows ?? 0,
@@ -104,7 +105,7 @@ export function checkCopy(
     payload.rows.length > limits.rows ||
     payload.rows.length * (end - start + 1) > limits.cells
   ) {
-    throw new Error('复制区域超出安全上限');
+    throw new Error(localize('ui.clipboard.copiedAreaExceedsSafetyLimit'));
   }
   return { start, end, limits };
 }
@@ -287,7 +288,7 @@ export function buildClipboard(
     for (const part of parts) {
       htmlBytes += utf8Length(part);
       if (htmlBytes > limits.htmlBytes) {
-        throw capacityError('复制HTML超过本次容量，请缩小选区或使用导出');
+        throw capacityError(localize('ui.clipboard.copyingHtmlExceedsThisCapacity'));
       }
       html.push(part);
     }
@@ -330,7 +331,7 @@ export function buildClipboard(
         sourceBytes += utf8Length(cell.conditional.display);
       }
       if (sourceBytes > limits.textBytes) {
-        throw capacityError('复制文字超过本次容量，请缩小选区或使用导出');
+        throw capacityError(localize('ui.clipboard.copiedTextExceedsCurrentCapacity'));
       }
       const value = conditionalValue(cell, false, showStyles);
       values.push(tsvCell(value));
@@ -362,7 +363,7 @@ export function buildClipboard(
   append('</table><!--EndFragment--></body></html>');
   const text = plain.join('\n');
   if (utf8Length(text) > limits.textBytes) {
-    throw capacityError('复制文字超过本次容量，请缩小选区或使用导出');
+    throw capacityError(localize('ui.clipboard.copiedTextExceedsCurrentCapacity'));
   }
   return { text, html: html.join(''), notices: [...notices] };
 }
@@ -373,17 +374,17 @@ const MAX_BATCH_CELLS = 20000;
 
 function changeBytes(change: PasteCellChange): number {
   if (characterCount(change.value) > 4000) {
-    throw new Error('单元格内容超过4000字符，请缩短后重试');
+    throw new Error(localize('ui.clipboard.cellContentExceedsCharactersShorten'));
   }
   return utf8Length(JSON.stringify({ row: change.row, col: change.col, value: change.value })) + 1;
 }
 
 export function validateClipboardChanges<T extends PasteCellChange>(changes: readonly T[]): readonly T[] {
-  if (changes.length > MAX_BATCH_CELLS) throw new Error('一次最多粘贴20,000个单元格');
+  if (changes.length > MAX_BATCH_CELLS) throw new Error(localize('ui.clipboard.maximumCellsCanBePasted'));
   let bytes = REQUEST_RESERVE;
   for (const change of changes) {
     bytes += changeBytes(change);
-    if (bytes > REQUEST_LIMIT) throw new Error('编辑请求超过 2 MB，请分批粘贴');
+    if (bytes > REQUEST_LIMIT) throw new Error(localize('ui.clipboard.editingRequestExceedsMbPaste'));
   }
   return changes;
 }
@@ -419,7 +420,7 @@ export function parseClipboardTSV(
   } = options;
   const text = rawText ?? '';
   if (text.length > maxTextLength || utf8Length(text) > maxTextLength) {
-    throw new Error('剪贴板内容超过 2 MB，请分批粘贴');
+    throw new Error(localize('ui.clipboard.clipboardContentExceedsMbPaste'));
   }
   const rows: string[][] = [];
   let row: string[] = [];
@@ -431,17 +432,17 @@ export function parseClipboardTSV(
 
   const pushCell = (): void => {
     if (characterCount(cell) > maxCellLength) {
-      throw new Error(`单元格内容超过${maxCellLength}字符，未粘贴`);
+      throw new Error(localize('ui.clipboard.cellContentExceedsLengthCharacters', { maxCellLength }));
     }
-    if (row.length >= maxCols) throw new Error(`一次最多粘贴${maxCols}列，未粘贴`);
-    if (++cells > maxCells) throw new Error(`一次最多粘贴${maxCells.toLocaleString()}个单元格`);
+    if (row.length >= maxCols) throw new Error(localize('ui.clipboard.upColumnsCanBePasted', { maxCols }));
+    if (++cells > maxCells) throw new Error(localize('ui.clipboard.upCellsCanBePasted', { maxCells: maxCells.toLocaleString(interfaceLocale()) }));
     row.push(cell);
     cell = '';
     closed = false;
   };
   const pushRow = (): void => {
     pushCell();
-    if (rows.length >= maxRows) throw new Error(`一次最多粘贴${maxRows}行`);
+    if (rows.length >= maxRows) throw new Error(localize('ui.clipboard.upRowsCanBePasted', { maxRows }));
     rows.push(row);
     row = [];
   };
@@ -468,17 +469,17 @@ export function parseClipboardTSV(
       pushRow();
       endedRow = true;
     } else if (closed) {
-      throw new Error('剪贴板引号格式无效，未粘贴');
+      throw new Error(localize('ui.clipboard.clipboardQuotationFormatInvalidNot'));
     } else if (ch === '"' && cell === '') {
       quoted = true;
     } else {
       cell += ch;
     }
     if (cell.length > maxCellLength * 2) {
-      throw new Error(`单元格内容超过${maxCellLength}字符，未粘贴`);
+      throw new Error(localize('ui.clipboard.cellContentExceedsLengthCharacters', { maxCellLength }));
     }
   }
-  if (quoted) throw new Error('剪贴板引号未闭合，未粘贴');
+  if (quoted) throw new Error(localize('ui.clipboard.pasteClipboardQuotesNotClosed'));
   if (!endedRow) pushRow();
   return rows;
 }
@@ -502,7 +503,7 @@ export function pasteChangesFromTSV(
     startRow + rows.length > rowLimit ||
     rows.some((r) => startCol + r.length > columns)
   ) {
-    throw new Error('粘贴范围超出编辑表边界，未粘贴；请增加行列或缩小范围');
+    throw new Error(localize('ui.clipboard.pastingRangeExceedsEditingTable'));
   }
   const changes: PasteCellChange[] = [];
   rows.forEach((r, i) => {

@@ -1,6 +1,7 @@
 /**
  * Bounded standalone printable HTML manuscript builder for print preview export.
  */
+import { interfaceLocale, t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { PrintingLimits } from '../contracts/formats.ts';
 import type { RenderedPrintPage } from './printing-model.ts';
 
@@ -8,16 +9,16 @@ export function parsePageRange(text: string, total: number, limit: number): numb
   const selected = new Set<number>();
   for (const part of text.trim().split(/[,，]/)) {
     const match = /^\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*$/.exec(part);
-    if (!match?.[1]) throw new Error('页段可填写 1-3,5');
+    if (!match?.[1]) throw new Error(localize('ui.printingOutput.pageSegmentsCanBeFilled'));
     const first = Number(match[1]);
     const last = Number(match[2] || match[1]);
     if (!Number.isSafeInteger(last) || first < 1 || last < first || last > total) {
-      throw new Error('输出页段超出已确认的分页范围');
+      throw new Error(localize('ui.printingOutput.outputPageSegmentExceedsConfirmed'));
     }
-    if (last - first + 1 > limit) throw new Error('输出页数超出容量，请分段导出');
+    if (last - first + 1 > limit) throw new Error(localize('ui.common.numberPagesBeExportedExceeds'));
     for (let page = first; page <= last; page++) {
       selected.add(page - 1);
-      if (selected.size > limit) throw new Error('输出页数超出容量，请分段导出');
+      if (selected.size > limit) throw new Error(localize('ui.common.numberPagesBeExportedExceeds'));
     }
   }
   return [...selected].sort((a, b) => a - b);
@@ -62,7 +63,7 @@ export class PrintOutput {
     notes: readonly string[],
   ): void {
     if (this.parts.length >= this.limits.outputPages) {
-      throw new Error('输出页数超出容量，请分段导出');
+      throw new Error(localize('ui.common.numberPagesBeExportedExceeds'));
     }
     const paper = rendered.node;
     paper.style.transform = 'none';
@@ -73,7 +74,7 @@ export class PrintOutput {
       this.sizes.set(size, pageName);
     }
     paper.style.setProperty('page', pageName);
-    paper.setAttribute('aria-label', `${source} · 第 ${page} 页`);
+    paper.setAttribute('aria-label', localize('ui.printingOutput.page', { source, page }));
     for (const cell of paper.querySelectorAll('[data-missing-cache]')) {
       if (!cell.textContent.trim()) {
         cell.textContent = cell.getAttribute('data-missing-cache') ?? '';
@@ -81,7 +82,7 @@ export class PrintOutput {
     }
     const html = paper.outerHTML;
     this.bytes += this.encoder.encode(html).length;
-    if (this.bytes > this.limits.outputBytes) throw new Error('底稿内容超过容量，请分段导出');
+    if (this.bytes > this.limits.outputBytes) throw new Error(localize('ui.printingOutput.subdocumentContentExceedsCapacityExport'));
     for (const note of [...notes, ...rendered.warnings]) {
       if (note) this.notes.add(note);
     }
@@ -89,7 +90,7 @@ export class PrintOutput {
   }
 
   file(): Blob {
-    if (!this.parts.length) throw new Error('所选范围没有可打印页面');
+    if (!this.parts.length) throw new Error(localize('ui.printingOutput.thereNoPrintablePagesSelected'));
     const safe = (text: string): string => {
       const el = document.createElement('span');
       el.textContent = text;
@@ -101,17 +102,17 @@ export class PrintOutput {
     const css =
       `${paperCSS()}\n${pages}` +
       '\n*{box-sizing:border-box}html,body{margin:0;padding:0}body{background:#eee}.print-paper{position:relative;left:auto;top:auto;margin:12px auto;break-after:page;break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}.print-paper:last-child{break-after:auto}.notes{font:14px sans-serif;padding:12px;color:#222}.print-paper [data-missing-cache]{color:#765200}@media print{body{background:white}.notes{display:none}.print-paper{margin:0;box-shadow:none}}';
-    const notes = [...this.notes, '字体由打开底稿的系统提供，缺少原字体时使用替代字体。'];
+    const notes = [...this.notes, localize('ui.printingOutput.fontProvidedSystemThatOpens')];
     const head =
-      '<!doctype html><html lang="zh-CN"><meta charset="utf-8">' +
+      '<!doctype html><html lang="' + safe(interfaceLocale()) + '"><meta charset="utf-8">' +
       `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">` +
       `<title>${safe(this.title)}</title><style>${css}</style><body><section class="notes">` +
-      `<strong>${safe(this.title)}</strong><p>${this.parts.length} 页 · 可打印或另存为 PDF</p>` +
+      `<strong>${safe(this.title)}</strong><p>${localizeHTML('ui.printingOutput.pagePrintableOrPdfFormat', { count: this.parts.length })}</p>` +
       `${notes.map((n) => `<p>${safe(n)}</p>`).join('')}</section>`;
     const blob = new Blob([head, ...this.parts, '</body></html>'], {
       type: 'text/html;charset=utf-8',
     });
-    if (blob.size > this.limits.outputBytes) throw new Error('底稿内容超过容量，请分段导出');
+    if (blob.size > this.limits.outputBytes) throw new Error(localize('ui.printingOutput.subdocumentContentExceedsCapacityExport'));
     return blob;
   }
 }

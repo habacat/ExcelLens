@@ -20,6 +20,7 @@ import (
 
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 var clipUser = syscall.NewLazyDLL("user32.dll")
@@ -34,7 +35,7 @@ var clipboardOwner = clipUser.NewProc("GetClipboardOwner")
 var clipboardLock = clipKernel.NewProc("GlobalLock")
 var clipboardUnlock = clipKernel.NewProc("GlobalUnlock")
 var clipboardSize = clipKernel.NewProc("GlobalSize")
-var errClipboardNotReady = errors.New("Excel 尚未提供剪贴板数据，请重新复制")
+var errClipboardNotReady = i18n.Error("service.editNativeClipboardWindows.excelNotYetProvidedClipboard")
 
 func clipFormat(name string) uintptr {
 	p, _ := syscall.UTF16PtrFromString(name)
@@ -56,7 +57,7 @@ func clipboardBytes(id uintptr, limit int) ([]byte, error) {
 	}
 	ptr, _, _ := clipboardLock.Call(h)
 	if ptr == 0 {
-		return nil, errors.New("剪贴板正忙，请重试")
+		return nil, i18n.Error("service.editNativeClipboardWindows.clipboardBusyTryAgain")
 	}
 	defer clipboardUnlock.Call(h)
 	out := make([]byte, int(n))
@@ -67,7 +68,7 @@ func clipboardBytes(id uintptr, limit int) ([]byte, error) {
 	ok, _, _ := clipKernel.NewProc("ReadProcessMemory").Call(process, ptr, uintptr(unsafe.Pointer(&out[0])), n, uintptr(unsafe.Pointer(&copied)))
 	runtime.KeepAlive(out)
 	if ok == 0 || copied != n {
-		return nil, errors.New("未能读取完整剪贴板数据")
+		return nil, i18n.Error("service.editNativeClipboardWindows.unableReadCompleteClipboardData")
 	}
 	return out, nil
 }
@@ -78,7 +79,7 @@ func openNativeClipboard(ctx context.Context) error {
 			return nil
 		}
 		if attempt >= 12 {
-			return errors.New("剪贴板正忙，请重试")
+			return i18n.Error("service.editNativeClipboardWindows.clipboardBusyTryAgain")
 		}
 		select {
 		case <-ctx.Done():
@@ -103,7 +104,7 @@ func nativeClipboard(ctx context.Context, digest string) ([]byte, editfile.Nativ
 		window, _, _ := clipboardOwner.Call()
 		return now == sequence && window == owner
 	}
-	changed := errors.New("剪贴板内容已变化，请重新粘贴")
+	changed := i18n.Error("service.editNativeClipboardWindows.clipboardContentChangedPasteAgain")
 	// Excel can release the requesting thread's lock or temporarily return a
 	// null handle while rendering a delayed format. Let its owner finish with
 	// the clipboard unlocked, then verify identity before retrying that format.
@@ -135,20 +136,20 @@ func nativeClipboard(ctx context.Context, digest string) ([]byte, editfile.Nativ
 		return nil, selection, nil
 	}
 	if ok, _, _ := clipboardAvailable.Call(embed); ok == 0 {
-		return nil, selection, errors.New("Excel 只提供了显示结果。可用 Ctrl+Shift+V 粘贴文字")
+		return nil, selection, i18n.Error("service.editNativeClipboardWindows.excelOnlyProvidesResultsCan")
 	}
 	raw, err := read(13, formats.EditRequestBytes*2+2)
 	if err != nil {
 		return nil, selection, err
 	}
 	if len(raw)%2 != 0 {
-		return nil, selection, errors.New("剪贴板文本无效")
+		return nil, selection, i18n.Error("service.editNativeClipboardWindows.clipboardTextInvalid")
 	}
 	units := unsafe.Slice((*uint16)(unsafe.Pointer(&raw[0])), len(raw)/2)
 	text := strings.ReplaceAll(syscall.UTF16ToString(units), "\r\n", "\n")
 	sum := sha256.Sum256([]byte(strings.TrimSuffix(text, "\n")))
 	if hex.EncodeToString(sum[:]) != digest {
-		return nil, selection, errors.New("剪贴板内容已变化，请重新粘贴")
+		return nil, selection, i18n.Error("service.editNativeClipboardWindows.clipboardContentChangedPasteAgain")
 	}
 	// Link carries the sheet of a copied inactive sheet as well. Published
 	// Windows ANSI names are converted with the system code page.

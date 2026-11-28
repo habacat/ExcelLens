@@ -2,13 +2,14 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -44,7 +45,7 @@ func (a *App) handleAnalysisQueryStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if key := r.Header.Get("X-ExcelLens-Workbook"); key != "" && key != wb.Fingerprint {
-		writeError(w, 409, "工作簿已切换，请重新选择分析数据源")
+		writeMessage(w, 409, "service.analysisQueryJob.workbookSwitchedReselectAnalysisData")
 		return
 	}
 	var req struct {
@@ -52,7 +53,7 @@ func (a *App) handleAnalysisQueryStart(w http.ResponseWriter, r *http.Request) {
 		SourceID string `json:"sourceId,omitempty"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "分析条件无效")
+		writeMessage(w, 400, "service.analysisQueryJob.invalidAnalysisConditions")
 		return
 	}
 	q := req.Query
@@ -60,7 +61,7 @@ func (a *App) handleAnalysisQueryStart(w http.ResponseWriter, r *http.Request) {
 		q.HeaderRow = 1
 	}
 	if len(q.Source) == 0 || len(q.Rows) > 3 || len(q.Filters) > 8 || len(q.Transforms) > 8 {
-		writeError(w, 400, "分析条件超出限制")
+		writeMessage(w, 400, "service.analysisQueryJob.analysisConditionsExceedLimits")
 		return
 	}
 	var captured *analysisSourceSnapshot
@@ -72,14 +73,14 @@ func (a *App) handleAnalysisQueryStart(w http.ResponseWriter, r *http.Request) {
 			captured, err = a.analysisSourceSnapshot(req.SourceID, wb)
 		}
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer captured.close()
 	}
 	job, err := a.startAnalysisTask(wb, q, nil, captured)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]string{"jobId": job.ID})
@@ -89,14 +90,14 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	if len(captured) > 1 {
-		return nil, errors.New("分析来源快照数量无效")
+		return nil, i18n.Error("service.analysisQueryJob.numberAnalysisSourceSnapshotsInvalid")
 	}
 	var base *analysisSourceSnapshot
 	if len(captured) == 1 {
 		base = captured[0]
 	}
 	if base != nil && base.isClosed() {
-		return nil, errors.New("分析来源快照已释放")
+		return nil, i18n.Error("service.analysisQueryJob.analysisSourceSnapshotReleased")
 	}
 	var err error
 	q, err = compositionAnalysisDefinition(q, base)
@@ -104,7 +105,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 		return nil, err
 	}
 	if q.Composition != nil && plan != nil {
-		return nil, errors.New("联合来源分析方案尚未接入")
+		return nil, i18n.Error("service.analysisQueryJob.jointSourceAnalysisSchemeNot")
 	}
 	if q.SourceScope != nil {
 		scope, err := normalizedAnalysisScope(wb, q.Source, *q.SourceScope)
@@ -116,7 +117,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 	var rows *analysisSourceSnapshot
 	if base != nil {
 		if base.isClosed() || base.data.wb != wb || base.data.source != q.Source || q.SourceScope != nil && q.SourceScope.Digest() != base.data.scope.Digest() {
-			return nil, errors.New("分析来源快照与查询范围不一致")
+			return nil, i18n.Error("service.analysisQueryJob.analysisSourceSnapshotDoesNot")
 		}
 		var err error
 		rows, err = base.retain()
@@ -143,12 +144,12 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 		}
 	}()
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &analysisTask{ID: randomID(), Workbook: wb, Query: q, RecipePlan: plan, SourceRows: rows, Status: "queued", Stage: "准备数据源", Created: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{})}
+	job := &analysisTask{ID: randomID(), Workbook: wb, Query: q, RecipePlan: plan, SourceRows: rows, Status: "queued", Stage: "stage.task.prepareDataSource", Created: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{})}
 	a.analysisMu.Lock()
 	if a.currentWorkbook() != wb {
 		a.analysisMu.Unlock()
 		cancel()
-		return nil, errors.New("工作簿已切换，分析未启动")
+		return nil, i18n.Error("service.analysisQueryJob.workbookSwitchedAnalysisNotInitiated")
 	}
 	// Bound retained jobs; old completed results remain accessible until evicted.
 	if len(a.analysisJobs) >= 12 {
@@ -165,7 +166,7 @@ func (a *App) startAnalysisTask(wb *workbook.Workbook, q analysis.Query, plan *r
 		if oldest == nil {
 			a.analysisMu.Unlock()
 			cancel()
-			return nil, errors.New("已有12项分析任务，请完成或取消后重试")
+			return nil, i18n.Error("service.analysisQueryJob.thereAlreadyAnalysisTasksComplete")
 		}
 		oldest.cancel()
 		oldest.closeSourceRows()
@@ -209,13 +210,13 @@ func (a *App) runAnalysisQuery(job *analysisTask, q analysis.Query) {
 	}
 	job.mu.Lock()
 	job.Status = "running"
-	job.Stage = "读取字段及建立索引"
+	job.Stage = "stage.task.readingFieldsCreatingIndexes"
 	job.mu.Unlock()
 	wb := job.Workbook
 	if strings.HasPrefix(q.Source, "wb:") {
 		meta, ok := wb.FindSheet(strings.TrimPrefix(q.Source, "wb:"))
 		if !ok {
-			a.finishAnalysis(job, analysis.Result{}, errors.New("源工作表不存在"))
+			a.finishAnalysis(job, analysis.Result{}, i18n.Error("service.analysisQueryJob.sourceWorksheetDoesNotExist"))
 			return
 		}
 		if wb.GetCachedIndex(meta.Path) == nil {
@@ -284,11 +285,11 @@ func (a *App) runAnalysisQuery(job *analysisTask, q analysis.Query) {
 	}
 	stamp := src.stamp()
 	if job.RecipePlan != nil && job.RecipePlan.Stamp != stamp {
-		a.finishAnalysis(job, analysis.Result{}, errors.New("分析方案目标来源已修改，请重新读取字段并核对映射"))
+		a.finishAnalysis(job, analysis.Result{}, i18n.Error("service.analysisQueryJob.sourceAnalysisPlanObjectivesModified"))
 		return
 	}
 	job.mu.Lock()
-	job.Stage = "正在逐行聚合（精确十进制）"
+	job.Stage = "stage.task.aggregatingRowRowExactDecimal"
 	job.Total = int64(src.total)
 	job.SourceStamp = stamp
 	needed := make(map[string]bool)
@@ -321,7 +322,7 @@ func (a *App) finishAnalysis(job *analysisTask, res analysis.Result, err error) 
 		} else {
 			job.Status = "error"
 		}
-		job.Stage = "任务结束"
+		job.Stage = "stage.task.taskCompleted"
 		job.Error = err.Error()
 		return
 	}
@@ -331,7 +332,7 @@ func (a *App) finishAnalysis(job *analysisTask, res analysis.Result, err error) 
 	}
 	job.Result = res
 	job.Status = "done"
-	job.Stage = "完成"
+	job.Stage = "stage.task.completed"
 	job.Progress = res.Scanned
 }
 func (a *App) getAnalysisJob(id string) *analysisTask {
@@ -384,11 +385,11 @@ func (a *App) handleAnalysisQueryStatus(w http.ResponseWriter, r *http.Request) 
 	}
 	job := a.getAnalysisJob(r.URL.Query().Get("id"))
 	if job == nil || a.currentWorkbook() != job.Workbook {
-		writeError(w, 404, "分析任务不存在或工作簿已切换")
+		writeMessage(w, 404, "service.analysisQueryJob.analysisTaskDoesNotExist")
 		return
 	}
 	job.mu.RLock()
-	response := map[string]any{"status": job.Status, "stage": job.Stage, "progress": job.Progress, "total": job.Total, "error": job.Error}
+	response := map[string]any{"status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "progress": job.Progress, "total": job.Total, "error": job.Error}
 	if job.Status == "done" {
 		response["result"] = job.Result
 		response["query"] = job.Query
@@ -412,12 +413,12 @@ func (a *App) handleAnalysisQueryCancel(w http.ResponseWriter, r *http.Request) 
 		ID string `json:"id"`
 	}
 	if err := decodeAnalysis(r, &req); err != nil {
-		writeError(w, 400, "参数无效")
+		writeMessage(w, 400, "service.analysisQueryJob.parameterInvalid")
 		return
 	}
 	job := a.getAnalysisJob(req.ID)
 	if job == nil {
-		writeError(w, 404, "任务不存在")
+		writeMessage(w, 404, "service.analysisQueryJob.taskDoesNotExist")
 		return
 	}
 	job.cancel()

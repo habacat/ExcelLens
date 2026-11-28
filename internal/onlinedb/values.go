@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"math"
 	"reflect"
@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 
 	mssql "github.com/microsoft/go-mssqldb"
 )
@@ -123,13 +124,13 @@ func readValue(kind columnKind, raw any) (Value, error) {
 		if kind == columnGUID {
 			var id mssql.UniqueIdentifier
 			if err := id.Scan(v); err != nil {
-				return Value{}, errors.New("SQL Server 标识符的字节长度无效")
+				return Value{}, i18n.Error("diagnostic.onlinedb.values.invalidByteLengthSqlServer")
 			}
 			return Value{Kind: Text, Raw: id.String()}, nil
 		}
 		if kind == columnBinary {
 			if len(v) > (formats.DatabaseCellBytes-2)/2 {
-				return Value{}, errors.New("二进制值超过读取容量")
+				return Value{}, i18n.Error("diagnostic.onlinedb.values.binaryValueExceedsReadCapacity")
 			}
 			return Value{Kind: Binary, Raw: "0x" + hex.EncodeToString(v)}, nil
 		}
@@ -139,7 +140,7 @@ func readValue(kind columnKind, raw any) (Value, error) {
 	case driver.Valuer:
 		value, err := v.Value()
 		if err != nil || !driver.IsValue(value) {
-			return Value{}, errors.New("数据库驱动的原始值无法表示")
+			return Value{}, i18n.Error("diagnostic.onlinedb.values.databaseDrivenOriginalValuesCannot")
 		}
 		return readValue(kind, value)
 	case fmt.Stringer:
@@ -148,16 +149,16 @@ func readValue(kind columnKind, raw any) (Value, error) {
 		return readExtendedValue(kind, v)
 	}
 	if len(out.Raw) > formats.DatabaseCellBytes {
-		return Value{}, errors.New("单元格超过读取容量")
+		return Value{}, i18n.Error("diagnostic.onlinedb.values.cellExceedsReadingCapacity")
 	}
 	if !utf8.ValidString(out.Raw) {
-		return Value{}, errors.New("数据库返回的文本编码无效")
+		return Value{}, i18n.Error("diagnostic.onlinedb.values.textEncodingReturnedDatabaseInvalid")
 	}
 	if out.Kind == Text && kind == columnDecimal {
 		if decimalLiteral.MatchString(out.Raw) {
 			out.Kind = Number
 		} else if out.Raw != "NaN" && out.Raw != "Infinity" && out.Raw != "-Infinity" {
-			return Value{}, errors.New("精确数字的表示无效")
+			return Value{}, i18n.Error("diagnostic.onlinedb.values.preciseNumericalRepresentationsIneffective")
 		}
 	}
 	if out.Kind == Text && (kind == columnDate || kind == columnTimestamp || kind == columnTimestampZone) {
@@ -181,7 +182,7 @@ func readValue(kind columnKind, raw any) (Value, error) {
 
 func databaseFloat(kind columnKind, v float64, bits int) (Value, error) {
 	if kind == columnDecimal {
-		return Value{}, errors.New("数据库驱动未提供精确数字的原值")
+		return Value{}, i18n.Error("diagnostic.onlinedb.values.databaseDriverDoesNotProvide")
 	}
 	value := Value{Kind: Number, Raw: strconv.FormatFloat(v, 'g', -1, bits)}
 	if math.IsInf(v, 0) || math.IsNaN(v) {
@@ -210,5 +211,5 @@ func readExtendedValue(kind columnKind, value any) (Value, error) {
 			return Value{Kind: Text, Raw: string(data)}, nil
 		}
 	}
-	return Value{}, errors.New("数据库值的类型无法读取或超过容量")
+	return Value{}, i18n.Error("diagnostic.onlinedb.values.typeDatabaseValueCannotBe")
 }

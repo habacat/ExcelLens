@@ -3,13 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"excellens/internal/calculator"
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 // Only the existing input kind is needed to interpret pasted plain text.
@@ -86,7 +86,7 @@ func (a *App) planGridFill(ctx context.Context, doc *editdoc.Document, layout ed
 			}
 		}
 		if !layout.Contains(seed) {
-			return plan, errors.New("填充起点前没有可复制的单元格")
+			return plan, i18n.Error("service.editGridRange.thereNoCellsAvailableCopying")
 		}
 		values, err = a.gridFillSources(ctx, doc, layout, anchors)
 		if err != nil {
@@ -170,7 +170,7 @@ func (a *App) gridFillSources(ctx context.Context, doc *editdoc.Document, layout
 		if derived, ok := calc.ArrayMembers[addr]; ok {
 			v.Kind, v.Raw = derived.Kind, derived.Raw
 		} else if calc.GeneratedStatus(addr) != "" && v.Kind != "formula" {
-			return nil, errors.New("填充来源需要先重算或刷新")
+			return nil, i18n.Error("service.editGridRange.fillSourceNeedsBeRecalculated")
 		}
 		if v.Kind == "missing" {
 			v.Kind = "blank"

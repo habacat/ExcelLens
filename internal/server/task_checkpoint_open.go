@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"excellens/internal/checkpoint"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -39,12 +40,12 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	req, err := readTaskCheckpointRequest(w, r)
 	if err != nil || req.Revision == 0 {
-		writeError(w, 400, "任务来源请求无效，请刷新后重试")
+		writeMessage(w, 400, "service.taskCheckpointOpen.taskSourceRequestInvalidRefresh")
 		return
 	}
 	expected := a.currentWorkbook()
 	if expected == nil && (req.Book != "" || req.WorkbookKey != "") || expected != nil && (req.Book != sourceBookID(expected) || req.WorkbookKey != expected.Fingerprint) {
-		writeError(w, 409, "当前文件已切换，请重试")
+		writeMessage(w, 409, "service.taskCheckpointOpen.currentFileSwitchedTryAgain")
 		return
 	}
 	if !a.admitCheckpoint(w) {
@@ -74,7 +75,7 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	wb, release, err := a.openPinnedWorkbook(source.Path)
 	if err != nil {
-		writeError(w, 422, "无法打开任务原文件："+err.Error())
+		writeMessage(w, 422, "service.taskCheckpointOpen.unableOpenOriginalTaskFile", i18n.Args{"detail": err})
 		return
 	}
 	defer release()
@@ -106,11 +107,11 @@ func (a *App) handleTaskCheckpointOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	info, err := os.Stat(wb.Path)
 	if err != nil {
-		writeError(w, 422, "任务原文件已移动或删除")
+		writeMessage(w, 422, "service.taskCheckpointOpen.originalTaskFileMovedOr")
 		return
 	}
 	if !a.installWorkbook(wb, expected, true) {
-		writeError(w, 409, "当前文件已切换，未替换当前视图")
+		writeMessage(w, 409, "service.taskCheckpointOpen.currentFileSwitchedNoReplacement")
 		return
 	}
 	a.closeArchive()

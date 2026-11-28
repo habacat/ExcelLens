@@ -1,6 +1,7 @@
 /**
  * Pivot table label filter, date grouping, and embedded date filter coordinator.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   PivotDateFilter as PivotDateFilterSpec,
   PivotDateGroup,
@@ -11,21 +12,21 @@ import { requireButton, requireEl, requireInput, requireSelect } from '../core/d
 import { PivotDateFilter } from './edit-pivot-date-filter.ts';
 
 const LABEL_CRITERIA: Readonly<Record<string, string>> = {
-  captionEqual: '等于',
-  captionNotEqual: '不等于',
-  captionBeginsWith: '开头是',
-  captionNotBeginsWith: '开头不是',
-  captionEndsWith: '结尾是',
-  captionNotEndsWith: '结尾不是',
-  captionContains: '包含',
-  captionNotContains: '不包含',
-  captionGreaterThan: '大于',
-  captionGreaterThanOrEqual: '大于或等于',
-  captionLessThan: '小于',
-  captionLessThanOrEqual: '小于或等于',
-  captionBetween: '介于',
-  captionNotBetween: '不介于',
-  clear: '清除筛选',
+  captionEqual: localize('ui.common.equal'),
+  captionNotEqual: localize('ui.common.notEqual'),
+  captionBeginsWith: localize('ui.common.beginning'),
+  captionNotBeginsWith: localize('ui.editPivotCriteria.notAtBeginning'),
+  captionEndsWith: localize('ui.common.ending'),
+  captionNotEndsWith: localize('ui.editPivotCriteria.endNot'),
+  captionContains: localize('ui.common.including'),
+  captionNotContains: localize('ui.common.notIncluded'),
+  captionGreaterThan: localize('ui.common.greaterThan'),
+  captionGreaterThanOrEqual: localize('ui.common.greaterThanOrEqualeebbdff'),
+  captionLessThan: localize('ui.common.lessThan'),
+  captionLessThanOrEqual: localize('ui.common.lessThanOrEqualb1ce53e'),
+  captionBetween: localize('ui.common.between'),
+  captionNotBetween: localize('ui.common.neither'),
+  clear: localize('ui.common.clearFilters'),
 };
 
 function options(names: readonly string[]): HTMLOptionElement[] {
@@ -175,7 +176,7 @@ export class PivotCriteria {
     const summary = bounds.querySelector('summary');
     if (summary) {
       summary.textContent =
-        date.start || date.end ? '起止时间（自定义）' : '起止时间（自动）';
+        date.start || date.end ? localize('ui.editPivotCriteria.startEndTimeCustomizable') : localize('ui.editPivotCriteria.startEndTimeAutomatic');
     }
     const dateStartInput = requireInput('editCopyPivotDateStart');
     const dateEndInput = requireInput('editCopyPivotDateEnd');
@@ -184,7 +185,7 @@ export class PivotCriteria {
     const invalidBounds =
       Boolean(date.units.length) && (!dateStartInput.validity.valid || !dateEndInput.validity.valid);
     const dateApply = requireButton('editCopyPivotDateApply');
-    dateApply.textContent = date.units.length ? '应用分组' : '取消分组';
+    dateApply.textContent = date.units.length ? localize('ui.editPivotCriteria.applicationGrouping') : localize('ui.editPivotCriteria.disaggregation');
     dateApply.disabled =
       !date.field ||
       invalidBounds ||

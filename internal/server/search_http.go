@@ -23,25 +23,25 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CheckpointRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.searchHttp.requestedContentInvalid")
 		return
 	}
 	if err := req.normalize(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeFailure(w, http.StatusBadRequest, err)
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.searchHttp.noWorkbookOpen")
 		return
 	}
 	if req.WorkbookKey != "" && req.WorkbookKey != wb.Fingerprint || req.Book != "" && req.Book != sourceBookID(wb) {
-		writeError(w, http.StatusConflict, "搜索来源已切换，请重新运行")
+		writeMessage(w, http.StatusConflict, "service.searchHttp.searchSourceSwitchedRunProcess")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.searchHttp.unableFindSpecifiedWorksheet")
 		return
 	}
 	if req.Recoverable {
@@ -52,19 +52,19 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	job := &SearchJob{
 		Full: req.Full, Ticket: randomID(), ID: randomID(), Sheet: meta.Name, Query: req.Query, Mode: req.Mode, Scope: req.Scope,
-		Status: "running", Stage: "准备搜索", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{}),
+		Status: "running", Stage: "stage.task.readyToSearch", Started: time.Now(), cancel: cancel, ctx: ctx, done: make(chan struct{}),
 	}
 	a.mu.Lock()
 	if a.maintenance {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusConflict, "正在维护本机缓存，请稍后重试")
+		writeMessage(w, http.StatusConflict, "service.searchHttp.localCacheBeingMaintainedTry")
 		return
 	}
 	if a.wb != wb {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusConflict, "工作簿已切换，请重试")
+		writeMessage(w, http.StatusConflict, "service.searchHttp.workbookSwitchedTryAgain")
 		return
 	}
 	// Reuse an in-flight or completed identical search instead of scanning again.
@@ -88,13 +88,13 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 			if !pruneSearchJobsLocked(a.searchJobs, formats.QueryTaskHistory) {
 				a.mu.Unlock()
 				cancel()
-				writeError(w, http.StatusTooManyRequests, "正在回收搜索任务，请稍后重试")
+				writeMessage(w, http.StatusTooManyRequests, "service.searchHttp.recoveringSearchTaskTryAgain")
 				return
 			}
 			close(job.done)
 			a.retainSubmitted(job.ID, job.done)
 			job.Status = "done"
-			job.Stage = "从本机缓存加载"
+			job.Stage = "stage.task.loadFromLocalCache"
 			job.Progress = 100
 			job.Matches = cached.Matches
 			job.Truncated = cached.Truncated
@@ -114,14 +114,14 @@ func (a *App) handleSearchStart(w http.ResponseWriter, r *http.Request) {
 		if idx == nil {
 			a.mu.Unlock()
 			cancel()
-			writeError(w, http.StatusConflict, "请先打开工作表，再执行新的搜索")
+			writeMessage(w, http.StatusConflict, "service.searchHttp.openSheetFirstBeforePerforming")
 			return
 		}
 	}
 	if !pruneSearchJobsLocked(a.searchJobs, formats.QueryTaskHistory) {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, http.StatusTooManyRequests, "正在回收搜索任务，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.searchHttp.recoveringSearchTaskTryAgain")
 		return
 	}
 	for _, old := range a.searchJobs {
@@ -165,7 +165,7 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 	if admissionErr != nil {
 		job.mu.Lock()
 		job.Status = "cancelled"
-		job.Stage = "已取消"
+		job.Stage = "stage.task.cancelled"
 		job.mu.Unlock()
 		return
 	}
@@ -202,7 +202,7 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 	if err != nil {
 		if job.ctx.Err() != nil || err.Error() == "search cancelled" {
 			job.Status = "cancelled"
-			job.Stage = "已取消"
+			job.Stage = "stage.task.cancelled"
 		} else {
 			job.Status = "error"
 			job.Error = err.Error()
@@ -212,7 +212,7 @@ func (a *App) runSearch(wb *workbook.Workbook, current workbook.SheetMeta, curre
 	job.Status = "done"
 	job.Progress = 100
 	job.Scanned = job.Total
-	job.Stage = "搜索完成"
+	job.Stage = "stage.task.searchCompleted"
 }
 
 func (a *App) runWorkbookSearch(wb *workbook.Workbook, job *SearchJob) {
@@ -238,7 +238,7 @@ func (a *App) runWorkbookSearch(wb *workbook.Workbook, job *SearchJob) {
 	job.Matches, job.Truncated = result.Matches, result.Truncated
 	switch {
 	case job.ctx.Err() != nil || errors.Is(err, context.Canceled):
-		job.Status, job.Stage = "cancelled", "已取消"
+		job.Status, job.Stage = "cancelled", "stage.task.cancelled"
 	case err != nil:
 		job.Status, job.Error = "error", err.Error()
 	default:
@@ -256,13 +256,13 @@ func (a *App) handleSearchStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.searchJobs[r.URL.Query().Get("id")]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, http.StatusNotFound, "搜索任务不存在或已失效")
+		writeMessage(w, http.StatusNotFound, "service.searchHttp.taskDoesNotExistOr")
 		return
 	}
 	job.mu.RLock()
 	data := map[string]any{
 		"id": job.ID, "sheet": job.Sheet, "query": job.Query, "mode": job.Mode, "scope": job.Scope,
-		"status": job.Status, "stage": job.Stage, "progress": job.Progress, "scanned": job.Scanned, "durationMs": time.Since(job.Started).Milliseconds(),
+		"status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "progress": job.Progress, "scanned": job.Scanned, "durationMs": time.Since(job.Started).Milliseconds(),
 		"total": job.Total, "sheetsDone": job.SheetsDone, "sheetsTotal": job.SheetsTotal,
 		"matches": append([]workbook.SearchResult{}, job.Matches...), "truncated": job.Truncated, "error": job.Error,
 		"taskId": job.TaskID,
@@ -286,7 +286,7 @@ func (a *App) handleSearchCancel(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if err := decodeControlRequest(w, r, 4096, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "请求内容无效")
+		writeMessage(w, http.StatusBadRequest, "service.searchHttp.requestedContentInvalid")
 		return
 	}
 	a.mu.RLock()

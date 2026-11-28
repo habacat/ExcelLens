@@ -1,3 +1,4 @@
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import { decodeNamedViewFilterJobStatus } from '../core/http-decoders.generated.ts';
 import type { AsyncJobProgress } from '../contracts/common.ts';
 /**
@@ -96,9 +97,9 @@ export function namedViewSummary(view: NamedView): string {
   const c = view.config;
   const parts: string[] = [view.source.sheet];
   const sort = q.sortKeys?.length || (q.sortColumn ? 1 : 0);
-  if (q.rules?.length) parts.push(`${q.rules.length}项筛选`);
-  if (sort) parts.push(`${sort}级排序`);
-  if (c.freeze.rows || c.freeze.cols) parts.push(`冻结${c.freeze.rows}行${c.freeze.cols}列`);
+  if (q.rules?.length) parts.push(localize('ui.namedViews.itemFiltering', { count: q.rules.length }));
+  if (sort) parts.push(localize('ui.namedViews.levelSorting', { sort }));
+  if (c.freeze.rows || c.freeze.cols) parts.push(localize('ui.namedViews.frozenRowColumn', { rows: c.freeze.rows, cols: c.freeze.cols }));
   if (c.zoom !== 100) parts.push(`${c.zoom}%`);
   return parts.join(' · ');
 }
@@ -146,12 +147,12 @@ export class NamedViews {
       requestIdentity: () => this.s.workbookKey,
       sleep: options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
       endpoint: '/api/filter',
-      label: '视图查询',
+      label: localize('ui.namedViews.viewQuery'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
       onProgress: (status) =>
         this.status(
-          `${status.stage || '正在恢复视图'}${status.total ? ` · ${(status.scanned || 0).toLocaleString()} / ${status.total.toLocaleString()}行` : ''}`,
+          `${status.stage || localize('ui.namedViews.restoringView')}${status.total ? ` ${localize('ui.namedViews.rows', { scanned: (status.scanned || 0).toLocaleString(interfaceLocale()), total: status.total.toLocaleString(interfaceLocale()) })}` : ''}`,
         ),
     });
 
@@ -241,7 +242,7 @@ export class NamedViews {
 
   async open(): Promise<void> {
     if (!this.s.opened || !this.s.indexReady) {
-      this.toast('请先打开工作表', 'warning');
+      this.toast(localize('ui.common.openWorksheetFirst'), 'warning');
       return;
     }
     if (!this.dialog.open) this.dialog.showModal();
@@ -254,7 +255,7 @@ export class NamedViews {
     const list = requireSelect('namedViewList');
     const previous = selected || list.value;
     list.replaceChildren();
-    const empty = new Option(this.store.items.length ? '选择已保存视图' : '尚无已保存视图', '');
+    const empty = new Option(this.store.items.length ? localize('ui.namedViews.selectSavedView') : localize('ui.namedViews.noSavedViewsAvailable'), '');
     list.append(empty);
     for (const view of this.store.items) {
       list.append(new Option(`${view.name} · ${view.source.sheet}`, view.id));
@@ -280,7 +281,7 @@ export class NamedViews {
         return;
       }
       this.setCatalog(data);
-      this.status(`${this.store?.items.length ?? 0} 个视图`);
+      this.status(localize('ui.namedViews.views', { detail: this.store?.items.length ?? 0 }));
     } catch (error: unknown) {
       if (serial === this.catalogSerial && epoch === this.epoch && !isAbortError(error)) {
         this.store = null;
@@ -317,7 +318,7 @@ export class NamedViews {
     const nameInput = requireInput('namedViewName');
     const name = nameInput.value.trim();
     if (!name) {
-      this.toast('请输入视图名称', 'warning');
+      this.toast(localize('ui.namedViews.enterViewName'), 'warning');
       nameInput.focus();
       return;
     }
@@ -339,12 +340,12 @@ export class NamedViews {
         ...copyValue(captured),
       };
       if (new TextEncoder().encode(JSON.stringify(request)).length > 256 * 1024 + 8192) {
-        throw new Error('视图配置过大，请减少尺寸覆盖或筛选值');
+        throw new Error(localize('ui.namedViews.viewConfigurationTooLargeReduce'));
       }
       const data = await this.post('/api/named-views', request).then(decodeNamedViewCatalogResponse);
       if (!this.current(serial, epoch, book)) return;
       this.setCatalog(data, data.id ?? '');
-      this.status('已保存到本机');
+      this.status(localize('ui.namedViews.savedOnLocalDevice'));
     } catch (error: unknown) {
       if (this.current(serial, epoch, book)) this.status(errorMessage(error), true);
     } finally {
@@ -376,7 +377,7 @@ export class NamedViews {
       }).then(decodeNamedViewCatalogResponse);
       if (!this.current(serial, epoch, book)) return;
       this.setCatalog(data);
-      this.status('已删除所选视图');
+      this.status(localize('ui.namedViews.selectedViewDeleted'));
     } catch (error: unknown) {
       if (this.current(serial, epoch, book)) this.status(errorMessage(error), true);
     } finally {
@@ -395,7 +396,7 @@ export class NamedViews {
     this.jobs.cancelMain();
     this.busy = false;
     this.mode = '';
-    this.status('已请求取消应用，当前视图保留');
+    this.status(localize('ui.namedViews.applicationRequestedBeCanceledCurrent'));
     this.controls();
   }
 
@@ -412,7 +413,7 @@ export class NamedViews {
     this.busy = true;
     this.mode = 'apply';
     this.controls();
-    this.status('正在核对来源与字段…');
+    this.status(localize('ui.namedViews.verifyingSourceFields'));
     const current = (): boolean => this.current(serial, epoch, book);
     const unchanged = (): boolean => current() && identity === this.identity();
     let owned = '';
@@ -426,7 +427,7 @@ export class NamedViews {
       if (!unchanged()) return;
       const version = prepared.view.ruleVersion || 1;
       if (version !== 1 && !(version === 2 && this.supportsRowVisibility())) {
-        throw new Error('此视图版本或行显隐设置尚不支持，未应用');
+        throw new Error(localize('ui.namedViews.thisViewVersionOrRow'));
       }
       let data: NamedViewFilterJobStatus | null = null;
       if (isNamedViewFilterActive(prepared.view.query)) {
@@ -446,13 +447,13 @@ export class NamedViews {
       if (!unchanged()) return;
       this.mode = 'commit';
       this.controls();
-      this.status('正在显示已核对的视图…');
+      this.status(localize('ui.namedViews.verifiedViewBeingDisplayed'));
       adopted = await this.applyView(prepared, data, current);
       if (!adopted) return;
       if (current()) {
-        this.status(`已应用「${prepared.view.name}」`);
+        this.status(localize('ui.namedViews.applied', { name: prepared.view.name }));
         this.dialog.close();
-        this.toast(`已应用视图：${prepared.view.name}`, 'success');
+        this.toast(localize('ui.namedViews.viewApplied', { name: prepared.view.name }), 'success');
       }
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) this.status(errorMessage(error), true);

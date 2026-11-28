@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/recovery"
 )
 
@@ -21,7 +22,7 @@ func (a *App) recoveryData() (*recovery.Store, error) {
 	root.recoveryOnce.Do(func() {
 		base, err := os.UserConfigDir()
 		if err != nil || base == "" {
-			root.recoveryErr = errors.New("无法定位用户配置目录，恢复副本尚未保存")
+			root.recoveryErr = i18n.Error("service.recovery.unableLocateUserConfigurationDirectory")
 			return
 		}
 		root.recoveryStore = recovery.New(filepath.Join(base, "ExcelLens", "recovery"))
@@ -53,7 +54,7 @@ func decodeRecovery(data []byte, dst any) error {
 		return err
 	}
 	if d.Decode(new(any)) != io.EOF {
-		return errors.New("恢复内容包含多余数据")
+		return i18n.Error("service.recovery.recoveryContentContainsRedundantData")
 	}
 	return nil
 }
@@ -65,15 +66,15 @@ func validateRecovery(kind string, c recovery.Change) error {
 	if kind == "calculator" {
 		index, err := strconv.ParseUint(c.Key, 10, 53)
 		if err != nil || index > recovery.MaxRevision-2 || strconv.FormatUint(index, 10) != c.Key {
-			return errors.New("计算表恢复行号无效")
+			return i18n.Error("service.recovery.rowNumberCalculationTableInvalid")
 		}
 		var v calculatorRecovery
 		if decodeRecovery(c.Data, &v) != nil || v.Text == nil || v.Note == nil || !utf8.ValidString(*v.Text) || !utf8.ValidString(*v.Note) ||
 			len(utf16.Encode([]rune(*v.Text))) > 4096 || len(utf16.Encode([]rune(*v.Note))) > 4096 {
-			return errors.New("计算表恢复内容无效或超过4096字符")
+			return i18n.Error("service.recovery.calculatedTableRestorationContentInvalid")
 		}
 		if v.Source != nil && (len(v.Source.WorkbookKey) > 128 || len(v.Source.Sheet) > 1024 || !utf8.ValidString(v.Source.Sheet)) {
-			return errors.New("计算表来源无效")
+			return i18n.Error("service.recovery.invalidTableSource")
 		}
 		return nil
 	}
@@ -81,15 +82,15 @@ func validateRecovery(kind string, c recovery.Change) error {
 		var v analysisRecovery
 		if decodeRecovery(c.Data, &v) != nil || len(v.Book) == 0 || len(v.Book) > 128 || !validSessionID(v.ID) ||
 			v.Row < 0 || v.Row >= analysis.MaxSheetRows || v.Col < 0 || v.Col >= analysis.MaxSheetCols || !analysis.ValidCellText(v.Value) {
-			return errors.New("分析草稿恢复内容无效或超出编辑表容量")
+			return i18n.Error("service.recovery.analysisDraftContentInvalidOr")
 		}
 		key, _ := json.Marshal([]any{v.Book, v.ID, v.Row, v.Col})
 		if c.Key != string(key) {
-			return errors.New("分析草稿坐标与内容不一致")
+			return i18n.Error("service.recovery.draftCoordinatesAnalysisDoNot")
 		}
 		return nil
 	}
-	return errors.New("恢复类型无效")
+	return i18n.Error("service.recovery.invalidRestoreType")
 }
 
 func (a *App) handleRecovery(w http.ResponseWriter, r *http.Request) {
@@ -102,24 +103,24 @@ func (a *App) handleRecovery(w http.ResponseWriter, r *http.Request) {
 	case a.rootApp().recoverySem <- struct{}{}:
 		defer func() { <-a.rootApp().recoverySem }()
 	default:
-		writeError(w, http.StatusTooManyRequests, "恢复保存繁忙，请稍后重试")
+		writeMessage(w, http.StatusTooManyRequests, "service.recovery.restoreSaveBusyTryAgain")
 		return
 	}
 	store, err := a.recoveryData()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
 		q := r.URL.Query()
 		data, err := store.Load(q.Get("owner"), q.Get("kind"), q.Get("backup") == "1")
 		if err != nil {
-			writeError(w, 422, err.Error())
+			writeFailure(w, 422, err)
 			return
 		}
 		for key, value := range data.Records {
 			if err := validateRecovery(q.Get("kind"), recovery.Change{Key: key, Data: value}); err != nil {
-				writeError(w, 422, "恢复副本内容与当前规则不兼容，请选择其他副本")
+				writeMessage(w, 422, "service.recovery.recoveredCopyContentNotCompatible")
 				return
 			}
 		}
@@ -135,13 +136,13 @@ func (a *App) handleRecovery(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil || !utf8.Valid(data) || decodeRecovery(data, &wire) != nil || wire.Revision == nil {
-		writeError(w, 400, "恢复保存请求无效或超过1 MiB")
+		writeMessage(w, 400, "service.recovery.saveRecoveryRequestInvalidOr")
 		return
 	}
 	req := recovery.Request{Owner: wire.Owner, Kind: wire.Kind, Revision: *wire.Revision, RequestID: wire.RequestID, Changes: wire.Changes}
 	for _, c := range req.Changes {
 		if err := validateRecovery(req.Kind, c); err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 	}
@@ -159,7 +160,7 @@ func (a *App) handleRecovery(w http.ResponseWriter, r *http.Request) {
 				status = http.StatusServiceUnavailable
 			}
 		}
-		writeError(w, status, err.Error())
+		writeFailure(w, status, err)
 		return
 	}
 	writeJSON(w, meta)
@@ -172,12 +173,12 @@ func (a *App) handleRecoveryList(w http.ResponseWriter, r *http.Request) {
 	}
 	store, err := a.recoveryData()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	list, err := store.List(r.URL.Query().Get("kind"))
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	writeJSON(w, map[string]any{"entries": list})

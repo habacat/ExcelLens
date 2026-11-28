@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -41,13 +42,13 @@ func readBookmarks(path string) (bookmarkStore, error) {
 		return store, err
 	}
 	if len(bytes) > 4<<20 {
-		return store, errors.New("本地标记文件超过大小上限")
+		return store, i18n.Error("service.bookmarks.localMarkedFilesExceedSize")
 	}
 	if err := json.Unmarshal(bytes, &store); err != nil {
-		return bookmarkStore{}, fmt.Errorf("标记文件损坏：%w", err)
+		return bookmarkStore{}, i18n.Wrap("service.bookmarks.fileDamagedMarkedAs", err)
 	}
 	if store.Version != 1 {
-		return bookmarkStore{}, errors.New("无法读取此版本的标记文件")
+		return bookmarkStore{}, i18n.Error("service.bookmarks.unableReadMarkedFilesThis")
 	}
 	if store.Items == nil {
 		store.Items = []Bookmark{}
@@ -57,20 +58,20 @@ func readBookmarks(path string) (bookmarkStore, error) {
 func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "请先打开工作簿")
+		writeMessage(w, 409, "service.bookmarks.openWorkbookFirst")
 		return
 	}
 	a.bookmarkMu.Lock()
 	defer a.bookmarkMu.Unlock()
 	path, unlock, err := lockWorkbookSetting(r.Context(), "annotations", wb.Fingerprint)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	defer unlock()
 	store, err := readBookmarks(path)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -93,7 +94,7 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 		Formula string `json:"formula"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&input); err != nil {
-		writeError(w, 400, "标记内容无效")
+		writeMessage(w, 400, "service.bookmarks.invalidMarkingContent")
 		return
 	}
 	if input.Action == "delete" {
@@ -106,22 +107,22 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !found {
-			writeError(w, 404, "标记不存在")
+			writeMessage(w, 404, "service.bookmarks.markAsNonExistent")
 			return
 		}
 	} else if input.Action == "save" {
 		if _, ok := wb.FindSheet(input.Sheet); !ok {
-			writeError(w, 400, "工作表不存在")
+			writeMessage(w, 400, "service.bookmarks.worksheetDoesNotExist")
 			return
 		}
 		col, row, err := workbook.ParseCellRef(input.Ref)
 		if err != nil || col < 1 || row < 1 {
-			writeError(w, 400, "无效的单元格地址")
+			writeMessage(w, 400, "service.bookmarks.invalidCellAddress")
 			return
 		}
 		input.Ref = strings.ToUpper(strings.ReplaceAll(input.Ref, "$", ""))
 		if len([]rune(input.Note)) > 800 || len(input.Value) > 1500 || len(input.Formula) > 6000 {
-			writeError(w, 400, "标记或快照内容太长")
+			writeMessage(w, 400, "service.bookmarks.markedOrSnapshotContentToo")
 			return
 		}
 		switch input.Tag {
@@ -132,7 +133,7 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().Format(time.RFC3339)
 		if input.ID == "" {
 			if len(store.Items) >= 1500 {
-				writeError(w, 400, "每个工作簿最多保存1500个标记")
+				writeMessage(w, 400, "service.bookmarks.maximumMarkersCanBeSaved")
 				return
 			}
 			store.Items = append(store.Items, Bookmark{ID: randomID(), Sheet: input.Sheet, Ref: input.Ref, Tag: input.Tag, Note: input.Note, Value: input.Value, Formula: input.Formula, Created: now, Updated: now})
@@ -149,16 +150,16 @@ func (a *App) handleBookmarks(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			if !found {
-				writeError(w, 404, "待更新的标记不存在")
+				writeMessage(w, 404, "service.bookmarks.markingUpdateDoesNotExist")
 				return
 			}
 		}
 	} else {
-		writeError(w, 400, "不支持的操作")
+		writeMessage(w, 400, "service.bookmarks.unsupportedOperation")
 		return
 	}
 	if err := writeWorkbookSetting(path, store); err != nil {
-		writeError(w, 500, "保存本机标记失败："+err.Error())
+		writeMessage(w, 500, "service.bookmarks.failedSaveLocalMarker", i18n.Args{"detail": err})
 		return
 	}
 	writeJSON(w, store)

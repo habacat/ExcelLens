@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"excellens/internal/browserlease"
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 	"excellens/internal/recovery"
 	"excellens/internal/transferjobs"
@@ -53,6 +54,7 @@ type App struct {
 	cacheResetMu  sync.RWMutex // root only: drain requests before discarding active caches
 	cacheEpoch    atomic.Uint64
 	toolbar       toolbarPreference
+	locale        localePreference
 	viewMu        sync.Mutex
 	bookmarkMu    sync.Mutex
 	recentMu      sync.Mutex
@@ -82,7 +84,7 @@ func New() (*App, error) {
 		a.restoreState.set(err)
 		log.Printf("已进入受限恢复模式：%v", err)
 	} else if pending {
-		a.restoreState.set(errors.New("检测到未完成的恢复事务"))
+		a.restoreState.set(i18n.Error("service.app.incompleteRecoveryTransactionWasDetected"))
 		a.restoreState.startup = true
 	} else {
 		recoverSnapshotStages(roots)
@@ -105,11 +107,11 @@ func recoverSnapshotStages(roots localstore.Roots) {
 func newApp() (*App, error) {
 	var tokenBytes [32]byte
 	if _, err := rand.Read(tokenBytes[:]); err != nil {
-		return nil, fmt.Errorf("生成本机访问令牌失败：%w", err)
+		return nil, i18n.Wrap("service.app.failedGenerateNativeAccessToken", err)
 	}
 	var mediaBytes [32]byte
 	if _, err := rand.Read(mediaBytes[:]); err != nil {
-		return nil, fmt.Errorf("生成图片访问票据失败：%w", err)
+		return nil, i18n.Wrap("service.app.failedGenerateImageAccessTicket", err)
 	}
 	return &App{
 		submitted:           &browserlease.Work{},
@@ -140,7 +142,7 @@ func (a *App) Handler() http.Handler {
 func (a *App) Listen() (net.Listener, string, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, "", fmt.Errorf("启动本机服务失败：%w", err)
+		return nil, "", i18n.Wrap("service.app.failedStartLocalService", err)
 	}
 	a.server = &http.Server{
 		DisableGeneralOptionsHandler: true,
@@ -157,7 +159,7 @@ func (a *App) Listen() (net.Listener, string, error) {
 
 func (a *App) Serve(ln net.Listener) error {
 	if a.server == nil {
-		return errors.New("HTTP 服务尚未初始化")
+		return i18n.Error("service.app.httpServiceNotInitializedYet")
 	}
 	if roots, err := dataRoots(); err == nil {
 		a.startRecovery(roots, false)
@@ -267,6 +269,9 @@ func (a *App) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
 		w.Header().Set("Cache-Control", "no-store")
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w = localizedResponse{w, a.requestLocale(r)}
+		}
 		next.ServeHTTP(w, r)
 	})
 }

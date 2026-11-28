@@ -2,12 +2,13 @@ package onlinedb
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"strings"
 	"unicode/utf8"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 type TableRef struct {
@@ -53,7 +54,7 @@ func (c *Connection) Tables(ctx context.Context) (Catalogue, error) {
 			return result, databaseError(err, "数据库返回的目录类型无法读取")
 		}
 		if !validIdentifier(t.Schema) || !validIdentifier(t.Name) {
-			return result, errors.New("数据库返回了无法读取的表或架构名称")
+			return result, i18n.Error("diagnostic.onlinedb.tables.databaseReturnedUnreadableTableOr")
 		}
 		if seen[t.TableRef] {
 			continue
@@ -152,7 +153,7 @@ func (c *Connection) ReadTable(ctx context.Context, table TableRef, emit func([]
 
 func (c *Connection) StreamTable(ctx context.Context, table TableRef, begin func(ReadDefinition) error, emit func([]Value) error) error {
 	if !validIdentifier(table.Schema) || !validIdentifier(table.Name) {
-		return errors.New("表或架构名称无效")
+		return i18n.Error("diagnostic.onlinedb.tables.invalidTableOrSchemaName")
 	}
 	query := "SELECT * FROM " + c.quote(table.Schema) + "." + c.quote(table.Name)
 	rows, err := c.db.QueryContext(c.readContext(ctx), query)
@@ -162,7 +163,7 @@ func (c *Connection) StreamTable(ctx context.Context, table TableRef, begin func
 	defer rows.Close()
 	columns, err := rows.ColumnTypes()
 	if err != nil || len(columns) == 0 || len(columns) > formats.ExcelColumns {
-		return errors.New("数据表的列定义无法读取或超出列数容量")
+		return i18n.Error("diagnostic.onlinedb.tables.columnDefinitionsDataTableCannot")
 	}
 	values := make([]Value, len(columns))
 	def := ReadDefinition{Query: query, Columns: make([]Column, len(columns))}
@@ -193,7 +194,7 @@ func (c *Connection) StreamTable(ctx context.Context, table TableRef, begin func
 		for i, value := range raw {
 			values[i], err = readValue(kinds[i], value)
 			if err != nil {
-				return fmt.Errorf("第 %d 行第 %d 列：%w", row, i+1, err)
+				return i18n.Wrap("diagnostic.onlinedb.tables.rowColumn", err, i18n.Args{"row": row, "total": i + 1})
 			}
 		}
 		clear(raw)

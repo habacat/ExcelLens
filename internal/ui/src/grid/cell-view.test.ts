@@ -856,6 +856,7 @@ test('the actual main and frozen cell factories share text, styles, filters and 
       colName: (c) => String.fromCharCode(64 + c),
       bindResizeGrip: () => undefined,
       getVirtualScrollTop: () => 0,
+      paintRowHeaderBorder: () => undefined,
       updateSharedBorders: () => undefined,
       isPrecedent: () => false,
       isSearchMatch: () => false,

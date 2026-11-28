@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -44,24 +45,24 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 	var req rowViewRequest
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.RowViewRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.Settings != nil && req.Change != nil || req.Persist && req.ExpectedRevision == nil || req.ExpectedRevision != nil && (*req.ExpectedRevision < 0 || *req.ExpectedRevision >= maxConfigRevision) {
-		writeError(w, 400, "行显隐参数或修订号无效")
+		writeMessage(w, 400, "service.rowViewTasks.rowVisibilityParametersOrRevision")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "工作簿来源已切换，请重新打开视图")
+		writeMessage(w, 409, "service.rowViewTasks.workbookSourceSwitchedOpenView")
 		return
 	}
 	meta, ok := wb.FindSheet(req.Sheet)
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.rowViewTasks.worksheetDoesNotExist")
 		return
 	}
 	a.cacheMu.RLock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
 		a.cacheMu.RUnlock()
-		writeError(w, 409, "请先打开并索引工作表")
+		writeMessage(w, 409, "service.rowViewTasks.openIndexWorksheetFirst")
 		return
 	}
 	var base *sheetRowView
@@ -74,7 +75,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 		a.mu.RUnlock()
 		if base == nil {
 			a.cacheMu.RUnlock()
-			writeError(w, 409, "原可见行视图已失效，请重新打开")
+			writeMessage(w, 409, "service.rowViewTasks.originalVisibleRowViewBecome")
 			return
 		}
 		defer base.close()
@@ -84,14 +85,14 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 		filtered = base.data.filter.snapshot()
 		if filtered == nil {
 			a.cacheMu.RUnlock()
-			writeError(w, 409, "筛选结果已失效，请重新筛选")
+			writeMessage(w, 409, "service.filter.expired")
 			return
 		}
 	} else {
 		selection, err := a.selectionSnapshot(wb, idx, meta.Path, req.FilterID, "")
 		if err != nil {
 			a.cacheMu.RUnlock()
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		filtered = selection.filter
@@ -106,7 +107,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 	}()
 	path, err := rowViewSettingsPath(wb)
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	var store rowViewSettingsStore
@@ -118,7 +119,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 		lock.RUnlock()
 		if err != nil {
 			if req.Settings == nil || req.Persist {
-				writeError(w, 422, err.Error())
+				writeFailure(w, 422, err)
 				return
 			}
 			// Only an explicit, non-persistent choice may recover the display.
@@ -137,7 +138,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Persist && (*req.ExpectedRevision != store.Revision || *req.ExpectedRevision != revision) {
-		writeError(w, 409, "行显隐设置已被其他页面修改，请刷新后重试")
+		writeMessage(w, 409, "service.rowViewTasks.rowVisibilitySettingsHaveModified")
 		return
 	}
 	if req.Settings != nil {
@@ -150,7 +151,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 		settings, err = settings.Normalized(maximum)
 	}
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -159,7 +160,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.rowViewTasks.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	active := 0
@@ -173,7 +174,7 @@ func (a *App) handleRowViewStart(w http.ResponseWriter, r *http.Request) {
 	if active >= formats.RowViewActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "已有两个可见行任务，请等待或取消后重试")
+		writeMessage(w, 429, "service.rowViewTasks.thereTwoVisibleTaskRows")
 		return
 	}
 	for _, old := range a.rowViewJobs {
@@ -288,7 +289,7 @@ func (a *App) publishRowView(v *sheetRowView, job *rowViewTask, persist bool, ex
 	}
 	if persist {
 		if expected == nil {
-			return errors.New("缺少行显隐设置修订号")
+			return i18n.Error("service.rowViewTasks.missingRowVisibilitySettingsRevision")
 		}
 		revision, err := saveRowViewSettings(path, v.data.wb, v.data.meta.Path, v.data.settings, *expected, ops)
 		if err != nil {
@@ -317,13 +318,13 @@ func saveRowViewSettings(path string, wb *workbook.Workbook, sheetPath string, s
 		return 0, err
 	}
 	if expected != store.Revision || store.Revision+1 >= maxConfigRevision {
-		return 0, errors.New("行显隐设置已被其他页面修改或修订号已达上限，请刷新后重试")
+		return 0, i18n.Error("service.rowViewTasks.displaySettingsThisRowHave")
 	}
 	if (settings.Mode == "" || settings.Mode == "original") && len(settings.Ranges) == 0 && len(settings.Groups) == 0 && settings.Depth == nil {
 		delete(store.Sheets, sheetPath)
 	} else {
 		if _, exists := store.Sheets[sheetPath]; !exists && len(store.Sheets) >= formats.RowViewSavedSheets {
-			return 0, errors.New("行显隐设置工作表数量达到容量")
+			return 0, i18n.Error("service.rowViewTasks.numberWorksheetsRowVisibilitySettings")
 		}
 		store.Sheets[sheetPath] = settings
 	}
@@ -343,7 +344,7 @@ func (a *App) handleRowViewStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.rowViewJobs[r.URL.Query().Get("id")]
 	a.mu.RUnlock()
 	if job == nil {
-		writeError(w, 404, "可见行任务已失效")
+		writeMessage(w, 404, "service.rowViewTasks.visibleRowTasksHaveBecome")
 		return
 	}
 	job.mu.RLock()
@@ -362,7 +363,7 @@ func (a *App) handleRowViewCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, 400, "任务标识无效")
+		writeMessage(w, 400, "service.rowViewTasks.taskIdentifierInvalid")
 		return
 	}
 	a.mu.Lock()
@@ -390,7 +391,7 @@ func (a *App) handleRowViewClear(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
 	if err != nil || decodeSavedConfig(data, &req) != nil {
-		writeError(w, 400, "视图标识无效")
+		writeMessage(w, 400, "service.rowViewTasks.viewIdentifierInvalid")
 		return
 	}
 	a.mu.Lock()
@@ -418,7 +419,7 @@ func (a *App) handleRowView(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 	defer v.close()
 	if v == nil {
-		writeError(w, 404, "可见行视图已失效，请重新打开")
+		writeMessage(w, 404, "service.rowViewTasks.visibleRowViewInvalidReopen")
 		return
 	}
 	payload := v.payload()
@@ -435,7 +436,7 @@ func (a *App) handleRowViewGroups(w http.ResponseWriter, r *http.Request) {
 	offset, e1 := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, e2 := strconv.Atoi(r.URL.Query().Get("limit"))
 	if e1 != nil || e2 != nil || offset < 0 || limit < 1 || limit > formats.RowViewGroupPage {
-		writeError(w, 400, "大纲读取范围无效")
+		writeMessage(w, 400, "service.rowViewTasks.invalidOutlineReadingRange")
 		return
 	}
 	a.mu.RLock()
@@ -447,12 +448,12 @@ func (a *App) handleRowViewGroups(w http.ResponseWriter, r *http.Request) {
 	a.mu.RUnlock()
 	defer v.close()
 	if v == nil {
-		writeError(w, 404, "可见行视图已失效，请重新打开")
+		writeMessage(w, 404, "service.rowViewTasks.visibleRowViewInvalidReopen")
 		return
 	}
 	groups, err := v.data.visibility.GroupPage(offset, limit)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	writeJSON(w, map[string]any{"id": v.data.id, "groups": groups, "total": v.data.visibility.GroupCount()})

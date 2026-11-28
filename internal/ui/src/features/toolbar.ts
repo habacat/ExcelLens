@@ -2,6 +2,7 @@
  * Adaptive ribbon & classic toolbar layout controller.
  * Both layouts share the same live DOM controls, event handlers, and state.
  */
+import { t as localize } from '../core/i18n.ts';
 import { byId } from '../core/dom.ts';
 import { getOverlayMenus, type OverlayMenus } from '../core/overlays.ts';
 
@@ -368,7 +369,7 @@ export class AdaptiveToolbar {
     this.root.toggleAttribute('data-ribbon-collapsed', value);
     this.root.removeAttribute('data-ribbon-peek');
     if (this.collapse) {
-      const label = value ? '展开功能区' : '折叠功能区';
+      const label = value ? localize('ui.toolbar.expandRibbon') : localize('ui.toolbar.foldFunctionBar');
       this.collapse.setAttribute('aria-pressed', String(value));
       this.collapse.setAttribute('aria-label', label);
       this.collapse.title = `${label}（Ctrl+F1）`;

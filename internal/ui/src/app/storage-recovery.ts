@@ -9,6 +9,7 @@ import {
 } from '../core/http-decoders.generated.ts';
 import { errorMessage, formatBytes } from '../core/display-format.ts';
 import { readAppToken, requireButton, requireEl } from '../core/dom.ts';
+import { interfaceLocale, languageHeader, t as localize } from '../core/i18n.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -21,7 +22,10 @@ function readError(value: unknown): string {
 function initStorageRecovery(): void {
   const button = requireButton('recoveryRetry');
   const status = requireEl('recoveryProgress');
-  const headers: Record<string, string> = { 'X-ExcelLens-Token': readAppToken() };
+  const headers: Record<string, string> = {
+    'X-ExcelLens-Token': readAppToken(),
+    [languageHeader]: interfaceLocale(),
+  };
 
   async function update(method: 'GET' | 'POST'): Promise<void> {
     button.disabled = true;
@@ -33,7 +37,7 @@ function initStorageRecovery(): void {
       });
       const raw: unknown = await response.json();
       if (!response.ok) {
-        throw new Error(readError(raw) || '无法读取恢复事务');
+        throw new Error(readError(raw) || localize('ui.storageRecovery.unableReadRecoveryTransaction'));
       }
       const result = decodeStorageRecoveryResponse(raw);
       if (!result.pending) {
@@ -44,12 +48,12 @@ function initStorageRecovery(): void {
       reason.hidden = result.running;
       reason.textContent = result.running ? '' : result.reason;
       requireEl('recoveryDirectories').textContent =
-        `配置目录　${result.roots.config}\n数据目录　${result.roots.local}`;
+        localize('ui.storageRecovery.configurationDirectoryDataDirectory', { config: result.roots.config, local: result.roots.local });
       const progress = result.progress;
       const transferred = progress.total
         ? `${formatBytes(progress.bytes || 0)} / ${formatBytes(progress.total)}`
         : '';
-      const files = progress.items ? `${progress.files || 0} / ${progress.items} 项` : '';
+      const files = progress.items ? localize('ui.storageRecovery.items', { files: progress.files || 0, items: progress.items }) : '';
       status.textContent = result.running
         ? [progress.phase, transferred, files].filter(Boolean).join(' · ')
         : '';
@@ -73,7 +77,7 @@ function initStorageRecovery(): void {
       try {
         const response = await fetch('/api/storage', { headers, cache: 'no-store' });
         const raw: unknown = await response.json();
-        if (!response.ok) throw new Error(readError(raw) || `请求失败 (${response.status})`);
+        if (!response.ok) throw new Error(readError(raw) || localize('ui.storageRecovery.requestFailed', { status: response.status }));
         const data = decodeStorageUsageResponse(raw);
         holder.replaceChildren(
           ...(data.groups ?? []).map((group) => {

@@ -1,6 +1,7 @@
 /**
  * Persistent task recovery dialog and home-screen indicator.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { TaskCheckpointInfo } from '../contracts/features.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -41,9 +42,9 @@ export interface TaskRecoveryOptions {
 }
 
 const ACTION_LABELS: Readonly<Record<Exclude<TaskRecoveryAction, ''>, string>> = {
-  open: '打开原文件',
-  resume: '继续',
-  download: '下载',
+  open: localize('ui.taskRecovery.openOriginalFile'),
+  resume: localize('ui.taskRecovery.continue'),
+  download: localize('ui.taskRecovery.download'),
 };
 
 export class TaskRecovery {
@@ -160,7 +161,7 @@ export class TaskRecovery {
     this.pending?.abort();
     const controller = new AbortController();
     this.pending = controller;
-    if (inDialog) this.status('正在读取…');
+    if (inDialog) this.status(localize('ui.common.reading'));
     try {
       const data = await this.api('/api/tasks', { signal: controller.signal });
       if (
@@ -200,7 +201,7 @@ export class TaskRecovery {
     if (!this.items.length) {
       const empty = document.createElement('p');
       empty.className = 'task-recovery-empty';
-      empty.textContent = '暂无可恢复的任务';
+      empty.textContent = localize('ui.taskRecovery.noRecoverableTasksAvailable');
       fragment.append(empty);
     }
     for (const item of this.items) {
@@ -216,7 +217,7 @@ export class TaskRecovery {
       kind.textContent = TaskRecoveryModel.label(item);
       const name = document.createElement('strong');
       name.className = 'task-recovery-name';
-      name.textContent = item.file || '无法读取的任务';
+      name.textContent = item.file || localize('ui.taskRecovery.taskCannotBeRead');
       name.title = item.file;
       heading.append(kind, name);
       const meta = document.createElement('div');
@@ -228,7 +229,7 @@ export class TaskRecovery {
       const time = document.createElement('time');
       const date = new Date(item.updated);
       if (!Number.isNaN(date.getTime())) {
-        time.textContent = new Intl.DateTimeFormat('zh-CN', {
+        time.textContent = new Intl.DateTimeFormat(interfaceLocale(), {
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
@@ -239,14 +240,14 @@ export class TaskRecovery {
       }
       const status = document.createElement('span');
       status.textContent = item.busy
-        ? '运行中'
+        ? localize('ui.taskRecovery.running')
         : item.error
-          ? '不可恢复'
+          ? localize('ui.taskRecovery.nonRecoverable')
           : item.complete
-            ? '已完成'
+            ? localize('ui.taskRecovery.completed')
             : item.backup
-              ? '已找回进度'
-              : '已暂停';
+              ? localize('ui.taskRecovery.progressRetrieved')
+              : localize('ui.taskRecovery.paused');
       meta.append(sheet, time, status);
       main.append(heading, meta);
       if (item.error) {
@@ -275,7 +276,7 @@ export class TaskRecovery {
       };
       const next = TaskRecoveryModel.action(item, this.s);
       if (next) add(next, ACTION_LABELS[next]);
-      add('remove', '移除', item.busy);
+      add('remove', localize('ui.common.remove'), item.busy);
       row.append(main, actions);
       fragment.append(row);
     }
@@ -324,7 +325,7 @@ export class TaskRecovery {
     this.opening = action === 'open';
     this.controls();
     this.status(
-      action === 'remove' ? '正在移除…' : action === 'open' ? '正在打开…' : '正在恢复…',
+      action === 'remove' ? localize('ui.taskRecovery.removing') : action === 'open' ? localize('ui.taskRecovery.openingProgress') : localize('ui.taskRecovery.restoringProgress'),
     );
     let started: RecoveredTaskStart | null = null;
     let claimed = false;
@@ -357,7 +358,7 @@ export class TaskRecovery {
       }, decodeRecoveredTaskStart);
       if (!current()) return;
       if (!started.jobId || started.operation !== TaskRecoveryModel.operation(item)) {
-        throw new Error('恢复响应无效，请刷新任务列表');
+        throw new Error(localize('ui.taskRecovery.recoveryResponseInvalidRefreshTask'));
       }
       dialog.close();
       claimed = await this.adopt(started, item);

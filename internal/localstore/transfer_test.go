@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"excellens/internal/i18n"
 )
 
 func put(t *testing.T, root, name, body string) {
@@ -110,7 +112,7 @@ func TestLegacyMigrationKeepsNewerWorkAndReportsAllocatedBytes(t *testing.T) {
 		}
 	}
 	found := false
-	for _, row := range r.Inventory(t.Context()) {
+	for _, row := range r.Inventory(t.Context(), i18n.Default) {
 		if row.Error != "" {
 			t.Fatal(row.Error)
 		}

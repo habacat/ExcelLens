@@ -2,6 +2,7 @@
  * Canvas/SVG chart renderer for pivot analysis, dashboards, and snapshot trends.
  * Axes use drawing approximations; data labels and tooltips use exact cells.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisCell,
   AnalysisDisplayOptions,
@@ -242,7 +243,7 @@ export function prepareChart(
   result: ChartResultLike | null | undefined,
   mode = 'bar',
 ): ChartPlan {
-  if (!isChartMode(mode)) throw new Error('图表类型无效');
+  if (!isChartMode(mode)) throw new Error(localize('ui.charts.invalidChartType'));
   const allRows = result?.rows ?? [];
   const allSeries = result?.columnKeys ?? [];
   const single = mode === 'horizontal' || mode === 'pie' || mode === 'donut';
@@ -428,9 +429,9 @@ export function paintChart(
   };
 
   const label = (row: Pick<AnalysisResultRow, 'keys'>): string =>
-    row.keys.length ? row.keys.map((key) => (key === '' ? '空白值' : key)).join(' / ') : '总计';
+    row.keys.length ? row.keys.map((key) => (key === '' ? localize('ui.charts.blankValues') : key)).join(' / ') : localize('ui.charts.total');
   const seriesLabel = (key: string): string =>
-    key === '' ? (result?.columnField || allSeries.length > 1 ? '空白列' : '汇总') : key;
+    key === '' ? (result?.columnField || allSeries.length > 1 ? localize('ui.charts.blankColumns') : localize('ui.charts.summary')) : key;
   const interactive = (
     x: number,
     y: number,
@@ -449,15 +450,15 @@ export function paintChart(
     !Number.isFinite(range.high - range.low) ||
     range.high === range.low
   ) {
-    text(w / 2, h / 2, '数值超出图表范围，请查看透视表', '#b16f72');
+    text(w / 2, h / 2, localize('ui.charts.valueExceedsChartRangeView'), '#b16f72');
     return { status: 'range', hit: [], points, series };
   }
 
   let scope =
     points.length < allRows.length || series.length < allSeries.length
-      ? `显示 ${points.length}/${allRows.length} 个分类 · ${series.length}/${allSeries.length} 个系列`
+      ? localize('ui.charts.displayCategoriesSeries', { count: points.length, count2: allRows.length, count3: series.length, count4: allSeries.length })
       : '';
-  if (result?.truncated) scope += `${scope ? '；' : ''}分类已截取，完整合计见透视表`;
+  if (result?.truncated) scope += localize('ui.charts.categoriesHaveCapturedCompleteSummary', { detail: scope ? '；' : '' });
 
   if (plan.mode === 'donut' || plan.mode === 'pie') {
     const positive = plan.positive;
@@ -468,7 +469,7 @@ export function paintChart(
     const r = Math.min(w * 0.26, h * 0.38);
     const inner = plan.mode === 'donut' ? r * 0.59 : 0;
     if (!Number.isFinite(total)) {
-      text(w / 2, h / 2, '数值超出图表范围，请查看透视表', '#b16f72');
+      text(w / 2, h / 2, localize('ui.charts.valueExceedsChartRangeView'), '#b16f72');
       return { status: 'range', hit: [], points, series };
     }
     let angle = -Math.PI / 2;
@@ -489,7 +490,7 @@ export function paintChart(
     }
     if (inner > 0) {
       text(cx, cy - 3, unitFmt(total), '#2c4852', 'center', 'bold 20px "Segoe UI"', inner * 1.7);
-      text(cx, cy + 14, compared ? '已绘制数值之和' : '已绘制合计', '#a1adb6');
+      text(cx, cy + 14, compared ? localize('ui.charts.sumValuesPlotted') : localize('ui.charts.totalPlotted'), '#a1adb6');
     }
     data.slice(0, 9).forEach((obj, j) => {
       const point = points[obj.i];
@@ -498,12 +499,12 @@ export function paintChart(
       ctx.fillRect(w * 0.76, 35 + j * 28, 9, 9);
       text(w * 0.76 + 15, 43 + j * 28, label(point).slice(0, 17), '#516675', 'left');
     });
-    if (!data.length) text(w / 2, h / 2, '当前分类没有可绘制的正数', '#a9b5be');
+    if (!data.length) text(w / 2, h / 2, localize('ui.charts.currentCategoryNoValidPositive'), '#a9b5be');
     if (positive.length > data.length || allRows.length > points.length) {
       scope =
-        `绘制 ${data.length} 个正值分类（共 ${allRows.length} 个分类）` +
-        (allSeries.length > 1 ? ' · 第1系列' : '') +
-        (result?.truncated ? '；分类已截取' : '');
+        localize('ui.charts.plotPositiveValueCategoriesTotal', { count: data.length, count2: allRows.length }) +
+        (allSeries.length > 1 ? ` ${localize('ui.charts.series')}` : '') +
+        (result?.truncated ? localize('ui.charts.categoriesHaveCaptured') : '');
     }
     if (
       points.some((_, i) => {
@@ -511,7 +512,7 @@ export function paintChart(
         return first !== null && first !== undefined && first < 0;
       })
     ) {
-      text(w * 0.49, h - 27, '含负数：扇形仅表示正值', '#b16f72');
+      text(w * 0.49, h - 27, localize('ui.charts.negativeNumbersPieChartOnly'), '#b16f72');
     }
   } else if (plan.mode === 'heatmap' && series.length > 1) {
     const rows = Math.min(points.length, 28);
@@ -843,7 +844,7 @@ export function drawChart(
       const extra = cell?.comparison
         ? `（${comparisonTitle(cell)}）`
         : cell?.exact && cell.exact !== display
-          ? `（精确值 ${cell.exact}）`
+          ? localize('ui.charts.exactValue', { exact: cell.exact })
           : '';
       tip.textContent = `${label(point)} · ${seriesLabel(seriesName)}：${display}${extra}`;
       tip.hidden = false;
@@ -924,7 +925,7 @@ export function drawSparkline(
     ctx.fillStyle = theme.muted;
     ctx.font = '12px "Segoe UI"';
     ctx.textAlign = 'center';
-    ctx.fillText(invalid ? '数值超出绘图范围' : '无可绘制数值', w / 2, h / 2 + 4);
+    ctx.fillText(invalid ? localize('ui.charts.valuesExceedPlottingRange') : localize('ui.charts.nonPlottableValues'), w / 2, h / 2 + 4);
     return;
   }
 

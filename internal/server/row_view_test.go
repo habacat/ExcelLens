@@ -213,6 +213,14 @@ func TestRowViewSortedFrozenSelectionSurvivesFilterClearWithoutChangingMatches(t
 	if pinned.TotalRows != 3 || pinned.PinnedThroughRow != 6 || len(pinned.Rows) != 3 || pinned.Rows[0].Number != 1 || pinned.Rows[1].Number != 4 || pinned.Rows[2].Number != 6 {
 		t.Fatal("frozen source prefix leaked hidden rows or lost unmatched blank headers", pinned)
 	}
+	border := decodeResponse[struct {
+		TotalRows, PinnedThroughRow int
+		Rows                        []workbook.RowData
+	}](t, featureCall(t, a, "GET", "/api/sheet?sheet=First&filterId=order&viewId="+id+"&pinnedThroughRow=4&pinnedBorderNeighbor=1&row=1&limit=5", ""))
+	if border.PinnedThroughRow != 4 || border.TotalRows != 3 || len(border.Rows) != 3 || border.Rows[0].Number != 1 ||
+		border.Rows[1].Number != 4 || border.Rows[2].Number != 6 {
+		t.Fatal("frozen border neighbor must be the next visible source row outside the pinned prefix", border)
+	}
 	clip := decodeResponse[clipboardPayload](t, featureCall(t, a, "GET", "/api/range?sheet=First&filterId=order&viewId="+id+"&start=B1&end=B4&visualStart=1&visualEnd=2&excludeThroughRow=1&format=json", ""))
 	numbers := []int{}
 	for _, row := range clip.Rows {

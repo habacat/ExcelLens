@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
-	"fmt"
+
 	"strconv"
 	"strings"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -120,11 +121,11 @@ func guardRecipeTypes(format string, expected map[int]recipeTypeMask) sourceCell
 	return func(row int, cell workbook.CellData, numeric bool) error {
 		allowed, ok := expected[cell.Col]
 		if !ok {
-			return fmt.Errorf("分析方案读取了未绑定字段%s，已停止", workbook.ColumnName(cell.Col))
+			return i18n.Error("service.recipeSchema.analysisSchemeReadUnboundFields", i18n.Args{"columnName": workbook.ColumnName(cell.Col)})
 		}
 		actual := recipeCellMask(format, cell, numeric)
 		if actual&^allowed != 0 {
-			return fmt.Errorf("%s%d的读取类型为%s，分析方案预期%s；已停止，未发布部分结果", workbook.ColumnName(cell.Col), row, actual.label(), allowed.label())
+			return i18n.Error("service.recipeSchema.readingTypeAnalysisPlanExpected", i18n.Args{"columnName": workbook.ColumnName(cell.Col), "row": row, "label": actual.label(), "label2": allowed.label()})
 		}
 		return nil
 	}

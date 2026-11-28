@@ -2,6 +2,7 @@
  * Frozen-pane renderer (top, left, corner, column headers, row headers).
  * The main grid owns the scrollbars; frozen panes render only pinned slices.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import type { CellData, RowData, SheetViewportResponse } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -12,6 +13,7 @@ import { decodeSheetViewport } from '../core/viewport-response.ts';
 
 export interface BorderEdgeContext {
   readonly nextCol?: number;
+  readonly belowRightCell?: CellData | null;
   readonly mergeFree?: boolean;
   readonly columns?: readonly number[];
   readonly firstRow?: number;
@@ -38,6 +40,13 @@ export interface FrozenPanesOptions {
   readonly sourceRowTop?: (row: number) => number;
   readonly sourceRowHeight?: (row: number) => number;
   readonly getVirtualScrollTop: () => number;
+  readonly paintRowHeaderBorder: (
+    el: HTMLElement,
+    cell?: CellData,
+    row?: RowData,
+    belowCell?: CellData,
+    belowRow?: RowData,
+  ) => void;
   readonly updateSharedBorders: (
     el: GridCellElement,
     cell: CellData | undefined,
@@ -102,6 +111,7 @@ export class FrozenPanes {
   private pending: PendingComposite | null = null;
   private serial = 0;
   private coverage: { readonly key: string; readonly bounds: ViewportBounds } | null = null;
+  private leftRows: ReadonlyMap<number, RowData> | null = null;
   public base: { readonly left: number; readonly top: number } | null = null;
 
   constructor(options: FrozenPanesOptions) {
@@ -143,6 +153,7 @@ export class FrozenPanes {
     this.pending = null;
     this.stopParts();
     this.coverage = null;
+    this.leftRows = null;
     this.key = '';
     this.cache.clear();
     this.cacheSizes.clear();
@@ -180,6 +191,20 @@ export class FrozenPanes {
     if (leftCells) {
       leftCells.style.transform = `translateY(${-(this.o.getVirtualScrollTop() - this.base.top)}px)`;
     }
+  }
+
+  paintLeftRowHeader(label: HTMLElement, visual: number, sourceRow: number): boolean {
+    const { state, colName, paintRowHeaderBorder } = this.o;
+    if (!this.leftRows || state.hiddenColumns.has(1)) return false;
+    const row = this.leftRows.get(visual);
+    if (row?.number !== sourceRow) return false;
+    const next = state.filtered ? visual + 1 : state.rowVisibility?.next(visual + 1) ?? visual + 1;
+    const below = this.leftRows.get(next);
+    const col = colName(1);
+    const firstCell = (data: RowData | undefined): CellData | undefined =>
+      data && state.frozenCellMap.get(`${col}${data.number}`);
+    paintRowHeaderBorder(label, firstCell(row), row, firstCell(below), below);
+    return true;
   }
 
   schedule(force = false): void {
@@ -281,7 +306,7 @@ export class FrozenPanes {
       merged.push(...byRow.values());
     }
     if (!meta) {
-      throw new Error('冻结窗格未返回有效数据');
+      throw new Error(localize('ui.freeze.frozenPanesDidNotReturn'));
     }
     return { ...meta, startCol: firstCol, colCount: cols, columns: selected ?? null, rows: merged };
   }
@@ -329,6 +354,7 @@ export class FrozenPanes {
     if (!nr && !nc) {
       if (!this.base && !this.pending && !this.cells.size && !this.key) return;
       this.coverage = null;
+      this.leftRows = null;
       this.stopParts();
       this.cells.clear();
       ++this.serial;
@@ -357,6 +383,14 @@ export class FrozenPanes {
     const req = getRequest();
     const topCol = Math.max(1, req.startCol);
     const viewId = s.rowView?.id ?? '';
+    // Use the source cell just beyond each pinned edge for border resolution.
+    // These neighbors share the part reads and are never materialized in the pane.
+    let followingPinnedCol = nc ? nc + 1 : 0;
+    while (followingPinnedCol && s.hiddenColumns.has(followingPinnedCol)) followingPinnedCol++;
+    if (!s.showStyles || followingPinnedCol > s.maxCol) followingPinnedCol = 0;
+    const nextPinnedRow = nr && s.showStyles ? next(nr + 1) : 0;
+    const borderNeighbor = nextPinnedRow > nr && nextPinnedRow <= s.maxRow;
+    const topLimit = nr + Number(borderNeighbor);
     const partsKey = [
       activeSheet,
       s.sheetEpoch,
@@ -406,18 +440,32 @@ export class FrozenPanes {
         sheet: activeSheet,
         rowWindow: '1',
         ...(s.showStyles ? {} : { conditional: '0' }),
-        ...(viewId
-          ? { viewId, filterId: s.filtered ? s.filterId : '', pinnedThroughRow: String(nr) }
-          : {}),
+        ...(viewId ? { viewId, filterId: s.filtered ? s.filterId : '' } : {}),
         ...init,
       });
+    const pinnedRows = (params: URLSearchParams): URLSearchParams => {
+      if (viewId) {
+        params.set('pinnedThroughRow', String(nr));
+        if (borderNeighbor) params.set('pinnedBorderNeighbor', '1');
+      }
+      return params;
+    };
+    const pinnedColumns = (params: URLSearchParams): URLSearchParams => {
+      if (followingPinnedCol) {
+        params.set('cols', String(nc + 1));
+        if (followingPinnedCol !== nc + 1) {
+          params.set('columns', [...Array.from({ length: nc }, (_, i) => i + 1), followingPinnedCol].join(','));
+        }
+      }
+      return params;
+    };
 
     const cornerJob: Promise<SheetViewportResponse | null> =
       nr && nc
         ? Promise.resolve(
             this.fetchPart(
               'corner',
-              build({ row: '1', limit: String(nr), col: '1', cols: String(nc) }),
+              pinnedRows(pinnedColumns(build({ row: '1', limit: String(topLimit), col: '1', cols: String(nc) }))),
               req,
             ),
           )
@@ -427,19 +475,18 @@ export class FrozenPanes {
       ? (() => {
           const params = build({
             row: '1',
-            limit: String(nr),
+            limit: String(topLimit),
             col: String(topCol),
             cols: String(req.cols),
           });
           if (req.selectedCols) params.set('columns', req.selectedCols.join(','));
-          return Promise.resolve(this.fetchPart('top', params, req));
+          return Promise.resolve(this.fetchPart('top', pinnedRows(params), req));
         })()
       : Promise.resolve(null);
 
     const leftJob: Promise<SheetViewportResponse | null> = nc
       ? (() => {
-          const params = build({ limit: String(req.limit), col: '1', cols: String(nc) });
-          params.delete('pinnedThroughRow');
+          const params = pinnedColumns(build({ limit: String(req.limit), col: '1', cols: String(nc) }));
           if (req.filtered) {
             params.set('offset', String(req.offset));
             params.set('filterId', s.filterId);
@@ -547,7 +594,13 @@ export class FrozenPanes {
           new Map(layouts.map((part, i) => [part.col, layouts[i + 1]?.col ?? 0]));
         const topNext = following(topLayouts);
         const pinnedNext = following(pinnedLayouts);
-        const borderColumns = [...pinnedLayouts, ...topLayouts].map((layout) => layout.col);
+        const pinnedLast = pinnedLayouts.at(-1)?.col;
+        if (pinnedLast && followingPinnedCol) pinnedNext.set(pinnedLast, followingPinnedCol);
+        const borderColumns = [...new Set([
+          ...pinnedLayouts.map((layout) => layout.col),
+          ...(followingPinnedCol ? [followingPinnedCol] : []),
+          ...topLayouts.map((layout) => layout.col),
+        ])].sort((a, b) => a - b);
         const rowColumnsCache = new WeakMap<RowData, Record<number, CellData | undefined>>();
         const cellByColumn = (
           data: RowData | undefined,
@@ -560,6 +613,13 @@ export class FrozenPanes {
             rowColumnsCache.set(data, columns);
           }
           return columns;
+        };
+        const borderCell = (data: RowData | undefined, col: number): CellData | undefined => {
+          if (!data || !col) return undefined;
+          const local = cellByColumn(data)?.[col];
+          if (local) return local;
+          const ref = `${this.o.colName(col)}${data.number}`;
+          return s.frozenCellMap.get(ref) ?? s.cellMap.get(ref);
         };
 
         const make = (
@@ -596,10 +656,14 @@ export class FrozenPanes {
           el.dataset.visualIndex = String(visual);
           this.o.paintCell(el, cell, data);
           if (base) s.frozenCellMap.set(ref, base);
-          const rightCell = cellByColumn(data)?.[nextCol];
-          const belowCell = cellByColumn(nextData)?.[col];
-          this.o.updateSharedBorders(el, cell, data, rightCell, data, belowCell, nextData, {
+          const rightRow = data ?? borderRows.get(row);
+          const belowRow = nextData ?? (type === 'left' ? undefined : borderRows.get(next(row + 1)));
+          const rightCell = borderCell(rightRow, nextCol);
+          const belowCell = borderCell(belowRow, col);
+          const belowRightCell = borderCell(belowRow, nextCol);
+          this.o.updateSharedBorders(el, cell, data, rightCell, rightRow, belowCell, belowRow, {
             nextCol,
+            belowRightCell,
             columns: borderColumns,
             rows: borderRows,
             lastRow: type === 'left' ? req.displayEnd : nr,
@@ -648,7 +712,7 @@ export class FrozenPanes {
             filter.className = 'column-filter';
             filter.textContent = '▾';
             filter.dataset.filterCol = String(col);
-            filter.title = `筛选 ${this.o.colName(col)} 列`;
+            filter.title = localize('ui.freeze.filteringColumn', { colName: this.o.colName(col) });
             if (!tableHead) el.append(filter);
             head.append(el);
           }
@@ -662,6 +726,9 @@ export class FrozenPanes {
         const topHeaders = document.createDocumentFragment();
         const topCellsFrag = document.createDocumentFragment();
         const topMap = new Map((top?.rows ?? []).map((r) => [r.number, r]));
+        const cornerMap = new Map((corner?.rows ?? []).map((r) => [r.number, r]));
+        const headerRows = nc ? cornerMap : topMap;
+        const startsAtA = (nc ? pinnedLayouts : topLayouts)[0]?.col === 1;
         for (let row = 1; row <= nr; row++) {
           if (!visible(row)) continue;
           const label = document.createElement('div');
@@ -674,6 +741,11 @@ export class FrozenPanes {
           resize.className = 'row-resize-grip';
           this.o.bindResizeGrip(resize, 'row', row);
           label.append(resize);
+          if (startsAtA) {
+            const data = headerRows.get(row);
+            const below = headerRows.get(next(row + 1));
+            this.o.paintRowHeaderBorder(label, borderCell(data, 1), data, borderCell(below, 1), below);
+          }
           topHeaders.append(label);
           for (const col of topCols) {
             if (col <= nc || s.hiddenColumns.has(col)) continue;
@@ -704,7 +776,6 @@ export class FrozenPanes {
         freezeTopCells.replaceChildren(topCellsFrag);
 
         const cornerNodes = document.createDocumentFragment();
-        const cornerMap = new Map((corner?.rows ?? []).map((r) => [r.number, r]));
         for (let r = 1; r <= nr; r++) {
           if (!visible(r)) continue;
           for (let c = 1; c <= nc; c++) {
@@ -739,6 +810,7 @@ export class FrozenPanes {
         const leftMap = new Map(
           leftRows.map((rd, i) => [s.filtered ? firstVisual + i : rd.number, rd]),
         );
+        this.leftRows = left ? leftMap : null;
         const origin = this.o.getVirtualScrollTop() + (s.filtered ? 0 : topHeight);
         for (
           let visual = firstVisual;
@@ -772,6 +844,13 @@ export class FrozenPanes {
         freezeLeft.style.left = `${rowHead}px`;
         freezeLeft.style.width = `${leftWidth}px`;
         freezeLeftCells.replaceChildren(leftNodes);
+        if (left) {
+          // The scrolling grid owns these labels even when column A is pinned.
+          for (const [visual, row] of s.renderedRows) {
+            const label = row.firstElementChild;
+            if (label instanceof HTMLElement) this.paintLeftRowHeader(label, visual, Number(row.dataset.row));
+          }
+        }
         this.followScroll();
         this.o.onRender();
       } catch (error: unknown) {

@@ -3,6 +3,7 @@
  * frozen panes: display formatting, rich-text budget planning, template cloning,
  * General number precision fitting, and text overflow/spill calculation.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { MergeRange } from '../contracts/common.ts';
 import type { RichTextLimits } from '../contracts/formats.ts';
 import type { CellData, RichText, RowData, VisualStyle } from '../contracts/workbook.ts';
@@ -436,7 +437,7 @@ export class CellPresenter {
       button.className = `auto-filter-button${filter.rules.has(c) ? ' is-filtered' : ''}`;
       button.dataset.column = String(c);
       button.textContent = '▾';
-      button.title = `${this.o.colName(c)} 列：筛选菜单`;
+      button.title = localize('ui.cellView.columnFilterMenu', { colName: this.o.colName(c) });
       button.setAttribute('aria-label', button.title);
       button.disabled = !s.indexReady;
       node.appendChild(button);
@@ -654,7 +655,7 @@ export class CellPresenter {
     }
     node._xlNumericSpan.textContent =
       fitted || '#'.repeat(Math.min(128, Math.max(1, Math.floor(available / Math.max(1, measured.hash)))));
-    node.title = [node._xlNumericOriginalTitle, `宽度不足，完整显示值：${text}`]
+    node.title = [node._xlNumericOriginalTitle, localize('ui.cellView.insufficientWidthFullDisplayValue', { text })]
       .filter(Boolean)
       .join('；');
     return true;
@@ -706,37 +707,37 @@ export class CellPresenter {
 }
 
 const CELL_TYPE_LABELS = new Map<string, string>([
-  ['s', '文本'],
-  ['str', '文本'],
-  ['inlineStr', '文本'],
-  ['text', '文本'],
-  ['string', '文本'],
-  ['b', '布尔'],
-  ['e', '错误'],
-  ['d', '日期'],
-  ['n', '数值'],
+  ['s', localize('ui.common.text')],
+  ['str', localize('ui.common.text')],
+  ['inlineStr', localize('ui.common.text')],
+  ['text', localize('ui.common.text')],
+  ['string', localize('ui.common.text')],
+  ['b', localize('ui.cellView.boolean')],
+  ['e', localize('ui.common.errors')],
+  ['d', localize('ui.common.date')],
+  ['n', localize('ui.common.numericalValues')],
 ]);
 
 const ODS_TYPE_LABELS = new Map<string, string>([
-  ['float', '数值'],
-  ['currency', '货币'],
-  ['percentage', '百分比'],
-  ['date', '日期'],
-  ['time', '时间'],
-  ['boolean', '布尔'],
-  ['string', '文本'],
+  ['float', localize('ui.common.numericalValues')],
+  ['currency', localize('ui.cellView.currency')],
+  ['percentage', localize('ui.cellView.percentage')],
+  ['date', localize('ui.common.date')],
+  ['time', localize('ui.common.time')],
+  ['boolean', localize('ui.cellView.boolean')],
+  ['string', localize('ui.common.text')],
 ]);
 
 export function cellSourceTypeLabel(cell: CellData): string {
-  if (cell.cacheMissing) return '公式无保存结果';
-  if (cell.presentationOnly) return '源为空白';
+  if (cell.cacheMissing) return localize('ui.cellView.formulasHaveNoSavedResults');
+  if (cell.presentationOnly) return localize('ui.cellView.sourceAsBlank');
   if (cell.sourceType) {
     const label = ODS_TYPE_LABELS.get(cell.sourceType) ?? cell.sourceType;
     return `ODS · ${label}${cell.currency ? ` ${cell.currency}` : ''}`;
   }
-  if (cell.raw === '' && !cell.hasFormula) return '空白';
-  if (cell.type) return CELL_TYPE_LABELS.get(cell.type) ?? `源类型 ${cell.type}`;
-  return '数值';
+  if (cell.raw === '' && !cell.hasFormula) return localize('ui.common.blank');
+  if (cell.type) return CELL_TYPE_LABELS.get(cell.type) ?? localize('ui.cellView.sourceType', { type: cell.type });
+  return localize('ui.common.numericalValues');
 }
 
 export function cellFormulaText(cell: CellData): string | null {

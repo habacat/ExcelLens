@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 type SnapshotStage struct {
@@ -68,7 +69,7 @@ func (r Roots) SnapshotStages(ctx context.Context, recoverOrphans bool) ([]Snaps
 					return err
 				}
 				if !info.Mode().IsRegular() {
-					return errors.New("暂存目录含非常规文件")
+					return i18n.Error("diagnostic.localstore.snapshotStage.temporaryDirectoryContainsNonStandard")
 				}
 				s.Bytes += info.Size()
 				s.Files++

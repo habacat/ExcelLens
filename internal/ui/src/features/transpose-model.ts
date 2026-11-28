@@ -3,6 +3,7 @@
  * source ref, type, raw value, and formula state; sparse blanks are not
  * manufactured into synthetic cells.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { TransposeLimits } from '../contracts/formats.ts';
 import type { CellData, ClipboardPayload } from '../contracts/workbook.ts';
 import { cellDisplayValue, cellFormulaText } from '../grid/cell-view.ts';
@@ -55,7 +56,7 @@ function integer(n: unknown, min: number, max: number): n is number {
 }
 
 function fail(): never {
-  throw new Error('转置内容与原选区不一致，请重新读取');
+  throw new Error(localize('ui.transposeModel.transposedContentDoesNotMatch'));
 }
 
 function isValidTransposeCell(

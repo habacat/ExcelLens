@@ -4,26 +4,5 @@ package tray
 
 import "context"
 
-type Options struct {
-	Address              string
-	OnOpen               func()
-	OnChooseFile         func(string) error
-	OnOpenCache          func() error
-	OnOpenTemp           func() error
-	OnOpenLog            func() error
-	OnOpenExports        func() error
-	OnOpenNotes          func() error
-	OnOpenLayouts        func() error
-	OnOpenProgram        func() error
-	RibbonLayout         func() (bool, error)
-	SetRibbonLayout      func(bool) error
-	OnClearAllCaches     func() (string, error)
-	OnClearCache         func() (string, error)
-	OnClearTemp          func() (string, error)
-	ContextMenuInstalled func() bool
-	OnInstallContextMenu func() error
-	OnRemoveContextMenu  func() error
-}
-
 func Run(ctx context.Context, options Options) error { <-ctx.Done(); return nil }
 func RequestQuit()                                   {}

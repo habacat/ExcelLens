@@ -1,16 +1,16 @@
 package server
 
 import (
-	"errors"
 	"log"
 	"runtime"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/taskmanager"
 	"excellens/internal/workbook"
 )
 
-var errRowViewReleased = errors.New("可见行视图已释放，请重新打开")
+var errRowViewReleased = i18n.Error("service.rowView.visibleRowViewReleasedOpen")
 
 // A lease binds a projection to one immutable source/index/filter/visibility
 // snapshot. Matching row counts alone never prove source identity. The pin
@@ -81,7 +81,7 @@ func (a *App) rowViewSnapshot(id string, wb *workbook.Workbook, idx *workbook.Sh
 	defer a.mu.RUnlock()
 	v := a.rowViews[id]
 	if a.wb != wb || v == nil || v.data.wb != wb || v.data.idx != idx || v.data.meta.Path != path || v.data.filterID != filterID {
-		return nil, errors.New("可见行视图的来源或筛选已变化，请重新打开视图")
+		return nil, i18n.Error("service.rowView.sourceOrFilterVisibleRow")
 	}
 	return v.retain()
 }

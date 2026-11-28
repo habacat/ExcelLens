@@ -3,6 +3,7 @@
  * (including job IDs arriving after cancellation). No cancelled task may
  * publish progress or results.
  */
+import { t as localize } from './i18n.ts';
 import type {
   ActivityService,
   ApiClient,
@@ -62,7 +63,7 @@ interface ActiveTask {
 const VALID_STATUSES = new Set<string>(['queued', 'running', 'done', 'error', 'cancelled']);
 
 function makeAbortError(label: string): Error {
-  const err = new Error(`${label}已取消`);
+  const err = new Error(localize('ui.asyncJobs.canceled', { label }));
   err.name = 'AbortError';
   return err;
 }
@@ -108,7 +109,7 @@ export class AsyncJobs<
       });
     this.endpoint = options.endpoint ?? '/api/analysis/query';
     this.cancelEndpoint = options.cancelEndpoint ?? `${this.endpoint}/cancel`;
-    this.label = options.label ?? '分析';
+    this.label = options.label ?? localize('ui.common.analysis');
     this.slot = options.slot ?? null;
     this.maxPolls = options.maxPolls ?? 1800;
     this.activity = options.activity;
@@ -172,7 +173,7 @@ export class AsyncJobs<
       finished: false,
       controller: new AbortController(),
     };
-    const activityHandle = this.activity?.begin(`正在处理${this.label}`, {
+    const activityHandle = this.activity?.begin(localize('ui.asyncJobs.processing', { label: this.label }), {
       signal: task.controller.signal,
       slot: isMain ? this.slot : null,
     });
@@ -188,7 +189,7 @@ export class AsyncJobs<
         body: JSON.stringify(query),
       }, decodeAsyncJobStartResponse);
       if (typeof started.jobId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(started.jobId)) {
-        throw new Error(`${this.label}任务标识无效，请重试`);
+        throw new Error(localize('ui.asyncJobs.taskIdentifierInvalidTryAgain', { label: this.label }));
       }
       task.id = started.jobId;
       if (!this.current(task)) throw makeAbortError(this.label);
@@ -206,7 +207,7 @@ export class AsyncJobs<
           !VALID_STATUSES.has(status.status) ||
           (status.id !== undefined && status.id !== task.id)
         ) {
-          throw new Error(`${this.label}任务状态响应无效，请重试`);
+          throw new Error(localize('ui.asyncJobs.taskStatusResponseInvalidTry', { label: this.label }));
         }
         activityHandle?.job(status);
         if (isMain) this.onProgress(status);
@@ -220,10 +221,10 @@ export class AsyncJobs<
           };
         }
         if (status.status === 'error' || status.status === 'cancelled') {
-          throw new Error(status.error || `${this.label}已取消`);
+          throw new Error(status.error || localize('ui.asyncJobs.canceled', { label: this.label }));
         }
       }
-      throw new Error(`${this.label}等待超时，请缩小范围后重试`);
+      throw new Error(localize('ui.asyncJobs.timeoutOccurredNarrowRangeTry', { label: this.label }));
     } catch (error: unknown) {
       if (!this.current(task)) throw makeAbortError(this.label);
       throw error;

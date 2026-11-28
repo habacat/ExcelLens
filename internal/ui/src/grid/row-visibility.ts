@@ -2,6 +2,7 @@
  * Compressed source-row visibility interval index supporting O(log n)
  * rank/select queries without allocating per-row bitmaps.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { AxisRange, SelectionArea } from '../contracts/common.ts';
 
 function lowerBound<T>(values: readonly T[], test: (item: T) => boolean): number {
@@ -24,7 +25,7 @@ export class RowVisibility {
 
   constructor(maximum: number, ranges?: readonly AxisRange[] | null) {
     if (!Number.isSafeInteger(maximum) || maximum < 1) {
-      throw new Error('源行容量无效');
+      throw new Error(localize('ui.rowVisibility.sourceRowCapacityInvalid'));
     }
     this.maximum = maximum;
     const hidden: AxisRange[] = [];
@@ -39,7 +40,7 @@ export class RowVisibility {
         r.max < r.min ||
         r.max > maximum
       ) {
-        throw new Error('行显隐区间无效');
+        throw new Error(localize('ui.rowVisibility.rowVisibilityRangeInvalid'));
       }
       hidden.push(Object.freeze({ min: r.min, max: r.max }));
       total += r.max - r.min + 1;

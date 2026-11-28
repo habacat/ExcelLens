@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -49,25 +50,25 @@ func (a *App) handleReconcileStart(w http.ResponseWriter, r *http.Request) {
 		Query       reconcile.Query `json:"query"`
 	}
 	if decodeAnalysis(r, &req) != nil || len(req.Query.Keys) < 1 || len(req.Query.Keys) > reconcile.MaxKeys || len(req.Query.Fields) > reconcile.MaxFields {
-		writeError(w, 400, "核对参数无效，请选择主键及比较字段")
+		writeMessage(w, 400, "service.reconcileTasks.verificationParametersInvalidSelectPrimary")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	primary := a.currentWorkbook()
 	if primary == nil || primary.Fingerprint != req.WorkbookKey || sourceBookID(primary) != req.PrimaryBook {
-		writeError(w, 409, "当前工作簿已切换，请重新选择来源")
+		writeMessage(w, 409, "service.reconcileTasks.currentWorkbookSwitchedSelectSource")
 		return
 	}
 	leftBook, rightBook := a.resolveReconcileBook(req.Left.Book), a.resolveReconcileBook(req.Right.Book)
 	if leftBook == nil || rightBook == nil {
-		writeError(w, 409, "核对来源已关闭或移除，请重新添加")
+		writeMessage(w, 409, "service.reconcileTasks.sourceVerificationClosedOrRemoved")
 		return
 	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != primary || a.maintenance {
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.reconcileTasks.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	a.reconcileMu.Lock()
@@ -77,7 +78,7 @@ func (a *App) handleReconcileStart(w http.ResponseWriter, r *http.Request) {
 		active := (old.Status == "queued" || old.Status == "running") && old.ctx.Err() == nil
 		old.mu.RUnlock()
 		if active {
-			writeError(w, 429, "已有核对任务，请先完成或取消")
+			writeMessage(w, 429, "service.reconcileTasks.thereAlreadyVerificationTasksComplete")
 			return
 		}
 	}
@@ -94,14 +95,14 @@ func (a *App) handleReconcileStart(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if oldest == nil {
-			writeError(w, 429, "正在回收已取消的核对任务，请稍后重试")
+			writeMessage(w, 429, "service.reconcileTasks.cancelingCanceledVerificationTaskTry")
 			return
 		}
 		delete(a.reconcileJobs, oldest.ID)
 		oldest.closeSources()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &reconcileTask{ID: randomID(), Workbook: primary, Books: [2]*workbook.Workbook{leftBook, rightBook}, Refs: [2]reconcileSourceRef{req.Left, req.Right}, Query: req.Query, Status: "queued", Stage: "等待核对任务", Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), release: a.pinWorkbooks(leftBook, rightBook)}
+	job := &reconcileTask{ID: randomID(), Workbook: primary, Books: [2]*workbook.Workbook{leftBook, rightBook}, Refs: [2]reconcileSourceRef{req.Left, req.Right}, Query: req.Query, Status: "queued", Stage: "stage.task.waitingForVerificationTasks", Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), release: a.pinWorkbooks(leftBook, rightBook)}
 	a.reconcileJobs[job.ID] = job
 	a.retainSubmitted(job.ID, job.done)
 	go a.runReconcile(job)
@@ -127,7 +128,7 @@ func (a *App) runReconcile(job *reconcileTask) {
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job.mu.Lock()
-	job.Status, job.Stage = "running", "准备来源快照"
+	job.Status, job.Stage = "running", "stage.task.prepareSourceSnapshots"
 	job.mu.Unlock()
 	var sources [2]reconcile.Source
 	for i := range sources {
@@ -139,7 +140,7 @@ func (a *App) runReconcile(job *reconcileTask) {
 		}
 	}
 	job.mu.Lock()
-	job.Stage = "核验输入摘要"
+	job.Stage = "stage.task.verificationOfInputSummary"
 	job.mu.Unlock()
 	record, recordErr := captureReconcileRecord(job, sources)
 	// Compare classified, identifiable exception groups even if their totals
@@ -166,7 +167,7 @@ func (a *App) runReconcile(job *reconcileTask) {
 		job.finishError(err)
 		return
 	}
-	job.Result, job.Sources, job.Status, job.Stage = result, sources, "done", "核对完成"
+	job.Result, job.Sources, job.Status, job.Stage = result, sources, "done", "stage.task.verificationCompleted"
 	if recordErr != nil {
 		job.RecordError = recordErr.Error()
 	} else {
@@ -194,9 +195,9 @@ func (job *reconcileTask) closeSources() {
 func (job *reconcileTask) finishError(err error) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
-	job.Status, job.Stage, job.Error = "error", "核对失败", err.Error()
+	job.Status, job.Stage, job.Error = "error", "stage.task.verificationFailed", err.Error()
 	if errors.Is(err, context.Canceled) {
-		job.Status, job.Stage, job.Error = "cancelled", "核对已取消", ""
+		job.Status, job.Stage, job.Error = "cancelled", "stage.task.verificationCanceled", ""
 	}
 }
 
@@ -224,12 +225,12 @@ func (a *App) snapshotReconcile(id string) (reconcileSnapshot, func(), error) {
 	defer a.reconcileMu.Unlock()
 	job := a.reconcileJobs[id]
 	if job == nil {
-		return reconcileSnapshot{}, nil, errors.New("核对结果已过期，请重新运行")
+		return reconcileSnapshot{}, nil, i18n.Error("service.reconcileTasks.resultExpiredRunAgain")
 	}
 	job.mu.RLock()
 	defer job.mu.RUnlock()
 	if job.Status != "done" {
-		return reconcileSnapshot{}, nil, errors.New("核对尚未完成")
+		return reconcileSnapshot{}, nil, i18n.Error("service.reconcileTasks.verificationNotCompletedYet")
 	}
 	snapshot := reconcileSnapshot{book: job.Workbook, books: job.Books, sources: job.Sources, refs: job.Refs, query: job.Query, counts: job.Result.Counts, record: job.Record, recordError: job.RecordError}
 	return snapshot, a.pinWorkbooks(job.Books[0], job.Books[1]), nil
@@ -242,11 +243,11 @@ func (a *App) handleReconcileStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	job := a.getReconcileTask(r.URL.Query().Get("id"))
 	if job == nil {
-		writeError(w, 404, "核对任务已过期，请重新运行")
+		writeMessage(w, 404, "service.reconcileTasks.taskExpiredRunAgain")
 		return
 	}
 	job.mu.RLock()
-	out := map[string]any{"jobId": job.ID, "status": job.Status, "stage": job.Stage, "error": job.Error, "done": job.Done, "total": job.Total, "elapsedMs": time.Since(job.Created).Milliseconds()}
+	out := map[string]any{"jobId": job.ID, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "error": job.Error, "done": job.Done, "total": job.Total, "elapsedMs": time.Since(job.Created).Milliseconds()}
 	if job.Status == "done" {
 		out["result"] = job.Result
 		out["recordError"] = job.RecordError
@@ -267,7 +268,7 @@ func (a *App) handleReconcileCancel(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "核对任务参数无效")
+		writeMessage(w, 400, "service.reconcileTasks.verificationTaskParametersInvalid")
 		return
 	}
 	if job := a.getReconcileTask(req.ID); job != nil {
@@ -285,7 +286,7 @@ func (a *App) handleReconcileClear(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "核对结果参数无效")
+		writeMessage(w, 400, "service.reconcileTasks.invalidVerificationResultParameters")
 		return
 	}
 	a.reconcileMu.Lock()
@@ -295,7 +296,7 @@ func (a *App) handleReconcileClear(w http.ResponseWriter, r *http.Request) {
 		case <-job.done:
 		default:
 			a.reconcileMu.Unlock()
-			writeError(w, 409, "请先取消或完成核对任务")
+			writeMessage(w, 409, "service.reconcileTasks.cancelOrCompleteVerificationTask")
 			return
 		}
 		delete(a.reconcileJobs, req.ID)
@@ -345,7 +346,7 @@ func (a *App) handleReconcileNavigate(w http.ResponseWriter, r *http.Request) {
 		Row, Col int
 	}
 	if decodeAnalysis(r, &req) != nil || req.Side != "left" && req.Side != "right" {
-		writeError(w, 400, "核对定位参数无效")
+		writeMessage(w, 400, "service.reconcileTasks.verificationPositioningParametersInvalid")
 		return
 	}
 	index := 0
@@ -361,12 +362,12 @@ func (a *App) handleReconcileNavigate(w http.ResponseWriter, r *http.Request) {
 	}()
 	snapshot, release, err := a.snapshotReconcile(req.JobID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	defer release()
 	if a.currentWorkbook() != snapshot.book {
-		writeError(w, 409, "工作簿已切换，请重新运行核对")
+		writeMessage(w, 409, "service.reconcileTasks.workbookSwitchedRerunVerification")
 		return
 	}
 	book, source, ref := snapshot.books[index], snapshot.sources[index], snapshot.refs[index]
@@ -378,29 +379,29 @@ func (a *App) handleReconcileNavigate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Row < 1 || !validCol {
-		writeError(w, 400, "定位源坐标无效")
+		writeMessage(w, 400, "service.reconcileTasks.invalidSourceCoordinatePositioning")
 		return
 	}
 	if source.Info.Kind == "analysis" {
 		current, err := a.reconcileScratchSource(book, reconcileSourceRef{Book: ref.Book, Source: ref.Source, Stamp: source.Info.Stamp}, nil)
 		if err != nil || req.Row > current.Info.Total {
-			writeError(w, 409, "分析编辑表已修改或移除，请先核对原结果快照")
+			writeMessage(w, 409, "service.reconcileTasks.analysisEditingTableModifiedOr")
 			return
 		}
 	} else {
 		if err := book.CheckSourceUnchanged(); err != nil {
-			writeError(w, 409, "来源文件已改变或不可访问，不能定位到原记录；原结果和CSV仍保留核对快照："+err.Error())
+			writeMessage(w, 409, "service.reconcileTasks.sourceFileChangedOrInaccessible", i18n.Args{"detail": err})
 			return
 		}
 		meta, _ := book.FindSheet(source.Info.Sheet)
 		idx := book.GetCachedIndex(meta.Path)
 		if idx == nil {
-			writeError(w, 409, "来源索引已失效")
+			writeMessage(w, 409, "service.reconcileTasks.sourceIndexBecomeInvalid")
 			return
 		}
 		at := idx.FindRowOffset(req.Row)
 		if at >= idx.RowCount() || idx.RowAt(at).Number != req.Row {
-			writeError(w, 400, "来源行不存在")
+			writeMessage(w, 400, "service.reconcileTasks.sourceRowDoesNotExist")
 			return
 		}
 	}
@@ -408,7 +409,7 @@ func (a *App) handleReconcileNavigate(w http.ResponseWriter, r *http.Request) {
 	locked = false
 	target, err := a.sourceNavigation(book, source.Info.Kind, ref.Source, source.Info.Sheet, req.Row, req.Col)
 	if err != nil {
-		writeError(w, 429, err.Error())
+		writeFailure(w, 429, err)
 		return
 	}
 	writeJSON(w, target)

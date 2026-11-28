@@ -75,7 +75,7 @@
 .analysis-zone-label span:last-child { color: var(--faint); font-size: var(--fs-1); font-weight: 400; }
 .analysis-dropzone .analysis-zone-label button { height: 22px; padding: 0 4px; font-size: var(--fs-2); }
 .analysis-zone-chips { min-height: 21px; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.analysis-zone-chips:empty::after { content: "把字段拖到这里"; color: var(--faint); font-size: var(--fs-2); }
+.analysis-zone-chips:empty::after { content: attr(data-empty-label); color: var(--faint); font-size: var(--fs-2); }
 .analysis-selected-chip { max-width: 100%; display: flex; align-items: center; gap: 5px; padding: 3px 4px 3px 8px; border-radius: var(--r-2); background: var(--active); color: var(--accent-strong); font-size: var(--fs-2); white-space: nowrap; }
 .analysis-selected-chip span { max-width: 167px; overflow: hidden; text-overflow: ellipsis; }
 .analysis-selected-chip button { padding: 0 3px; border: 0; background: transparent; color: inherit; font-size: var(--fs-4); line-height: 1; opacity: .7; }

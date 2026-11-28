@@ -1,3 +1,4 @@
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastTone } from '../contracts/common.ts';
 import type { CellData } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -179,7 +180,7 @@ export class SheetConditionalStats {
         .catch(() => undefined);
     }
     if (showCancelled && S.showStyles && S.indexReady) {
-      this.updateConditionalStatsUI('cancelled', '条件统计已取消', { canRetry: true });
+      this.updateConditionalStatsUI('cancelled', localize('ui.sheetConditionalStats.conditionalStatisticsHaveCanceled'), { canRetry: true });
       void cancelPromise.then(() => {
         if (epoch === S.sheetEpoch && S.showStyles && S.conditionalStatsState === 'cancelled') {
           this.refreshViewportForConditionalStats(epoch);
@@ -221,14 +222,14 @@ export class SheetConditionalStats {
         S.conditionalStatsJob = null;
         this.updateConditionalStatsUI(
           'error',
-          start.error ? `条件统计失败：${start.error}` : '条件统计失败',
+          start.error ? localize('ui.sheetConditionalStats.conditionalStatisticsFailed', { detail: start.error }) : localize('ui.sheetConditionalStats.failedPerformConditionalStatisticsCalculations'),
           { canRetry: true },
         );
         return;
       }
       const jobId = start.jobId;
       S.conditionalStatsJob = jobId;
-      const baseLabel = start.damaged ? '条件统计重建中' : '条件统计计算中';
+      const baseLabel = start.damaged ? localize('ui.sheetConditionalStats.conditionalStatisticsBeingRebuilt') : localize('ui.sheetConditionalStats.conditionalStatisticsBeingCalculated');
       this.updateConditionalStatsUI(start.status || 'running', baseLabel, { canCancel: true });
       const poll = async (): Promise<void> => {
         if (seq !== S.conditionalStatsSeq || epoch !== S.sheetEpoch || !S.showStyles) return;
@@ -247,7 +248,7 @@ export class SheetConditionalStats {
           }
           if (st.status === 'cancelled') {
             S.conditionalStatsJob = null;
-            this.updateConditionalStatsUI('cancelled', '条件统计已取消', { canRetry: true });
+            this.updateConditionalStatsUI('cancelled', localize('ui.sheetConditionalStats.conditionalStatisticsHaveCanceled'), { canRetry: true });
             this.refreshViewportForConditionalStats(epoch);
             return;
           }
@@ -255,20 +256,20 @@ export class SheetConditionalStats {
             S.conditionalStatsJob = null;
             this.updateConditionalStatsUI(
               'error',
-              st.error ? `条件统计失败：${st.error}` : '条件统计失败',
+              st.error ? localize('ui.sheetConditionalStats.conditionalStatisticsFailed', { detail: st.error }) : localize('ui.sheetConditionalStats.failedPerformConditionalStatisticsCalculations'),
               { canRetry: true },
             );
             this.refreshViewportForConditionalStats(epoch);
             return;
           }
-          const label = st.damaged ? '条件统计重建中' : '条件统计计算中';
+          const label = st.damaged ? localize('ui.sheetConditionalStats.conditionalStatisticsBeingRebuilt') : localize('ui.sheetConditionalStats.conditionalStatisticsBeingCalculated');
           const pct =
             st.totalRows > 0
               ? ` ${Math.min(99, Math.floor((st.doneRows * 100) / st.totalRows))}%`
               : '';
           const rowsText =
             st.totalRows > 0
-              ? `（${st.doneRows.toLocaleString()} / ${st.totalRows.toLocaleString()} 行）`
+              ? localize('ui.sheetConditionalStats.row', { doneRows: st.doneRows.toLocaleString(interfaceLocale()), totalRows: st.totalRows.toLocaleString(interfaceLocale()) })
               : '';
           this.updateConditionalStatsUI(st.status || 'running', `${label}${pct}${rowsText}`, {
             canCancel: true,
@@ -281,7 +282,7 @@ export class SheetConditionalStats {
           S.conditionalStatsJob = null;
           this.updateConditionalStatsUI(
             'error',
-            `条件统计状态读取失败：${errorMessage(error)}`,
+            localize('ui.sheetConditionalStats.failedReadConditionalStatisticsStatus', { detail: errorMessage(error) }),
             { canRetry: true },
           );
         }
@@ -295,7 +296,7 @@ export class SheetConditionalStats {
       if (this.d.S.showStyles) {
         this.updateConditionalStatsUI(
           'error',
-          `条件统计启动失败：${errorMessage(error)}`,
+          localize('ui.sheetConditionalStats.conditionalStatisticsLaunchFailed', { detail: errorMessage(error) }),
           { canRetry: true },
         );
       }

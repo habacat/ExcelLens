@@ -3,6 +3,8 @@ package server
 import (
 	"errors"
 	"net/http"
+
+	"excellens/internal/i18n"
 )
 
 import "excellens/internal/workbook"
@@ -14,12 +16,12 @@ func (a *App) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "尚未打开数据文件")
+		writeMessage(w, 409, "service.preview.dataFileNotOpenedYet")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.preview.worksheetDoesNotExist")
 		return
 	}
 	rows, err := wb.PreviewRows(r.Context(), meta, 80, 40)
@@ -28,7 +30,7 @@ func (a *App) handlePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, 400, "首屏预览失败："+err.Error())
+		writeMessage(w, 400, "service.preview.firstScreenPreviewFailed", i18n.Args{"detail": err})
 		return
 	}
 	maxRow, maxCol := 0, 0

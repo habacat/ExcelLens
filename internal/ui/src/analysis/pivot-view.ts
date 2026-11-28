@@ -2,6 +2,7 @@
  * Focused Pivot / Metrics / Chart / Tree / Drill-down rendering view and
  * shared query/metric formatting helpers for the Analysis workspace.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisAggregateKind,
   AnalysisCell,
@@ -35,12 +36,12 @@ import type { AnalysisTree, AnalysisTreeRenderer } from './tree.ts';
 import { decodeDrillResult } from '../core/http-decoders.generated.ts';
 
 export const AGGREGATIONS: readonly (readonly [AnalysisAggregateKind, string])[] = Object.freeze([
-  ['sum', '求和'] as const,
-  ['count', '计数'] as const,
-  ['average', '平均'] as const,
-  ['min', '最小'] as const,
-  ['max', '最大'] as const,
-  ['distinct', '去重计数'] as const,
+  ['sum', localize('ui.common.sum')] as const,
+  ['count', localize('ui.common.count')] as const,
+  ['average', localize('ui.common.average')] as const,
+  ['min', localize('ui.common.minimum')] as const,
+  ['max', localize('ui.common.maximum')] as const,
+  ['distinct', localize('ui.pivotView.deductionDuplicateCounts')] as const,
 ]);
 
 export interface EditableAnalysisQuery extends WorkspaceAnalysisQuery {
@@ -174,13 +175,13 @@ export function effectiveMetrics(
 
 export function metricLabel(m: AnalysisMetric, lookup: (id: string) => string): string {
   const aggLabel = AGGREGATIONS.find((a) => a[0] === m.aggregate)?.[1] ?? m.aggregate;
-  const base = m.name || `${m.field ? lookup(m.field) : '记录数'} · ${aggLabel}`;
+  const base = m.name || `${m.field ? lookup(m.field) : localize('ui.common.numberRecords')} · ${aggLabel}`;
   return m.comparison ? `${base} · ${comparisonLabel(m)}` : base;
 }
 
 export function queryScopeCaption(q: Pick<AnalysisQuery, 'composition' | 'sourceScope'>): string {
   return q.composition
-    ? `${q.composition.inputs.length} 个来源`
+    ? localize('ui.pivotView.sources', { count: q.composition.inputs.length })
     : sourceScopeCaption(q.sourceScope);
 }
 
@@ -221,7 +222,7 @@ export class AnalysisPivotView {
   }
 
   resultFieldName(id: string | undefined): string {
-    if (!id) return '记录数';
+    if (!id) return localize('ui.common.numberRecords');
     const { state } = this.d;
     return (
       state.activeResultQuery?.transforms.find((field) => field.id === id)?.name ||
@@ -263,10 +264,10 @@ export class AnalysisPivotView {
     requireEl('analysisPivotTable').replaceChildren();
     drawChart(requireCanvas('analysisChart'), null);
     requireEl('analysisChartHint').hidden = false;
-    setText('analysisReportTitle', '透视分析');
-    setText('analysisReportSubtitle', '从左侧拖入字段，或从模板库快速开始。');
+    setText('analysisReportTitle', localize('ui.common.p'));
+    setText('analysisReportSubtitle', localize('ui.pivotView.dragFieldsFromLeftOr'));
     setText('analysisChartSummary', '');
-    setText('analysisTableSummary', '尚未运行分析');
+    setText('analysisTableSummary', localize('ui.pivotView.noAnalysisRunYet'));
     for (const id of [
       'analysisSaveReport',
       'analysisMaterialize',
@@ -293,7 +294,7 @@ export class AnalysisPivotView {
       q.transforms?.find((f) => f.id === id)?.name ||
       fields.find((f) => f.id === id)?.name ||
       id ||
-      '记录数';
+      localize('ui.common.numberRecords');
     const measures = effectiveMetrics(q);
     const metric = measures[index] ?? measures[0];
     const percent = expectedResult.rows.some((row) =>
@@ -304,7 +305,7 @@ export class AnalysisPivotView {
       (q.source.startsWith('wb:')
         ? q.source.slice(3)
         : (state.workspace?.sheets.find((sheet) => `scratch:${sheet.id}` === q.source)?.name ??
-          '分析工作表'));
+          localize('ui.pivotView.analyzeWorksheet')));
     const caption = byId('analysisSourceCaption')?.textContent ?? '';
     (this.d.openChartExport ?? openChartExport)({
       kind: 'analysis',
@@ -322,14 +323,14 @@ export class AnalysisPivotView {
         source: q.source,
       },
       title,
-      source: `${state.workspace?.workbook || caption || '当前工作簿'} / ${sourceName}`,
-      scope: `${queryScopeCaption(q)}${q.filters?.length ? ' · 已筛选' : ''}`,
+      source: `${state.workspace?.workbook || caption || localize('ui.common.currentWorkbook')} / ${sourceName}`,
+      scope: `${queryScopeCaption(q)}${q.filters?.length ? ` ${localize('ui.pivotView.filtered')}` : ''}`,
       metric: metricLabel(metric, lookup),
       unit: percent
-        ? '百分比'
+        ? localize('ui.pivotView.percentage')
         : metric.aggregate === 'count' || metric.aggregate === 'distinct'
-          ? '个'
-          : '原始单位',
+          ? localize('ui.pivotView.individual')
+          : localize('ui.pivotView.originalUnits'),
       current,
       notify: toast,
     });
@@ -343,16 +344,16 @@ export class AnalysisPivotView {
         return [
           this.resultMetricCaption(m),
           formatAnalysisNumber(cell),
-          `${result.tree ? '本层范围汇总' : '全量汇总'} · ${i + 1}`,
+          `${result.tree ? localize('ui.pivotView.summaryThisLayer') : localize('ui.pivotView.fullSummary')} · ${i + 1}`,
           comparisonTitle(cell),
         ] as const;
       });
     stats.push(
-      ['参与记录', formatCountNumber(result.included), '实际纳入统计', String(result.included)],
+      [localize('ui.pivotView.participatingRecords'), formatCountNumber(result.included), localize('ui.pivotView.actualInclusionStatistics'), String(result.included)],
       [
-        result.tree ? '首层分类' : '分类数',
+        result.tree ? localize('ui.pivotView.firstLevelClassification') : localize('ui.pivotView.numberCategories'),
         formatCountNumber(result.rows.length),
-        '透视结果行',
+        localize('ui.pivotView.perspectiveResultRow'),
         String(result.rows.length),
       ],
     );
@@ -371,31 +372,31 @@ export class AnalysisPivotView {
     const { state, setText, toast, issuePanel } = this.d;
     issuePanel?.setSnapshot({ book: state.fingerprint, job: state.jobID, query: q, result });
     const measures = effectiveMetrics(q);
-    setText('analysisReportTitle', q.title || '透视分析');
+    setText('analysisReportTitle', q.title || localize('ui.common.p'));
     setText(
       'analysisReportSubtitle',
-      `${queryScopeCaption(q)} · ${result.tree ? '层级展开 · ' : ''}${q.rows.map((id) => this.resultFieldName(id)).join(' / ') || '全部记录'} · ${measures.map((m) => this.resultMetricCaption(m)).join(' / ')}`,
+      `${queryScopeCaption(q)} · ${result.tree ? `${localize('ui.pivotView.expandLevels')} ` : ''}${q.rows.map((id) => this.resultFieldName(id)).join(' / ') || localize('ui.pivotView.allRecordsRecorded')} · ${measures.map((m) => this.resultMetricCaption(m)).join(' / ')}`,
     );
     this.renderMetrics(result, q);
     const alerts: string[] = [];
     if (result.invalidNumbers) {
-      alerts.push(`${formatCountNumber(result.invalidNumbers)} 个非数值参与字段未计入数值聚合`);
+      alerts.push(localize('ui.pivotView.nonNumericFieldsWereNot', { formatCountNumber: formatCountNumber(result.invalidNumbers) }));
     }
     if (result.invalidConversions) {
       alerts.push(
-        `扫描中有 ${formatCountNumber(result.invalidConversions)} 个值转换失败，转换列保留原文；请检查输入格式`,
+        localize('ui.pivotView.duringScanningValuesFailedBe', { formatCountNumber: formatCountNumber(result.invalidConversions) }),
       );
     }
     if (result.missingFormulaCaches) {
-      alerts.push(`${formatCountNumber(result.missingFormulaCaches)} 个公式缺少缓存值，已排除`);
+      alerts.push(localize('ui.pivotView.formulaLacksCachedValuesRuled', { formatCountNumber: formatCountNumber(result.missingFormulaCaches) }));
     }
-    if (result.truncated) alerts.push('仅显示排名前 N 项，合计仍为全量结果');
+    if (result.truncated) alerts.push(localize('ui.pivotView.onlyTopNItemsDisplayed'));
     const cmpScope = comparisonScope(q);
     if (cmpScope) alerts.push(cmpScope);
-    setText('analysisChartSummary', alerts.join('；') || '点击图表或透视数值查看来源记录');
+    setText('analysisChartSummary', alerts.join('；') || localize('ui.pivotView.clickOnChartsOrPivot'));
     setText(
       'analysisTableSummary',
-      `${formatCountNumber(result.rows.length)} 个分类 · ${formatCountNumber(result.included)} 条记录`,
+      localize('ui.pivotView.categoriesRecords', { count: formatCountNumber(result.rows.length), formatCountNumber: formatCountNumber(result.included) }),
     );
     const saveBtn = requireButton('analysisSaveReport');
     const matBtn = requireButton('analysisMaterialize');
@@ -405,12 +406,12 @@ export class AnalysisPivotView {
     matBtn.disabled = false;
     matDetailBtn.disabled = false;
     expBtn.disabled = false;
-    saveBtn.textContent = state.activeReportID ? '更新报表' : '保存报表';
-    matBtn.textContent = result.tree ? '首层编辑表' : '生成编辑表';
-    expBtn.textContent = result.tree ? '导出首层' : '导出结果';
+    saveBtn.textContent = state.activeReportID ? localize('ui.pivotView.updateReports') : localize('ui.pivotView.saveReport');
+    matBtn.textContent = result.tree ? localize('ui.pivotView.firstLevelEditingTable') : localize('ui.pivotView.generatingEditedTable');
+    expBtn.textContent = result.tree ? localize('ui.pivotView.firstLayerExport') : localize('ui.pivotView.exportResults');
     setText(
       'analysisTableHint',
-      result.tree ? '箭头展开分组，数值查看来源明细' : '点击数值查看对应明细 ↗',
+      result.tree ? localize('ui.pivotView.arrowsExpandGroupingAllowingView') : localize('ui.pivotView.clickOnValueViewCorresponding'),
     );
 
     const chartMetric = requireSelect('analysisChartMetric');
@@ -425,7 +426,7 @@ export class AnalysisPivotView {
     this.renderPivot();
     this.renderChart();
     if (result.invalidNumbers || result.missingFormulaCaches || result.invalidConversions) {
-      toast('本次分析存在需核对项目，请查看图表上方提示', 'warning');
+      toast(localize('ui.pivotView.thereItemsThatNeedVerification'), 'warning');
     }
   }
 
@@ -455,11 +456,11 @@ export class AnalysisPivotView {
       requireButton('analysisTreeNext').disabled = !page.more;
       setText(
         'analysisTreePage',
-        page.last ? `${formatCountNumber(page.first)}–${formatCountNumber(page.last)} 行` : '暂无分组',
+        page.last ? localize('ui.pivotView.row', { formatCountNumber: formatCountNumber(page.first), formatCountNumber2: formatCountNumber(page.last) }) : localize('ui.pivotView.noGroupingAvailable'),
       );
       setText(
         'analysisTableSummary',
-        `${formatCountNumber(result.rows.length)} 个首层分组 · ${formatCountNumber(result.included)} 条记录`,
+        localize('ui.pivotView.groupsRecords', { count: formatCountNumber(result.rows.length), formatCountNumber: formatCountNumber(result.included) }),
       );
       return;
     }
@@ -470,15 +471,15 @@ export class AnalysisPivotView {
     const measures = effectiveMetrics(q);
     const withColumns = Boolean(q.columns.length);
     const dimCount = Math.max(1, q.rows.length);
-    const headers: string[] = q.rows.length ? q.rows.map((id) => this.resultFieldName(id)) : ['分类'];
+    const headers: string[] = q.rows.length ? q.rows.map((id) => this.resultFieldName(id)) : [localize('ui.common.classification')];
     if (withColumns) {
       for (const k of result.columnKeys) {
         for (const m of measures) {
-          headers.push(`${k || '（空白）'} · ${this.resultMetricCaption(m)}`);
+          headers.push(`${k || localize('ui.common.empty')} · ${this.resultMetricCaption(m)}`);
         }
       }
       for (const m of measures) {
-        headers.push(`合计 · ${this.resultMetricCaption(m)}`);
+        headers.push(localize('ui.pivotView.total', { resultMetricCaption: this.resultMetricCaption(m) }));
       }
     } else {
       for (const m of measures) {
@@ -513,7 +514,7 @@ export class AnalysisPivotView {
         btn.type = 'button';
         btn.className = 'analysis-drill-link';
         btn.textContent = formatAnalysisNumber(cell);
-        btn.title = `${td.title} · 查看当前分组来源明细`;
+        btn.title = localize('ui.pivotView.viewCurrentGroupSourceDetails', { title: td.title });
         btn.onclick = (): void => {
           void this.drill(keys, colKey, 0);
         };
@@ -526,10 +527,10 @@ export class AnalysisPivotView {
 
     for (const row of visible) {
       const tr = document.createElement('tr');
-      const keys = q.rows.length ? row.keys : ['全部'];
+      const keys = q.rows.length ? row.keys : [localize('ui.common.all')];
       for (const k of keys) {
         const td = document.createElement('td');
-        td.textContent = k || '（空白）';
+        td.textContent = k || localize('ui.common.empty');
         tr.append(td);
       }
       if (withColumns) {
@@ -550,7 +551,7 @@ export class AnalysisPivotView {
     const footer = document.createElement('tr');
     for (let i = 0; i < dimCount; i++) {
       const td = document.createElement('td');
-      td.textContent = i === 0 ? '全量总计' : '';
+      td.textContent = i === 0 ? localize('ui.pivotView.totalAmount') : '';
       footer.append(td);
     }
     if (withColumns) {
@@ -573,7 +574,7 @@ export class AnalysisPivotView {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'analysis-quiet-button';
-      button.textContent = `继续显示（还有 ${formatCountNumber(result.rows.length - rowLimit)} 行）`;
+      button.textContent = localize('ui.pivotView.continueDisplayingThereStillRows', { formatCountNumber: formatCountNumber(result.rows.length - rowLimit) });
       button.onclick = (): void => this.renderPivot(Math.min(result.rows.length, rowLimit + 150));
       cell.append(button);
       extra.append(cell);
@@ -647,7 +648,7 @@ export class AnalysisPivotView {
         c.projected,
         c.mode,
         c.metric,
-        c.snapshot.query.title || '透视分析',
+        c.snapshot.query.title || localize('ui.common.p'),
         c.current,
       );
     }
@@ -702,8 +703,8 @@ export class AnalysisPivotView {
     state.drillColumn = colKey;
     state.drillColumnSelected = columnSelected;
     state.drillOffset = offset;
-    setText('analysisDrillTitle', `${keys.join(' / ') || '全部记录'}${colKey ? ` · ${colKey}` : ''}`);
-    setText('analysisDrillInfo', '正在读取源数据…');
+    setText('analysisDrillTitle', `${keys.join(' / ') || localize('ui.pivotView.allRecordsRecorded')}${colKey ? ` · ${colKey}` : ''}`);
+    setText('analysisDrillInfo', localize('ui.pivotView.readingSourceData'));
     setText('analysisDrillTable', '');
     setText('analysisDrillPaging', '');
     try {
@@ -724,17 +725,15 @@ export class AnalysisPivotView {
       const rows = data.rows ?? [];
       setText(
         'analysisDrillInfo',
-        `已扫描 ${formatCountNumber(data.scanned)} 行 · ${
-          rows.length ? `显示第 ${offset + 1}–${offset + rows.length} 条` : '没有匹配明细'
-        }`,
+        localize('ui.pivotView.scannedRows', { formatCountNumber: formatCountNumber(data.scanned), detail: rows.length ? localize('ui.pivotView.displayThItem', { offset: offset + 1, count: offset + rows.length }) : localize('ui.pivotView.noMatchingDetails') }),
       );
       const wrap = requireEl('analysisDrillTable');
       const table = document.createElement('table');
       const head = document.createElement('thead');
       const hr = document.createElement('tr');
       for (const title of [
-        ...(q.composition ? ['来源文件', '来源表'] : []),
-        '原行号',
+        ...(q.composition ? [localize('ui.pivotView.sourceFiles'), localize('ui.pivotView.sourceTable')] : []),
+        localize('ui.pivotView.originalLineNumber'),
         ...data.fields.map((x) => x.name),
       ]) {
         const th = document.createElement('th');
@@ -752,7 +751,7 @@ export class AnalysisPivotView {
         position.type = 'button';
         position.className = 'analysis-source-row analysis-drill-link';
         position.textContent = String(row.row);
-        position.title = '转到来源行';
+        position.title = localize('ui.pivotView.transferSourceRow');
         pos.append(position);
         if (q.composition) {
           for (const text of [row.origin?.file, row.origin?.sheet]) {
@@ -809,7 +808,7 @@ export class AnalysisPivotView {
       const paging = requireEl('analysisDrillPaging');
       const prev = document.createElement('button');
       prev.type = 'button';
-      prev.textContent = '上一页';
+      prev.textContent = localize('ui.common.previousPage');
       prev.disabled = offset === 0;
       prev.onclick = (): void => {
         void this.drill(keys, colKey, Math.max(0, offset - 100), columnSelected);
@@ -817,7 +816,7 @@ export class AnalysisPivotView {
       paging.append(prev);
       const next = document.createElement('button');
       next.type = 'button';
-      next.textContent = '下一页';
+      next.textContent = localize('ui.common.nextPage');
       next.disabled = !data.hasMore;
       next.onclick = (): void => {
         void this.drill(keys, colKey, offset + 100, columnSelected);
@@ -827,7 +826,7 @@ export class AnalysisPivotView {
       if (current() && isDrawerVisible() && !isAbortError(err)) {
         const msg = errorMessage(err);
         setText('analysisDrillInfo', msg);
-        toast(`读取明细失败：${msg}`, 'error');
+        toast(localize('ui.pivotView.detailReadingFailed', { msg }), 'error');
       }
     }
   }

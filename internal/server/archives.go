@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"excellens/internal/archives"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -110,7 +111,7 @@ func (a *App) handleArchiveList(w http.ResponseWriter, r *http.Request) {
 	view := a.archiveView
 	if view == nil || view.id != r.URL.Query().Get("id") {
 		a.archiveMu.Unlock()
-		writeError(w, 404, "压缩包已关闭或切换，请重新选择")
+		writeMessage(w, 404, "service.archives.compressedPackageClosedOrSwitched")
 		return
 	}
 	query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
@@ -149,19 +150,19 @@ func (a *App) handleArchiveOpen(w http.ResponseWriter, r *http.Request) {
 		AllowPartial bool   `json:"allowPartial"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&input) != nil {
-		writeError(w, 400, "压缩包打开参数无效")
+		writeMessage(w, 400, "service.archives.invalidParametersOpeningCompressedPackage")
 		return
 	}
 	a.archiveMu.Lock()
 	view := a.archiveView
 	if view == nil || view.id != input.Archive || input.Member < 0 || input.Member >= len(view.file.Members) {
 		a.archiveMu.Unlock()
-		writeError(w, 404, "压缩包成员不存在")
+		writeMessage(w, 404, "service.archives.compressedPackageMembersDoNot")
 		return
 	}
 	if view.file.Members[input.Member].Incomplete && !input.AllowPartial {
 		a.archiveMu.Unlock()
-		writeError(w, 409, "该 TXT 不完整。请先勾选「仅查看现存片段」，或重新获取完整压缩包。")
+		writeMessage(w, 409, "service.archives.thisTxtIncompleteCheckView")
 		return
 	}
 	if old := a.archiveTask; old != nil {
@@ -170,12 +171,12 @@ func (a *App) handleArchiveOpen(w http.ResponseWriter, r *http.Request) {
 		old.mu.RUnlock()
 		if running {
 			a.archiveMu.Unlock()
-			writeError(w, 409, "正在读取另一成员，请先取消或等待完成")
+			writeMessage(w, 409, "service.archives.readingAnotherMemberCancelOr")
 			return
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &archiveTask{id: randomID(), status: "running", stage: "正在准备读取", cancel: cancel, done: make(chan struct{})}
+	job := &archiveTask{id: randomID(), status: "running", stage: "stage.task.preparingTheReading", cancel: cancel, done: make(chan struct{})}
 	a.archiveTask = job
 	a.archiveMu.Unlock()
 	go a.runArchiveOpen(ctx, view, input.Member, job)
@@ -204,12 +205,12 @@ func (a *App) runArchiveOpen(ctx context.Context, view *archiveView, id int, job
 	if err == nil {
 		if member.Archive {
 			if view.depth >= 4 {
-				err = errors.New("嵌套压缩包超过 4 层，请单独打开需要的压缩包")
+				err = i18n.Error("service.archives.nestedCompressedPackagesExceedLevels")
 			} else {
 				nested, err = archives.Open(ctx, path, member.Name)
 			}
 		} else {
-			progress(0, 0, "正在识别成员文件并读取工作簿结构")
+			progress(0, 0, "stage.task.identifyingMemberFilesReadingWorkbook")
 			if member.Incomplete {
 				wb, err = workbook.OpenTextFragment(path)
 			} else {
@@ -267,7 +268,7 @@ func (a *App) runArchiveOpen(ctx context.Context, view *archiveView, id int, job
 		}
 	} else {
 		job.status = "done"
-		job.stage = "成员文件已打开"
+		job.stage = "stage.task.memberFilesAreOpen"
 	}
 }
 
@@ -280,14 +281,14 @@ func (a *App) handleArchiveJob(w http.ResponseWriter, r *http.Request) {
 	job := a.archiveTask
 	a.archiveMu.Unlock()
 	if job == nil || job.id != r.URL.Query().Get("id") {
-		writeError(w, 404, "压缩包读取任务不存在")
+		writeMessage(w, 404, "service.archives.noTaskExistsReadingCompressed")
 		return
 	}
 	if r.Method == http.MethodPost {
 		job.cancel()
 	}
 	job.mu.RLock()
-	payload := map[string]any{"id": job.id, "status": job.status, "stage": job.stage, "doneBytes": job.doneBytes, "totalBytes": job.totalBytes, "error": job.failure, "result": job.result}
+	payload := map[string]any{"id": job.id, "status": job.status, "stage": responseLocale(w).Stage(job.stage), "doneBytes": job.doneBytes, "totalBytes": job.totalBytes, "error": job.failure, "result": job.result}
 	job.mu.RUnlock()
 	writeJSON(w, payload)
 }
@@ -367,7 +368,7 @@ func (a *App) reopenArchiveRecent(ctx context.Context, item recentEntry) (*workb
 		wb, err = workbook.OpenWorkbook(path)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("读取压缩包成员失败：%w", err)
+		return nil, i18n.Wrap("service.archives.failedReadCompressedPackageMember", err)
 	}
 	wb.SetDisplayName(item.Name)
 	decorateArchiveWorkbook(wb, view, m)
@@ -391,5 +392,5 @@ func findArchiveMember(a *archives.Archive, id int, name string) (int, error) {
 			return m.ID, nil
 		}
 	}
-	return 0, errors.New("压缩包成员已移动或更名，请从压缩包目录重新选择")
+	return 0, i18n.Error("service.archives.membersCompressedPackageHaveMoved")
 }

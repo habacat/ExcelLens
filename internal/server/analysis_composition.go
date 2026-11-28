@@ -2,8 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
 	"slices"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"excellens/internal/analysis"
 	"excellens/internal/composition"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -23,7 +23,7 @@ func ownCompositionAnalysisSource(wb *workbook.Workbook, source *compositionSnap
 
 func (a *App) borrowCompositionAnalysisSource(wb *workbook.Workbook, source, id string) (*analysisSourceSnapshot, error) {
 	if id == "" {
-		return nil, errors.New("联合来源尚未准备，请重新选择来源")
+		return nil, i18n.Error("service.analysisComposition.combinedSourceNotYetPrepared")
 	}
 	borrowed, err := a.borrowCompositionTask(id, wb)
 	if err != nil {
@@ -32,7 +32,7 @@ func (a *App) borrowCompositionAnalysisSource(wb *workbook.Workbook, source, id 
 	owner := ownCompositionAnalysisSource(wb, borrowed)
 	if owner.data.source != source {
 		owner.close()
-		return nil, errors.New("联合来源与准备结果不一致，请重新选择")
+		return nil, i18n.Error("service.analysisComposition.combinedSourcePreparedResultsInconsistent")
 	}
 	return owner, nil
 }
@@ -52,7 +52,7 @@ func compositionAnalysisDefinition(q analysis.Query, captured *analysisSourceSna
 		if q.Composition != nil {
 			provided, err := q.Composition.Normalized()
 			if err != nil || provided.Digest() != definition.Digest() {
-				return q, errors.New("联合来源快照与查询定义不一致")
+				return q, i18n.Error("service.analysisComposition.combinedSourceSnapshotDoesNot")
 			}
 		}
 		q.Composition = &definition
@@ -69,10 +69,10 @@ func compositionAnalysisDefinition(q analysis.Query, captured *analysisSourceSna
 
 func (a *App) compositionAnalysisSource(ctx context.Context, wb *workbook.Workbook, q analysis.Query, observer sourceCellObserver, borrowed *analysisSourceSnapshot) (analysisSource, error) {
 	if observer != nil {
-		return analysisSource{}, errors.New("联合来源的分析方案捕获尚未接入")
+		return analysisSource{}, i18n.Error("service.analysisComposition.analysisSchemeCombinedSourceNot")
 	}
 	if borrowed == nil || borrowed.isClosed() || borrowed.data.composition == nil || borrowed.data.wb != wb || borrowed.data.source != q.Source {
-		return analysisSource{}, errors.New("联合来源快照已释放，请重新运行分析")
+		return analysisSource{}, i18n.Error("service.analysisComposition.combinedSourceSnapshotReleasedRun")
 	}
 	q, err := compositionAnalysisDefinition(q, borrowed)
 	if err != nil {
@@ -105,7 +105,7 @@ func (a *App) compositionAnalysisSource(ctx context.Context, wb *workbook.Workbo
 				continue // calculated fields are provided by the analysis engine
 			}
 			if column < 1 || column > len(fields) {
-				return errors.New("联合来源分析字段无效")
+				return i18n.Error("service.analysisComposition.invalidAnalysisFieldsJointSources")
 			}
 			if _, found := ids[column]; !found {
 				columns = append(columns, column)
@@ -113,7 +113,7 @@ func (a *App) compositionAnalysisSource(ctx context.Context, wb *workbook.Workbo
 			}
 		}
 		if len(columns) > analysis.MaxSourceFields {
-			return errors.New("一次分析最多引用80个原始字段，请移除部分维度或筛选条件")
+			return i18n.Error("service.analysisComposition.maximumOriginalFieldsCanBe")
 		}
 		if len(columns) == 0 {
 			columns = append(columns, 1)
@@ -159,7 +159,7 @@ func (a *App) pinCompositionAnalysisBooks(q analysis.Query) (func(), error) {
 	for i, input := range q.Composition.Inputs {
 		book := a.resolveReconcileBook(input.Ref.Book)
 		if book == nil || book.Fingerprint != input.Ref.Fingerprint {
-			return nil, fmt.Errorf("第%d份联合来源未打开或已变化，请重新选择", i+1)
+			return nil, i18n.Error("service.analysisComposition.jointSourceNotOpenOr", i18n.Args{"value": i + 1})
 		}
 		books[i] = book
 	}

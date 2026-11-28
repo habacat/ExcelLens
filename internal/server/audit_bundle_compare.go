@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -50,18 +51,18 @@ func readBatchBundle(ctx context.Context, dir, side string) (batchBundle, error)
 		switch part.Name {
 		case "核查记录.json":
 			if manifest != nil {
-				return bundle, errors.New("核查包记录重复")
+				return bundle, i18n.Error("service.auditBundleCompare.checkingDuplicatePackageRecords")
 			}
 			manifest = part
 		case "核对明细.csv":
 			if detail != nil {
-				return bundle, errors.New("核查包明细重复")
+				return bundle, i18n.Error("service.auditBundleCompare.checkingDuplicatePackageDetails")
 			}
 			detail = part
 		}
 	}
 	if manifest == nil || detail == nil || manifest.UncompressedSize64 > formats.ReconcileRecordBytes || detail.UncompressedSize64 > formats.BatchDetailBytes {
-		return bundle, errors.New("包内缺少核查记录、明细或超出读取容量")
+		return bundle, i18n.Error("service.auditBundleCompare.thereNoVerificationRecordsDetails")
 	}
 	r, err := manifest.Open()
 	if err != nil {
@@ -70,14 +71,14 @@ func readBatchBundle(ctx context.Context, dir, side string) (batchBundle, error)
 	data, err := io.ReadAll(io.LimitReader(r, formats.ReconcileRecordBytes+1))
 	r.Close()
 	if err != nil || len(data) > formats.ReconcileRecordBytes || json.Unmarshal(data, &bundle.record) != nil {
-		return bundle, errors.New("核查记录不完整")
+		return bundle, i18n.Error("service.auditBundleCompare.incompleteCheckRecords")
 	}
 	m := bundle.record
 	if m.Kind != "ExcelLens.Reconcile" || (m.RuleVersion != 1 && m.RuleVersion != reconcile.CurrentRuleVersion) || m.Version != 1 || m.Query.RuleVersion != 0 && m.Query.RuleVersion != m.RuleVersion || m.Scope != "all-data-rows" || m.Detail.Status != "" || m.Detail.File != detail.Name || !validDigest(m.Detail.SHA256, 32) || m.Detail.Rows < 0 || m.Detail.Rows > formats.ExternalRows {
-		return bundle, errors.New("请使用同版本规则、全部类型的完整核查包")
+		return bundle, i18n.Error("service.auditBundleCompare.useSameVersionRulesComplete")
 	}
 	if len(m.Query.Keys) == 0 || len(m.Query.Keys) > reconcile.MaxKeys || len(m.Query.Fields) > reconcile.MaxFields {
-		return bundle, errors.New("核查字段数量无效")
+		return bundle, i18n.Error("service.auditBundleCompare.invalidNumberVerificationFields")
 	}
 	for section, pairs := range [][]reconcile.Pair{m.Query.Keys, m.Query.Fields} {
 		for _, pair := range pairs {
@@ -85,7 +86,7 @@ func readBatchBundle(ctx context.Context, dir, side string) (batchBundle, error)
 				continue
 			}
 			if section == 0 || m.RuleVersion == 1 {
-				return bundle, errors.New("核查包中主键或旧规则包含无效容差")
+				return bundle, i18n.Error("service.auditBundleCompare.primaryKeyOrOldRules")
 			}
 			if _, err := pair.AmountTolerance(); err != nil {
 				return bundle, err
@@ -94,7 +95,7 @@ func readBatchBundle(ctx context.Context, dir, side string) (batchBundle, error)
 	}
 	for _, input := range m.Inputs {
 		if !validDigest(input.Stamp, 32) || (input.Kind != "analysis" && (input.Kind != "workbook" || !validDigest(input.FileSHA256, 32))) {
-			return bundle, errors.New("核查输入摘要无效")
+			return bundle, i18n.Error("service.auditBundleCompare.invalidVerificationInputSummary")
 		}
 	}
 	reader, err := detail.Open()
@@ -110,7 +111,7 @@ func readBatchBundle(ctx context.Context, dir, side string) (batchBundle, error)
 	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(&batchContextReader{ctx, reader}, formats.BatchDetailBytes+1))
 	if err != nil || uint64(n) != detail.UncompressedSize64 || hex.EncodeToString(h.Sum(nil)) != m.Detail.SHA256 {
 		f.Close()
-		return bundle, errors.New("核查明细长度或 SHA-256 与记录不符")
+		return bundle, i18n.Error("service.auditBundleCompare.detailedLengthOrShaDoes")
 	}
 	if _, err = f.Seek(0, io.SeekStart); err != nil {
 		f.Close()
@@ -190,7 +191,7 @@ type batchItem struct {
 
 func batchKey(row []string, m reconcileRecord, period string) (string, error) {
 	if !validDigest(row[3], 16) {
-		return "", errors.New("明细主键组标识无效")
+		return "", i18n.Error("service.auditBundleCompare.invalidDetailedPrimaryKeyGroup")
 	}
 	group := row[3]
 	kind := row[0]
@@ -201,7 +202,7 @@ func batchKey(row []string, m reconcileRecord, period string) (string, error) {
 		return group + "/S", nil
 	}
 	if kind != "重复键记录" && kind != "核对记录" {
-		return "", errors.New("核查明细记录类别无效")
+		return "", i18n.Error("service.auditBundleCompare.invalidCategoryRecordsVerifiedDetail")
 	}
 	pairs := m.Query.Fields
 	if len(pairs) == 0 {
@@ -213,11 +214,11 @@ func batchKey(row []string, m reconcileRecord, period string) (string, error) {
 	}
 	col, _, err := workbook.ParseCellRef(ref)
 	if err != nil {
-		return "", errors.New("核查明细的源坐标无效")
+		return "", i18n.Error("service.auditBundleCompare.invalidSourceCoordinatesVerifiedDetail")
 	}
 	pair := slices.IndexFunc(pairs, func(p reconcile.Pair) bool { return side == 0 && p.Left == col || side == 1 && p.Right == col })
 	if pair < 0 {
-		return "", errors.New("明细源格与记录的字段映射不符")
+		return "", i18n.Error("service.auditBundleCompare.detailedSourceCellsDoNot")
 	}
 	key := fmt.Sprintf("%s/N%02d", group, pair)
 	if kind == "重复键记录" {
@@ -264,7 +265,7 @@ func (b batchBundle) items(ctx context.Context, dir, period string) iter.Seq2[ba
 			actual[0] = strings.TrimPrefix(actual[0], "\ufeff")
 		}
 		if err != nil || !slices.Equal(actual, header) {
-			yield(batchItem{}, errors.New("核查明细表头无效"))
+			yield(batchItem{}, i18n.Error("service.auditBundleCompare.invalidVerificationDetailedHeaders"))
 			return
 		}
 		rows := int(b.record.Detail.Rows)
@@ -279,13 +280,13 @@ func (b batchBundle) items(ctx context.Context, dir, period string) iter.Seq2[ba
 				row, err := reader.Read()
 				if err == io.EOF {
 					if n != rows || limit.N == 0 {
-						return errors.New("核查明细行数与记录不符")
+						return i18n.Error("service.auditBundleCompare.verifiedDetailsDoNotMatch")
 					}
 					return offsets.Flush()
 				}
 				size := reader.InputOffset() - start
 				if err != nil || size > formats.BatchCSVRowBytes || n >= rows {
-					return errors.New("核查明细行无效或超出容量")
+					return i18n.Error("service.auditBundleCompare.detailedRowVerifiedBeInvalid")
 				}
 				binary.LittleEndian.PutUint64(block[:8], uint64(start))
 				binary.LittleEndian.PutUint64(block[8:], uint64(size))
@@ -335,7 +336,7 @@ func batchEvidence(row []string) []string {
 
 func compareBatchDetails(ctx context.Context, dir string, before, after batchBundle, out *auditCSV) error {
 	if !sameBatchRules(before.record, after.record) {
-		return errors.New("两批规则版本、主键、字段、金额容差、匹配方式或 CSV 文字保护设置不一致")
+		return i18n.Error("service.auditBundleCompare.versionsTwoSetsRulesPrimary")
 	}
 	header := []string{"跟踪结果", "主键组ID"}
 	for _, period := range []string{"基线", "当期"} {
@@ -439,7 +440,7 @@ func (a *App) handleBatchComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	book := a.currentWorkbook()
 	if book == nil || sourceBookID(book) != r.URL.Query().Get("book") {
-		writeError(w, 409, "当前工作簿已切换")
+		writeMessage(w, 409, "service.auditBundleCompare.currentWorkbookSwitched")
 		return
 	}
 	job, err := a.newExportJob(book, "csv")
@@ -461,7 +462,7 @@ func (a *App) handleBatchComparison(w http.ResponseWriter, r *http.Request) {
 		if dir != "" {
 			_ = os.RemoveAll(dir)
 		}
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	go a.runAuditReport(job, "异常逐项跟踪", func() { _ = os.RemoveAll(dir) }, func(ctx context.Context, out *auditCSV) error {
@@ -496,7 +497,7 @@ func receiveBatchFiles(r *http.Request, dir string) error {
 		}
 		name := part.FormName()
 		if (name != "baseline" && name != "current") || seen[name] {
-			return errors.New("请选择基线和当期各一个核查包")
+			return i18n.Error("service.auditBundleCompare.selectOneBaselineOneCurrent")
 		}
 		f, err := os.Create(filepath.Join(dir, name+".zip"))
 		if err != nil {
@@ -511,12 +512,12 @@ func receiveBatchFiles(r *http.Request, dir string) error {
 			return closeErr
 		}
 		if n > formats.BatchArchiveBytes {
-			return errors.New("核查包超过 256 MB")
+			return i18n.Error("service.auditBundleCompare.packageCheckedBeExceedingMb")
 		}
 		seen[name] = true
 	}
 	if len(seen) != 2 {
-		return errors.New("缺少基线或当期核查包")
+		return i18n.Error("service.auditBundleCompare.missingBaselineOrCurrentVerification")
 	}
 	return nil
 }

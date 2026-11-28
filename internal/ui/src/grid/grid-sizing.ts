@@ -1,3 +1,4 @@
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastTone } from '../contracts/common.ts';
 import type { VisualStyle } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -43,11 +44,11 @@ export class GridSizing {
     const save = async (): Promise<boolean> => {
       if (!current() || !S.indexReady || !sheet) return false;
       if (kind === 'row' && S.filtered) {
-        toast('筛选视图暂不调整单行高度，请清除筛选后操作', 'warning');
+        toast(localize('ui.gridSizing.singleRowHeightFilteredView'), 'warning');
         return false;
       }
       if (kind === 'col' && S.hiddenColumns.has(index)) {
-        toast('请先显示该列，再调整列宽', 'warning');
+        toast(localize('ui.gridSizing.displayColumnFirstThenAdjust'), 'warning');
         return false;
       }
       const sizes = kind === 'col' ? S.columnWidths : S.rowSizes;
@@ -61,7 +62,7 @@ export class GridSizing {
         if (!current()) return false;
         const confirmed = kind === 'col' ? layout.cols : layout.rows;
         if (!confirmed || (confirmed[String(index)] ?? 0) !== size) {
-          throw new Error('服务未确认新的尺寸');
+          throw new Error(localize('ui.gridSizing.serviceNotConfirmedNewDimensions'));
         }
         if (size) sizes[String(index)] = size;
         else Reflect.deleteProperty(sizes, String(index));
@@ -70,7 +71,7 @@ export class GridSizing {
         this.d.relayoutGrid();
         return true;
       } catch (error: unknown) {
-        if (current()) toast(`保存尺寸失败：${errorMessage(error)}`, 'error');
+        if (current()) toast(localize('ui.gridSizing.failedSaveDimensions', { detail: errorMessage(error) }), 'error');
         return false;
       }
     };
@@ -83,7 +84,7 @@ export class GridSizing {
   async promptResize(kind: 'row' | 'col', explicitIndex?: number): Promise<void> {
     const { S, colName, toast } = this.d;
     if (kind === 'row' && S.filtered) {
-      toast('请先清除筛选，再调整单行高度', 'warning');
+      toast(localize('ui.gridSizing.clearFilterFirstThenAdjust'), 'warning');
       return;
     }
     const index = explicitIndex ?? (kind === 'row' ? (S.selected?.row ?? 1) : (S.selected?.col ?? 1));
@@ -95,12 +96,12 @@ export class GridSizing {
     const valid = (text: string): boolean =>
       /^\d+$/.test(text) && (Number(text) === 0 || (Number(text) >= low && Number(text) <= high));
     const answer = await askOverlay({
-      title: kind === 'row' ? `第 ${index} 行的行高` : `${colName(index)} 列的列宽`,
-      label: `像素，${low}–${high}`,
+      title: kind === 'row' ? localize('ui.gridSizing.rowHeightRow', { index }) : localize('ui.gridSizing.columnWidth', { colName: colName(index) }),
+      label: localize('ui.gridSizing.pixel', { low, high }),
       value: String(Math.round(oldValue / this.d.scale())),
       inputMode: 'numeric',
-      alternative: '恢复默认',
-      validate: (text) => (valid(text) ? '' : `请输入 ${low} 到 ${high} 之间的整数`),
+      alternative: localize('ui.gridSizing.restoreDefault'),
+      validate: (text) => (valid(text) ? '' : localize('ui.gridSizing.enterIntegerBetween', { low, high })),
     });
     if (!answer || S.sheet !== sheet || S.sheetEpoch !== epoch) return;
     await this.commitResize(kind, index, answer.alternative ? 0 : Number(answer.value));
@@ -108,13 +109,13 @@ export class GridSizing {
 
   bindResizeGrip(grip: HTMLElement, kind: 'row' | 'col', index: number): void {
     const { S, colName, toast } = this.d;
-    grip.title = kind === 'row' ? `调整第 ${index} 行高度` : `调整 ${colName(index)} 列宽度`;
+    grip.title = kind === 'row' ? localize('ui.gridSizing.adjustHeightRow', { index }) : localize('ui.gridSizing.adjustWidthColumn', { colName: colName(index) });
     grip.addEventListener('pointerdown', (event: PointerEvent) => {
       if (event.button !== 0) return;
       if (kind === 'row' && S.filtered) {
         event.preventDefault();
         event.stopPropagation();
-        toast('请先清除筛选，再调整单行高度', 'warning');
+        toast(localize('ui.gridSizing.clearFilterFirstThenAdjust'), 'warning');
         return;
       }
       event.preventDefault();
@@ -205,7 +206,7 @@ export class GridSizing {
     const { S, api, geometry, colName, sourceColLimit, toast } = this.d;
     if (!S.indexReady || !S.sheet) return;
     if (kind === 'row' && S.filtered) {
-      toast('筛选后请先清除筛选，再自动调整行高', 'warning');
+      toast(localize('ui.gridSizing.clearFilterBeforeAdjustingRow'), 'warning');
       return;
     }
     const sheet = S.sheet;
@@ -262,12 +263,12 @@ export class GridSizing {
       const saved = await this.commitResize(kind, index, result);
       if (saved && epoch === S.sheetEpoch) {
         toast(
-          `${kind === 'col' ? `${colName(index)} 列` : `第 ${index} 行`}已根据${kind === 'col' ? '抽样内容' : '当前查看列'}自动调整`,
+          localize('ui.gridSizing.adjustedAutomaticallyBasedOn', { detail: kind === 'col' ? localize('ui.gridSizing.column', { colName: colName(index) }) : localize('ui.gridSizing.row', { index }), detail2: kind === 'col' ? localize('ui.gridSizing.samplingContent') : localize('ui.gridSizing.currentViewedColumn') }),
           'success',
         );
       }
     } catch (err: unknown) {
-      if (epoch === S.sheetEpoch) toast(`自动调整失败：${errorMessage(err)}`, 'error');
+      if (epoch === S.sheetEpoch) toast(localize('ui.gridSizing.automaticAdjustmentFailed', { detail: errorMessage(err) }), 'error');
     }
   }
 }

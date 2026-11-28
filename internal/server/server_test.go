@@ -25,18 +25,29 @@ func TestJSONErrorSendsMediaTypeBeforeStatus(t *testing.T) {
 }
 
 func TestInitialPageClearlyExplainsHowToStart(t *testing.T) {
+	isolateTestStorage(t)
 	app, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = localTestConnection(req)
+	req.Header.Set("Accept-Language", "zh-CN")
 	res := httptest.NewRecorder()
 	app.Handler().ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
 		t.Fatalf("status=%d", res.Code)
 	}
 	body := res.Body.String()
+	before, catalog, found := strings.Cut(body, `<script id="languageMessages" type="application/json">`)
+	if !found {
+		t.Fatal("missing language catalog")
+	}
+	_, after, closed := strings.Cut(catalog, "</script>")
+	if !closed {
+		t.Fatal("unclosed language catalog")
+	}
+	body = before + after
 	for _, required := range []string{
 		"浏览数据", "选择数据文件", "连接在线数据库", `data-menu="workbookOpenMenu"`,
 		"全屏", "追踪引用", "追踪从属", "筛选条件", "冻结窗格",

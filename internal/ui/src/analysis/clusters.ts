@@ -2,6 +2,7 @@
  * Text clustering (near-duplicate candidate inspection, variant selection,
  * mapping transform creation, and CSV export) modal controller.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import { decodeAsyncJobProgress } from '../core/http-decoders.generated.ts';
 import type {
   AnalysisField,
@@ -82,7 +83,7 @@ export interface AnalysisClustersOptions {
 }
 
 function makeAbortError(): Error {
-  const err = new Error('疑似重复检查已取消');
+  const err = new Error(localize('ui.clusters.suspectedDuplicateChecksHaveCanceled'));
   err.name = 'AbortError';
   return err;
 }
@@ -127,7 +128,7 @@ export function validateClusterOwner(
     data.field !== field ||
     scopeKey(data.sourceScope) !== scopeKey(c.sourceScope)
   ) {
-    throw new Error('候选响应与当前来源范围不一致');
+    throw new Error(localize('ui.clusters.candidateResponsesDoNotMatch'));
   }
 }
 
@@ -157,7 +158,7 @@ export function validateClusterPage(
     data.next > data.total ||
     (data.next < data.total && items.length !== limit)
   ) {
-    throw new Error('候选分页响应无效');
+    throw new Error(localize('ui.clusters.candidatePaginationResponseInvalid'));
   }
 }
 
@@ -219,13 +220,13 @@ export class AnalysisClusters {
       requestIdentity: () => this.context().bookKey,
       sleep,
       endpoint: '/api/analysis/clusters',
-      label: '疑似重复检查',
+      label: localize('ui.clusters.suspectedDuplicateCheck'),
       resultFromStatus: (s) => s,
       onBusy: (busy) => {
         this.busy = busy;
         this.controls();
       },
-      onProgress: (s) => this.status(s.stage || '正在检查疑似重复…'),
+      onProgress: (s) => this.status(s.stage || localize('ui.clusters.checkingSuspectedDuplicates')),
     });
 
     requireButton('analysisClustersClose').addEventListener('click', () => this.close());
@@ -237,7 +238,7 @@ export class AnalysisClusters {
       this.loading = false;
       this.jobs.cancelMain();
       this.controls();
-      this.status('检查已取消；上次成功结果保留');
+      this.status(localize('ui.clusters.checkCanceledLastSuccessfulResult'));
     });
     requireButton('analysisClustersPrev').addEventListener('click', () => {
       if (!this.page) return;
@@ -340,11 +341,11 @@ export class AnalysisClusters {
     this.field = { ...field };
     this.opened = true;
     this.serial++;
-    requireEl('analysisClustersTitle').textContent = `疑似重复 · ${field.name}`;
+    requireEl('analysisClustersTitle').textContent = localize('ui.clusters.suspectedDuplicationcbf4386', { name: field.name });
     this.status(
       this.snapshot
-        ? '保留上次成功结果；可调整规则重新检查'
-        : '选择比较规则后点击“检查”。',
+        ? localize('ui.clusters.retainPreviousSuccessfulResultsAdjust')
+        : localize('ui.clusters.afterSelectingComparisonRuleClick'),
     );
     this.controls();
     if (!this.dialog.open) this.dialog.showModal();
@@ -389,7 +390,7 @@ export class AnalysisClusters {
     const identity = this.identity();
     const ticket = ++this.serial;
     if (c.sourceScope && !c.sourceId) {
-      this.status('来源范围已释放，请重新读取分析字段', true);
+      this.status(localize('ui.clusters.sourceRangeReleasedReadAnalysis'), true);
       return;
     }
     this.pageController?.abort();
@@ -441,7 +442,7 @@ export class AnalysisClusters {
       this.renderSummary();
       this.controls();
       if (previous && previous !== candidate) this.release(previous);
-      this.status('已检查完整分析范围。疑似相同仅供核对，需逐组选择代表原文。');
+      this.status(localize('ui.clusters.completeAnalysisRangeCheckedSuspected'));
       const firstItem = page.items[0];
       if (firstItem) await this.select(firstItem.id);
     } catch (error: unknown) {
@@ -451,7 +452,7 @@ export class AnalysisClusters {
         identity === this.identity() &&
         !isAbortError(error)
       ) {
-        this.status(`${errorMessage(error)}；上次成功结果保留`, true);
+        this.status(localize('ui.clusters.lastSuccessfulResultRetained', { detail: errorMessage(error) }), true);
       }
     } finally {
       if (candidate && !adopted) this.release(candidate);
@@ -529,7 +530,7 @@ export class AnalysisClusters {
             !Array.isArray(v.rows),
         )
       ) {
-        throw new Error('候选原文响应无效');
+        throw new Error(localize('ui.clusters.candidateOriginalResponseInvalid'));
       }
       this.detail = data;
       this.renderList();
@@ -551,7 +552,7 @@ export class AnalysisClusters {
   renderSummary(): void {
     const counts = this.page?.counts;
     requireEl('analysisClustersSummary').textContent = counts
-      ? `范围 ${counts.scanned.toLocaleString()} 行；参与 ${counts.eligible.toLocaleString()} 项，疑似重复 ${counts.similarGroups.toLocaleString()} 组，原文相同 ${counts.exactGroups.toLocaleString()} 组。排除：空值 ${counts.blank}、数值 ${counts.numeric}、其他类型 ${counts.otherTypes}、缺缓存 ${counts.missingCache}、空比较键 ${counts.emptyKey}。`
+      ? localize('ui.clusters.scopeCoversItemsThereParticipants', { scanned: counts.scanned.toLocaleString(interfaceLocale()), eligible: counts.eligible.toLocaleString(interfaceLocale()), similarGroups: counts.similarGroups.toLocaleString(interfaceLocale()), exactGroups: counts.exactGroups.toLocaleString(interfaceLocale()), blank: counts.blank, numeric: counts.numeric, otherTypes: counts.otherTypes, missingCache: counts.missingCache, emptyKey: counts.emptyKey })
       : '';
   }
 
@@ -568,7 +569,7 @@ export class AnalysisClusters {
       title.textContent = item.key;
       title.title = item.key;
       const meta = document.createElement('span');
-      meta.textContent = `${item.kind === 'similar' ? '疑似重复' : '原文相同'} · ${item.variants} 项原文与类型 · ${item.count.toLocaleString()} 次`;
+      meta.textContent = localize('ui.clusters.originalTextType', { detail: item.kind === 'similar' ? localize('ui.clusters.suspectedDuplication') : localize('ui.clusters.originalTextRemainsUnchanged'), variants: item.variants, count: item.count.toLocaleString(interfaceLocale()) });
       button.append(title, meta);
       button.addEventListener('click', () => {
         void this.select(item.id);
@@ -577,12 +578,12 @@ export class AnalysisClusters {
     }
     if (this.page && !this.page.items.length) {
       const note = document.createElement('p');
-      note.textContent = '此范围和规则下没有重复候选。';
+      note.textContent = localize('ui.clusters.thereNoDuplicateCandidatesUnder');
       host.append(note);
     }
     requireEl('analysisClustersPage').textContent = this.page
       ? `${this.page.total ? this.page.offset + 1 : 0}–${this.page.next} / ${this.page.total}`
-      : '尚未检查';
+      : localize('ui.clusters.notYetChecked');
   }
 
   renderDetail(): void {
@@ -591,9 +592,9 @@ export class AnalysisClusters {
     host.replaceChildren();
     requireEl('analysisClusterDetailTitle').textContent = detail
       ? detail.kind === 'similar'
-        ? '选择代表原文'
-        : '原文相同，无需映射'
-      : '选择候选组查看原文';
+        ? localize('ui.clusters.selectRepresentative')
+        : localize('ui.clusters.originalTextRemainsUnchangedNo')
+      : localize('ui.clusters.selectCandidateGroupsViewOriginal');
     requireEl('analysisClusterDetailKey').textContent = detail?.key ?? '';
     if (detail) {
       for (const [i, value] of detail.variants.entries()) {
@@ -620,9 +621,9 @@ export class AnalysisClusters {
         meta.className = 'analysis-cluster-variant-meta';
         const count = document.createElement('span');
         count.textContent =
-          `文本 · ${value.count.toLocaleString()} 次` +
-          (value.formulaCount ? ` · 其中公式缓存 ${value.formulaCount} 次` : '');
-        count.title = `数据类型：${value.type}`;
+          localize('ui.clusters.textTimes', { count: value.count.toLocaleString(interfaceLocale()) }) +
+          (value.formulaCount ? ` ${localize('ui.clusters.formulaCachingTimes', { formulaCount: value.formulaCount })}` : '');
+        count.title = localize('ui.clusters.dataType', { type: value.type });
         meta.append(count);
         const colIdx = detail.column || Number(this.snapshot?.field.id.slice(1));
         for (const [sample, row] of value.rows.entries()) {
@@ -640,8 +641,8 @@ export class AnalysisClusters {
       }
     }
     requireEl('analysisClusterVariantsPage').textContent = detail
-      ? `${detail.offset + 1}–${detail.next} / ${detail.total} 项原文与类型`
-      : '原文按读取类型分别列出；位置为有限样例，次数覆盖完整范围';
+      ? localize('ui.clusters.originalItemType', { offset: detail.offset + 1, next: detail.next, total: detail.total })
+      : localize('ui.clusters.originalDataListedReadingType');
   }
 
   async confirm(): Promise<void> {
@@ -687,12 +688,12 @@ export class AnalysisClusters {
         data.transform.source !== snapshot.field.id ||
         !data.transform.mapping?.length
       ) {
-        throw new Error('文本映射响应无效');
+        throw new Error(localize('ui.clusters.textMappingResponseInvalid'));
       }
       await this.onTransform(data.transform, () => this.current(snapshot) && ticket === this.serial);
       this.confirmed.set(detail.group, choice);
-      this.status('已添加独立文本映射列；将新列用于分类并运行分析后生效。');
-      this.toast('已添加文本核对列，运行分析后生效', 'success');
+      this.status(localize('ui.clusters.independentTextMappingColumnAdded'));
+      this.toast(localize('ui.clusters.textVerificationColumnAddedWhich'), 'success');
     } catch (error: unknown) {
       if (this.current(snapshot) && ticket === this.serial) {
         this.status(errorMessage(error), true);

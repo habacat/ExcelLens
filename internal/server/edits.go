@@ -15,6 +15,7 @@ import (
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -46,7 +47,7 @@ type editRequest struct {
 	Cells       []editdoc.Address    `json:"cells,omitempty"`
 }
 
-var errEditRequestCapacity = errors.New("编辑请求超过容量，请缩小区域")
+var errEditRequestCapacity = i18n.Error("service.edits.editingRequestExceedsCapacityReduce")
 
 type editListItem struct {
 	editdoc.Info
@@ -84,23 +85,23 @@ func editError(w http.ResponseWriter, err error) {
 	status := http.StatusUnprocessableEntity
 	switch {
 	case errors.Is(err, checkpoint.ErrBusy):
-		status, err = http.StatusConflict, errors.New("编辑副本正在使用，请稍后重试")
+		status, err = http.StatusConflict, i18n.Error("service.edits.editingCopyUseTryAgain")
 	case errors.Is(err, checkpoint.ErrConflict):
-		status, err = http.StatusConflict, errors.New("编辑修订已变化，请刷新后重试")
+		status, err = http.StatusConflict, i18n.Error("service.edits.editedRevisionChangedTryAgain")
 	case errors.Is(err, checkpoint.ErrUncertain):
-		status, err = http.StatusServiceUnavailable, errors.New("提交确认暂不可用，可用同一请求重试或刷新修订")
+		status, err = http.StatusServiceUnavailable, i18n.Error("service.edits.submittingConfirmationTemporarilyUnavailableCan")
 	case errors.Is(err, checkpoint.ErrCorrupt):
-		err = errors.New("编辑副本确认记录损坏，已有记录已保留")
+		err = i18n.Error("service.edits.editedCopyConfirmationRecordsDamaged")
 	case errors.Is(err, checkpoint.ErrCapacity), errors.Is(err, editdoc.ErrHistory), errors.Is(err, errEditRequestCapacity):
 		status = http.StatusRequestEntityTooLarge
 	case errors.Is(err, editfile.ErrBinding), errors.Is(err, checkpoint.ErrBinding):
 		status = http.StatusConflict
 	case errors.Is(err, os.ErrNotExist):
-		status, err = http.StatusNotFound, errors.New("编辑副本、原文件或生成的文件已移走")
+		status, err = http.StatusNotFound, i18n.Error("service.edits.editedCopyOriginalFileOr")
 	case errors.Is(err, context.Canceled):
-		status, err = http.StatusRequestTimeout, errors.New("操作已取消，可刷新核对已保存修订和副本")
+		status, err = http.StatusRequestTimeout, i18n.Error("service.edits.operationCancelledCanRefreshCheck")
 	}
-	writeError(w, status, err.Error())
+	writeFailure(w, status, err)
 }
 
 func (a *App) handleEditList(w http.ResponseWriter, r *http.Request) {

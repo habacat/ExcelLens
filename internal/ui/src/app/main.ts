@@ -4,6 +4,7 @@
  * editing, analysis, and feature modules using explicit ES imports and
  * dependency injection. Exposes ONLY the narrow QA bridge in `runtime-bridge.ts`.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ToastTone } from '../contracts/common.ts';
 import type { CellData } from '../contracts/workbook.ts';
 import { createActivityService, setActivityService } from '../core/activity.ts';
@@ -39,6 +40,8 @@ import {
   type GridInteractionPanels,
 } from '../grid/grid-interactions.ts';
 import {
+  bindSourceIntegrityControls,
+  hideSourceIntegrity,
   renderSourceIntegrity as renderSourceIntegrityBanner,
   WorkbookIO,
   type WorkbookIOPanels,
@@ -174,15 +177,17 @@ function bootstrap(): void {
   configureClipboard(fileFormats.clipboard);
 
   const ribbon = initToolbarRibbon(undefined, menus);
-  if (ribbon) {
-    initToolbarSettings({ ribbon, session, menus });
-  }
 
   // ── Layer 2: Shared workbook state & geometry primitives ──────────────────
   const S = createInitialWorkbookState(
     fileFormats.source('xlsx').maxRows,
     fileFormats.maxColumns,
   );
+  const interfaceSettings = ribbon ? initToolbarSettings({
+    ribbon, session, menus,
+    canReloadLanguage: () => !S.opening && document.body.classList.contains('home-view') &&
+      !document.querySelector('dialog[open], #tabActivity:not([hidden])'),
+  }) : null;
   const geometry = new Geometry(fileFormats.maxRows, fileFormats.maxColumns);
   const mergedCells = new MergedCells(fileFormats.maxRows, fileFormats.maxColumns);
   const virtualScroll = new VirtualScroll(MAX_BROWSER_SCROLL_PIXELS);
@@ -201,11 +206,10 @@ function bootstrap(): void {
     toastController.show(message, tone);
   };
 
-  const setStatus = (text: string): void => {
+  const setStatus = (text: string, hidden = false): void => {
     const el = requireEl('globalStatus');
     el.textContent = text;
-    el.hidden =
-      /^已打开\s*·/.test(text) || (S.indexReady && /^等待选择文件$/.test(text));
+    el.hidden = hidden;
   };
 
   // Explicit nullable slots for mutual controller wiring (zero non-null assertions)
@@ -264,7 +268,7 @@ function bootstrap(): void {
   const getExportCenter = (): ExportCenter => requireBound(exportCenterRef, 'exportCenter');
 
   const renderSourceIntegrity = (): void => {
-    renderSourceIntegrityBanner(S.source);
+    renderSourceIntegrityBanner(S.source, S.workbookKey);
   };
 
   const showWorkspace = (): void => {
@@ -297,11 +301,12 @@ function bootstrap(): void {
   const showWelcome = (): void => {
     if (editCopy?.grid.active) editCopy.grid.leave();
     editCopy?.availability(false);
-    requireEl('sourceIntegrityNotice').hidden = true;
+    hideSourceIntegrity();
     picturesRef?.close();
     document.body.classList.add('home-view');
     requireEl('workspace').hidden = true;
     requireEl('welcome').hidden = false;
+    interfaceSettings?.applyLanguageOnHome();
     requireEl('taskRecoveryHome').hidden = true;
     void taskRecoveryRef?.refreshHome();
     for (const id of [
@@ -900,6 +905,8 @@ function bootstrap(): void {
     sourceRowTop: (row) => pipeline.sourceRowTop(row),
     sourceRowHeight: (row) => pipeline.sourceRowHeight(row),
     getVirtualScrollTop: () => pipeline.getVirtualScrollTop(),
+    paintRowHeaderBorder: (el, cell, row, belowCell, belowRow) =>
+      pipeline.appearance.paintRowHeaderBorder(el, cell, row, belowCell, belowRow),
     updateSharedBorders: (
       el,
       cell,
@@ -949,15 +956,20 @@ function bootstrap(): void {
         ? rawColumns.split(',').map(Number)
         : Array.from({ length: count }, (_, i) => first + i);
       const startRow = base.r1 ?? 1;
+      const pinnedThrough = Number(params.get('pinnedThroughRow'));
       const visuals =
         name === 'left'
           ? Array.from({ length: base.rowCount ? base.limit : 0 }, (_, i) => {
               const ordered = base.rowOrder?.at(startRow + i - 1);
               return ordered || startRow + i;
             })
-          : Array.from({ length: Number(params.get('limit')) }, (_, i) => i + 1).filter((r) =>
+          : Array.from({ length: pinnedThrough || Number(params.get('limit')) }, (_, i) => i + 1).filter((r) =>
               pipeline.rowVisible(r),
             );
+      if (params.has('pinnedBorderNeighbor')) {
+        const next = pipeline.nextVisibleRow(pinnedThrough + 1);
+        if (next > pinnedThrough && next <= S.maxRow) visuals.push(next);
+      }
       const band = {
         ...base,
         displayStart: visuals[0] ?? 1,
@@ -974,7 +986,7 @@ function bootstrap(): void {
       pipeline.decorateMergedCell(cell, row, col, nav.selectionHighlight()),
     decorateColumnHeader: (head, col) => sheetController.decorateTableColumnHeader(head, col),
     isBookmarked: (sheet, ref) => Boolean(bookmarkCenterRef?.has(sheet, ref)),
-    onError: (error) => toast(`冻结窗格读取失败：${error.message}`, 'error'),
+    onError: (error) => toast(localize('ui.main.failedFreezePanesReading', { detail: error.message }), 'error'),
   });
   frozenPanesRef = frozenPanes;
 
@@ -1190,7 +1202,7 @@ function bootstrap(): void {
         pasteRows: async (count) => {
           const limits = fileFormats.editing;
           const snapshot = gridClipboard.captureClipboardSelection({
-            purpose: '粘贴',
+            purpose: localize('ui.main.paste'),
             limits: {
               rows: limits.batchCells,
               columns: limits.batchCells,
@@ -1199,12 +1211,12 @@ function bootstrap(): void {
           });
           if (snapshot.rows > 1) {
             const data = await snapshot.read({ richText: false, conditional: false });
-            if (!snapshot.current()) throw new Error('选区已变化，请重新粘贴');
+            if (!snapshot.current()) throw new Error(localize('ui.common.electoralDistrictChangedPasteInformation'));
             return data.rows.map((r) => r.row);
           }
           const through = frozenPanes.effective().rows;
           const selected = S.selected;
-          if (!selected) throw new Error('请先选择目标单元格');
+          if (!selected) throw new Error(localize('ui.main.selectTargetCellFirst'));
           const first = selected.row;
           const rows: number[] = [];
           if (!S.filtered) {
@@ -1224,7 +1236,7 @@ function bootstrap(): void {
             first <= through
               ? 0
               : (S.selectedVisualIndex || (await nav.locateFilteredVisual(first, through))) - 1;
-          if (offset < 0) throw new Error('当前单元格已离开筛选结果');
+          if (offset < 0) throw new Error(localize('ui.main.currentCellLeftFilterResults'));
           if (first <= through) {
             for (
               let row = first;
@@ -1235,7 +1247,7 @@ function bootstrap(): void {
             }
           }
           while (rows.length < count) {
-            if (!snapshot.current()) throw new Error('选区已变化，请重新粘贴');
+            if (!snapshot.current()) throw new Error(localize('ui.common.electoralDistrictChangedPasteInformation'));
             const size = Math.min(MAX_ROWS_PER_REQUEST, count - rows.length);
             const params = new URLSearchParams({
               sheet: S.sheet ?? '',
@@ -1250,7 +1262,7 @@ function bootstrap(): void {
             });
             if (S.rowView) params.set('viewId', S.rowView.id);
             const data = await api(`/api/sheet?${params.toString()}`, undefined, decodeSheetViewport);
-            if (!snapshot.current()) throw new Error('选区已变化，请重新粘贴');
+            if (!snapshot.current()) throw new Error(localize('ui.common.electoralDistrictChangedPasteInformation'));
             rows.push(...data.rows.map((row) => row.number));
             if (data.rows.length < size) break;
             offset += size;
@@ -1260,7 +1272,7 @@ function bootstrap(): void {
         visibleSelection: () => {
           const cells = fileFormats.editing.batchCells;
           return gridClipboard.captureClipboardSelection({
-            purpose: '编辑',
+            purpose: localize('ui.main.editing'),
             limits: { rows: cells, columns: cells, cells },
           });
         },
@@ -1330,13 +1342,13 @@ function bootstrap(): void {
       rowViews.busy ||
       S.rowViewFailure
     ) {
-      throw new Error('请先完成工作表加载、筛选或行显隐更新');
+      throw new Error(localize('ui.main.completeWorksheetLoadingFilteringOr'));
     }
     if (mode === 'filtered' && (!S.filtered || !S.filterId)) {
-      throw new Error('当前工作表没有已完成的筛选或排序');
+      throw new Error(localize('ui.main.currentWorksheetDoesNotHave'));
     }
     if (mode === 'visible' && !S.rowView?.id) {
-      throw new Error('当前可见行尚未准备好');
+      throw new Error(localize('ui.main.currentlyVisibleRowsNotReady'));
     }
     const base = {
       workbookKey: S.workbookKey,
@@ -1348,9 +1360,9 @@ function bootstrap(): void {
     };
     if (mode === 'selection') {
       const areas = MultiSelection.areas(S, true);
-      if (areas.length !== 1) throw new Error('请在工作簿中保留一个连续选区');
+      if (areas.length !== 1) throw new Error(localize('ui.main.maintainContinuousSelectionWorkbook'));
       const only = areas[0];
-      if (!only) throw new Error('请在工作簿中保留一个连续选区');
+      if (!only) throw new Error(localize('ui.main.maintainContinuousSelectionWorkbook'));
       const pts = MultiSelection.points(only, columnName);
       return { ...base, ...pts };
     }
@@ -1558,7 +1570,7 @@ function bootstrap(): void {
     canResume: (item, action) => {
       if (action === 'open') return !S.opening && workbookIO.canOpenWorkbook();
       if (S.opening || S.sheetLoadingEpoch) {
-        toast('请先完成文件加载', 'warning');
+        toast(localize('ui.main.completeFileLoadingFirst'), 'warning');
         return false;
       }
       if (
@@ -1566,7 +1578,7 @@ function bootstrap(): void {
           ? exportCenter.running || exportCenter.busy
           : Boolean(S.searchJob || S.filterJob)
       ) {
-        toast('请先完成或取消当前任务', 'warning');
+        toast(localize('ui.main.completeOrCancelCurrentTask'), 'warning');
         return false;
       }
       return true;
@@ -1618,14 +1630,14 @@ function bootstrap(): void {
       void exportCenter.startGenerated(
         '/api/analysis/issues/export',
         { jobId, protectCSV },
-        '异常核对清单（完整）',
+        localize('ui.main.exceptionVerificationListComplete'),
       );
     },
     exportClusters: (jobId, protectCSV) => {
       void exportCenter.startGenerated(
         '/api/analysis/clusters/export',
         { jobId, protectCSV },
-        '疑似重复候选（完整计数、有限位置样例）',
+        localize('ui.main.suspectedDuplicateCandidatesCompleteCount'),
       );
     },
     onNavigate: (sheet, ref) => {
@@ -1689,7 +1701,7 @@ function bootstrap(): void {
     supportsRowVisibility: () => true,
     canApply: () => {
       if (S.filterJob || S.opening || S.sheetLoadingEpoch || rowViews.busy) {
-        toast('请先完成当前加载、筛选或行显隐更新', 'warning');
+        toast(localize('ui.main.completeLoadingFilteringOrRow'), 'warning');
         return false;
       }
       return true;
@@ -1824,20 +1836,20 @@ function bootstrap(): void {
       const firstNote = notes[0];
       if (!firstNote) return;
       if (!editCopy || editCopy.pending || editCopy.abort || editCopy.grid.blocked) {
-        throw new Error('请先完成当前编辑操作');
+        throw new Error(localize('ui.main.completeCurrentEditingOperationsFirst'));
       }
       if (!editCopy.grid.active) await editCopy.show();
       if (!editCopy.grid.active || S.book !== book || editCopy.data?.book !== book) {
-        throw new Error('编辑来源已变化，请重新选择标记');
+        throw new Error(localize('ui.main.sourceDataChangedReselectTag'));
       }
       const ok = await editCopy.commit('structure', [], {
         direct: true,
         structure: { kind: 'reviewNotes', sheet: firstNote.sheet, notes },
       });
       if (!ok) {
-        throw new Error(byId('editCopyStatus')?.textContent || '批注写入失败');
+        throw new Error(byId('editCopyStatus')?.textContent || localize('ui.main.annotationWritingFailed'));
       }
-      toast('批注已写入当前修订，可撤销或生成副本', 'success');
+      toast(localize('ui.main.annotationWrittenCurrentRevisionCan'), 'success');
     },
     onChange: () => {
       ++S.decorVersion;
@@ -1849,108 +1861,108 @@ function bootstrap(): void {
 
   // ── Command Palette Actions ───────────────────────────────────────────────
   const ACTIONS: readonly CommandAction[] = [
-    buttonCommand('打开文件', 'openLocalMenuBtn', '工作簿 选择 文件', 'Ctrl+O'),
+    buttonCommand(localize('ui.main.openFile'), 'openLocalMenuBtn', localize('ui.main.workbookSelectionFile'), 'Ctrl+O'),
     buttonCommand(
-      '连接在线数据库',
+      localize('ui.main.connectDatabase'),
       'openDatabaseBtn',
-      '数据库 MySQL PostgreSQL Oracle SQL Server ClickHouse',
+      localize('ui.main.databasesMysqlPostgresqlOracleSql'),
     ),
-    buttonCommand('数据库快照', 'databaseSnapshotsBtn', '固化 保存 核验 数据库'),
-    buttonCommand('搜索', 'searchOpenBtn', '查找公式或值 查找 公式 值', 'Ctrl+F'),
-    buttonCommand('筛选', 'filterOpenBtn', '自动筛选 表头 下拉', 'Ctrl+Shift+L'),
-    buttonCommand('清除筛选', 'clearFilterBtn', '清除 筛选 恢复 原序'),
-    buttonCommand('排序', 'multiSortBtn', '多级自定义排序 多级 多列 升序 降序 自定义'),
-    buttonCommand('冻结窗格', 'freezeBtn', '表头 行 列 固定'),
-    buttonCommand('导出', 'exportOpenBtn', '保存 CSV XLSX HTML 数据 导出中心', 'Ctrl+Shift+E'),
-    { name: '导出当前选区', shortcut: '', tags: '区域 导出', run: () => exportCenter.open('selection') },
-    { name: '导出整个工作簿', shortcut: '', tags: '全部 Sheet 工作表', run: () => exportCenter.open('all') },
-    buttonCommand('编辑副本', 'editCopyOpen', '改值 粘贴 另存 撤销 修改'),
-    buttonCommand('分析', 'analysisOpenBtn', '数据分析 透视 汇总 图表 分析表'),
+    buttonCommand(localize('ui.main.databaseSnapshots'), 'databaseSnapshotsBtn', localize('ui.main.solidificationSavingVerificationDatabase')),
+    buttonCommand(localize('ui.common.search'), 'searchOpenBtn', localize('ui.main.searchFormulaOrValueSearch'), 'Ctrl+F'),
+    buttonCommand(localize('ui.main.filter'), 'filterOpenBtn', localize('ui.main.automaticFilteringHeaderDropdown'), 'Ctrl+Shift+L'),
+    buttonCommand(localize('ui.common.clearFilters'), 'clearFilterBtn', localize('ui.main.clearFilterRestoreOriginalOrder')),
+    buttonCommand(localize('ui.main.sort'), 'multiSortBtn', localize('ui.main.multiLevelCustomSortingMulti')),
+    buttonCommand(localize('ui.main.freezePane'), 'freezeBtn', localize('ui.main.headingsRowsColumnsFixed')),
+    buttonCommand(localize('ui.main.export'), 'exportOpenBtn', localize('ui.main.saveCsvXlsxHtmlData'), 'Ctrl+Shift+E'),
+    { name: localize('ui.main.exportCurrentSelection'), shortcut: '', tags: localize('ui.main.areaExport'), run: () => exportCenter.open('selection') },
+    { name: localize('ui.main.exportEntireWorkbook'), shortcut: '', tags: localize('ui.main.allSheetWorksheets'), run: () => exportCenter.open('all') },
+    buttonCommand(localize('ui.common.editCopy'), 'editCopyOpen', localize('ui.main.changeValuePasteSaveAs')),
+    buttonCommand(localize('ui.common.analysis'), 'analysisOpenBtn', localize('ui.main.dataAnalysisPivotTableSummary')),
     buttonCommand(
-      '统计选区',
+      localize('ui.main.statisticalElectoralDistricts'),
       'profileOpenBtn',
-      '数据洞察 精确统计 汇总 求和 公式 异常 计数',
+      localize('ui.main.dataInsightPreciseStatisticsSummary'),
       'Ctrl+Alt+S',
     ),
-    buttonCommand('计算', 'calculatorOpenBtn', '公式计算 加减乘除 金额', 'Ctrl+Alt+C'),
-    buttonCommand('复制选区', 'copySelectionBtn', 'Excel 格式 复制 保留颜色 粘贴', 'Ctrl+C'),
-    buttonCommand('复制为纯文本', 'copyPlainBtn', '复制选区为纯文本 TSV 不带格式 粘贴 值'),
+    buttonCommand(localize('ui.main.calculation'), 'calculatorOpenBtn', localize('ui.main.formulaCalculationAdditionSubtractionMultiplication'), 'Ctrl+Alt+C'),
+    buttonCommand(localize('ui.main.copySelectionArea'), 'copySelectionBtn', localize('ui.main.excelFormatCopyPreserveColors'), 'Ctrl+C'),
+    buttonCommand(localize('ui.main.copyPlainText'), 'copyPlainBtn', localize('ui.main.copySelectedAreaAsPlain')),
     buttonCommand(
-      '选择性复制',
+      localize('ui.main.selectiveReplication'),
       'copySpecialBtn',
-      '表头 TSV Markdown JSON 原值 公式 复制',
+      localize('ui.main.tableHeadersTsvMarkdownJson'),
       'Ctrl+Alt+Shift+C',
     ),
-    buttonCommand('复制当前值', 'copyValueBtn', '复制当前单元格值 复制 值 单格'),
-    buttonCommand('复制公式', 'copyFormulaBtn', '复制当前公式 复制 公式 原文', 'Ctrl+Shift+C'),
-    buttonCommand('复制地址', 'copyAddressBtn', '复制跨 Sheet 地址 引用 定位 复制'),
-    buttonCommand('复制证据摘要', 'copyEvidenceBtn', '复制审计证据摘要 审计 数值 公式 复制 底稿 来源'),
-    buttonCommand('压缩包里的其他文件', 'archiveBtn', '浏览当前压缩包 压缩包 文件 成员 浏览'),
-    buttonCommand('高级筛选', 'advancedFilterBtn', '高级条件筛选 筛选 条件 AND 多条件'),
+    buttonCommand(localize('ui.main.copyCurrentValue'), 'copyValueBtn', localize('ui.main.copyCurrentCellValueCopy')),
+    buttonCommand(localize('ui.main.copyFormula'), 'copyFormulaBtn', localize('ui.main.copyCurrentFormulaCopyFormula'), 'Ctrl+Shift+C'),
+    buttonCommand(localize('ui.main.copyAddress'), 'copyAddressBtn', localize('ui.main.copyingAcrossSheetAddressesReferences')),
+    buttonCommand(localize('ui.main.copyEvidenceSummary'), 'copyEvidenceBtn', localize('ui.main.copyAuditEvidenceSummaryAudit')),
+    buttonCommand(localize('ui.main.otherFilesCompressedPackage'), 'archiveBtn', localize('ui.main.viewCurrentCompressedPackageCompressed')),
+    buttonCommand(localize('ui.main.advancedFiltering'), 'advancedFilterBtn', localize('ui.main.advancedConditionalFilteringFilterConditions')),
     {
-      name: '按当前单元格的值筛选',
+      name: localize('ui.main.filterValueCurrentCell'),
       shortcut: '',
-      tags: '根据当前单元格值筛选 快捷筛选 等于 当前值',
+      tags: localize('ui.main.filterCurrentCellValueQuick'),
       run: () => sheetController.filterSelectedValue(),
     },
-    buttonCommand('TXT 表头', 'textHeaderBtn', '设置文本表头 文本 表头 字段 设置'),
+    buttonCommand(localize('ui.main.txtHeader'), 'textHeaderBtn', localize('ui.main.setTextHeadersTextHeaders')),
     buttonCommand(
-      '查找重复值',
+      localize('ui.main.searchingDuplicateValues'),
       'duplicateOpenBtn',
-      '高亮重复值 查重 高亮 重复单号 收款人 账号 重复数据',
+      localize('ui.main.highlightDuplicateValuesCheckDuplicates'),
       'Ctrl+Shift+D',
     ),
-    buttonCommand('定位条件', 'inspectOpenBtn', '查找 定位特殊单元格 公式 常量 错误 空值', 'Ctrl+Alt+G'),
-    buttonCommand('数据规则', 'dataRulesOpenBtn', '查看数据规则 数据验证 有效性 下拉列表 验证条件'),
-    buttonCommand('记录卡片', 'recordCardOpenBtn', '查看记录卡片 宽表 字段 长文本 原值 记录'),
+    buttonCommand(localize('ui.main.locationCriteria'), 'inspectOpenBtn', localize('ui.main.searchSpecialCellsFormulasConstants'), 'Ctrl+Alt+G'),
+    buttonCommand(localize('ui.main.dataRules'), 'dataRulesOpenBtn', localize('ui.main.viewDataRulesDataValidation')),
+    buttonCommand(localize('ui.main.recordCards'), 'recordCardOpenBtn', localize('ui.main.viewRecordCardsWideTables')),
     buttonCommand(
-      '快速分析选区',
+      localize('ui.main.quickAnalysisSelection'),
       'selectionQuickBtn',
-      '选区快速分析 分布 差额 趋势 小图 同行 比较',
+      localize('ui.main.quickAnalysisSelectionDistributionDifferences'),
       'Ctrl+Q',
     ),
-    buttonCommand('转置查看选区', 'transposeOpenBtn', '转置阅读当前选区 行列 交换 宽表 原坐标'),
-    buttonCommand('显示公式', 'formulaViewBtn', '显示或隐藏全部公式 公式视图 显示 隐藏 计算结果', 'Ctrl+`'),
-    buttonCommand('追踪引用', 'tracePrecedentsBtn', '公式追踪 引用 上游'),
-    buttonCommand('追踪从属', 'traceDependentsBtn', '追踪从属单元格 公式 下游 依赖 从属'),
-    buttonCommand('名称与表', 'catalogueOpenBtn', '名称与表目录 定义名称 表对象 结构化引用 区域', 'Ctrl+F3'),
-    buttonCommand('单元格信息', 'cellDetailBtn', '原值 源类型 公式 缓存 统计 解释', 'Ctrl+1'),
-    buttonCommand('显示或隐藏列', 'columnsBtn', '列 显隐 隐藏 显示'),
-    buttonCommand('行与大纲', 'rowsBtn', '行 隐藏 显示 分组 折叠 展开'),
-    buttonCommand('原格式', 'formatBtn', '显示/隐藏原格式 显示 隐藏 背景 颜色 字体 边框'),
-    buttonCommand('显示或隐藏图片', 'imagesBtn', '图片 图形 显示 隐藏'),
-    buttonCommand('命名视图', 'namedViewOpenBtn', '保存 应用 视图 筛选 排序 布局'),
-    buttonCommand('分页预览', 'printPreviewOpenBtn', '打印 纸张 页边距 缩放 重复标题', 'Ctrl+P'),
-    buttonCommand('全屏', 'fullscreenBtn', '窗口', 'F11'),
-    { name: '设置当前行高', shortcut: 'Alt+H,O,H', tags: '行高 调整 大小', run: () => pipeline.sizing.promptResize('row') },
-    { name: '设置当前列宽', shortcut: 'Alt+H,O,W', tags: '列宽 调整 大小', run: () => pipeline.sizing.promptResize('col') },
+    buttonCommand(localize('ui.main.invertViewSelection'), 'transposeOpenBtn', localize('ui.main.transposeReadCurrentSelectionRow')),
+    buttonCommand(localize('ui.main.displayFormula'), 'formulaViewBtn', localize('ui.main.showOrHideAllFormulas'), 'Ctrl+`'),
+    buttonCommand(localize('ui.main.trackingReferences'), 'tracePrecedentsBtn', localize('ui.main.formulaTrackingReferencingUpstream')),
+    buttonCommand(localize('ui.main.tracingSubordinateRelations'), 'traceDependentsBtn', localize('ui.main.trackDependentCellsFormulasDownstream')),
+    buttonCommand(localize('ui.main.namesTables'), 'catalogueOpenBtn', localize('ui.main.nameTableDirectoryDefineName'), 'Ctrl+F3'),
+    buttonCommand(localize('ui.main.cellInformation'), 'cellDetailBtn', localize('ui.main.originalValueSourceTypeFormula'), 'Ctrl+1'),
+    buttonCommand(localize('ui.main.showOrHideColumns'), 'columnsBtn', localize('ui.main.columnShowHideHideShow')),
+    buttonCommand(localize('ui.main.actionsOverallPlan'), 'rowsBtn', localize('ui.main.rowHideShowGroupCollapse')),
+    buttonCommand(localize('ui.main.originalFormat'), 'formatBtn', localize('ui.main.displayHideOriginalFormatDisplay')),
+    buttonCommand(localize('ui.main.showOrHideImages'), 'imagesBtn', localize('ui.main.imageGraphicDisplayHide')),
+    buttonCommand(localize('ui.main.namedViews'), 'namedViewOpenBtn', localize('ui.main.saveApplyViewFilterSort')),
+    buttonCommand(localize('ui.main.pageBreakPreview'), 'printPreviewOpenBtn', localize('ui.main.printingPaperPageMarginsScaling'), 'Ctrl+P'),
+    buttonCommand(localize('ui.main.fullScreen'), 'fullscreenBtn', localize('ui.main.window'), 'F11'),
+    { name: localize('ui.main.setCurrentRowHeight'), shortcut: 'Alt+H,O,H', tags: localize('ui.main.rowHeightAdjustedSize'), run: () => pipeline.sizing.promptResize('row') },
+    { name: localize('ui.main.setCurrentColumnWidth'), shortcut: 'Alt+H,O,W', tags: localize('ui.main.columnWidthAdjustedSize'), run: () => pipeline.sizing.promptResize('col') },
     {
-      name: '当前列宽自动适应',
+      name: localize('ui.main.currentColumnWidthAutomaticallyAdjusted'),
       shortcut: 'Alt+H,O,I',
-      tags: '列宽 自动 调整',
+      tags: localize('ui.main.columnWidthAutomaticallyAdjusted'),
       run: () => pipeline.sizing.autoFitSize('col', S.selected?.col || 1),
     },
     {
-      name: '当前行高自动适应',
+      name: localize('ui.main.rowHeightAutomaticallyAdapts'),
       shortcut: 'Alt+H,O,A',
-      tags: '行高 自动 调整',
+      tags: localize('ui.main.rowHeightAutomaticallyAdjusted'),
       run: () => pipeline.sizing.autoFitSize('row', S.selected?.row || 1),
     },
-    buttonCommand('对账', 'reconcileOpenBtn', '双表对账 主键 差异 未匹配 重复键'),
-    buttonCommand('关联', 'relationsOpenBtn', '关联提取 连接 左表 右表 未匹配'),
+    buttonCommand(localize('ui.main.reconcilingAccounts'), 'reconcileOpenBtn', localize('ui.main.doubleTableReconciliationPrimaryKey')),
+    buttonCommand(localize('ui.main.association'), 'relationsOpenBtn', localize('ui.main.associatedExtractionConnectionLeftTable')),
     buttonCommand(
-      '标记与备注',
+      localize('ui.main.marksRemarks'),
       'bookmarkOpenBtn',
-      '审计标记 备注复核 异常 核实 审核 提醒 标签 待复核',
+      localize('ui.main.auditMarkRemarksReviewException'),
       'Ctrl+Alt+B',
     ),
-    buttonCommand('比较快照', 'snapshotsOpenBtn', '保存 分析 趋势 差额 历史 比较'),
-    buttonCommand('本地数据', 'storageOpenBtn', '数据管理 备份 迁入 缓存 清理 存储'),
-    buttonCommand('任务恢复', 'taskRecoveryOpenBtn', '继续 查询 筛选 排序 导出 下载 中断'),
+    buttonCommand(localize('ui.main.compareSnapshots'), 'snapshotsOpenBtn', localize('ui.main.saveAnalyzeTrendDifferenceHistory')),
+    buttonCommand(localize('ui.main.localData'), 'storageOpenBtn', localize('ui.main.dataManagementBackupImportCache')),
+    buttonCommand(localize('ui.main.taskRestored'), 'taskRecoveryOpenBtn', localize('ui.main.continueQueryFilterSortExport')),
     {
-      name: '跳转到单元格',
+      name: localize('ui.main.jumpCell'),
       shortcut: 'Ctrl+G',
-      tags: '定位 行 列 名称框',
+      tags: localize('ui.main.locateRowColumnNameBox'),
       run: () => {
         const box = requireInput('nameBox');
         box.focus();
@@ -1958,17 +1970,17 @@ function bootstrap(): void {
       },
     },
     {
-      name: '跳到数据区域边界',
-      shortcut: 'Ctrl+方向键',
-      tags: '跳至数据区域边界 移动 跳过 空值 快速定位',
+      name: localize('ui.main.jumpDataAreaBoundary'),
+      shortcut: localize('ui.main.ctrlDirectionKeys'),
+      tags: localize('ui.main.skipDataAreaBoundaryMove'),
       run: () => nav.jumpDataEdge('down'),
     },
-    buttonCommand('返回上一位置', 'historyBackBtn', '历史 返回 位置', 'Alt+←'),
-    buttonCommand('前进到下一位置', 'historyForwardBtn', '历史 前进 位置', 'Alt+→'),
+    buttonCommand(localize('ui.main.returnPreviousPosition'), 'historyBackBtn', localize('ui.main.historyReturnLocation'), 'Alt+←'),
+    buttonCommand(localize('ui.main.moveNextPosition'), 'historyForwardBtn', localize('ui.main.historyMoveForwardPosition'), 'Alt+→'),
     {
-      name: '打开所选单元格的超链接',
+      name: localize('ui.main.openHyperlinkSelectedCells'),
       shortcut: 'Ctrl+Enter',
-      tags: '打开所选单元格超链接 跳转 工作表 网页',
+      tags: localize('ui.main.openingHyperlinkSelectedCellWill'),
       run: () =>
         nav.followCellHyperlink(
           S.selected?.hyperlink,
@@ -1976,14 +1988,14 @@ function bootstrap(): void {
         ),
     },
     {
-      name: '全部工作表',
+      name: localize('ui.common.allWorksheets'),
       shortcut: '',
-      tags: '工作表列表 Sheet 导航',
+      tags: localize('ui.main.worksheetListSheetNavigation'),
       run: () => requireButton('sheetListBtn').click(),
     },
-    buttonCommand('返回首页', 'homeBtn', '返回最近文件 最近打开 历史 工作簿'),
-    buttonCommand('快捷键', 'helpBtn', '快捷键与操作帮助 帮助 操作说明'),
-    buttonCommand('退出程序', 'exitBtn', '退出 关闭 程序'),
+    buttonCommand(localize('ui.main.backHome'), 'homeBtn', localize('ui.main.returnRecentlyOpenedFilesHistory')),
+    buttonCommand(localize('ui.main.keyboardShortcuts'), 'helpBtn', localize('ui.main.shortcutKeysOperationInstructionsHelp')),
+    buttonCommand(localize('ui.main.exitProgram'), 'exitBtn', localize('ui.main.exitCloseProgram')),
   ];
 
   const commandPalette = new CommandPalette(ACTIONS, {
@@ -2019,7 +2031,7 @@ function bootstrap(): void {
     onOpened: async (result) => {
       const current = await api('/api/status', undefined, decodeWorkbookStatus);
       if (!current.opened || current.workbookKey !== result.workbookKey) {
-        throw new Error('工作簿已切换');
+        throw new Error(localize('ui.common.workbookSwitched'));
       }
       await workbookIO.acceptOpenedWorkbook(current);
     },
@@ -2173,6 +2185,7 @@ function bootstrap(): void {
     void sheetController.conditional.startConditionalStats(S.sheet, S.sheetEpoch, { refreshOnReady: true });
   });
 
+  bindSourceIntegrityControls();
   gridInteractions.bindEvents();
   workbookReady = workbookIO.loadStatus();
   exposeWorkbookReadyBridge(workbookReady);

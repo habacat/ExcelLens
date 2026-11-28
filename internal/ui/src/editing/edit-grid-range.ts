@@ -3,6 +3,7 @@
  * range context menu, Tab/Enter selection cycling, clear, fill down/right/entry,
  * cut-source marching border, typed/portable/TSV clipboard copy & paste.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, HttpError, MergeRange, SelectionArea } from '../contracts/common.ts';
 import type { EditAddress, EditChange, EditSheetMeta, EditStructure } from '../contracts/edit.ts';
 import type { EditLimits } from '../contracts/formats.ts';
@@ -155,13 +156,13 @@ export class GridRangeEditor {
       if (action === 'copy') void this.view.copy();
       if (action === 'resize-table') this.owner.advanced('Table');
       if (action === 'paste') {
-        void editor.act((activity) => this.pasteClipboard(activity), true, '正在粘贴选区');
+        void editor.act((activity) => this.pasteClipboard(activity), true, localize('ui.editGridRange.pastingSelectedArea'));
       }
       if (action === 'clear') {
-        void editor.act(() => this.clear(), true, '正在清除选区');
+        void editor.act(() => this.clear(), true, localize('ui.editGridRange.selectingAreaProgress'));
       }
       if (action === 'down' || action === 'right') {
-        void editor.act(() => this.fill(`fill-${action}`), true, '正在填充选区');
+        void editor.act(() => this.fill(`fill-${action}`), true, localize('ui.common.selectionBeingFilled'));
       }
     });
     this.menu.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -237,7 +238,7 @@ export class GridRangeEditor {
         raw = await navigator.clipboard.readText();
       }
     } catch {
-      throw new Error('浏览器未读取剪贴板，请按 Ctrl+V 粘贴');
+      throw new Error(localize('ui.editGridRange.browserNotReadClipboardPress'));
     }
     this.current(target);
     const now = this.rectangle(true);
@@ -247,10 +248,10 @@ export class GridRangeEditor {
       selection.left !== now.left ||
       selection.right !== now.right
     ) {
-      throw new Error('选区已变化，请重新粘贴');
+      throw new Error(localize('ui.common.electoralDistrictChangedPasteInformation'));
     }
     const typed = this.typedClipboard(raw, html);
-    if (!raw && !typed) throw new Error('剪贴板没有可粘贴的单元格或文字');
+    if (!raw && !typed) throw new Error(localize('ui.editGridRange.clipboardNoCellsOrText'));
     return this.paste(raw, typed, activity);
   }
 
@@ -264,7 +265,7 @@ export class GridRangeEditor {
       this.owner.pending ||
       !data
     ) {
-      throw new Error('请先核对当前修订');
+      throw new Error(localize('ui.editGridRange.checkCurrentRevisionsFirst'));
     }
     if (!copyOnly && this.grid.shape?.readOnly) throw new Error(this.grid.shape.readOnly);
     const { id, binding, revision } = data.document;
@@ -283,7 +284,7 @@ export class GridRangeEditor {
       (target.selection !== this.view.clipboardIdentity() ||
         this.grid.queue.some((task) => 'navigate' in task && Boolean(task.navigate)))
     ) {
-      throw new Error('选区或筛选已变化，请重新粘贴');
+      throw new Error(localize('ui.editGridRange.selectionOrFilterChangedPaste'));
     }
     const current = this.target();
     if (
@@ -292,20 +293,20 @@ export class GridRangeEditor {
       current.document.binding !== target.document.binding ||
       current.revision !== target.revision
     ) {
-      throw new Error('选区或修订已变化，请重新操作');
+      throw new Error(localize('ui.editGridRange.selectionOrRevisionsHaveChanged'));
     }
   }
 
   rectangle(allowVisible = false): GridRangeBounds {
     const ranges = this.view.areas();
     const first = ranges.length === 1 ? ranges[0] : undefined;
-    if (!first) throw new Error('请选择一个连续区域');
+    if (!first) throw new Error(localize('ui.editGridRange.selectContiguousRange'));
     if (
       !allowVisible &&
       this.view.filtered() &&
       (first.visual1 !== first.visual2 || first.col1 !== first.col2)
     ) {
-      throw new Error('请清除筛选或排序后按原地址填充或粘贴');
+      throw new Error(localize('ui.editGridRange.clearFilterOrSortThen'));
     }
     const rect = bounds(first);
     const merge = this.view.mergeAt(rect.top, rect.left);
@@ -322,11 +323,11 @@ export class GridRangeEditor {
 
   checkSize(top: number, bottom: number, left: number, right: number): void {
     if ((bottom - top + 1) * (right - left + 1) > this.owner.limits.batchCells) {
-      throw new Error('区域超出一次编辑容量，请缩小范围');
+      throw new Error(localize('ui.common.selectedAreaExceedsMaximumEditing'));
     }
     const shape = this.grid.shape;
     if (!shape || top < shape.firstRow || left < shape.firstCol || bottom > shape.rows || right > shape.cols) {
-      throw new Error('选区超出可编辑区域');
+      throw new Error(localize('ui.common.electionDistrictExtendsBeyondEditable'));
     }
   }
 
@@ -423,14 +424,14 @@ export class GridRangeEditor {
       if (merge && (merge.row !== row || merge.col !== col)) return;
       changes.set(`${row},${col}`, { sheet, row, col, value: { kind: 'blank', raw: '' } });
       if (changes.size > this.owner.limits.batchCells) {
-        throw new Error('选区超出一次编辑容量，请缩小范围');
+        throw new Error(localize('ui.editGridRange.selectedAreaExceedsEditingCapacity'));
       }
     };
     const ranges = this.view.areas();
     if (this.view.filtered()) {
       const snapshot = this.view.visibleSelection();
       const data = await snapshot.read({ richText: false, conditional: false });
-      if (!snapshot.current()) throw new Error('选区已变化，请重新操作');
+      if (!snapshot.current()) throw new Error(localize('ui.editGridRange.selectionChangedOperateAgain'));
       for (const row of data.rows) {
         for (let col = snapshot.firstColumn; col <= snapshot.lastColumn; col++) {
           add(row.row, col);
@@ -454,7 +455,7 @@ export class GridRangeEditor {
   async fill(mode: string, input?: EditChange): Promise<boolean | undefined> {
     const target = this.target();
     if (this.view.filtered() && mode !== 'fill-entry') {
-      throw new Error('请清除筛选或排序后按原地址填充');
+      throw new Error(localize('ui.editGridRange.clearFiltersOrSortData'));
     }
     const { top, bottom, left, right } = this.rectangle();
     this.checkSize(top, bottom, left, right);
@@ -608,14 +609,14 @@ export class GridRangeEditor {
       const ref = `${this.owner.colName(left)}${top}`;
       const end = top === bottom && left === right ? undefined : `${this.owner.colName(right)}${bottom}`;
       if (local.inactive) return true;
-      if (local.binding !== target.document.binding) throw new Error('副本已切换，请重新复制');
+      if (local.binding !== target.document.binding) throw new Error(localize('ui.editGridRange.copySwitchedRecopy'));
       if (!local.first || !local.last || !local.sheet || !local.start || !local.end || !local.revision) {
-        throw new Error('选区或修订已变化，请重新操作');
+        throw new Error(localize('ui.editGridRange.selectionOrRevisionsHaveChanged'));
       }
       const height = local.last.row - local.first.row + 1;
       const width = local.last.col - local.first.col + 1;
       if (this.view.filtered() && (end || height > 1 || local.cut)) {
-        throw new Error('请清除筛选或排序后按原地址粘贴');
+        throw new Error(localize('ui.editGridRange.clearFiltersOrSortData8209b35'));
       }
       const lastRow = local.cut ? top + height - 1 : Math.max(bottom, top + height - 1);
       const lastCol = local.cut ? left + width - 1 : Math.max(right, left + width - 1);
@@ -627,7 +628,7 @@ export class GridRangeEditor {
         this.hasMerge(top, lastRow, left, lastCol)
       ) {
         if ((local.acceptedRevision ?? local.revision) !== target.revision) {
-          throw new Error('来源修订已变化，请重新复制或剪切');
+          throw new Error(localize('ui.editGridRange.sourceRevisionChangedCopyOr'));
         }
         const structure: EditStructure = {
           kind: local.cut ? 'cutRange' : 'copyRange',
@@ -677,7 +678,7 @@ export class GridRangeEditor {
     }
     if (this.copied?.cut) this.cancelCut();
     const shape = this.grid.shape;
-    if (!shape) throw new Error('选区超出可编辑区域');
+    if (!shape) throw new Error(localize('ui.common.electionDistrictExtendsBeyondEditable'));
     const rows = /[\r\n\t]/.test(raw)
       ? parseClipboardTSV(raw, {
           maxRows: limits.batchCells,

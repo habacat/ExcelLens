@@ -2,6 +2,7 @@
  * Selection Quick Analysis dialog: per-column type distribution, paired
  * column difference, segmented trend chart, and source cell jump.
  */
+import { interfaceLocale, t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ApiClient, SelectionArea, ToastFn } from '../contracts/common.ts';
 import type { SelectionQuickLimits } from '../contracts/formats.ts';
 import type { IndexStartResponse, IndexStatusResponse } from '../contracts/workbook.ts';
@@ -140,7 +141,7 @@ export class SelectionQuick {
       !options.limits.bytes ||
       !options.limits.requestBytes
     ) {
-      throw new Error('快速分析容量配置不可用');
+      throw new Error(localize('ui.selectionQuick.quickAnalysisCapacityConfigurationNot'));
     }
     this.s = options.state;
     this.api = options.api;
@@ -169,7 +170,7 @@ export class SelectionQuick {
     requireButton('selectionQuickCancel').addEventListener('click', () => this.cancel());
     for (const id of ['selectionQuickSkip', 'selectionQuickMinuend', 'selectionQuickSubtrahend']) {
       requireEl(id).addEventListener('change', () => {
-        if (this.page) this.status('设置已更改，请重新运行。');
+        if (this.page) this.status(localize('ui.selectionQuick.settingChangedRunProcessAgain'));
       });
     }
     for (const eventName of ['excellens:readingchange', 'excellens:analysisnumberchange']) {
@@ -196,10 +197,10 @@ export class SelectionQuick {
     d.id = 'selectionQuickDialog';
     d.setAttribute('aria-labelledby', 'selectionQuickTitle');
     // Static markup only; every source string below uses textContent.
-    d.innerHTML = `<div class="dialog-head"><div id="selectionQuickTitle" class="dialog-title">选区快速分析</div><button id="selectionQuickClose" type="button" class="dialog-close" aria-label="关闭快速分析">×</button></div>
-        <p id="selectionQuickSource" class="selection-quick-source"></p><div class="selection-quick-tools"><label><input id="selectionQuickSkip" type="checkbox">跳过首行</label><label>被减列<select id="selectionQuickMinuend" class="field-control"></select></label><span aria-hidden="true">−</span><label>减列<select id="selectionQuickSubtrahend" class="field-control"></select></label><button id="selectionQuickRun" type="button" class="mini-button">运行分析</button></div>
+    d.innerHTML = `<div class="dialog-head"><div id="selectionQuickTitle" class="dialog-title">${localizeHTML('ui.selectionQuick.quickAnalysisSelection')}</div><button id="selectionQuickClose" type="button" class="dialog-close" aria-label="${localizeHTML('ui.selectionQuick.disableQuickAnalysis')}">×</button></div>
+        <p id="selectionQuickSource" class="selection-quick-source"></p><div class="selection-quick-tools"><label><input id="selectionQuickSkip" type="checkbox">${localizeHTML('ui.selectionQuick.skipFirstRow')}</label><label>${localizeHTML('ui.selectionQuick.subtractedColumns')}<select id="selectionQuickMinuend" class="field-control"></select></label><span aria-hidden="true">−</span><label>${localizeHTML('ui.selectionQuick.removeColumns')}<select id="selectionQuickSubtrahend" class="field-control"></select></label><button id="selectionQuickRun" type="button" class="mini-button">${localizeHTML('ui.selectionQuick.runAnalysis')}</button></div>
         <div id="selectionQuickBody" class="selection-quick-body"></div>
-        <div class="selection-quick-footer"><p id="selectionQuickStatus" role="status" aria-live="polite"></p><button id="selectionQuickCancel" type="button" class="mini-button" hidden>取消分析</button></div>`;
+        <div class="selection-quick-footer"><p id="selectionQuickStatus" role="status" aria-live="polite"></p><button id="selectionQuickCancel" type="button" class="mini-button" hidden>${localizeHTML('ui.selectionQuick.disanalysis')}</button></div>`;
     document.body.append(d);
     return d;
   }
@@ -303,7 +304,7 @@ export class SelectionQuick {
 
   open(): void {
     if (!this.ready()) {
-      this.toast('请先在已完成加载的工作表中选择连续区域', 'warning');
+      this.toast(localize('ui.selectionQuick.selectConsecutiveAreasWorksheetsThat'), 'warning');
       return;
     }
     if (this.dialog.open) return;
@@ -311,12 +312,12 @@ export class SelectionQuick {
     const { first, last, rows } = bound;
     const indexMaxCol = this.s.index?.maxCol ?? 0;
     if (!bound.area || first < 1 || last > indexMaxCol || rows < 1) {
-      this.toast('快速分析请选择已用范围内的一个连续区域', 'warning');
+      this.toast(localize('ui.selectionQuick.quickAnalysisSelectContinuousArea'), 'warning');
       return;
     }
     if (last - first + 1 > this.limits.columns || rows * (last - first + 1) > this.limits.cells) {
       this.toast(
-        `快速分析最多 ${this.limits.columns} 列、${this.limits.cells.toLocaleString()} 格，请缩小选区`,
+        localize('ui.selectionQuick.quickAnalysisThereMaximumColumns', { columns: this.limits.columns, cells: this.limits.cells.toLocaleString(interfaceLocale()) }),
         'warning',
       );
       return;
@@ -330,14 +331,14 @@ export class SelectionQuick {
       if (this.s.hiddenColumns.has(col)) hidden.push(this.colName(col));
     }
     const hiddenNote = hidden.length
-      ? ` · 含隐藏列 ${hidden.slice(0, 6).join('、')}${hidden.length > 6 ? ` 等 ${hidden.length} 列` : ''}`
+      ? ` ${localize('ui.selectionQuick.includesHiddenColumns', { slice: hidden.slice(0, 6).join('、'), detail: hidden.length > 6 ? ` ${localize('ui.selectionQuick.waitColumn', { count: hidden.length })}` : '' })}`
       : '';
     requireEl('selectionQuickSource').textContent =
-      `${this.s.sheet ?? ''}!${bound.request.start}:${bound.request.end} · ${rows.toLocaleString()} 行${hiddenNote}`;
+      localize('ui.selectionQuick.rowsa30527c', { detail: this.s.sheet ?? '', start: bound.request.start, end: bound.request.end, rows: rows.toLocaleString(interfaceLocale()), hiddenNote });
     requireInput('selectionQuickSkip').checked = false;
     const left = requireSelect('selectionQuickMinuend');
     const right = requireSelect('selectionQuickSubtrahend');
-    left.replaceChildren(new Option('不比较', '0'));
+    left.replaceChildren(new Option(localize('ui.selectionQuick.noComparison'), '0'));
     right.replaceChildren();
     for (let col = first; col <= last; col++) {
       left.append(new Option(this.colName(col), String(col)));
@@ -380,7 +381,7 @@ export class SelectionQuick {
 
   cancel(): void {
     this.stop();
-    this.status(this.page ? '已取消，保留上次结果。' : '已取消');
+    this.status(this.page ? localize('ui.selectionQuick.cancelledRetainingPreviousResults') : localize('ui.common.canceled'));
     this.controls();
   }
 
@@ -398,7 +399,7 @@ export class SelectionQuick {
         subtrahend < bound.first ||
         subtrahend > bound.last)
     ) {
-      this.status('差额请选择选区内两个不同的源列。', true);
+      this.status(localize('ui.selectionQuick.differenceSelectTwoDifferentSource'), true);
       return;
     }
     const request: SelectionQuickRequest = {
@@ -413,7 +414,7 @@ export class SelectionQuick {
     this.abort = ctrl;
     this.busy = true;
     this.controls();
-    this.status('正在分析…');
+    this.status(localize('ui.common.analyzing'));
     const current = (): boolean =>
       this.serial === serial &&
       !ctrl.signal.aborted &&
@@ -423,7 +424,7 @@ export class SelectionQuick {
     try {
       const body = JSON.stringify(request);
       if (new TextEncoder().encode(body).length > this.limits.requestBytes) {
-        throw new Error('请求超过快速分析容量');
+        throw new Error(localize('ui.selectionQuick.requestExceedsQuickAnalysisCapacity'));
       }
       const rawPage = await this.api('/api/selection/quick', {
         method: 'POST',
@@ -445,12 +446,12 @@ export class SelectionQuick {
       this.page = page;
       requireEl('selectionQuickBody').replaceChildren(view);
       this.status(
-        `${page.rows.toLocaleString()} 行 × ${page.columns.length} 列${page.skipFirstRow ? '（跳过首行）' : ''}`,
+        localize('ui.selectionQuick.rowsColumns', { rows: page.rows.toLocaleString(interfaceLocale()), count: page.columns.length, detail: page.skipFirstRow ? localize('ui.selectionQuick.skipFirstLine') : '' }),
       );
       this.renderSeries();
     } catch (error: unknown) {
       if (current() && !(error instanceof Error && error.name === 'AbortError')) {
-        this.status(`${errorMessage(error)}${this.page ? '（保留上次结果）' : ''}`, true);
+        this.status(`${errorMessage(error)}${this.page ? localize('ui.common.keepPreviousResult') : ''}`, true);
       }
     } finally {
       if (this.serial === serial) {
@@ -495,10 +496,10 @@ export class SelectionQuick {
 
   private build(page: SelectionQuickWireResponse): DocumentFragment {
     const fragment = document.createDocumentFragment();
-    fragment.append(makeEl('h4', '', '逐列分布'));
+    fragment.append(makeEl('h4', '', localize('ui.selectionQuick.columnColumnDistribution')));
     fragment.append(
       this.table(
-        ['列', '负数', '零', '正数', '空白', '其他值', '错误', '公式无结果', '无效数值'],
+        [localize('ui.common.column'), localize('ui.selectionQuick.negativeNumbers'), localize('ui.selectionQuick.pages'), localize('ui.selectionQuick.positiveNumbers'), localize('ui.common.blank'), localize('ui.selectionQuick.otherValues'), localize('ui.common.errors'), localize('ui.selectionQuick.formulaNoResult'), localize('ui.selectionQuick.invalidValues')],
         page.columns.map((c) => [
           this.colName(c.column),
           c.counts.negative,
@@ -513,15 +514,15 @@ export class SelectionQuick {
       ),
     );
     const tools = makeEl('div', 'selection-quick-series-tools');
-    const label = makeEl('label', '', '查看统计与趋势 ');
+    const label = makeEl('label', '', `${localize('ui.selectionQuick.viewStatisticsTrends')} `);
     const select = makeEl('select', 'field-control');
     select.id = 'selectionQuickSeries';
     for (const col of page.columns) {
-      select.append(new Option(`源列 ${this.colName(col.column)}`, String(col.column)));
+      select.append(new Option(localize('ui.selectionQuick.sourceColumn', { colName: this.colName(col.column) }), String(col.column)));
     }
     if (page.difference) {
       select.append(
-        new Option(`差额 ${this.colName(page.minuend)} − ${this.colName(page.subtrahend)}`, 'difference'),
+        new Option(localize('ui.selectionQuick.difference', { colName: this.colName(page.minuend), colName2: this.colName(page.subtrahend) }), 'difference'),
       );
     }
     select.value = page.difference ? 'difference' : String(page.firstColumn);
@@ -529,7 +530,7 @@ export class SelectionQuick {
     label.append(select);
     tools.append(label);
 
-    const image = makeEl('button', 'mini-button', '导出趋势图片');
+    const image = makeEl('button', 'mini-button', localize('ui.selectionQuick.exportTrendImages'));
     image.id = 'selectionQuickImage';
     image.type = 'button';
     image.addEventListener('click', () => this.exportImage());
@@ -544,18 +545,18 @@ export class SelectionQuick {
     note.id = 'selectionQuickPairing';
     fragment.append(note);
 
-    fragment.append(makeEl('h4', '', '分段平均趋势'));
+    fragment.append(makeEl('h4', '', localize('ui.selectionQuick.segmentedAverageTrend')));
     const chart = makeEl('div', 'selection-quick-chart');
     const canvas = makeEl('canvas');
     canvas.id = 'selectionQuickChart';
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', '分段平均趋势');
+    canvas.setAttribute('aria-label', localize('ui.selectionQuick.segmentedAverageTrend'));
     chart.append(canvas, makeEl('div', 'analysis-chart-tooltip'));
     fragment.append(chart);
 
     const details = makeEl('details');
     details.id = 'selectionQuickSegments';
-    details.append(makeEl('summary', '', '分段明细'));
+    details.append(makeEl('summary', '', localize('ui.selectionQuick.segmentDetails')));
     const holder = makeEl('div');
     holder.id = 'selectionQuickSegmentTable';
     details.append(holder);
@@ -569,7 +570,7 @@ export class SelectionQuick {
 
   private numeric(exact: string): HTMLSpanElement {
     const span = makeEl('span', 'selection-quick-value', this.format(exact));
-    span.title = exact === '' ? '无有效数值' : `精确值 ${exact}`;
+    span.title = exact === '' ? localize('ui.selectionQuick.noValidValues') : localize('ui.selectionQuick.exactValue', { exact });
     return span;
   }
 
@@ -577,7 +578,7 @@ export class SelectionQuick {
     const ref = `${this.colName(col)}${row}`;
     const button = makeEl('button', 'selection-quick-ref', ref);
     button.type = 'button';
-    button.title = `定位源单元格 ${ref}`;
+    button.title = localize('ui.selectionQuick.locateSourceCell', { ref });
     button.addEventListener('click', () => {
       void this.locate(ref);
     });
@@ -600,11 +601,11 @@ export class SelectionQuick {
     holder.replaceChildren();
     const col = delta ? page.minuend : Number(key);
     const cards: readonly (readonly [string, string, number?])[] = [
-      ['数值数量', String(summary.count)],
-      ['合计', summary.sum],
-      ['平均', summary.average],
-      ['最小', summary.minimum, summary.minimumRow],
-      ['最大', summary.maximum, summary.maximumRow],
+      [localize('ui.selectionQuick.numberValues'), String(summary.count)],
+      [localize('ui.common.total'), summary.sum],
+      [localize('ui.common.average'), summary.average],
+      [localize('ui.common.minimum'), summary.minimum, summary.minimumRow],
+      [localize('ui.common.maximum'), summary.maximum, summary.maximumRow],
     ];
     for (const [title, exact, row] of cards) {
       const card = makeEl('div');
@@ -614,11 +615,11 @@ export class SelectionQuick {
     }
     requireEl('selectionQuickPairing').textContent =
       delta && diffSeries
-        ? `配对 ${diffSeries.paired.toLocaleString()} 行${diffSeries.unpaired ? ` · 未配对 ${diffSeries.unpaired.toLocaleString()} 行` : ''}`
+        ? localize('ui.selectionQuick.pairingRow', { paired: diffSeries.paired.toLocaleString(interfaceLocale()), detail: diffSeries.unpaired ? ` ${localize('ui.selectionQuick.unpairedRowsMarked', { unpaired: diffSeries.unpaired.toLocaleString(interfaceLocale()) })}` : '' })
         : '';
     requireEl('selectionQuickSegmentTable').replaceChildren(
       this.table(
-        ['段', '选中行序', '源首行→末行', '数值数', '合计', '平均', '最小', '最大'],
+        [localize('ui.selectionQuick.minutes'), localize('ui.selectionQuick.selectRowOrder'), localize('ui.selectionQuick.sourceFirstRowLastRow'), localize('ui.selectionQuick.numericalValue'), localize('ui.common.total'), localize('ui.common.average'), localize('ui.common.minimum'), localize('ui.common.maximum')],
         series.segments.map((p, i) => [
           i + 1,
           `${p.first}–${p.last}`,
@@ -645,7 +646,7 @@ export class SelectionQuick {
         const p = series.segments[at];
         if (Number.isInteger(at) && p) {
           this.status(
-            `第 ${at + 1} 段 · 选中行 ${p.first}–${p.last}；精确平均 ${p.summary.average}，源行 ${p.firstRow} → ${p.lastRow}。`,
+            localize('ui.selectionQuick.paragraphSelectedRowsPreciseAveraging', { at: at + 1, first: p.first, last: p.last, average: p.summary.average, firstRow: p.firstRow, lastRow: p.lastRow }),
           );
         }
       });
@@ -686,14 +687,14 @@ export class SelectionQuick {
         sheet: page.sheet,
         viewId: page.viewId,
       },
-      title: '选区分段趋势',
-      source: `${this.s.fileName || '当前工作簿'} / ${page.sheet}`,
-      scope: `${page.start}:${page.end} · ${page.rows}行${page.skipFirstRow ? '（跳过首行）' : ''}`,
+      title: localize('ui.selectionQuick.segmentTrendSelectedArea'),
+      source: `${this.s.fileName || localize('ui.common.currentWorkbook')} / ${page.sheet}`,
+      scope: localize('ui.selectionQuick.rows', { start: page.start, end: page.end, rows: page.rows, detail: page.skipFirstRow ? localize('ui.selectionQuick.skipFirstLine') : '' }),
       metric:
         key === 'difference'
-          ? `差额 ${this.colName(page.minuend)} − ${this.colName(page.subtrahend)} · 分段平均`
-          : `源列 ${this.colName(Number(key))} · 分段平均`,
-      unit: '原始单位',
+          ? localize('ui.selectionQuick.differenceSegmentedAverage', { colName: this.colName(page.minuend), colName2: this.colName(page.subtrahend) })
+          : localize('ui.selectionQuick.sourceColumnSegmentedAverage', { colName: this.colName(Number(key)) }),
+      unit: localize('ui.selectionQuick.originalUnits'),
       current,
       notify: this.toast,
     });

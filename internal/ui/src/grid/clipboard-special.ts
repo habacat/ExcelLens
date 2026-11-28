@@ -2,6 +2,7 @@
  * Bounded special clipboard representations (TSV, Markdown, version-1 Selection JSON)
  * and text-only paste plan generator for editable analysis sheets.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ClipboardLimits } from '../contracts/formats.ts';
 import type { CellData, ClipboardPayload, ClipboardRow } from '../contracts/workbook.ts';
 import { columnName } from '../core/cell-address.ts';
@@ -61,7 +62,7 @@ function cellsOfRow(row: ClipboardRow, start: number, end: number): CellData[] {
   const cells = new Map<number, CellData>();
   for (const cell of row.cells) {
     if (!Number.isSafeInteger(cell.col) || cell.col < start || cell.col > end || cells.has(cell.col)) {
-      throw new Error('复制单元格坐标无效或重复');
+      throw new Error(localize('ui.clipboardSpecial.copyingCellCoordinatesInvalidOr'));
     }
     cells.set(cell.col, cell);
   }
@@ -93,12 +94,12 @@ interface CellValueLike {
 function valueOfCell(cell: CellValueLike, mode: CopySpecialMode = 'raw', styled = false): string {
   if (mode === 'formula' && cell.hasFormula) {
     if (typeof cell.formula !== 'string' || !cell.formula.startsWith('=')) {
-      throw new Error(`${cell.ref || '此单元格'} 的公式无法还原，请使用保留状态的JSON`);
+      throw new Error(localize('ui.clipboardSpecial.formulasCannotBeRestoredUse', { ref: cell.ref || localize('ui.clipboardSpecial.thisCell') }));
     }
     return cell.formula;
   }
   if (cell.cacheMissing) {
-    throw new Error(`${cell.ref || '此单元格'} 的公式缺少缓存值，请选择公式文字或JSON`);
+    throw new Error(localize('ui.clipboardSpecial.formulasLackCacheValuesSelect', { ref: cell.ref || localize('ui.clipboardSpecial.thisCell') }));
   }
   if (mode === 'display') {
     if (styled && cell.conditional?.display != null) return cell.conditional.display;
@@ -136,12 +137,12 @@ export function buildSpecialSelection(
     !['tsv', 'markdown', 'json'].includes(format) ||
     !['display', 'raw', 'formula'].includes(mode)
   ) {
-    throw new Error('复制方式无效');
+    throw new Error(localize('ui.clipboardSpecial.invalidCopyMethod'));
   }
   const rows = includeHeader
     ? payload.rows.filter((row) => row.row !== payload.header?.row)
     : payload.rows;
-  if (includeHeader && !payload.header) throw new Error('请先读取所选表头行');
+  if (includeHeader && !payload.header) throw new Error(localize('ui.clipboardSpecial.readSelectedHeaderRowsFirst'));
   const all = includeHeader && payload.header ? [payload.header, ...rows] : rows;
   const { start, end, limits: budget } = checkCopy({ ...payload, rows: all }, limits);
   const notices = new Set<string>();
@@ -227,7 +228,7 @@ export function buildSpecialSelection(
   }
 
   if (utf8Length(text) > budget.textBytes) {
-    throw new Error('复制结果超过本次文字容量，请缩小选区或使用导出');
+    throw new Error(localize('ui.clipboardSpecial.copyingResultsExceedsThisText'));
   }
   return {
     text,
@@ -255,12 +256,12 @@ function parseSelectionJSON(
   try {
     doc = JSON.parse(text);
   } catch {
-    throw new Error('JSON格式无效，未粘贴');
+    throw new Error(localize('ui.clipboardSpecial.invalidJsonFormatNotPasted'));
   }
   const asString = (value: unknown): string => {
     if (value === null) return '';
     if (typeof value !== 'string') {
-      throw new Error('JSON单元格必须为字符串，数字请加引号以保留精度');
+      throw new Error(localize('ui.clipboardSpecial.jsonCellsMustBeStrings'));
     }
     return value;
   };
@@ -270,7 +271,7 @@ function parseSelectionJSON(
       !doc.every((row) => isUnknownArray(row) && row.length <= 80) ||
       doc.reduce<number>((sum, row) => sum + (isUnknownArray(row) ? row.length : 0), 0) > 20000
     ) {
-      throw new Error('JSON应为容量以内的二维文字数组');
+      throw new Error(localize('ui.clipboardSpecial.jsonShouldBeTwoDimensional'));
     }
     return doc.map((row) => (isUnknownArray(row) ? row.map(asString) : []));
   }
@@ -284,7 +285,7 @@ function parseSelectionJSON(
     !isUnknownArray(doc.rows) ||
     doc.rows.length > 2000
   ) {
-    throw new Error('不支持此JSON结构、版本或容量');
+    throw new Error(localize('ui.clipboardSpecial.thisJsonStructureVersionOr'));
   }
   const columns = doc.columns.map((column: unknown) =>
     isPlainRecord(column) && typeof column.col === 'number' ? column.col : -1,
@@ -294,9 +295,9 @@ function parseSelectionJSON(
       (col, i) => !Number.isSafeInteger(col) || col < 1 || (i > 0 && col !== (columns[i - 1] ?? 0) + 1),
     )
   ) {
-    throw new Error('JSON列坐标无效');
+    throw new Error(localize('ui.clipboardSpecial.invalidJsonColumnCoordinates'));
   }
-  if (withHeader && !doc.header) throw new Error('JSON中没有附带表头');
+  if (withHeader && !doc.header) throw new Error(localize('ui.clipboardSpecial.jsonDoesNotIncludeHeaders'));
   const rawRows: readonly unknown[] = withHeader ? [doc.header, ...doc.rows] : doc.rows;
   return rawRows.map((rawRow) => {
     if (
@@ -307,7 +308,7 @@ function parseSelectionJSON(
       !isUnknownArray(rawRow.cells) ||
       rawRow.cells.length !== columns.length
     ) {
-      throw new Error('JSON行内容无效');
+      throw new Error(localize('ui.clipboardSpecial.invalidJsonContent'));
     }
     const cells = new Map<number, CellData>();
     for (const rawCell of rawRow.cells) {
@@ -322,7 +323,7 @@ function parseSelectionJSON(
         typeof rawCell.hasFormula !== 'boolean' ||
         (rawCell.hasFormula && typeof rawCell.formula !== 'string')
       ) {
-        throw new Error('JSON单元格值、类型或坐标无效');
+        throw new Error(localize('ui.clipboardSpecial.invalidJsonCellValueType'));
       }
       cells.set(rawCell.col, {
         col: rawCell.col,
@@ -335,10 +336,10 @@ function parseSelectionJSON(
         cacheMissing: rawCell.cacheMissing === true,
       });
     }
-    if (cells.size !== columns.length) throw new Error('JSON行缺少单元格，未粘贴');
+    if (cells.size !== columns.length) throw new Error(localize('ui.clipboardSpecial.jsonRowLacksCellsNot'));
     return columns.map((col) => {
       const cell = cells.get(col);
-      if (!cell) throw new Error('JSON行缺少单元格，未粘贴');
+      if (!cell) throw new Error(localize('ui.clipboardSpecial.jsonRowLacksCellsNot'));
       return valueOfCell(cell, mode);
     });
   });
@@ -362,13 +363,13 @@ export function buildPastePlan(
   } = options;
   const text = rawText ?? '';
   if (text.length > 2 * 1024 * 1024 || utf8Length(text) > 2 * 1024 * 1024) {
-    throw new Error('剪贴板内容超过 2 MB，请分批粘贴');
+    throw new Error(localize('ui.clipboardSpecial.clipboardContentExceedsMbPaste'));
   }
   let rows =
     format === 'tsv'
       ? parseClipboardTSV(text)
       : parseSelectionJSON(text, { mode, withHeader });
-  if (!rows.length) throw new Error('没有可粘贴的数据');
+  if (!rows.length) throw new Error(localize('ui.clipboardSpecial.noDataPaste'));
   let width = Math.max(0, ...rows.map((row) => row.length));
   if (
     !width ||
@@ -376,17 +377,17 @@ export function buildPastePlan(
     width > 80 ||
     rows.reduce((sum, row) => sum + row.length, 0) > 20000
   ) {
-    throw new Error('粘贴数据超过本次行列或单元格容量');
+    throw new Error(localize('ui.clipboardSpecial.pastedDataExceedsCurrentRow'));
   }
   for (const row of rows) {
     for (const value of row) {
-      if (characterCount(value) > 4000) throw new Error('单元格内容超过4000字符，未粘贴');
+      if (characterCount(value) > 4000) throw new Error(localize('ui.clipboardSpecial.cellContentExceedsCharactersNot'));
     }
   }
   if (skipFirstRow) rows = rows.slice(1);
-  if (!rows.length) throw new Error('跳过表头后没有可粘贴的数据');
+  if (!rows.length) throw new Error(localize('ui.clipboardSpecial.noDataAvailablePastingAfter'));
   width = Math.max(0, ...rows.map((row) => row.length));
-  if (!width) throw new Error('没有可粘贴的数据');
+  if (!width) throw new Error(localize('ui.clipboardSpecial.noDataPaste'));
   if (transpose) {
     const sourceRows = rows;
     rows = Array.from({ length: width }, (_, col) => sourceRows.map((row) => row[col] ?? ''));
@@ -405,7 +406,7 @@ export function buildPastePlan(
     startRow + rows.length > rowLimit ||
     startCol + resultWidth > columns
   ) {
-    throw new Error('粘贴范围超出编辑表边界，未粘贴；请增加行列或缩小范围');
+    throw new Error(localize('ui.clipboardSpecial.pastingRangeExceedsEditingTable'));
   }
   const changes: PasteCellChange[] = [];
   let skipped = 0;

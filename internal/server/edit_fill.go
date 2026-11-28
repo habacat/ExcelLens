@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -19,7 +19,7 @@ func editFillTargets(layout editfile.Layout, first editdoc.Address, end string) 
 	rows, cols := last.Row-first.Row, last.Col-first.Col
 	count := max(rows, -rows) + max(cols, -cols)
 	if rows != 0 && cols != 0 || count < 1 || count > formats.EditBatchCells {
-		return nil, errors.New("请选择同列或同行且容量以内的填充终点")
+		return nil, i18n.Error("service.editFill.chooseFillEndPointWithin")
 	}
 	targets := make([]editdoc.Address, count)
 	for i := range targets {
@@ -35,7 +35,7 @@ func planEditFill(ctx context.Context, layout editfile.Layout, f *workbook.EditS
 	var err error
 	if req.Mode == "formula-fill" {
 		if layout.XLSX == nil || start.Kind != "formula" {
-			return editBatchPreview{}, errors.New("起点需要受支持的普通公式")
+			return editBatchPreview{}, i18n.Error("service.editFill.startingPointRequiresSupportedRegular")
 		}
 		formula, err := layout.XLSX.FormulaForFill(ctx, start.Raw)
 		if err != nil {

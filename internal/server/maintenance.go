@@ -3,8 +3,9 @@ package server
 import (
 	"context"
 	"errors"
+
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -30,10 +31,14 @@ func LogDir() string {
 // ClearUnusedCaches intentionally preserves the currently open workbook so a
 // tray action cannot invalidate mapped row indexes while a browser reads them.
 func (a *App) ClearUnusedCaches() (string, error) {
+	return a.clearUnusedCaches(a.DisplayLocale())
+}
+
+func (a *App) clearUnusedCaches(locale i18n.Locale) (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
 	if a.rootApp().restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.maintenance.completeRestorationProcessFirst")
 	}
 	releaseArchiveMaintenance := archives.LockCacheMaintenance()
 	defer releaseArchiveMaintenance()
@@ -54,7 +59,7 @@ func (a *App) ClearUnusedCaches() (string, error) {
 	}
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
-		return "缓存目录为空", nil
+		return locale.Text("native.cleanup.emptyCache"), nil
 	}
 	if err != nil {
 		return "", err
@@ -83,12 +88,12 @@ func (a *App) ClearUnusedCaches() (string, error) {
 		count++
 	}
 	statsReport, statsErr := workbook.ClearUnusedConditionalStats(rootApp.conditionalStatsProtector())
-	info := fmt.Sprintf("已清理 %d 组历史工作簿缓存。当前打开工作簿的缓存已保留。", count)
+	info := locale.Text("native.cleanup.unusedCachesCleared", i18n.Args{"count": count})
 	if statsReport.RemovedFiles > 0 {
-		info = fmt.Sprintf("已清理 %d 组历史工作簿缓存与 %d 个条件统计索引（释放 %s）。当前打开工作簿的缓存已保留。", count, statsReport.RemovedFiles, formatReadableBytes(statsReport.FreedBytes))
+		info = locale.Text("native.cleanup.unusedCachesAndStatisticsCleared", i18n.Args{"count": count, "indexes": statsReport.RemovedFiles, "space": formatReadableBytes(statsReport.FreedBytes)})
 	}
 	if len(failed) > 0 {
-		return info, errors.Join(fmt.Errorf("%d 组缓存清理失败：%s", len(failed), strings.Join(failed, ", ")), statsErr)
+		return info, errors.Join(i18n.Error("service.maintenance.groupCacheCleanupFailed", i18n.Args{"len": len(failed), "join": strings.Join(failed, ", ")}), statsErr)
 	}
 	return info, statsErr
 }
@@ -97,10 +102,14 @@ func (a *App) ClearUnusedCaches() (string, error) {
 // never the original workbook and never the one currently open in the viewer.
 // No file is ever deleted implicitly on switching workbooks or quitting.
 func (a *App) ClearUnusedUploads() (string, error) {
+	return a.clearUnusedUploads(a.DisplayLocale())
+}
+
+func (a *App) clearUnusedUploads(locale i18n.Locale) (string, error) {
 	a.rootApp().cacheResetMu.RLock()
 	defer a.rootApp().cacheResetMu.RUnlock()
 	if a.rootApp().restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.maintenance.completeRestorationProcessFirst")
 	}
 	rootApp := a.rootApp()
 	rootApp.cacheMu.Lock()
@@ -130,7 +139,7 @@ func (a *App) ClearUnusedUploads() (string, error) {
 	}
 	entries, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
-		return "没有可清理的临时文件", nil
+		return locale.Text("native.cleanup.noUnusedTemporaryFiles"), nil
 	}
 	if err != nil {
 		return "", err
@@ -152,9 +161,9 @@ func (a *App) ClearUnusedUploads() (string, error) {
 		}
 		count++
 	}
-	info := fmt.Sprintf("已清理 %d 个临时文件；保留正在使用的 %d 个文件。", count, skipped)
+	info := locale.Text("native.cleanup.temporaryFilesCleared", i18n.Args{"count": count, "kept": skipped})
 	if failed > 0 {
-		return info, fmt.Errorf("另外 %d 个文件无法删除（可能被其他程序占用）", failed)
+		return info, i18n.Error("service.maintenance.additionallyFilesCannotBeDeleted", i18n.Args{"failed": failed})
 	}
 	return info, nil
 }
@@ -184,7 +193,7 @@ func savedTaskSources() ([]string, error) {
 	var paths []string
 	for _, item := range items {
 		if item.Manifest == nil {
-			return nil, errors.New("任务恢复记录的来源无法核对，已保留文件")
+			return nil, i18n.Error("service.maintenance.sourceTaskRecoveryRecordsCannot")
 		}
 		for _, s := range item.Manifest.Definition.Sources {
 			source, err := locatedSource(s)

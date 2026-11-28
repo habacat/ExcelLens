@@ -74,6 +74,12 @@ function saveStorage(name: string, value: string): void {
   }
 }
 
+export function reloadHome(): void {
+  saveStorage(SESSION_KEY, '');
+  saveStorage(GENERATION_KEY, '');
+  window.location.replace(window.location.pathname);
+}
+
 export interface SessionTimers {
   setTimeout(fn: () => void, ms: number): number;
   clearTimeout(id: number): void;
@@ -210,6 +216,7 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
     const tokenMeta = document.querySelector('meta[name="app-token"]');
     const token = tokenMeta instanceof HTMLMetaElement ? tokenMeta.content : '';
     headers.set('X-ExcelLens-Token', token);
+    headers.set(languageHeader, interfaceLocale());
     if (action === 'attach') {
       headers.set('X-ExcelLens-Generation', String(state.generation));
       if (background && !state.resumed) headers.set('X-ExcelLens-Background', '1');
@@ -227,7 +234,7 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
     if (response.ok) return;
     const raw: unknown = await response.json().catch(() => ({}));
     const msg = readErrorPayload(raw);
-    throw new Error(msg || `无法连接页面会话（HTTP ${response.status}）`);
+    throw new Error(msg || localize('ui.session.unableConnectPageSessionHttp', { status: response.status }));
   }
 
   const isAway = (): boolean => state.away;
@@ -252,7 +259,7 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
 
   async function attach(current: string): Promise<void> {
     await state.negotiation;
-    if (isAway() || current !== state.page) throw new Error('页面已关闭');
+    if (isAway() || current !== state.page) throw new Error(localize('ui.session.pageClosed'));
     const session = id;
     state.requested = true;
     const response = await control('attach', session, current);
@@ -261,7 +268,7 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
       void control('detach', session, current).catch(() => {
         // Best-effort cleanup during teardown.
       });
-      throw new Error('页面已关闭');
+      throw new Error(localize('ui.session.pageClosed'));
     }
     state.attached = true;
     state.heartbeat = timers.setInterval(() => {
@@ -278,9 +285,7 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
     returnHomeAfterCacheReset(): void {
       if (state.cacheCleared) return;
       state.cacheCleared = true;
-      saveStorage(SESSION_KEY, '');
-      saveStorage(GENERATION_KEY, '');
-      window.location.replace(window.location.pathname);
+      reloadHome();
     },
     nativeLaunch,
     get restoring(): boolean {
@@ -337,3 +342,4 @@ export function createBrowserSession(timers: SessionTimers = DEFAULT_SESSION_TIM
 
   return service;
 }
+import { interfaceLocale, languageHeader, t as localize } from './i18n.ts';

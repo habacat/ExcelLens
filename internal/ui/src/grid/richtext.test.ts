@@ -223,6 +223,7 @@ test('frozen cache uses measured bytes, retains its budget across an oversized t
       colName: deps.colName,
       bindResizeGrip: () => undefined,
       getVirtualScrollTop: () => 0,
+      paintRowHeaderBorder: () => undefined,
       updateSharedBorders: () => undefined,
       isPrecedent: () => false,
       isSearchMatch: () => false,

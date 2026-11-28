@@ -2,6 +2,7 @@
  * ExcelLens formula inspector: read-only A1-reference lexer and interactive
  * formula bar preview. Never evaluates formulas or mutates the workbook.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { CellData } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
@@ -403,7 +404,7 @@ export class FormulaInspector {
       if (!token.external) list.push(token);
     });
     this.el.title =
-      this.tokens.length >= 256 ? '引用较多：目前只交互显示前 256 处引用' : '';
+      this.tokens.length >= 256 ? localize('ui.formulaInspector.frequentlyReferencedCurrentlyOnlyFirst') : '';
     if (!this.tokens.length) {
       this.el.textContent = text;
       this.el.classList.remove('formula-focused');
@@ -425,7 +426,7 @@ export class FormulaInspector {
       span.textContent = text.slice(token.startIndex, token.endIndex);
       span.tabIndex = 0;
       span.setAttribute('role', 'button');
-      span.setAttribute('aria-label', `${token.label}：悬停查看引用值，回车高亮`);
+      span.setAttribute('aria-label', localize('ui.formulaInspector.hoverViewReferenceValueEnter', { label: token.label }));
       f.appendChild(span);
       pos = token.endIndex;
     }
@@ -442,7 +443,7 @@ export class FormulaInspector {
     this.toolbar?.classList.toggle('formula-expanded', this.expanded);
     this.workspace?.classList.toggle('formula-expanded', this.expanded);
     if (this.expandButton) {
-      const label = this.expanded ? '收起公式栏' : '展开公式栏';
+      const label = this.expanded ? localize('ui.formulaInspector.hideFormulaBar') : localize('ui.formulaInspector.expandFormulaBar');
       this.expandButton.setAttribute('aria-expanded', String(this.expanded));
       this.expandButton.setAttribute('aria-label', label);
       this.expandButton.title = label;
@@ -614,10 +615,10 @@ export class FormulaInspector {
     this.actions = document.createElement('div');
     this.actions.className = 'formula-preview-actions';
     this.jump = document.createElement('button');
-    this.jump.textContent = '定位引用';
+    this.jump.textContent = localize('ui.formulaInspector.locateReference');
     this.jump.type = 'button';
     this.copy = document.createElement('button');
-    this.copy.textContent = '复制地址';
+    this.copy.textContent = localize('ui.formulaInspector.copyAddress');
     this.copy.type = 'button';
     this.actions.append(this.jump, this.copy);
     pop.append(this.head, this.content, this.actions);
@@ -719,10 +720,10 @@ export class FormulaInspector {
     const exists = this.o.sheetExists(t.sheet);
     this.head.textContent = t.label;
     this.content.textContent = t.external
-      ? '外部工作簿引用：不读取外部文件'
+      ? localize('ui.formulaInspector.externalWorkbookReferenceDoNot')
       : exists
-        ? '读取引用单元格…'
-        : '工作簿中不存在对应工作表';
+        ? localize('ui.formulaInspector.readReferenceCell')
+        : localize('ui.formulaInspector.correspondingWorksheetDoesNotExist');
     this.actions.hidden = !pinned || t.external || !exists;
     this.pop.classList.toggle('is-pinned', pinned);
     this.pop.hidden = false;
@@ -742,7 +743,8 @@ export class FormulaInspector {
           const prefix =
             t.kind === 'cell'
               ? ''
-              : `${t.kind === 'row' ? '整行' : t.kind === 'column' ? '整列' : '区域'}引用 · ${t.end.row - start.row + 1} 行 × ${t.end.col - start.col + 1} 列\n`;
+              : `${localize('ui.formulaInspector.referencesRowsColumns', { detail: t.kind === 'row' ? localize('ui.formulaInspector.entireRow') : t.kind === 'column' ? localize('ui.formulaInspector.entireColumn') : localize('ui.formulaInspector.region'), row: t.end.row - start.row + 1, col: t.end.col - start.col + 1 })}
+`;
           const first = await this.readCell(t.sheet, address(start.row, start.col), update);
           if (this.generation !== generation || this.previewID !== request) return;
           let msg = prefix + this.describe(first, address(start.row, start.col));
@@ -751,26 +753,30 @@ export class FormulaInspector {
             const endAddress = address(t.end.row, t.end.col);
             const last = await this.readCell(t.sheet, endAddress, update);
             if (this.generation !== generation || this.previewID !== request) return;
-            msg += `\n终点 ${this.describe(last, endAddress)}`;
+            msg += `
+${localize('ui.formulaInspector.endpoint', { describe: this.describe(last, endAddress) })}`;
             update(msg);
           } else if (t.kind !== 'cell') {
-            msg += '\n仅预览起点，不计算区域结果';
+            msg += `
+${localize('ui.formulaInspector.onlyPreviewStartsNoCalculation')}`;
             update(msg);
           }
         } catch (err: unknown) {
-          update(`读取失败：${errorMessage(err)}`);
+          update(localize('ui.formulaInspector.readingFailed', { detail: errorMessage(err) }));
         }
       })();
     }, pinned ? 0 : 140);
   }
 
   describe(cell: CellData | null | undefined, ref: string): string {
-    const value = cell?.cacheMissing ? '无缓存（未重算）' : (cell?.display ?? '');
+    const value = cell?.cacheMissing ? localize('ui.formulaInspector.noCacheNotRecalculated') : (cell?.display ?? '');
     const raw = cell?.raw ?? '';
     return (
-      `${ref} · 保存值：${value === '' ? '（空白）' : value}` +
-      (raw !== '' && raw !== value ? `\n原始值：${raw}` : '') +
-      (cell?.hasFormula ? `\n公式：${cell.formula || '（未解析到公式文本）'}` : '')
+      localize('ui.formulaInspector.savedValues', { ref, detail: value === '' ? localize('ui.common.empty') : value }) +
+      (raw !== '' && raw !== value ? `
+${localize('ui.formulaInspector.originalValue', { raw })}` : '') +
+      (cell?.hasFormula ? `
+${localize('ui.formulaInspector.formula', { formula: cell.formula || localize('ui.formulaInspector.formulaTextNotParsed') })}` : '')
     );
   }
 
@@ -780,7 +786,7 @@ export class FormulaInspector {
     const existing = this.indexTasks.get(sheet);
     if (existing) return existing;
     const { signal } = this.workbook;
-    const activity = beginActivity('正在读取引用工作表');
+    const activity = beginActivity(localize('ui.formulaInspector.readingReferencedWorksheets'));
     const task = (async (): Promise<void> => {
       const started = await this.o.api('/api/index/start', {
         signal,
@@ -808,13 +814,13 @@ export class FormulaInspector {
           progress: result.progress,
           stage: result.stage,
         });
-        progress(`首次读取「${sheet}」：建立索引 ${Math.round(result.progress ?? 0)}%`);
+        progress(localize('ui.formulaInspector.firstReadingIndexingEstablished', { sheet, detail: Math.round(result.progress ?? 0) }));
         if (result.status === 'done') {
           this.readySheets.add(sheet);
           return;
         }
         if (result.status === 'error' || result.status === 'cancelled') {
-          throw new Error(result.error || '建立索引失败');
+          throw new Error(result.error || localize('ui.formulaInspector.indexingFailure'));
         }
       }
     })();

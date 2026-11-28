@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"io"
 	"net/http"
 	"path/filepath"
@@ -15,6 +15,7 @@ import (
 	"excellens/internal/analysis"
 	"excellens/internal/clustering"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 	"excellens/internal/workbook"
 )
@@ -56,17 +57,17 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var req clusterStartRequest
 	if decodeClusterRequest(w, r, &req) != nil || req.HeaderRow < 1 || req.HeaderRow > formats.ExternalRows || req.Options.Validate() != nil {
-		writeError(w, 400, "疑似重复检查参数无效")
+		writeMessage(w, 400, "service.clustering.invalidCheckParameterSuspectedDuplication")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.WorkbookKey != wb.Fingerprint || req.Book != sourceBookID(wb) {
-		writeError(w, 409, "聚类来源已切换，请重新读取")
+		writeMessage(w, 409, "service.clustering.clusteringSourceSwitchedReadAgain")
 		return
 	}
 	capability, _ := formats.Lookup(wb.Format)
 	if !strings.HasPrefix(req.Source, "scratch:") && !capability.TextClustering {
-		writeError(w, 422, "此来源未保留可靠的文本类型，暂不支持聚类")
+		writeMessage(w, 422, "service.clustering.thisSourceDoesNotRetain")
 		return
 	}
 	a.cacheMu.RLock()
@@ -77,7 +78,7 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	accepted := false
@@ -94,7 +95,7 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if field.ID == "" {
-		writeError(w, 400, "聚类字段必须是当前范围内的原始字段")
+		writeMessage(w, 400, "service.clustering.clusteringFieldsMustBeOriginal")
 		return
 	}
 	meta := workbook.SheetMeta{}
@@ -109,23 +110,23 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 	}
 	scopeJSON, err := json.Marshal(snapshot.Scope)
 	if err != nil {
-		writeError(w, 400, "聚类来源范围无法保存")
+		writeMessage(w, 400, "service.clustering.unableSaveClusteringSourceRange")
 		return
 	}
 	snapshot.bytes = int64(len(scopeJSON)*2+len(snapshot.Source)+len(snapshot.FieldName)+len(snapshot.Stamp)) + 1024
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &clusterTask{ID: randomID(), Mode: req.Source, Status: "queued", Stage: "等待检查疑似重复", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	job := &clusterTask{ID: randomID(), Mode: req.Source, Status: "queued", Stage: "stage.task.waitingToCheckForSuspectedDuplicates", Workbook: wb, Meta: meta, Index: idx, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
 	a.mu.Lock()
 	if a.wb != wb || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.clustering.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	if activeMetadataTasks(a.clusterJobs) >= formats.ClusterActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "疑似重复检查正在运行，请等待或取消后重试")
+		writeMessage(w, 429, "service.clustering.duplicateChecksProgressWaitOr")
 		return
 	}
 	a.pruneClustersLocked("", formats.ClusterTaskHistory-1)
@@ -133,7 +134,7 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 	a.clusterJobs[job.ID] = job
 	a.mu.Unlock()
 	accepted = true
-	go runSourceMetadataTask(a, job, func() { src.close(); releasePin() }, "疑似重复", func() bool {
+	go runSourceMetadataTask(a, job, func() { src.close(); releasePin() }, func() bool {
 		return a.wb == wb && a.clusterJobs[job.ID] == job && (idx == nil || wb.GetCachedIndex(meta.Path) == idx)
 	}, func() { a.pruneClustersLocked(job.ID, formats.ClusterTaskHistory) }, func(progress func(int64, int64, string)) (*clusterSnapshot, error) {
 		a.cacheMu.RLock()
@@ -157,7 +158,7 @@ func (a *App) handleClusterStart(w http.ResponseWriter, r *http.Request) {
 		snapshot.Result = result
 		snapshot.bytes += result.BudgetBytes()
 		if snapshot.bytes > formats.ClusterRetainedBytes {
-			return nil, errors.New("聚类结果和来源范围超过快照容量，未发布部分结果")
+			return nil, i18n.Error("service.clustering.clusteringResultsSourceRangeExceed")
 		}
 		return snapshot, nil
 	})
@@ -175,7 +176,7 @@ func (a *App) checkClusterSource(ctx context.Context, wb *workbook.Workbook, sna
 		}
 		defer latest.close()
 		if latest.stamp() != snapshot.Stamp {
-			return errors.New("编辑表内容已变化，请重新检查疑似重复")
+			return i18n.Error("service.clustering.contentEditedTableChangedRecheck")
 		}
 	}
 	return wb.CheckSourceUnchanged()
@@ -194,10 +195,10 @@ func (a *App) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.clusterJobs[r.URL.Query().Get("id")]
 	if job == nil || a.wb != job.Workbook || job.discarded {
 		a.mu.RUnlock()
-		writeError(w, 404, "疑似重复任务已失效")
+		writeMessage(w, 404, "service.clustering.suspectedDuplicateTasksHaveInvalidated")
 		return
 	}
-	payload := metadataTaskPayload(job)
+	payload := metadataTaskPayload(responseLocale(w), job)
 	if job.Snapshot != nil {
 		payload["counts"] = job.Snapshot.Result.Counts
 		payload["groups"] = len(job.Snapshot.Result.Groups)
@@ -227,12 +228,12 @@ func (a *App) clusterSnapshot(ctx context.Context, id string) (*clusterTask, *cl
 	job := a.clusterJobs[id]
 	if job == nil || job.Status != "done" || job.Snapshot == nil || a.wb != job.Workbook || job.discarded {
 		a.mu.RUnlock()
-		return nil, nil, errors.New("疑似重复结果已失效，请重新检查")
+		return nil, nil, i18n.Error("service.clustering.suspectedDuplicateResultsHaveBecome")
 	}
 	snapshot, wb := job.Snapshot, job.Workbook
 	a.mu.RUnlock()
 	if job.Index != nil && wb.GetCachedIndex(job.Meta.Path) != job.Index {
-		return nil, nil, errors.New("聚类来源索引已变化，请重新检查")
+		return nil, nil, i18n.Error("service.clustering.indexClusteringSourceChangedRecheck")
 	}
 	if err := a.checkClusterSource(ctx, wb, snapshot); err != nil {
 		return nil, nil, err
@@ -241,7 +242,7 @@ func (a *App) clusterSnapshot(ctx context.Context, id string) (*clusterTask, *cl
 	current := a.wb == wb && a.clusterJobs[id] == job && !job.discarded
 	a.mu.RUnlock()
 	if !current {
-		return nil, nil, errors.New("聚类来源已切换，请重新检查")
+		return nil, nil, i18n.Error("service.clustering.clusteringSourceSwitchedRecheck")
 	}
 	return job, snapshot, nil
 }
@@ -257,19 +258,19 @@ func (a *App) handleClusterGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	offset, err := dataRuleQueryInt(r, "offset")
 	if err != nil {
-		writeError(w, 400, "候选分页位置无效")
+		writeMessage(w, 400, "service.clustering.candidatePaginationPositionInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job, snapshot, err := a.clusterSnapshot(r.Context(), r.URL.Query().Get("id"))
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	total := len(snapshot.Result.Groups)
 	if offset > total {
-		writeError(w, 400, "候选分页位置超出结果")
+		writeMessage(w, 400, "service.clustering.candidatePageBreakLocationExceeds")
 		return
 	}
 	items := make([]map[string]any, 0, formats.ClusterPageGroups)
@@ -291,23 +292,23 @@ func (a *App) handleClusterDetail(w http.ResponseWriter, r *http.Request) {
 	groupID, e1 := dataRuleQueryInt(r, "group")
 	offset, e2 := dataRuleQueryInt(r, "offset")
 	if e1 != nil || e2 != nil {
-		writeError(w, 400, "候选组或原文分页无效")
+		writeMessage(w, 400, "service.clustering.invalidCandidateGroupOrOriginal")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job, snapshot, err := a.clusterSnapshot(r.Context(), r.URL.Query().Get("id"))
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if groupID >= len(snapshot.Result.Groups) {
-		writeError(w, 404, "候选组不存在")
+		writeMessage(w, 404, "service.clustering.candidateGroupDoesNotExist")
 		return
 	}
 	group := snapshot.Result.Groups[groupID]
 	if offset > len(group.Variants) {
-		writeError(w, 400, "候选原文分页超出结果")
+		writeMessage(w, 400, "service.clustering.candidateOriginalPageBreakExceeds")
 		return
 	}
 	payload := clusterEnvelope(job, snapshot)
@@ -332,24 +333,24 @@ func (a *App) handleClusterConfirm(w http.ResponseWriter, r *http.Request) {
 		Choices               []clusterChoice
 	}
 	if decodeClusterRequest(w, r, &req) != nil || len(req.Choices) == 0 || len(req.Choices) > formats.TextMappingEntries {
-		writeError(w, 400, "请明确选择候选组及代表原文")
+		writeMessage(w, 400, "service.clustering.clearlySelectCandidateGroupRepresentative")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job, snapshot, err := a.clusterSnapshot(r.Context(), req.ID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if req.WorkbookKey != job.Workbook.Fingerprint || req.Book != sourceBookID(job.Workbook) {
-		writeError(w, 409, "确认来源已切换")
+		writeMessage(w, 409, "service.clustering.confirmedSourceSwitched")
 		return
 	}
 	seen, values := make(map[int]bool), make(map[string]string)
 	for _, choice := range req.Choices {
 		if choice.Group < 0 || choice.Group >= len(snapshot.Result.Groups) || seen[choice.Group] {
-			writeError(w, 400, "候选组无效或重复")
+			writeMessage(w, 400, "service.clustering.invalidOrDuplicateCandidateGroups")
 			return
 		}
 		seen[choice.Group] = true
@@ -359,7 +360,7 @@ func (a *App) handleClusterConfirm(w http.ResponseWriter, r *http.Request) {
 			found = found || value.Raw == choice.Representative
 		}
 		if !found || group.Kind != "similar" {
-			writeError(w, 400, "代表值必须是疑似重复组中已有的原文")
+			writeMessage(w, 400, "service.clustering.representativeValueMustBeAlready")
 			return
 		}
 		for _, value := range group.Variants {
@@ -367,7 +368,7 @@ func (a *App) handleClusterConfirm(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if previous, exists := values[value.Raw]; exists && previous != choice.Representative {
-				writeError(w, 400, "同一原文对应了不同代表值，请重新核对")
+				writeMessage(w, 400, "service.clustering.sameOriginalTextCorrespondsDifferent")
 				return
 			}
 			values[value.Raw] = choice.Representative
@@ -379,7 +380,7 @@ func (a *App) handleClusterConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(step.Mapping, func(i, j int) bool { return step.Mapping[i].From < step.Mapping[j].From })
 	if err := analysis.ValidateTextMapping(step); err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	payload := clusterEnvelope(job, snapshot)
@@ -397,23 +398,23 @@ func (a *App) handleClusterResolve(w http.ResponseWriter, r *http.Request) {
 	variant, e2 := dataRuleQueryInt(r, "variant")
 	sample, e3 := dataRuleQueryInt(r, "sample")
 	if e1 != nil || e2 != nil || e3 != nil {
-		writeError(w, 400, "候选源坐标无效")
+		writeMessage(w, 400, "service.clustering.invalidCandidateSourceCoordinates")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	job, snapshot, err := a.clusterSnapshot(r.Context(), q.Get("id"))
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if q.Get("workbookKey") != job.Workbook.Fingerprint || q.Get("book") != sourceBookID(job.Workbook) {
-		writeError(w, 409, "定位来源已切换")
+		writeMessage(w, 409, "service.clustering.sourceLocationSwitched")
 		return
 	}
 	groups := snapshot.Result.Groups
 	if groupID >= len(groups) || variant >= len(groups[groupID].Variants) || sample >= len(groups[groupID].Variants[variant].Rows) {
-		writeError(w, 404, "候选源坐标不存在")
+		writeMessage(w, 404, "service.clustering.candidateSourceCoordinatesDoNot")
 		return
 	}
 	row := groups[groupID].Variants[variant].Rows[sample]

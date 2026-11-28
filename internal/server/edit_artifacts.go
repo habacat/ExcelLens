@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+
 	"excellens/internal/checkpoint"
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
+	"excellens/internal/i18n"
 	"fmt"
 	"io"
 	"net/http"
@@ -127,7 +129,7 @@ func (a *App) handleEditOpen(w http.ResponseWriter, r *http.Request, req editReq
 	if artifact.Delimiter != 0 {
 		delimiter, _ := wb.EditDialect()
 		if delimiter != artifact.Delimiter {
-			editError(w, errors.New("副本已生成，当前自动识别的分隔符与副本不一致"))
+			editError(w, i18n.Error("service.editArtifacts.copyGeneratedCurrentAutomaticallyIdentified"))
 			return
 		}
 	}

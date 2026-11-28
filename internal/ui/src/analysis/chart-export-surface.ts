@@ -1,6 +1,7 @@
 /**
  * Canvas subset used by the shared chart core for PNG and vector-only SVG export.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ChartExportLimits } from '../contracts/formats.ts';
 import {
   paintChart,
@@ -33,7 +34,7 @@ let rasterOwner: RasterTicket | null = null;
 let rasterWaiter: RasterTicket | null = null;
 
 function makeRasterAbortError(): Error {
-  const err = new Error('图片生成已取消');
+  const err = new Error(localize('ui.chartExportSurface.imageGenerationCanceled'));
   err.name = 'AbortError';
   return err;
 }
@@ -73,13 +74,13 @@ function rasterLease(signal?: AbortSignal): Promise<() => void> {
       rasterWaiter = ticket;
       signal?.addEventListener('abort', ticket.abort, { once: true });
     } else {
-      reject(new Error('已有图片正在等待编码，请取消后重试'));
+      reject(new Error(localize('ui.chartExportSurface.someImagesWaitingBeEncoded')));
     }
   });
 }
 
 function assertFiniteCoord(n: number): number {
-  if (!Number.isFinite(n) || Math.abs(n) > 1e7) throw new Error('图表绘制坐标无效');
+  if (!Number.isFinite(n) || Math.abs(n) > 1e7) throw new Error(localize('ui.chartExportSurface.invalidChartDrawingCoordinates'));
   return n;
 }
 
@@ -132,7 +133,7 @@ function validateColor(value: unknown): string {
     typeof value !== 'string' ||
     !/^(?:#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})|rgba?\([\d.,\s%]+\))$/i.test(value)
   ) {
-    throw new Error('图表颜色无法导出');
+    throw new Error(localize('ui.chartExportSurface.chartColorsCannotBeExported'));
   }
   if (value.startsWith('rgb')) {
     const parts = value
@@ -148,7 +149,7 @@ function validateColor(value: unknown): string {
           Number.parseFloat(s) > (s.endsWith('%') ? 100 : i === 3 ? 1 : 255),
       )
     ) {
-      throw new Error('图表颜色无效');
+      throw new Error(localize('ui.chartExportSurface.invalidChartColor'));
     }
   }
   return value;
@@ -248,7 +249,7 @@ export class SVGContext implements ChartDrawContext {
     assertFiniteCoord(r);
     assertFiniteCoord(start);
     assertFiniteCoord(end);
-    if (r < 0) throw new Error('图表圆弧半径无效');
+    if (r < 0) throw new Error(localize('ui.chartExportSurface.invalidChartArcRadius'));
     const tau = Math.PI * 2;
     const raw = ccw ? start - end : end - start;
     const span = raw >= tau ? tau : ((raw % tau) + tau) % tau;
@@ -282,7 +283,7 @@ export class SVGContext implements ChartDrawContext {
   stroke(): void {
     if (this.path) {
       if (!Number.isFinite(this.lineWidth) || this.lineWidth <= 0) {
-        throw new Error('图表线宽无效');
+        throw new Error(localize('ui.chartExportSurface.invalidChartLineWidth'));
       }
       this.emit(
         `<path d="${this.path}" fill="none" stroke="${validateColor(this.strokeStyle)}" stroke-width="${formatSvgNumber(this.lineWidth)}"/>`,
@@ -312,7 +313,7 @@ export class SVGContext implements ChartDrawContext {
     const fontFamily = font?.[3]?.trim();
     const fontSize = font?.[2];
     if (!font || !fontFamily || !fontSize || !['Segoe UI', 'Microsoft YaHei'].includes(fontFamily)) {
-      throw new Error('图表字体无法导出');
+      throw new Error(localize('ui.chartExportSurface.chartFontCannotBeExported'));
     }
     const measured = this.measureText(value).width;
     const squeeze =
@@ -345,7 +346,7 @@ export class SVGContext implements ChartDrawContext {
 
   restore(): void {
     const state = this.stack.pop();
-    if (!state) throw new Error('SVG绘图状态无效');
+    if (!state) throw new Error(localize('ui.chartExportSurface.invalidSvgDrawingStatus'));
     this.tx = state.tx;
     this.ty = state.ty;
     this.font = state.font;
@@ -361,10 +362,10 @@ export class SVGContext implements ChartDrawContext {
   }
 
   serialize(width: number, height: number, title: string): string {
-    if (this.stack.length) throw new Error('SVG绘图状态未结束');
+    if (this.stack.length) throw new Error(localize('ui.chartExportSurface.svgDrawingStatusNotCompleted'));
     const w = formatSvgNumber(width);
     const h = formatSvgNumber(height);
-    const text = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-labelledby="chart-title"><title id="chart-title">${escapeXml(title)}</title><desc>已接受结果快照；精确值与完整说明见同包 exact-data.json 及 README.txt。</desc><defs><clipPath id="chart-bounds"><rect width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#chart-bounds)">${this.nodes.join('')}</g></svg>`;
+    const text = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-labelledby="chart-title"><title id="chart-title">${escapeXml(title)}</title><desc>${localizeHTML('ui.chartExportSurface.resultSnapshotAcceptedPreciseValues')}</desc><defs><clipPath id="chart-bounds"><rect width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#chart-bounds)">${this.nodes.join('')}</g></svg>`;
     if (encoder.encode(text).length > this.limits.svgBytes) throw chartExportCapacityError();
     return text;
   }
@@ -400,22 +401,22 @@ export function chartExportDescriptions(payload: ChartExportPayload): readonly s
   const c = payload.chart;
   const d = c.drawing;
   const flags: string[] = [];
-  if (d.resultTruncated) flags.push('结果已按前 N 项截取，未显示分类不在附件行中');
-  if (d.firstTreeLevel) flags.push('层级透视首层，未导出展开后代');
+  if (d.resultTruncated) flags.push(localize('ui.chartExportSurface.resultsHaveTruncatedFirstN'));
+  if (d.firstTreeLevel) flags.push(localize('ui.chartExportSurface.hierarchicalPerspectiveFirstLevelNo'));
   if (d.positiveOnly) {
     flags.push(
-      `仅从前${d.consideredRows}分类绘制前${d.rowIndices.length}个正值及第1系列，负数/零不画`,
+      localize('ui.chartExportSurface.onlyFirstValuesFromPrevious', { consideredRows: d.consideredRows, count: d.rowIndices.length }),
     );
   }
-  if (d.missingCells) flags.push(`${d.missingCells}个缺值不补0`);
+  if (d.missingCells) flags.push(localize('ui.chartExportSurface.valuesMissingNoFilled', { missingCells: d.missingCells }));
   const display = c.numberSettings;
   return [
-    `绘制 ${d.rowIndices.length}/${d.totalRows} 个分类 · ${d.seriesIndices.length}/${d.totalSeries} 个系列；范围：${c.scope}`,
-    flags.join('；') || '本图保留所绘分类顺序；附件保留全部已接受结果。',
-    '绘图坐标使用近似值；原始/派生精确值、分数及状态以 exact-data.json 为准。',
-    `快照 ${c.capturedAt} · 千分位${display.groupThousands ? '开启' : '关闭'} · 科学计数法${display.scientific ? `10^${display.scientificExponent}起` : '关闭'}`,
-    '长标签/说明在图片中可能截短，完整原文见附件。',
-    '数据附件为已接受结果快照，不代表未截取的整个源表；源文件未修改。',
+    localize('ui.chartExportSurface.createCategoriesSeriesRange', { count: d.rowIndices.length, totalRows: d.totalRows, count2: d.seriesIndices.length, totalSeries: d.totalSeries, scope: c.scope }),
+    flags.join('；') || localize('ui.chartExportSurface.drawingOrderThisFigureRetained'),
+    localize('ui.chartExportSurface.drawingCoordinatesUseApproximateValues'),
+    localize('ui.chartExportSurface.snapshotThousandthsScientificNotation', { capturedAt: c.capturedAt, detail: display.groupThousands ? localize('ui.chartExportSurface.enable') : localize('ui.common.close'), detail2: display.scientific ? localize('ui.chartExportSurface.startingFrom', { scientificExponent: display.scientificExponent }) : localize('ui.common.close') }),
+    localize('ui.chartExportSurface.longLabelsDescriptionsMayBe'),
+    localize('ui.chartExportSurface.dataAttachmentsSnapshotsAcceptedResults'),
   ];
 }
 
@@ -445,9 +446,9 @@ export function paintChartExportDocument(
     ctx.fillText(fitSvgLine(ctx, value, spec.width - 48), 24, y);
   };
 
-  text(c.title || 'ExcelLens 图表', 32, 18, true);
-  text(`来源：${c.source}`, 56);
-  text(`指标：${c.metric} · 单位：${c.unit}`, 78);
+  text(c.title || localize('ui.chartExportSurface.excellensChart'), 32, 18, true);
+  text(localize('ui.chartExportSurface.source', { source: c.source }), 56);
+  text(localize('ui.chartExportSurface.indicatorUnit', { metric: c.metric, unit: c.unit }), 78);
 
   ctx.save();
   ctx.translate(0, 100);
@@ -461,7 +462,7 @@ export function paintChartExportDocument(
     c.numberSettings,
   );
   ctx.restore();
-  if (drawn.status !== 'ok') throw new Error('数值超出可绘制范围，未生成图片');
+  if (drawn.status !== 'ok') throw new Error(localize('ui.chartExportSurface.valueExceedsPrintableRangeNo'));
 
   const description = chartExportDescriptions(payload);
   const d = c.drawing;
@@ -469,7 +470,7 @@ export function paintChartExportDocument(
   if (d.resultTruncated || d.firstTreeLevel || d.positiveOnly || d.missingCells) {
     notes.push(description[1] ?? '');
   }
-  notes.push('精确数据见 exact-data.json');
+  notes.push(localize('ui.chartExportSurface.preciseDataReferExactData'));
   notes.forEach((line, i) => text(line, spec.height - 74 + i * 18, 11));
 }
 
@@ -494,7 +495,7 @@ export async function renderChartExportImage(
     canvas = document.createElement('canvas');
     if (spec.type === 'svg') {
       const measure = canvas.getContext('2d');
-      if (!measure) throw new Error('当前环境无法测量图表字体');
+      if (!measure) throw new Error(localize('ui.chartExportSurface.chartFontsCannotBeMeasured'));
       const ctx = new SVGContext(measure, limits);
       paintChartExportDocument(ctx, payload, spec);
       return new Blob(
@@ -505,18 +506,18 @@ export async function renderChartExportImage(
     canvas.width = dimensions.width;
     canvas.height = dimensions.height;
     const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) throw new Error('当前环境无法创建图表图片');
+    if (!ctx) throw new Error(localize('ui.chartExportSurface.chartImagesCannotBeCreated'));
     ctx.setTransform(spec.scale, 0, 0, spec.scale, 0, 0);
     paintChartExportDocument(ctx, payload, spec);
     const rasterCanvas = canvas;
     const blob = await new Promise<Blob>((resolve, reject) => {
       try {
         rasterCanvas.toBlob(
-          (value) => (value ? resolve(value) : reject(new Error('PNG编码失败，请重试'))),
+          (value) => (value ? resolve(value) : reject(new Error(localize('ui.chartExportSurface.pngEncodingFailedTryAgain')))),
           'image/png',
         );
       } catch (error: unknown) {
-        reject(error instanceof Error ? error : new Error('PNG编码失败，请重试'));
+        reject(error instanceof Error ? error : new Error(localize('ui.chartExportSurface.pngEncodingFailedTryAgain')));
       }
     });
     await checkpoint();

@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -15,29 +16,29 @@ func (a *App) handleCell(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.cell.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "找不到指定工作表")
+		writeMessage(w, http.StatusNotFound, "service.cell.unableFindSpecifiedWorksheet")
 		return
 	}
 	ref := r.URL.Query().Get("ref")
 	col, rowNumber, err := workbook.ParseCellRef(ref)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "单元格地址无效")
+		writeMessage(w, http.StatusBadRequest, "service.cell.cellAddressInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, http.StatusConflict, "该工作表尚未建立索引，请先打开工作表")
+		writeMessage(w, http.StatusConflict, "service.cell.thisWorksheetNotIndexedYet")
 		return
 	}
 	if rowNumber > workbook.MaxRowsForIndex(idx) {
-		writeError(w, http.StatusBadRequest, "单元格地址超出源格式范围")
+		writeMessage(w, http.StatusBadRequest, "service.cell.cellAddressExceedsSourceFormat")
 		return
 	}
 	cell := workbook.CellData{Ref: ref, Col: col, Raw: "", Display: ""}
@@ -56,7 +57,7 @@ func (a *App) handleCell(w http.ResponseWriter, r *http.Request) {
 		}
 		rows, readErr := wb.ReadRowsByNumbersWithOptionsContext(r.Context(), idx, []int{rowNumber}, col, col, readOpts)
 		if readErr != nil {
-			writeError(w, http.StatusInternalServerError, "读取单元格失败："+readErr.Error())
+			writeMessage(w, http.StatusInternalServerError, "service.cell.failedReadCell", i18n.Args{"detail": readErr})
 			return
 		}
 		if len(rows) > 0 {

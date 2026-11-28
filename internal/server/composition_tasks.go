@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"io"
 	"net/http"
 	"slices"
@@ -12,6 +12,7 @@ import (
 
 	"excellens/internal/composition"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 	"excellens/internal/workbook"
 )
@@ -89,28 +90,28 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 	var req compositionStartRequest
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.CompositionRequestBytes))
 	if err != nil || decodeSavedConfig(data, &req) != nil || req.Mode != "fields" && req.Mode != "append" || req.Mode == "fields" && (req.Choice == nil || req.Definition != nil) || req.Mode == "append" && (req.Definition == nil || req.Choice != nil) {
-		writeError(w, 400, "多表来源参数无效")
+		writeMessage(w, 400, "service.compositionTasks.invalidMultiTableSourceParameters")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	primary := a.currentWorkbook()
 	if primary == nil || primary.Fingerprint != req.WorkbookKey || sourceBookID(primary) != req.Book {
-		writeError(w, 409, "工作簿已切换，请重新选择多表来源")
+		writeMessage(w, 409, "service.compositionTasks.workbookSwitchedSelectMultiTable")
 		return
 	}
 	var books []*workbook.Workbook
 	if req.Mode == "append" {
 		definition, err := req.Definition.Normalized()
 		if err != nil {
-			writeError(w, 400, err.Error())
+			writeFailure(w, 400, err)
 			return
 		}
 		req.Definition = &definition
 		for _, input := range definition.Inputs {
 			wb := a.resolveReconcileBook(input.Ref.Book)
 			if wb == nil || wb.Fingerprint != input.Ref.Fingerprint {
-				writeError(w, 409, "多表来源已关闭或变化，请重新选择")
+				writeMessage(w, 409, "service.compositionTasks.multiSheetSourceClosedOr")
 				return
 			}
 			books = append(books, wb)
@@ -119,17 +120,17 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 		choice := *req.Choice
 		wb := a.resolveReconcileBook(choice.Book)
 		if wb == nil || len(choice.Source) > 512 || choice.HeaderRow < 0 || choice.HeaderRow > formats.ExternalRows || !(strings.HasPrefix(choice.Source, "wb:") && len(choice.Source) > 3 || strings.HasPrefix(choice.Source, "scratch:") && len(choice.Source) > 8) {
-			writeError(w, 400, "字段来源或表头无效")
+			writeMessage(w, 400, "service.compositionTasks.fieldSourceOrHeaderInvalid")
 			return
 		}
 		if strings.HasPrefix(choice.Source, "scratch:") && (choice.HeaderRow != 0 || choice.Scope != nil) {
-			writeError(w, 400, "分析表不使用源表头或源范围")
+			writeMessage(w, 400, "service.compositionTasks.analysisTableDoesNotUse")
 			return
 		}
 		if choice.Scope != nil {
 			scope, err := normalizedAnalysisScope(wb, choice.Source, *choice.Scope)
 			if err != nil {
-				writeError(w, 400, err.Error())
+				writeFailure(w, 400, err)
 				return
 			}
 			choice.Scope = &scope
@@ -139,12 +140,12 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 	}
 	configuration, err := json.Marshal(req)
 	if err != nil {
-		writeError(w, 400, "来源配置无法读取")
+		writeMessage(w, 400, "service.compositionTasks.sourceConfigurationUnableBeRead")
 		return
 	}
 	releaseConfiguration, err := a.reserveCompositionBytes(int64(len(configuration))*4 + 4096)
 	if err != nil {
-		writeError(w, 429, err.Error())
+		writeFailure(w, 429, err)
 		return
 	}
 	accepted := false
@@ -154,12 +155,12 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	ctx, cancel := context.WithCancel(context.Background())
-	job := &compositionTask{ID: randomID(), Mode: req.Mode, Status: "queued", Stage: "等待来源任务", Primary: primary, Books: books, Choice: req.Choice, Definition: req.Definition, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	job := &compositionTask{ID: randomID(), Mode: req.Mode, Status: "queued", Stage: "stage.task.waitingForSourceTasks", Primary: primary, Books: books, Choice: req.Choice, Definition: req.Definition, Created: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{})}
 	a.mu.Lock()
 	if a.wb != primary || a.maintenance || r.Context().Err() != nil {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.compositionTasks.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	active := 0
@@ -179,7 +180,7 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 	if active >= formats.CompositionActiveTasks {
 		a.mu.Unlock()
 		cancel()
-		writeError(w, 429, "来源任务正在准备，请等待或取消后重试")
+		writeMessage(w, 429, "service.compositionTasks.sourceTaskBeingPreparedWait")
 		return
 	}
 	retired := a.pruneCompositionLocked(keep, formats.CompositionTaskHistory-1, formats.CompositionSnapshots-1)
@@ -187,7 +188,7 @@ func (a *App) handleCompositionStart(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		closeCompositionResources(retired)
 		cancel()
-		writeError(w, 429, "正在回收来源任务，请稍后重试")
+		writeMessage(w, 429, "service.compositionTasks.sourceTasksBeingReclaimedTry")
 		return
 	}
 	releasePins := a.pinWorkbooks(append(slices.Clone(books), primary)...)
@@ -210,16 +211,16 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 	defer func() {
 		a.mu.Lock()
 		if job.ctx.Err() != nil || job.discarded || a.wb != job.Primary || a.compositionJobs[job.ID] != job {
-			job.Status, job.Stage, job.Error = "cancelled", "已取消", ""
+			job.Status, job.Stage, job.Error = "cancelled", "stage.task.cancelled", ""
 		} else if err != nil {
-			job.Status, job.Stage, job.Error = "error", "来源准备失败", err.Error()
+			job.Status, job.Stage, job.Error = "error", "stage.task.sourcePreparationFailed", err.Error()
 		} else if result == nil {
-			job.Status, job.Stage, job.Error = "error", "来源准备失败", "未取得来源结果"
+			job.Status, job.Stage, job.Error = "error", "stage.task.sourcePreparationFailed", "未取得来源结果"
 		} else {
 			job.Source, source = source, nil
 			job.Result, job.Rows, job.Bytes = result, rows, int64(len(result))
 			job.check = check
-			job.Status, job.Stage = "done", "来源已就绪"
+			job.Status, job.Stage = "done", "stage.task.sourceIsReady"
 			job.release, resultRelease = resultRelease, nil
 			if job.Mode == "fields" {
 				bytesRelease, sourceRelease := job.release, unpin
@@ -254,7 +255,7 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 	a.mu.Lock()
 	current := a.wb == job.Primary && a.compositionJobs[job.ID] == job && !job.discarded && job.ctx.Err() == nil
 	if current {
-		job.Status, job.Stage = "running", "正在准备来源"
+		job.Status, job.Stage = "running", "stage.task.preparingTheSource"
 	}
 	a.mu.Unlock()
 	if !current {
@@ -310,7 +311,7 @@ func (a *App) runCompositionTask(job *compositionTask, unpin func()) {
 		return
 	}
 	if len(result) > formats.CompositionResultBytes {
-		err = errors.New("来源结果超过显示容量，请减少字段或来源")
+		err = i18n.Error("service.compositionTasks.sourceResultExceedsDisplayCapacity")
 		return
 	}
 	if resultRelease, err = a.reserveCompositionBytes(int64(len(result))*2 + 4096); err != nil {
@@ -383,10 +384,10 @@ func (a *App) handleCompositionStatus(w http.ResponseWriter, r *http.Request) {
 	job := a.compositionJobs[r.URL.Query().Get("id")]
 	if job == nil || job.discarded || a.wb != job.Primary {
 		a.mu.RUnlock()
-		writeError(w, 404, "来源任务已失效")
+		writeMessage(w, 404, "service.compositionTasks.sourceTaskBecomeInvalid")
 		return
 	}
-	payload := map[string]any{"id": job.ID, "mode": job.Mode, "status": job.Status, "stage": job.Stage, "error": job.Error, "rows": job.Rows, "workbookKey": job.Primary.Fingerprint, "book": sourceBookID(job.Primary)}
+	payload := map[string]any{"id": job.ID, "mode": job.Mode, "status": job.Status, "stage": responseLocale(w).Stage(job.Stage), "error": job.Error, "rows": job.Rows, "workbookKey": job.Primary.Fingerprint, "book": sourceBookID(job.Primary)}
 	a.mu.RUnlock()
 	writeJSON(w, payload)
 }
@@ -434,7 +435,7 @@ func (a *App) borrowCompositionTask(id string, primary *workbook.Workbook) (*com
 	defer a.mu.RUnlock()
 	job := a.compositionJobs[id]
 	if job == nil || job.Status != "done" || job.ctx.Err() != nil || job.discarded || job.Source == nil || job.Primary != primary || a.wb != primary {
-		return nil, errors.New("多表来源尚未准备或已失效，请重新准备")
+		return nil, i18n.Error("service.compositionTasks.multipleTableSourcesNotPrepared")
 	}
 	return job.Source.retain()
 }
@@ -450,7 +451,7 @@ func (a *App) handleCompositionResult(w http.ResponseWriter, r *http.Request) {
 	job := a.compositionJobs[r.URL.Query().Get("id")]
 	if job == nil || job.Status != "done" || job.ctx.Err() != nil || job.Result == nil || job.discarded || a.wb != job.Primary {
 		a.mu.RUnlock()
-		writeError(w, 404, "来源结果已失效")
+		writeMessage(w, 404, "service.compositionTasks.sourceResultsHaveBecomeInvalid")
 		return
 	}
 	data, primary, check := job.Result, job.Primary, job.check
@@ -460,14 +461,14 @@ func (a *App) handleCompositionResult(w http.ResponseWriter, r *http.Request) {
 		source, err = job.Source.retain()
 		if err != nil {
 			a.mu.RUnlock()
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 	}
 	a.mu.RUnlock()
 	defer source.close()
 	if err := primary.CheckSourceUnchanged(); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if source != nil {
@@ -475,7 +476,7 @@ func (a *App) handleCompositionResult(w http.ResponseWriter, r *http.Request) {
 	}
 	if check != nil {
 		if err := check(r.Context()); err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 	}
@@ -483,7 +484,7 @@ func (a *App) handleCompositionResult(w http.ResponseWriter, r *http.Request) {
 	current := a.wb == primary && a.compositionJobs[job.ID] == job && !job.discarded && job.Result != nil
 	a.mu.RUnlock()
 	if !current {
-		writeError(w, 409, "工作簿或来源结果已切换")
+		writeMessage(w, 409, "service.compositionTasks.workbookOrSourceResultsHave")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

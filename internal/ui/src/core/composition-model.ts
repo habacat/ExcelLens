@@ -2,6 +2,7 @@
  * Pure field alignment, search, validation, and type-warning model shared by
  * Multi-Table Composition and FieldPicker (used by both Composition and Relations).
  */
+import { t as localize } from './i18n.ts';
 import type {
   CompositionDefinition,
   CompositionField,
@@ -63,7 +64,7 @@ export function initialCompositionRows(
 ): CompositionMappingRow[] {
   const used = new Set<string>();
   return fields.slice(0, columns).map((field) => {
-    const base = (field.name || `${columnName(field.column)} 列`).trim();
+    const base = (field.name || localize('ui.compositionModel.column', { columnName: columnName(field.column) })).trim();
     let name = base;
     let suffix = 1;
     while (used.has(name)) {
@@ -82,59 +83,59 @@ export function validateComposition(
 ): string {
   const trimmedName = name.trim();
   if (!trimmedName || Array.from(trimmedName).length > 80) {
-    return '请输入联合来源名称（最多80字）';
+    return localize('ui.compositionModel.enterNameCombinedSourceUp');
   }
   if (
     inputs.length < 2 ||
     inputs.length > limits.sources ||
     inputs.some((input) => !input.info)
   ) {
-    return '请至少选择两份来源并读取字段';
+    return localize('ui.common.selectAtLeastTwoSources');
   }
   if (!rows.length || rows.length > limits.columns) {
-    return '请选择结果字段';
+    return localize('ui.compositionModel.selectResultField');
   }
   const names = new Set<string>();
   const sources = new Set<string>();
   for (const input of inputs) {
     const info = input.info;
-    if (!info) return '请至少选择两份来源并读取字段';
+    if (!info) return localize('ui.common.selectAtLeastTwoSources');
     const ref: TableRef = cloneValue(info.ref);
     delete ref.stamp;
     const key = JSON.stringify(ref);
-    if (sources.has(key)) return '同一来源和范围不能重复追加';
+    if (sources.has(key)) return localize('ui.compositionModel.sameSourceRangeCannotBe');
     sources.add(key);
   }
   for (const row of rows) {
     const fieldName = row.name.trim();
     if (!fieldName || Array.from(fieldName).length > 128 || names.has(fieldName)) {
-      return '结果字段名称不能为空或重复';
+      return localize('ui.compositionModel.nameResultFieldCannotBe');
     }
     names.add(fieldName);
     if (!row.columns.some((column) => column !== null && column > 0)) {
-      return '每个结果字段至少选择一份来源';
+      return localize('ui.compositionModel.selectAtLeastOneSource');
     }
   }
   for (let i = 0; i < inputs.length; i++) {
     const info = inputs[i]?.info;
-    if (!info) return '请至少选择两份来源并读取字段';
+    if (!info) return localize('ui.common.selectAtLeastTwoSources');
     const used = new Set<number>();
     const fieldSet = new Set((info.fields ?? []).map((field) => field.column));
     for (const row of rows) {
       const column = row.columns[i];
       if (column === null || column === undefined) {
-        return '请确认未匹配字段，可选择空列';
+        return localize('ui.compositionModel.confirmUnmatchedFieldsCanChoose');
       }
       if (
         !Number.isInteger(column) ||
         column < 0 ||
         (column > 0 && (!fieldSet.has(column) || used.has(column)))
       ) {
-        return '来源字段无效或重复使用';
+        return localize('ui.compositionModel.sourceFieldInvalidOrUsed');
       }
       if (column > 0) used.add(column);
     }
-    if (!used.size) return '每份来源至少选择一个字段';
+    if (!used.size) return localize('ui.compositionModel.eachSourceMustHaveAt');
   }
   return '';
 }
@@ -202,8 +203,8 @@ export function compositionTypeWarning(
   inputs: readonly CompositionInputSlot[],
 ): string {
   const types = sampleTypes(row, inputs);
-  if (hasTypeConflict(row, inputs)) return '示例类型不同';
-  if (types.includes('unknown')) return '类型未确认';
-  if (types.includes('cache')) return '示例缺缓存';
+  if (hasTypeConflict(row, inputs)) return localize('ui.compositionModel.differentExampleTypes');
+  if (types.includes('unknown')) return localize('ui.compositionModel.typeNotConfirmed');
+  if (types.includes('cache')) return localize('ui.compositionModel.exampleWithoutCache');
   return '';
 }

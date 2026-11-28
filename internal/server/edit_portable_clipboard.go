@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+
 	"excellens/internal/calculator"
+	"excellens/internal/i18n"
 	"strings"
 
 	"excellens/internal/checkpoint"
@@ -87,7 +89,7 @@ func (a *App) checkPortable(ctx context.Context, doc *editdoc.Document, r *editd
 		return err
 	}
 	if !hmac.Equal([]byte(signed.Proof), []byte(proof)) {
-		return errors.New("剪贴板格式已过期，请重新复制")
+		return i18n.Error("service.editPortableClipboard.clipboardFormatExpiredCopyAgain")
 	}
 	if r.Origin == doc.OriginalBase().Source.Book {
 		return nil
@@ -109,7 +111,7 @@ func (a *App) checkPortable(ctx context.Context, doc *editdoc.Document, r *editd
 		}
 		_, _ = calculator.ParseLocalFormula(ctx, strings.TrimPrefix(raw, "="), func(string) bool { return true }, func(string) (bool, bool) { bound = true; return false, true })
 		if bound {
-			return errors.New("此公式需要链接来源工作簿或导入其名称，可用 Ctrl+Shift+V 粘贴显示值")
+			return i18n.Error("service.editPortableClipboard.thisFormulaRequiresLinkedSource")
 		}
 	}
 	return nil

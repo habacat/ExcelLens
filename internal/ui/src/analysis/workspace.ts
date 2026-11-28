@@ -39,6 +39,7 @@ import {
   requireSelect,
 } from '../core/dom.ts';
 import { requireFileFormats } from '../core/formats.ts';
+import { t, t as localize } from '../core/i18n.ts';
 import { askOverlay } from '../core/overlays.ts';
 import { RecoveryJournal, showRecoveryDialog } from '../core/recovery.ts';
 import { SourceTasks } from '../core/source-tasks.ts';
@@ -359,7 +360,7 @@ export class AnalysisWorkspace {
       reportCache: new AnalysisResultCache(),
       reportOpenSerial: 0,
       reportPending: 0,
-      templateCategory: '全部',
+      templateCategory: 'all',
       templateText: '',
       dashboardObserver: null,
       drillQuery: null,
@@ -380,7 +381,7 @@ export class AnalysisWorkspace {
     };
 
     const toastFn = (message: string, tone: ToastTone = 'info'): void => this.toast(message, tone);
-    const askTextFn = (title: string, initial = '', hint = '请输入名称'): Promise<string | null> =>
+    const askTextFn = (title: string, initial = '', hint = localize('ui.workspace.enterName')): Promise<string | null> =>
       this.askText(title, initial, hint);
 
     this.queryEditor = new QueryEditor(this.state, (text, tone) => this.toast(text, tone), field => this.loadFieldProfile(field));
@@ -457,7 +458,7 @@ export class AnalysisWorkspace {
     this.analysisJobs = new AsyncJobs<AnalysisResult, AnalysisQueryStatusResponse>({
       decodeStatus: decodeAnalysisQueryStatusResponse,
       resultFromStatus: status => {
-        if (!status.result) throw new Error('已完成的分析任务缺少结果');
+        if (!status.result) throw new Error(localize('ui.workspace.completedAnalysisTaskLacksResults'));
         return status.result;
       },
       api: this.api,
@@ -516,7 +517,7 @@ export class AnalysisWorkspace {
       }),
       capture: () => {
         if (!this.state.activeResult || !this.state.jobID || this.analysisJobs.main) {
-          throw new Error('请先完成一次分析，再保存方案');
+          throw new Error(localize('ui.workspace.completeAnalysisFirstBeforeSaving'));
         }
         return {
           jobId: this.state.jobID,
@@ -578,11 +579,11 @@ export class AnalysisWorkspace {
         sourceId: this.sourceRows.binding?.id || '',
       }),
       onTransform: (step, guard) => {
-        if (!guard()) throw new Error('分析来源已变化，请重新核对');
+        if (!guard()) throw new Error(localize('ui.workspace.analysisSourceChangedRecheck'));
         const q = this.state.query;
         if (!q) return;
         if (q.transforms.length >= 8) {
-          throw new Error('最多8个计算列，请先移除部分计算列');
+          throw new Error(localize('ui.workspace.upCalculatedColumnsRemoveSome'));
         }
         q.transforms.push(cloneJson(step));
         this.queryEditor.renderFields();
@@ -630,16 +631,16 @@ export class AnalysisWorkspace {
       onStatus: (status) => {
         if (!this.root.isConnected) return;
         const button = requireButton('analysisDraftRecovery');
-        button.title = status.error || '找回未确认的分析输入；核对后点击重试保存';
+        button.title = status.error || localize('ui.workspace.retrieveUnconfirmedAnalysisInputsClick');
         button.classList.toggle('danger', Boolean(status.error));
       },
     });
     this.drafts.onChange = (key, data): void => this.recovery.set(key, data);
     requireButton('analysisDraftRecovery').addEventListener('click', () => {
       showRecoveryDialog(this.recovery, {
-        title: '恢复分析草稿',
+        title: localize('ui.workspace.restorationAnalysisDraft'),
         explanation:
-          '草稿按原文件和编辑表匹配。载入后核对当前已保存值，再点击“重试保存”；本页同格草稿优先保留。',
+          localize('ui.workspace.draftMatchedOriginalFileEditing'),
       });
     });
 
@@ -748,7 +749,7 @@ export class AnalysisWorkspace {
     if (el) el.textContent = text;
   }
 
-  private askText(title: string, initial = '', hint = '请输入名称'): Promise<string | null> {
+  private askText(title: string, initial = '', hint = localize('ui.workspace.enterName')): Promise<string | null> {
     if (this.askTextOverride) return this.askTextOverride(title, initial, hint);
     return askOverlay({ title, value: initial, placeholder: hint, maxLength: 80 }).then((res) =>
       res && typeof res.value === 'string' ? res.value : null,
@@ -791,7 +792,7 @@ export class AnalysisWorkspace {
     }
     if (!choices.size) return;
     const group = document.createElement('optgroup');
-    group.label = '联合来源';
+    group.label = localize('ui.common.jointSources');
     group.setAttribute('data-composition', '');
     for (const [source, definition] of choices) {
       group.append(new Option(definition.name, source));
@@ -846,7 +847,7 @@ export class AnalysisWorkspace {
       requireInput('analysisHeaderRow').value = String(this.state.headerRow);
       this.setText('analysisSourceInfo', previousInfo);
       this.setAnalysisBusy(Boolean(this.analysisJobs.main));
-      if (guard()) throw new Error(reason || '读取字段失败，请重试');
+      if (guard()) throw new Error(reason || localize('ui.workspace.failedReadFieldsTryAgain'));
       return false;
     }
     this.analysisJobs.cancelMain();
@@ -911,14 +912,14 @@ export class AnalysisWorkspace {
   async open(): Promise<void> {
     const ticket = ++this.state.openSerial;
     this.state.openActivity?.end();
-    const activity = this.currentActivity()?.begin('正在打开分析工作区') ?? null;
+    const activity = this.currentActivity()?.begin(localize('ui.workspace.openingAnalysisWorkspace')) ?? null;
     this.state.openActivity = activity;
     this.state.fieldsReady = false;
     this.setAnalysisBusy(Boolean(this.analysisJobs.main));
     try {
       const status = await this.api('/api/status', undefined, decodeWorkbookStatus);
       if (!status.opened) {
-        this.toast('请先打开原始 Excel 工作簿', 'warning');
+        this.toast(localize('ui.workspace.openOriginalExcelWorkbook'), 'warning');
         return;
       }
       if (ticket !== this.state.openSerial) return;
@@ -929,7 +930,7 @@ export class AnalysisWorkspace {
       const workspace = await this.api('/api/analysis/workspace', undefined, decodeAnalysisWorkspaceResponse);
       if (ticket !== this.state.openSerial || !this.isOpened()) return;
       if (workspace.fingerprint !== status.workbookKey) {
-        throw new Error('工作簿已切换，请重新打开分析');
+        throw new Error(localize('ui.workspace.workbookSwitchedReopenAnalysis'));
       }
       this.state.workspace = { ...workspace };
       if (this.state.fingerprint && this.state.workspace.fingerprint !== this.state.fingerprint) {
@@ -956,12 +957,12 @@ export class AnalysisWorkspace {
       const select = requireSelect('analysisSourceSelect');
       select.replaceChildren();
       const originalGroup = document.createElement('optgroup');
-      originalGroup.label = '原始 Excel · 只读';
+      originalGroup.label = localize('ui.workspace.originalExcelFileReadOnly');
       for (const s of original) originalGroup.append(new Option(s.name, `wb:${s.name}`));
       select.append(originalGroup);
       if (this.state.workspace.sheets.length) {
         const editable = document.createElement('optgroup');
-        editable.label = '分析工作表 · 可编辑';
+        editable.label = localize('ui.workspace.analysisWorksheetEditable');
         for (const s of this.state.workspace.sheets) {
           editable.append(new Option(s.name, `scratch:${s.id}`));
         }
@@ -1077,7 +1078,7 @@ export class AnalysisWorkspace {
       return false;
     }
     if (workspace.fingerprint !== book) {
-      throw new Error('工作簿已切换，未载入其他来源的分析工作区');
+      throw new Error(localize('ui.workspace.workbookSwitchedNoAnalysisWorkspace'));
     }
     this.state.workspace = { ...workspace };
     this.state.fingerprint = this.state.workspace.fingerprint || '';
@@ -1086,12 +1087,12 @@ export class AnalysisWorkspace {
     const original = this.state.workspace.sourceSheets;
     select.replaceChildren();
     const originalGroup = document.createElement('optgroup');
-    originalGroup.label = '原始 Excel · 只读';
+    originalGroup.label = localize('ui.workspace.originalExcelFileReadOnly');
     for (const s of original) originalGroup.append(new Option(s.name, `wb:${s.name}`));
     select.append(originalGroup);
     if (this.state.workspace.sheets.length) {
       const grp = document.createElement('optgroup');
-      grp.label = '分析工作表 · 可编辑';
+      grp.label = localize('ui.workspace.analysisWorksheetEditable');
       for (const s of this.state.workspace.sheets) {
         grp.append(new Option(s.name, `scratch:${s.id}`));
       }
@@ -1113,7 +1114,7 @@ export class AnalysisWorkspace {
     sheet: string,
     current: () => boolean = () => this.state.opened,
   ): Promise<void> {
-    const activity = this.currentActivity()?.begin('正在建立行索引');
+    const activity = this.currentActivity()?.begin(localize('ui.workspace.establishingRowIndexes'));
     try {
       const data = await this.post('/api/index/start', { sheet }).then(decodeIndexStartResponse);
       if (data.ready) return;
@@ -1125,7 +1126,7 @@ export class AnalysisWorkspace {
           undefined,
           decodeIndexStatusResponse,
         );
-        if (!current()) throw makeAbortError('读取字段已取消');
+        if (!current()) throw makeAbortError(localize('ui.workspace.readingFieldsHaveCanceled'));
         activity?.job({
           id: s.id,
           stage: s.stage,
@@ -1134,13 +1135,13 @@ export class AnalysisWorkspace {
           totalBytes: s.totalBytes,
           error: s.error,
         });
-        this.setText('analysisSourceInfo', s.stage || '正在建立行索引…');
+        this.setText('analysisSourceInfo', s.stage || localize('ui.workspace.establishingRowIndex'));
         if (s.status === 'done') return;
         if (s.status === 'error' || s.status === 'cancelled') {
-          throw new Error(s.error || '建立索引未完成');
+          throw new Error(s.error || localize('ui.workspace.indexingNotCompleted'));
         }
       }
-      throw new Error('建立索引超时或已取消');
+      throw new Error(localize('ui.workspace.indexingTimeoutOrCanceled'));
     } finally {
       activity?.end();
     }
@@ -1159,7 +1160,7 @@ export class AnalysisWorkspace {
     this.setText(
       'analysisScopeInfo',
       this.state.query?.composition
-        ? `${this.state.query.composition.inputs.length} 个来源`
+        ? localize('ui.workspace.sources', { count: this.state.query.composition.inputs.length })
         : sourceScopeCaption(this.state.query?.sourceScope),
     );
     requireButton('analysisSourceRefresh').disabled = this.state.fieldsLoading || mode === 'full';
@@ -1203,7 +1204,7 @@ export class AnalysisWorkspace {
     this.setAnalysisBusy(Boolean(this.analysisJobs.main));
     this.renderSourceScope();
     requireEl('analysisFieldProfile').hidden = true;
-    this.setText('analysisSourceInfo', '正在读取表头…');
+    this.setText('analysisSourceInfo', localize('ui.workspace.readingHeaders'));
     let candidate: AnalysisSourceRecord | undefined;
     try {
       if (
@@ -1256,7 +1257,7 @@ export class AnalysisWorkspace {
       this.setText('analysisFieldCount', String(this.state.fields.length));
       this.setText(
         'analysisSourceInfo',
-        `${formatCountNumber(data.totalRows)} 条源记录${data.truncatedFields ? ' · 仅显示前256列' : ''}`,
+        localize('ui.workspace.numberSourceRecords', { formatCountNumber: formatCountNumber(data.totalRows), detail: data.truncatedFields ? ` ${localize('ui.workspace.onlyDisplayFirstColumns')}` : '' }),
       );
       activeQuery.source = this.state.source;
       activeQuery.headerRow = this.state.headerRow;
@@ -1287,7 +1288,7 @@ export class AnalysisWorkspace {
     if (!this.state.fieldsReady || this.state.fieldsLoading) return;
     const host = requireEl('analysisFieldProfile');
     host.hidden = false;
-    host.textContent = `正在分析 ${field.name} …`;
+    host.textContent = localize('ui.workspace.analyzing', { name: field.name });
     this.state.profileController?.abort();
     const controller = new AbortController();
     this.state.profileController = controller;
@@ -1325,8 +1326,8 @@ export class AnalysisWorkspace {
       const closeBtn = document.createElement('button');
       closeBtn.type = 'button';
       closeBtn.textContent = '×';
-      closeBtn.title = '收起字段统计';
-      closeBtn.setAttribute('aria-label', '收起字段统计');
+      closeBtn.title = localize('ui.workspace.collapseFieldStatistics');
+      closeBtn.setAttribute('aria-label', localize('ui.workspace.collapseFieldStatistics'));
       closeBtn.onclick = (): void => {
         controller.abort();
         host.hidden = true;
@@ -1342,7 +1343,7 @@ export class AnalysisWorkspace {
         const candidates = document.createElement('button');
         candidates.type = 'button';
         candidates.className = 'analysis-quiet-button';
-        candidates.textContent = '疑似重复';
+        candidates.textContent = localize('ui.workspace.suspectedDuplication');
         candidates.dataset.clusterField = field.id;
         candidates.addEventListener('click', () => {
           if (current()) this.clusters.open(field);
@@ -1353,10 +1354,10 @@ export class AnalysisWorkspace {
       const stats = document.createElement('div');
       stats.className = 'analysis-profile-stat';
       const profilePairs: readonly (readonly [string, number])[] = [
-        ['总行数', info.rows],
-        ['空值', info.empty],
-        [`唯一值${info.uniqueTruncated ? '（至少）' : ''}`, info.unique],
-        ['数值', info.numeric],
+        [localize('ui.workspace.totalLines'), info.rows],
+        [localize('ui.workspace.nullValues'), info.empty],
+        [localize('ui.workspace.uniqueValue', { detail: info.uniqueTruncated ? localize('ui.workspace.atLeast') : '' }), info.unique],
+        [localize('ui.common.numericalValues'), info.numeric],
       ];
       for (const [label, value] of profilePairs) {
         const box = document.createElement('div');
@@ -1371,24 +1372,24 @@ export class AnalysisWorkspace {
       if (info.minNumber !== '' && info.maxNumber !== '') {
         const range = document.createElement('p');
         range.className = 'analysis-profile-range';
-        range.textContent = `数值范围：${info.minNumber} ～ ${info.maxNumber}`;
+        range.textContent = localize('ui.workspace.valueRange', { minNumber: info.minNumber, maxNumber: info.maxNumber });
         host.append(range);
       }
       const caption = document.createElement('p');
       caption.className = 'analysis-profile-range';
-      caption.textContent = '常见值 · 点击即可作为筛选条件';
+      caption.textContent = localize('ui.workspace.commonValuesClickUseAs');
       host.append(caption);
       for (const item of info.frequent) {
         const row = document.createElement('div');
         row.className = 'analysis-profile-item';
         const select = document.createElement('button');
         select.type = 'button';
-        select.textContent = item.value || '（空白）';
+        select.textContent = item.value || localize('ui.common.empty');
         select.title = item.value;
         select.onclick = (): void => {
           if (!current() || !this.state.query) return;
           if (this.state.query.filters.length >= 8) {
-            this.toast('最多8个筛选条件', 'warning');
+            this.toast(localize('ui.workspace.maximumFilteringConditions'), 'warning');
             return;
           }
           this.state.query.filters.push({
@@ -1397,7 +1398,7 @@ export class AnalysisWorkspace {
             value: item.value,
           });
           this.queryEditor.renderRules();
-          this.toast(`已添加筛选：${field.name}`, 'success');
+          this.toast(localize('ui.workspace.filtersAdded', { name: field.name }), 'success');
         };
         const count = document.createElement('span');
         count.textContent = formatCountNumber(item.count);
@@ -1406,7 +1407,7 @@ export class AnalysisWorkspace {
       }
       if (info.missingFormulaCaches) {
         const warning = document.createElement('p');
-        warning.textContent = `${formatCountNumber(info.missingFormulaCaches)} 条公式缺少缓存值`;
+        warning.textContent = localize('ui.workspace.formulasLackCachedValues', { formatCountNumber: formatCountNumber(info.missingFormulaCaches) });
         host.append(warning);
       }
     } catch (err: unknown) {
@@ -1421,17 +1422,17 @@ export class AnalysisWorkspace {
   private async backupExport(): Promise<void> {
     await this.sheetsController.flush();
     if (this.hasUnsaved()) {
-      this.toast('仍有未保存的分析内容，请先重试保存', 'warning');
+      this.toast(localize('ui.common.thereStillAnalysisResultsThat'), 'warning');
       return;
     }
-    const activity = this.currentActivity()?.begin('正在导出分析备份');
+    const activity = this.currentActivity()?.begin(localize('ui.workspace.exportingAnalysisBackup'));
     try {
       const blob = await this.api('/api/analysis/backup', { activity: false }, 'blob');
       this.downloadBlobFn(
         blob,
         `ExcelLens-Analysis-Backup-${new Date().toISOString().slice(0, 10)}.json`,
       );
-      this.toast('已导出分析工作区备份', 'success');
+      this.toast(localize('ui.workspace.analyzedWorkspaceBackupExported'), 'success');
     } catch (err: unknown) {
       this.toast(errorMessage(err), 'error');
     } finally {
@@ -1442,20 +1443,21 @@ export class AnalysisWorkspace {
   private async backupImport(file: File | undefined): Promise<void> {
     if (!file) return;
     if (this.hasUnsaved()) {
-      this.toast('仍有未保存的分析内容，请先重试保存', 'warning');
+      this.toast(localize('ui.common.thereStillAnalysisResultsThat'), 'warning');
       return;
     }
     if (file.size > 41 * 1024 * 1024) {
-      this.toast('备份文件超过大小限制', 'warning');
+      this.toast(localize('ui.workspace.backupFileExceedsSizeLimit'), 'warning');
       return;
     }
+    const confirmation = t('ui.workspace.restoreConfirmationWord');
     const answer = await this.askText(
-      '恢复分析工作区',
+      localize('ui.workspace.restoreAnalysisWorkspace'),
       '',
-      '请输入“恢复”确认覆盖当前编辑表和已保存报表',
+      t('ui.workspace.restoreConfirmationPrompt', { word: confirmation }),
     );
-    if (answer !== '恢复') return;
-    const activity = this.currentActivity()?.begin('正在恢复分析备份');
+    if (answer !== confirmation) return;
+    const activity = this.currentActivity()?.begin(localize('ui.workspace.restoringAnalysisBackup'));
     try {
       const raw = await file.text();
       const parsed: unknown = JSON.parse(raw);
@@ -1471,9 +1473,9 @@ export class AnalysisWorkspace {
       await this.refreshWorkspace();
       await this.loadFields();
       void this.setTab('dashboard');
-      this.toast('分析工作区已从备份恢复', 'success');
+      this.toast(localize('ui.workspace.analysisWorkspaceRestoredFromBackup'), 'success');
     } catch (err: unknown) {
-      this.toast(`恢复失败：${errorMessage(err)}`, 'error');
+      this.toast(localize('ui.workspace.recoveryFailed', { detail: errorMessage(err) }), 'error');
     } finally {
       activity?.end();
     }
@@ -1497,7 +1499,7 @@ export class AnalysisWorkspace {
     requireButton('analysisRun').disabled =
       busy || this.state.fieldsLoading || !this.state.fieldsReady;
     if (busy) {
-      this.setText('analysisProgressText', '正在准备分析…');
+      this.setText('analysisProgressText', localize('ui.workspace.preparingAnalysis'));
       this.setText('analysisProgressPercent', '');
       requireEl('analysisProgressBar').style.width = '0%';
     }
@@ -1519,10 +1521,10 @@ export class AnalysisWorkspace {
     const percent = status.total
       ? Math.min(99, Math.round((100 * status.progress) / status.total))
       : 0;
-    this.setText('analysisProgressText', status.stage || '正在分析…');
+    this.setText('analysisProgressText', status.stage || localize('ui.common.analyzing'));
     this.setText(
       'analysisProgressPercent',
-      status.total ? `${percent}%` : `${formatCountNumber(status.progress)} 行`,
+      status.total ? `${percent}%` : localize('ui.workspace.moving', { formatCountNumber: formatCountNumber(status.progress) }),
     );
     requireEl('analysisProgressBar').style.width = `${percent}%`;
   }
@@ -1545,17 +1547,17 @@ export class AnalysisWorkspace {
   private async run(): Promise<void> {
     ++this.state.reportOpenSerial;
     if (!this.state.fieldsReady || this.state.fieldsLoading || !this.state.fields.length) {
-      this.toast('请先成功读取所选范围的字段', 'warning');
+      this.toast(localize('ui.workspace.successfullyReadFieldsSelectedRange'), 'warning');
       return;
     }
     const q = this.currentQuery();
     if (q.layout === 'tree' && !q.rows.length) {
-      this.toast('层级展开需要至少一个行维度', 'warning');
+      this.toast(localize('ui.workspace.hierarchicalExpansionRequiresAtLeast'), 'warning');
       return;
     }
     const measures = effectiveMetrics(q);
     if (measures.some((m) => m.aggregate !== 'count' && !m.field)) {
-      this.toast('数值指标必须选择字段', 'warning');
+      this.toast(localize('ui.workspace.valueIndicatorsMustBeSelected'), 'warning');
       return;
     }
     if (
@@ -1563,7 +1565,7 @@ export class AnalysisWorkspace {
       !q.columns.length &&
       measures.every((m) => m.aggregate === 'count' && !m.field)
     ) {
-      this.toast('请选择至少一个分类字段', 'warning');
+      this.toast(localize('ui.workspace.selectAtLeastOneCategory'), 'warning');
       return;
     }
     try {
@@ -1603,10 +1605,10 @@ export class AnalysisWorkspace {
     const book = this.state.fingerprint;
     const serial = this.state.reportOpenSerial;
     const status = completed.result;
-    if (!status.query) throw new Error('方案结果与目标来源不一致');
+    if (!status.query) throw new Error(localize('ui.workspace.solutionResultsDoNotMatch'));
     const q = restoreReportQuery(status.query);
     if (!status.result || !q.source || q.source !== preview.ref.source) {
-      throw new Error('方案结果与目标来源不一致');
+      throw new Error(localize('ui.workspace.solutionResultsDoNotMatch'));
     }
     // Prepare the complete builder schema before replacing the active result.
     // Errors, cancellation and edits after completion leave the old UI intact.
@@ -1634,7 +1636,7 @@ export class AnalysisWorkspace {
       );
       if (!guard()) return false;
       if (schema.sourceStamp !== preview.stamp) {
-        throw new Error('目标表在分析后发生变化，请重新核对字段；当前结果保留');
+        throw new Error(localize('ui.workspace.targetTableChangedAfterAnalysis'));
       }
       this.sourceRows.commit(candidate);
     } finally {
@@ -1658,7 +1660,7 @@ export class AnalysisWorkspace {
     this.setText('analysisFieldCount', String(this.state.fields.length));
     this.setText(
       'analysisSourceInfo',
-      `${formatCountNumber(schema.totalRows)} 条源记录${schema.truncatedFields ? ' · 仅显示前256列' : ''}`,
+      localize('ui.workspace.numberSourceRecords', { formatCountNumber: formatCountNumber(schema.totalRows), detail: schema.truncatedFields ? ` ${localize('ui.workspace.onlyDisplayFirstColumns')}` : '' }),
     );
     requireEl('analysisFieldProfile').hidden = true;
     const snapshot = this.state.reportCache.set(book, q, {
@@ -1726,7 +1728,7 @@ export class AnalysisWorkspace {
         popup.location.assign(target.url);
         handled = true;
       } else {
-        this.toast('请允许打开来源窗口后重试', 'warning');
+        this.toast(localize('ui.workspace.allowOpenSourceWindowTry'), 'warning');
       }
     } catch (error: unknown) {
       if (
@@ -1759,9 +1761,9 @@ export class AnalysisWorkspace {
       opened === this.state.openSerial;
     const old = this.state.workspace?.reports.find((x) => x.id === this.state.activeReportID);
     const name = await this.askText(
-      old ? '更新分析报表' : '保存分析报表',
-      old?.name || this.state.activeResultQuery.title || '我的数据分析',
-      '例如：机构资产规模分布',
+      old ? localize('ui.workspace.updateAnalysisReport') : localize('ui.workspace.saveAnalysisReport'),
+      old?.name || this.state.activeResultQuery.title || localize('ui.workspace.myDataAnalysis'),
+      localize('ui.workspace.exampleDistributionInstitutionalAssetScale'),
     );
     if (!name || !current()) return;
     try {
@@ -1779,7 +1781,7 @@ export class AnalysisWorkspace {
         this.state.activeReportID === reportID
       ) {
         this.state.activeReportID = data.id;
-        requireButton('analysisSaveReport').textContent = '更新报表';
+        requireButton('analysisSaveReport').textContent = localize('ui.workspace.updateReports');
       }
       // The dashboard can become visible while its catalogue refresh is in
       // flight. Cache the completed result before that refresh adopts/renders.
@@ -1787,11 +1789,11 @@ export class AnalysisWorkspace {
       try {
         await this.refreshWorkspace();
       } catch (e: unknown) {
-        if (current()) this.toast(`报表已保存，列表刷新失败：${errorMessage(e)}`, 'warning');
+        if (current()) this.toast(localize('ui.workspace.reportSavedListRefreshFailed', { errorMessage: errorMessage(e) }), 'warning');
         return;
       }
       if (current()) {
-        this.toast(old ? '已更新已保存的报表' : `已保存到仪表盘 · ${name}`, 'success');
+        this.toast(old ? localize('ui.workspace.savedReportsUpdated') : localize('ui.workspace.savedDashboard', { name }), 'success');
       }
     } catch (e: unknown) {
       if (current()) this.toast(errorMessage(e), 'error');
@@ -1804,8 +1806,8 @@ export class AnalysisWorkspace {
     const book = this.state.fingerprint;
     const isTree = Boolean(this.state.activeResult.tree);
     const name = await this.askText(
-      isTree ? '创建首层结果表' : '创建可编辑结果表',
-      `${isTree ? '首层结果 ' : '透视结果 '}${new Date().toLocaleDateString('zh-CN')}`,
+      isTree ? localize('ui.workspace.createFirstLevelResultTable') : localize('ui.workspace.createEditableResultTable'),
+      `${isTree ? `${localize('ui.workspace.firstLevelResults')} ` : `${localize('ui.workspace.pivotResults')} `}${new Date().toLocaleDateString('zh-CN')}`,
     );
     if (!name || book !== this.state.fingerprint) return;
     try {
@@ -1817,10 +1819,10 @@ export class AnalysisWorkspace {
       this.state.loadedSheet = data.id;
       this.state.sheetPage = 0;
       void this.setTab('sheets');
-      this.toast('已生成编辑工作表', 'success');
+      this.toast(localize('ui.workspace.editedWorksheetGenerated'), 'success');
     } catch (e: unknown) {
       this.toast(
-        getHttpStatus(e) === 404 ? '结果任务已过期，请重新运行分析后保存' : errorMessage(e),
+        getHttpStatus(e) === 404 ? localize('ui.workspace.resultTaskExpiredRunAnalysisa5cb6ac') : errorMessage(e),
         'error',
       );
     }
@@ -1831,7 +1833,7 @@ export class AnalysisWorkspace {
       ? this.state.drillQuery
       : (this.state.activeResultQuery ?? (this.state.query ? this.currentQuery() : null));
     if (!q) {
-      this.toast('请先配置分析条件', 'warning');
+      this.toast(localize('ui.workspace.configureAnalysisConditionsFirst'), 'warning');
       return;
     }
     const keys = groupOnly ? [...this.state.drillKeys] : null;
@@ -1840,14 +1842,14 @@ export class AnalysisWorkspace {
     const columnSelected = groupOnly ? this.state.drillColumnSelected : undefined;
     const book = this.state.fingerprint;
     const pathBook = this.state.book;
-    const initial = `${groupOnly ? '来源明细 ' : '清洗明细 '}${new Date().toLocaleDateString('zh-CN')}`;
-    const name = await this.askText('提取可编辑明细', initial, '最多10,000行，保留源行号');
+    const initial = `${groupOnly ? `${localize('ui.workspace.sourceDetails')} ` : `${localize('ui.workspace.cleanupDetails')} `}${new Date().toLocaleDateString('zh-CN')}`;
+    const name = await this.askText(localize('ui.workspace.extractEditableDetails'), initial, localize('ui.workspace.upRowsRetainedIncludingOriginal'));
     if (!name || !this.state.opened || book !== this.state.fingerprint || pathBook !== this.state.book) {
       return;
     }
     const btn = requireButton(groupOnly ? 'analysisDrillSave' : 'analysisMaterializeDetails');
     btn.disabled = true;
-    this.setText('analysisAutoSave', '正在提取明细…');
+    this.setText('analysisAutoSave', localize('ui.workspace.extractingDetails'));
     try {
       const response = await this.post('/api/analysis/detail/materialize', {
         query: q,
@@ -1866,15 +1868,13 @@ export class AnalysisWorkspace {
       this.state.sheetPage = 0;
       requireEl('analysisDrill').hidden = true;
       void this.setTab('sheets');
-      this.setText('analysisAutoSave', '已保存');
+      this.setText('analysisAutoSave', localize('ui.common.saved'));
       this.toast(
-        `已提取 ${formatCountNumber(response.rows ?? 0)} 行${
-          response.truncated ? '；已达到1万行上限，请增加筛选条件' : ''
-        }，原工作簿未修改`,
+        localize('ui.workspace.rowExtractedOriginalWorkbookRemains', { detail: formatCountNumber(response.rows ?? 0), detail2: response.truncated ? localize('ui.workspace.rowLimitWasReachedAdd') : '' }),
         response.truncated ? 'warning' : 'success',
       );
     } catch (e: unknown) {
-      this.setText('analysisAutoSave', '提取失败');
+      this.setText('analysisAutoSave', localize('ui.workspace.extractionFailed'));
       this.toast(errorMessage(e), 'error');
     } finally {
       btn.disabled = false;
@@ -1886,24 +1886,24 @@ export class AnalysisWorkspace {
     const job = this.state.jobID;
     const book = this.state.fingerprint;
     const format = requireSelect('analysisExportFormat').value === 'csv' ? 'csv' : 'xlsx';
-    const activity = this.currentActivity()?.begin('正在导出分析结果');
+    const activity = this.currentActivity()?.begin(localize('ui.workspace.exportingAnalysisResults'));
     try {
       const url = `/api/analysis/export?id=${encodeURIComponent(job)}&format=${format}`;
       const res = await this.api(url, { activity: false }, 'response');
       if (book !== this.state.fingerprint) return;
-      if (res.status === 404) throw new Error('结果任务已过期，请重新运行分析后导出');
+      if (res.status === 404) throw new Error(localize('ui.workspace.resultTaskExpiredRunAnalysis'));
       if (!res.ok) {
         const data: unknown = await res.json().catch(() => ({}));
         const msg =
           isPlainRecord(data) && typeof data.error === 'string' && data.error
             ? data.error
-            : '导出失败';
+            : localize('ui.workspace.exportFailed');
         throw new Error(msg);
       }
       const blob = await res.blob();
       if (book !== this.state.fingerprint) return;
       this.downloadBlobFn(blob, `ExcelLens-Analysis.${format}`);
-      this.toast('分析结果已导出', 'success');
+      this.toast(localize('ui.workspace.analysisResultsHaveExported'), 'success');
     } catch (e: unknown) {
       this.toast(errorMessage(e), 'error');
     } finally {
@@ -2036,7 +2036,7 @@ export class AnalysisWorkspace {
       this.state.fieldsReady = this.state.loadedFieldsKey === this.fieldsKey();
       this.renderSourceScope();
       this.setAnalysisBusy(Boolean(this.analysisJobs.main));
-      this.setText('analysisSourceInfo', '已取消选择，保留原范围');
+      this.setText('analysisSourceInfo', localize('ui.workspace.selectionCanceledOriginalRangeRetained'));
     });
 
     const headerInput = requireInput('analysisHeaderRow');
@@ -2111,7 +2111,7 @@ export class AnalysisWorkspace {
           metric: c.metric,
           workbookKey: this.state.fingerprint,
           book: this.state.book,
-          title: requireEl('analysisReportTitle').textContent || '分析快照',
+          title: requireEl('analysisReportTitle').textContent || localize('ui.workspace.analyzeSnapshots'),
           current: c.current,
         });
       }
@@ -2132,7 +2132,7 @@ export class AnalysisWorkspace {
       const q = this.state.query;
       if (!firstField || !q) return;
       if (q.filters.length >= 8) {
-        this.toast('最多8条筛选条件', 'warning');
+        this.toast(localize('ui.workspace.maximumFilteringCriteria'), 'warning');
         return;
       }
       q.filters.push({ field: firstField.id, op: 'eq', value: '' });
@@ -2143,12 +2143,12 @@ export class AnalysisWorkspace {
       const q = this.state.query;
       if (!firstField || !q) return;
       if (q.transforms.length >= 8) {
-        this.toast('最多8个计算列', 'warning');
+        this.toast(localize('ui.workspace.upCalculationColumns'), 'warning');
         return;
       }
       q.transforms.push({
         id: `D_${Date.now().toString(36)}_${q.transforms.length}`,
-        name: '转换日期',
+        name: localize('ui.workspace.conversionDate'),
         source: firstField.id,
         op: 'date',
         arg: 'auto',
@@ -2161,12 +2161,12 @@ export class AnalysisWorkspace {
       const q = this.state.query;
       if (!firstField || !q) return;
       if (q.transforms.length >= 8) {
-        this.toast('最多8个计算列', 'warning');
+        this.toast(localize('ui.workspace.upCalculationColumns'), 'warning');
         return;
       }
       q.transforms.push({
         id: `D_${Date.now().toString(36)}_${q.transforms.length}`,
-        name: `计算列${q.transforms.length + 1}`,
+        name: localize('ui.workspace.calculateColumn', { count: q.transforms.length + 1 }),
         source: firstField.id,
         op: 'trim',
         arg: '',
@@ -2188,7 +2188,7 @@ export class AnalysisWorkspace {
       this.pivotView.renderPivot();
     });
     requireButton('analysisCancel').addEventListener('click', () => {
-      if (this.analysisJobs.cancelMain()) this.toast('已取消分析任务');
+      if (this.analysisJobs.cancelMain()) this.toast(localize('ui.workspace.analysisTaskCanceled'));
     });
     requireButton('analysisSaveReport').addEventListener('click', () => {
       void this.saveReport();

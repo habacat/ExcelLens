@@ -6,20 +6,21 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+
 	"hash"
 	"path/filepath"
 
 	"excellens/internal/checkpoint"
 	excelExport "excellens/internal/export"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
 const exportCheckpointDriver = "source-export"
 const exportCheckpointSemantics = 1
 
-var errExportCaptureIncomplete = errors.New("导出范围尚未完整保存，请重新选择范围并运行导出")
+var errExportCaptureIncomplete = i18n.Error("service.exportCheckpoint.exportRangeNotFullySaved")
 
 // No transient filter/view/job ID or downloaded file path enters this payload.
 // Implicit physical spans remain constant size, including billion-row blanks.

@@ -2,6 +2,7 @@
  * Edit copy tool tabs, structural operations (rows/columns/sheets/merges/arrays/tables),
  * and pivot/chart object editing coordinator.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle } from '../contracts/common.ts';
 import type {
   EditAddress,
@@ -556,7 +557,7 @@ export class EditTools {
       cell?.array?.formula ?? (cell?.value.kind === 'formula' ? cell.value.raw : '');
     el('MergeConsent').hidden = kind !== 'mergeCells' && kind !== 'fixedArray';
     el('ConsentLabel').textContent =
-      kind === 'fixedArray' ? '替换选区内已有内容' : '若有多个值，仅保留首个有内容的格';
+      kind === 'fixedArray' ? localize('ui.editTools.replaceExistingContentSelectionArea') : localize('ui.editTools.ifThereMultipleValuesOnly');
     inputEl('ReplaceContents').checked = false;
     const sheetValue = selectEl('Sheet').value;
     const selected =
@@ -582,7 +583,7 @@ export class EditTools {
     el('AtField').hidden = sheetAction || range;
     el('CountField').hidden = sheetAction || range;
     el('BeforeField').hidden = !kind.startsWith('move');
-    el('AtLabel').textContent = rows ? '起始行号' : '起始列号';
+    el('AtLabel').textContent = rows ? localize('ui.editTools.startingLineNumber') : localize('ui.editTools.startingColumnNumber');
     inputEl('At').value = cell ? String(rows ? cell.address.row : cell.address.col) : '';
     const newName = inputEl('NewName');
     newName.value = sheetValue;

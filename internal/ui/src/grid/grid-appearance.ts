@@ -1,3 +1,4 @@
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, MergeRange, ToastTone } from '../contracts/common.ts';
 import type { CellData, RowData, VisualStyle } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -5,7 +6,17 @@ import { requireSelect } from '../core/dom.ts';
 import { conditionalColor, conditionalVisual } from './conditional.ts';
 import type { BorderEdgeContext } from './freeze.ts';
 import { fontStack, isKnownFont } from './display-font.ts';
-import { borderRuns, chooseBorder, paintBorder } from './grid-borders.ts';
+import {
+  borderRuns,
+  chooseBorder,
+  paintBorder,
+  paintBorderCorner,
+  paintInnerBorderCorners,
+  parseBorder,
+  resolveBorderCorner,
+  type BorderCorner,
+  type InnerBorderCorner,
+} from './grid-borders.ts';
 import type { GridCellElement, WorkbookState } from './state.ts';
 import { decodeStylesWire } from '../core/http-decoders.generated.ts';
 
@@ -58,7 +69,7 @@ export class GridAppearance {
       if (response.richTextNotice) toast(response.richTextNotice, 'warning');
     } catch (error: unknown) {
       S.styles = [];
-      toast(`原始格式暂不可用：${errorMessage(error)}`, 'error');
+      toast(localize('ui.gridAppearance.originalFormatTemporarilyUnavailable', { detail: errorMessage(error) }), 'error');
     }
   }
 
@@ -77,7 +88,7 @@ export class GridAppearance {
     this.d.S.fontOverride = font;
     const picker = requireSelect('fontSelect');
     picker.value = font;
-    const label = `显示字体（${picker.selectedOptions[0]?.text || font}）`;
+    const label = localize('ui.gridAppearance.displayFont', { detail: picker.selectedOptions[0]?.text || font });
     picker.title = label;
     const field = picker.closest('.ribbon-field');
     if (field instanceof HTMLElement) {
@@ -99,7 +110,7 @@ export class GridAppearance {
         body: JSON.stringify({ sheet, kind: 'font', font }),
       });
     } catch (err: unknown) {
-      toast(`字体设置保存失败：${errorMessage(err)}`, 'error');
+      toast(localize('ui.gridAppearance.fontSettingSavingFailed', { detail: errorMessage(err) }), 'error');
     }
   }
 
@@ -197,6 +208,24 @@ export class GridAppearance {
     return conditionalVisual(cell, S.styles, row?.style ?? 0) ?? {};
   }
 
+  paintRowHeaderBorder(
+    header: HTMLElement,
+    cell?: CellData,
+    row?: RowData,
+    belowCell?: CellData,
+    belowRow?: RowData,
+  ): void {
+    const node = header as GridCellElement;
+    const own = this.visualForBorder(cell, row);
+    const below = this.visualForBorder(belowCell, belowRow);
+    const border = own.borderLeft ?? '';
+    const east = chooseBorder(own.borderBottom, below.borderTop);
+    const corner = resolveBorderCorner(border, '', east, below.borderLeft);
+    header.classList.toggle('row-head-bordered', Boolean(border || corner));
+    paintBorder(node, 'right', border, () => 0, corner ? '1px' : '', Boolean(corner && border));
+    paintBorderCorner(node, corner);
+  }
+
   private mergedVisualBorder(
     own: VisualStyle,
     range: MergeRange,
@@ -238,6 +267,8 @@ export class GridAppearance {
     if (!S.showStyles) {
       paintBorder(node, 'right', '', (idx) => this.d.rowTop(idx));
       paintBorder(node, 'bottom', '', (idx) => this.d.colLeft(idx));
+      paintBorderCorner(node, null);
+      paintInnerBorderCorners(node, []);
       if (node._xlOuterLeft) {
         node.style.removeProperty('border-left');
         node._xlOuterLeft = '';
@@ -258,8 +289,20 @@ export class GridAppearance {
       const y =
         chooseBorder(own.borderBottom, below.borderTop) ||
         (own.background || below.background ? '0px' : '');
-      paintBorder(node, 'right', x, (idx) => this.d.rowTop(idx), y);
-      paintBorder(node, 'bottom', y, (idx) => this.d.colLeft(idx), x);
+      let corner: BorderCorner | null = null;
+      if (right.borderBottom || below.borderRight || edge.belowRightCell || belowRow.style) {
+        const belowRight = this.visualForBorder(edge.belowRightCell, belowRow);
+        const east = chooseBorder(right.borderBottom, belowRight.borderTop);
+        const south = chooseBorder(below.borderRight, belowRight.borderLeft);
+        if (east && south) corner = resolveBorderCorner(x, y, east, south);
+      }
+      const cornerFlag = corner ? '1px' : '';
+      const insetRight = Boolean(corner && x && x !== '0px');
+      const insetBottom = Boolean(corner && y && y !== '0px');
+      paintBorder(node, 'right', x, (idx) => this.d.rowTop(idx), y || cornerFlag, insetRight);
+      paintBorder(node, 'bottom', y, (idx) => this.d.colLeft(idx), x || cornerFlag, insetBottom);
+      paintBorderCorner(node, corner);
+      paintInnerBorderCorners(node, []);
       if (node._xlOuterLeft) {
         node.style.removeProperty('border-left');
         node._xlOuterLeft = '';
@@ -302,6 +345,10 @@ export class GridAppearance {
     };
     const directRight = endCol === c && edge.nextCol ? (rightCell ?? null) : undefined;
     const directBelow = endRow === r && belowRow ? (belowCell ?? null) : undefined;
+    const directBelowRight =
+      endRow === r && endCol === c && edge.nextCol && belowRow
+        ? (edge.belowRightCell ?? null)
+        : undefined;
     const seam = (
       primary: string | undefined,
       neighbor: VisualStyle,
@@ -344,12 +391,147 @@ export class GridAppearance {
             own.borderBottom || fallback,
             edge.columns?.[0],
           );
+    const horizontalBetween = (
+      topRow: number,
+      botRow: number,
+      colIndex: number,
+      topRowData: RowData | null | undefined,
+      topDirect: CellData | null | undefined,
+      botRowData: RowData | null | undefined,
+      botDirect: CellData | null | undefined,
+    ): string => {
+      const topMerge = edge.mergeFree ? null : this.d.activeMerge(topRow, colIndex);
+      const botMerge = edge.mergeFree ? null : this.d.activeMerge(botRow, colIndex);
+      if (topMerge && topMerge === botMerge) return '';
+      const topHasBottom = !topMerge || topMerge.endRow < botRow;
+      const botHasTop = !botMerge || botMerge.row > topRow;
+      if (!topHasBottom && !botHasTop) return '';
+      const topVisual = topHasBottom ? opposite(topRow, colIndex, topRowData, topDirect) : {};
+      const botVisual = botHasTop ? opposite(botRow, colIndex, botRowData, botDirect) : {};
+      return chooseBorder(topVisual.borderBottom, botVisual.borderTop);
+    };
+    const verticalBetween = (
+      rowIndex: number,
+      leftCol: number,
+      nextColIndex: number,
+      rowData: RowData | null | undefined,
+      leftDirect: CellData | null | undefined,
+      rightDirect: CellData | null | undefined,
+    ): string => {
+      const leftMerge = edge.mergeFree ? null : this.d.activeMerge(rowIndex, leftCol);
+      const rightMerge = edge.mergeFree ? null : this.d.activeMerge(rowIndex, nextColIndex);
+      if (leftMerge && leftMerge === rightMerge) return '';
+      const leftHasRight = !leftMerge || leftMerge.endCol < nextColIndex;
+      const rightHasLeft = !rightMerge || rightMerge.col > leftCol;
+      if (!leftHasRight && !rightHasLeft) return '';
+      const leftVisual = leftHasRight ? opposite(rowIndex, leftCol, rowData, leftDirect) : {};
+      const rightVisual = rightHasLeft ? opposite(rowIndex, nextColIndex, rowData, rightDirect) : {};
+      return chooseBorder(leftVisual.borderRight, rightVisual.borderLeft);
+    };
+    const rightEnd = typeof right === 'string' ? right : (right.at(-1)?.style ?? '');
+    const bottomEnd = typeof bottom === 'string' ? bottom : (bottom.at(-1)?.style ?? '');
+    const cornerEast = horizontalBetween(
+      endRow,
+      under,
+      rightCol,
+      endRow === r ? rightRow : null,
+      endRow === r ? directRight : undefined,
+      belowRow,
+      directBelowRight,
+    );
+    const cornerSouth = cornerEast
+      ? verticalBetween(
+          under,
+          endCol,
+          rightCol,
+          belowRow,
+          endCol === c ? directBelow : undefined,
+          directBelowRight,
+        )
+      : '';
+    const corner =
+      cornerEast && cornerSouth
+        ? resolveBorderCorner(rightEnd, bottomEnd, cornerEast, cornerSouth)
+        : null;
+    const innerCorners: InnerBorderCorner[] = [];
+    if (Array.isArray(right)) {
+      const originY = this.d.rowTop(r);
+      for (let i = 0; i < right.length - 1; i++) {
+        const seg = right[i];
+        const nextSeg = right[i + 1];
+        if (!seg || !nextSeg || !parseBorder(nextSeg.style)) continue;
+        const prevRow = Math.max(seg.start, nextSeg.start - 1);
+        const eastInner = horizontalBetween(
+          prevRow,
+          nextSeg.start,
+          rightCol,
+          prevRow === r ? rightRow : null,
+          prevRow === r ? directRight : undefined,
+          null,
+          undefined,
+        );
+        const inner = eastInner
+          ? resolveBorderCorner(seg.style, '', eastInner, nextSeg.style)
+          : null;
+        if (inner) {
+          innerCorners.push({
+            corner: inner,
+            bottomOffset: this.d.rowTop(nextSeg.start) - originY,
+          });
+        }
+      }
+    }
+    if (Array.isArray(bottom)) {
+      const originX = this.d.colLeft(c);
+      for (let i = 0; i < bottom.length - 1; i++) {
+        const seg = bottom[i];
+        const nextSeg = bottom[i + 1];
+        if (!seg || !nextSeg || !parseBorder(nextSeg.style)) continue;
+        const prevCol = Math.max(seg.start, nextSeg.start - 1);
+        const southInner = verticalBetween(
+          under,
+          prevCol,
+          nextSeg.start,
+          belowRow,
+          prevCol === c ? directBelow : undefined,
+          undefined,
+        );
+        const inner = southInner
+          ? resolveBorderCorner('', seg.style, nextSeg.style, southInner)
+          : null;
+        if (inner) {
+          innerCorners.push({
+            corner: inner,
+            rightOffset: this.d.colLeft(nextSeg.start) - originX,
+          });
+        }
+      }
+    }
     const left = edge.outerLeft && this.d.colLeft(c) === 0 ? (own.borderLeft ?? '') : '';
     const top = edge.outerTop ? (own.borderTop ?? '') : '';
     const bottomCross = typeof bottom === 'string' ? bottom : '';
     const rightCross = typeof right === 'string' ? right : '';
-    paintBorder(node, 'right', right, (idx) => this.d.rowTop(idx), top || bottomCross);
-    paintBorder(node, 'bottom', bottom, (idx) => this.d.colLeft(idx), left || rightCross);
+    const cornerFlag = corner ? '1px' : '';
+    const insetRight = typeof right === 'string' && Boolean(corner && right && right !== '0px');
+    const insetBottom = typeof bottom === 'string' && Boolean(corner && bottom && bottom !== '0px');
+    paintBorder(
+      node,
+      'right',
+      right,
+      (idx) => this.d.rowTop(idx),
+      top || bottomCross || cornerFlag,
+      insetRight,
+    );
+    paintBorder(
+      node,
+      'bottom',
+      bottom,
+      (idx) => this.d.colLeft(idx),
+      left || rightCross || cornerFlag,
+      insetBottom,
+    );
+    paintBorderCorner(node, corner);
+    paintInnerBorderCorners(node, innerCorners);
     if (node._xlOuterLeft !== left) {
       node._xlOuterLeft = left;
       if (left) node.style.borderLeft = left;

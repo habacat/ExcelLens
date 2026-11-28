@@ -3,6 +3,7 @@
  * Source CellData and style IDs remain immutable; the shared CellPresenter owns
  * display values, rich text, and conditional formatting ink.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { MergeRange } from '../contracts/common.ts';
 import type { PrintingLimits, RichTextLimits } from '../contracts/formats.ts';
 import type { CellData, RichFont, VisualStyle } from '../contracts/workbook.ts';
@@ -13,7 +14,12 @@ import {
   type ColumnLayoutItem,
 } from '../grid/cell-view.ts';
 import { conditionalColor } from '../grid/conditional.ts';
-import { resolveBorders } from '../grid/grid-borders.ts';
+import {
+  chooseBorder,
+  parseBorder,
+  resolveBorderCorner,
+  resolveBorders,
+} from '../grid/grid-borders.ts';
 import { richFontProperties } from '../grid/richtext.ts';
 import type { GridCellElement } from '../grid/state.ts';
 import {
@@ -152,7 +158,7 @@ export class PrintingRenderer {
     const body = makeDiv('print-body');
     const data = makeDiv('print-data');
     const edges = makeDiv('print-edges');
-    paper.setAttribute('aria-label', `源表第${pageValue.page + 1}页`);
+    paper.setAttribute('aria-label', localize('ui.printingRender.sourceTablePage', { page: pageValue.page + 1 }));
     putPx(paper, { width: v.width, height: v.height });
     putPx(body, { left: v.x, top: v.y, width: v.contentWidth, height: v.contentHeight });
     putPx(data, { width: v.contentWidth, height: v.contentHeight });
@@ -275,7 +281,7 @@ export class PrintingRenderer {
         node.style.alignItems = vAlign || 'flex-end';
         node.style.whiteSpace = style.wrap ? 'pre-wrap' : 'pre';
         node.style.wordBreak = style.wrap ? 'break-word' : 'normal';
-        if (style.rotation) warnings.add('旋转文字按普通文字预览，原始设置保留');
+        if (style.rotation) warnings.add(localize('ui.printingRender.rotateTextPreviewAsRegular'));
       },
     });
     presenterRef = presenter;
@@ -332,28 +338,29 @@ export class PrintingRenderer {
       if (!cell) presenter.o.applyStyle(node, { style: item.style });
       if (item.hiddenAnchor) {
         node.replaceChildren();
-        warnings.add('隐藏的合并起点保留原坐标，未把其值移到可见覆盖格');
+        warnings.add(localize('ui.printingRender.hiddenMergeStartingPointsRetain'));
       }
       const messages = [node._xlRichNotice, node._xlPresentationNotice].filter(
         (msg): msg is string => Boolean(msg),
       );
       for (const message of messages) warnings.add(message);
       if (item.cell?.cacheMissing) {
-        node.setAttribute('data-missing-cache', '缺少缓存');
-        warnings.add('本页有公式缺少保存结果');
+        node.setAttribute('data-missing-cache', localize('ui.printingRender.lackCache'));
+        warnings.add(localize('ui.printingRender.thereFormulasOnThisPage'));
       } else if (
         item.cell?.hasFormula &&
         !item.cell.raw &&
         (!item.cell.type || item.cell.type === 'n')
       ) {
-        node.setAttribute('data-missing-cache', '数值缓存为空');
-        warnings.add('本页有公式的数值缓存为空');
+        node.setAttribute('data-missing-cache', localize('ui.printingRender.valueCacheEmpty'));
+        warnings.add(localize('ui.printingRender.valuesCachedOnThisPage'));
       }
       node.title =
         item.ref +
-        (item.hiddenAnchor ? '（源合并起点隐藏）' : '') +
-        (item.cell ? `\n${item.cell.raw.slice(0, 2048)}` : '（空白源坐标）') +
-        (item.cell?.cacheMissing ? '\n源公式未保存计算结果' : '') +
+        (item.hiddenAnchor ? localize('ui.printingRender.sourceMergeStartPointHidden') : '') +
+        (item.cell ? `\n${item.cell.raw.slice(0, 2048)}` : localize('ui.printingRender.blankSourceCoordinates')) +
+        (item.cell?.cacheMissing ? `
+${localize('ui.printingRender.sourceFormulaDidNotSave')}` : '') +
         (messages.length ? `\n${messages.join('；')}` : '');
 
       const numericOverflow =
@@ -403,6 +410,25 @@ export class PrintingRenderer {
 
     // Collapse physical seam segments, including a large merged edge beside
     // several small cells, using the same source-border precedence as grid.
+    interface PrintVertex {
+      readonly x: bigint;
+      readonly y: bigint;
+      north?: string;
+      south?: string;
+      west?: string;
+      east?: string;
+    }
+    const vertices = new Map<string, PrintVertex>();
+    const vertexAt = (vx: bigint, vy: bigint): PrintVertex => {
+      const key = `${vx.toString()}:${vy.toString()}`;
+      let vertex = vertices.get(key);
+      if (!vertex) {
+        vertex = { x: vx, y: vy };
+        vertices.set(key, vertex);
+      }
+      return vertex;
+    };
+
     for (const group of edgeGroups.values()) {
       group.events.sort((a, b) => compareBigInt(a.at, b.at));
       const first = group.events[0];
@@ -424,9 +450,9 @@ export class PrintingRenderer {
           const css = group.vertical
             ? resolveBorders({ borderRight: own }, { borderLeft: other }, {}).right
             : resolveBorders({ borderBottom: own }, {}, { borderTop: other }).bottom;
-          const parsed = /^([\d.]+)px\s+(solid|double|dashed|dotted)\s+(#[\da-f]{6})$/i.exec(css);
-          if (parsed?.[1] && parsed[2] && parsed[3]) {
-            const stroke = Number(parsed[1]) * scale;
+          const parsed = parseBorder(css);
+          if (parsed) {
+            const stroke = parsed.width * scale;
             const line = makeDiv('print-edge');
             if (group.vertical) {
               putPx(line, {
@@ -434,14 +460,22 @@ export class PrintingRenderer {
                 top: px(last),
                 height: px(position - last),
               });
-              line.style.borderLeft = `${stroke}px ${parsed[2]} ${parsed[3]}`;
+              line.style.borderLeft = `${stroke}px ${parsed.kind} ${parsed.color}`;
+              const topV = vertexAt(group.position, last);
+              topV.south = chooseBorder(topV.south, css);
+              const botV = vertexAt(group.position, position);
+              botV.north = chooseBorder(botV.north, css);
             } else {
               putPx(line, {
                 left: px(last),
                 top: px(group.position) - stroke / 2,
                 width: px(position - last),
               });
-              line.style.borderTop = `${stroke}px ${parsed[2]} ${parsed[3]}`;
+              line.style.borderTop = `${stroke}px ${parsed.kind} ${parsed.color}`;
+              const leftV = vertexAt(last, group.position);
+              leftV.east = chooseBorder(leftV.east, css);
+              const rightV = vertexAt(position, group.position);
+              rightV.west = chooseBorder(rightV.west, css);
             }
             edges.append(line);
           }
@@ -455,6 +489,53 @@ export class PrintingRenderer {
         }
         last = position;
       }
+    }
+
+    // Close centered corner junctions across all four quadrants using the same
+    // vertex corner model as the interactive grid.
+    const paintPrintCorner = (
+      vx: number,
+      vy: number,
+      leftSide: boolean,
+      topSide: boolean,
+      north: string | undefined,
+      west: string | undefined,
+      east: string | undefined,
+      south: string | undefined,
+    ): void => {
+      const corner = resolveBorderCorner(north, west, east, south);
+      if (!corner) return;
+      const halfW = (corner.width * scale) / 2;
+      const halfH = (corner.height * scale) / 2;
+      if (halfW <= 0 || halfH <= 0) return;
+      const cap = makeDiv('print-edge-corner');
+      putPx(cap, {
+        left: leftSide ? vx - halfW : vx,
+        top: topSide ? vy - halfH : vy,
+        width: halfW,
+        height: halfH,
+      });
+      if (corner.kind === 'double') {
+        const strokeX = (corner.width * scale) / 3;
+        const strokeY = (corner.height * scale) / 3;
+        if (topSide) cap.style.borderTop = `${strokeY}px solid ${corner.color}`;
+        else cap.style.borderBottom = `${strokeY}px solid ${corner.color}`;
+        if (leftSide) cap.style.borderLeft = `${strokeX}px solid ${corner.color}`;
+        else cap.style.borderRight = `${strokeX}px solid ${corner.color}`;
+      } else {
+        cap.style.backgroundColor = corner.color;
+      }
+      edges.append(cap);
+    };
+
+    for (const vertex of vertices.values()) {
+      if (!(vertex.north || vertex.south) || !(vertex.west || vertex.east)) continue;
+      const vx = px(vertex.x);
+      const vy = px(vertex.y);
+      paintPrintCorner(vx, vy, true, true, vertex.north, vertex.west, vertex.east, vertex.south);
+      paintPrintCorner(vx, vy, false, true, vertex.north, vertex.east, vertex.west, vertex.south);
+      paintPrintCorner(vx, vy, true, false, vertex.south, vertex.west, vertex.east, vertex.north);
+      paintPrintCorner(vx, vy, false, false, vertex.south, vertex.east, vertex.west, vertex.north);
     }
 
     const headingWidth = printPixels(s.headings.width, this.limits);

@@ -1,6 +1,7 @@
 /**
  * Cryptographic collection-evidence inspection dialog for retained online database snapshots.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import type { DatabaseSnapshotSource } from '../contracts/features.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -71,7 +72,7 @@ function makeNode<K extends keyof HTMLElementTagNameMap>(
 }
 
 function formatWhen(value: string | undefined): string {
-  return value ? new Date(value).toLocaleString() : '未记录';
+  return value ? new Date(value).toLocaleString(interfaceLocale()) : localize('ui.common.notRecorded');
 }
 
 function renderFacts(rows: readonly (readonly [string, string])[]): HTMLDListElement {
@@ -116,27 +117,27 @@ export class DatabaseEvidence {
     requireEl('dbEvidenceName').textContent = e.label;
     const rows: [string, string][] = source
       ? [
-          ['数据库', source.database || '未指定'],
-          ['服务器', `${source.host} · ${source.port}`],
-          ['引擎 / 协议', `${source.engine} / ${source.protocol}`],
-          ['TLS', source.tls || '未记录'],
+          [localize('ui.databaseEvidence.database'), source.database || localize('ui.databaseEvidence.notSpecified')],
+          [localize('ui.databaseEvidence.server'), `${source.host} · ${source.port}`],
+          [localize('ui.databaseEvidence.engineProtocol'), `${source.engine} / ${source.protocol}`],
+          ['TLS', source.tls || localize('ui.common.notRecorded')],
         ]
-      : [['连接来源', '旧版未记录']];
+      : [[localize('ui.databaseEvidence.sourceConnection'), localize('ui.common.thisFeatureNotRecordedPrevious')]];
     rows.push(
-      ['采集开始', formatWhen(e.taken)],
-      [e.legacyKey ? '保存时间' : '采集完成', formatWhen(e.finishedAt)],
-      ['一致性', e.consistency === 'per-table' ? '各表独立采集' : '旧版未记录'],
-      ['清单 SHA-256', result.key],
-      ['核验通过', formatWhen(result.verifiedAt)],
+      [localize('ui.databaseEvidence.collectionStarted'), formatWhen(e.taken)],
+      [e.legacyKey ? localize('ui.databaseEvidence.saveTime') : localize('ui.databaseEvidence.collectionCompleted'), formatWhen(e.finishedAt)],
+      [localize('ui.databaseEvidence.consistency'), e.consistency === 'per-table' ? localize('ui.databaseEvidence.independentCollectionEachTable') : localize('ui.common.thisFeatureNotRecordedPrevious')],
+      [localize('ui.databaseEvidence.listSha'), result.key],
+      [localize('ui.databaseEvidence.verificationPassed'), formatWhen(result.verifiedAt)],
     );
     if (e.legacyKey) {
-      rows.push(['旧版清单 SHA-256', e.legacyKey], ['摘要范围', '从保存快照起可核验']);
+      rows.push([localize('ui.databaseEvidence.oldVersionListSha'), e.legacyKey], [localize('ui.databaseEvidence.summaryRange'), localize('ui.databaseEvidence.verifiableSinceSnapshotWasSaved')]);
     }
     requireEl('dbEvidenceOrigin').replaceChildren(...Array.from(renderFacts(rows).children));
     this.table.replaceChildren(
       ...e.tables.map(
         (t, i) =>
-          new Option(`${t.schema}.${t.name}（${t.evidence.records.toLocaleString()} 条）`, String(i)),
+          new Option(localize('ui.databaseEvidence.items', { schema: t.schema, name: t.name, records: t.evidence.records.toLocaleString(interfaceLocale()) }), String(i)),
       ),
     );
     this.table.selectedIndex = 0;
@@ -153,13 +154,13 @@ export class DatabaseEvidence {
     if (!t) return;
     const e = t.evidence;
     const rows: [string, string][] = [
-      ['对象类型', t.kind === 'view' ? '视图' : '表'],
-      ['记录数', e.records.toLocaleString()],
-      ['开始 / 完成', `${formatWhen(e.startedAt)} / ${formatWhen(e.finishedAt)}`],
-      ['采集 SQL', proof.legacyKey ? '旧版未记录原始 SQL' : e.query],
-      ['排序', proof.legacyKey ? '旧版未记录' : '未指定排序'],
-      ['行文件 SHA-256', `${e.rows.sha256}（${this.fmtBytes(e.rows.bytes)}）`],
-      ['索引 SHA-256', `${e.index.sha256}（${this.fmtBytes(e.index.bytes)}）`],
+      [localize('ui.databaseEvidence.objectType'), t.kind === 'view' ? localize('ui.databaseEvidence.view') : localize('ui.databaseEvidence.table')],
+      [localize('ui.common.numberRecords'), e.records.toLocaleString(interfaceLocale())],
+      [localize('ui.databaseEvidence.startComplete'), `${formatWhen(e.startedAt)} / ${formatWhen(e.finishedAt)}`],
+      [localize('ui.databaseEvidence.collectingSql'), proof.legacyKey ? localize('ui.databaseEvidence.oldVersionDoesNotRecord') : e.query],
+      [localize('ui.databaseEvidence.sort'), proof.legacyKey ? localize('ui.common.thisFeatureNotRecordedPrevious') : localize('ui.databaseEvidence.noSortingSpecified')],
+      [localize('ui.databaseEvidence.rowFileSha'), `${e.rows.sha256}（${this.fmtBytes(e.rows.bytes)}）`],
+      [localize('ui.databaseEvidence.indexSha'), `${e.index.sha256}（${this.fmtBytes(e.index.bytes)}）`],
     ];
     requireEl('dbEvidenceTableFacts').replaceChildren(renderFacts(rows));
     this.renderColumns(e.columns, 0);
@@ -171,8 +172,8 @@ export class DatabaseEvidence {
     const table = document.createElement('table');
     const head = table.createTHead().insertRow();
     wrap.className = 'snapshot-column-wrap';
-    table.createCaption().textContent = `字段定义（${columns.length.toLocaleString()}）`;
-    for (const label of ['字段', '类型', '可空', '精度', '小数位']) {
+    table.createCaption().textContent = localize('ui.databaseEvidence.fieldDefinition', { count: columns.length.toLocaleString(interfaceLocale()) });
+    for (const label of [localize('ui.common.field'), localize('ui.common.type'), localize('ui.databaseEvidence.optional'), localize('ui.databaseEvidence.precision'), localize('ui.databaseEvidence.numberDecimalPlaces')]) {
       head.append(makeNode('th', label));
     }
     const body = table.createTBody();
@@ -180,10 +181,10 @@ export class DatabaseEvidence {
       const row = body.insertRow();
       const cells: readonly string[] = [
         col.name,
-        col.type || '未记录',
-        col.nullable === undefined || col.nullable === null ? '未记录' : col.nullable ? '是' : '否',
-        col.precision !== undefined && col.precision !== null ? String(col.precision) : '未记录',
-        col.scale !== undefined && col.scale !== null ? String(col.scale) : '未记录',
+        col.type || localize('ui.common.notRecorded'),
+        col.nullable === undefined || col.nullable === null ? localize('ui.common.notRecorded') : col.nullable ? localize('ui.databaseEvidence.sJustThat') : localize('ui.databaseEvidence.no'),
+        col.precision !== undefined && col.precision !== null ? String(col.precision) : localize('ui.common.notRecorded'),
+        col.scale !== undefined && col.scale !== null ? String(col.scale) : localize('ui.common.notRecorded'),
       ];
       for (const value of cells) {
         row.insertCell().textContent = value;
@@ -196,8 +197,8 @@ export class DatabaseEvidence {
     nav.className = 'database-paging';
     nav.append(makeNode('span', `${start + 1}–${Math.min(start + PAGE_SIZE, columns.length)}`));
     const controls: readonly (readonly [string, number])[] = [
-      ['上一页字段', -PAGE_SIZE],
-      ['下一页字段', PAGE_SIZE],
+      [localize('ui.databaseEvidence.previousPageField'), -PAGE_SIZE],
+      [localize('ui.databaseEvidence.nextPageField'), PAGE_SIZE],
     ];
     for (const [label, offset] of controls) {
       const button = makeNode('button', label);
@@ -219,7 +220,7 @@ export class DatabaseEvidence {
     const status = requireEl('dbEvidenceStatus');
     const button = requireButton('dbEvidenceDownload');
     button.disabled = true;
-    status.textContent = '正在核验导出文件';
+    status.textContent = localize('ui.databaseEvidence.verifyingExportedFiles');
     try {
       const blob = await this.api(
         '/api/database/snapshots',
@@ -237,7 +238,7 @@ export class DatabaseEvidence {
       link.download = `ExcelLens-snapshot-${key}.json`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      status.textContent = '已导出采集清单';
+      status.textContent = localize('ui.databaseEvidence.collectionListExported');
     } catch (err: unknown) {
       if (!controller.signal.aborted) status.textContent = errorMessage(err);
     } finally {

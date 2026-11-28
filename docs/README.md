@@ -12,7 +12,7 @@
 | [releases/1.9.1.md](releases/1.9.1.md) | 区域编辑、透视对象和标签页进度 |
 | [releases/1.9.0.md](releases/1.9.0.md) | 最新公开版本的升级及验收范围 |
 | [user/formats.md](user/formats.md) | 当前格式、精度、缓存、压缩包及导出边界 |
-| [user/interface.md](user/interface.md) | 经典工具栏、可选选项卡、命令搜索与托盘 |
+| [user/interface.md](user/interface.md) | 界面语言、工具栏、命令搜索与托盘 |
 | [user/calculator.md](user/calculator.md) | 计算器语义、用法及限制 |
 | [user/conversion.md](user/conversion.md) | 手动格式转换、日期顺序、失败处理和计算建议 |
 | [user/recovery-and-issues.md](user/recovery-and-issues.md) | 查询/导出任务恢复、计算表及草稿恢复、异常核对清单 |
@@ -74,6 +74,7 @@
 | [development/visual-validation.md](development/visual-validation.md) | 第三阶段字体/DPI/应用缩放独立组合、真实字形字体及证据边界 |
 | [development/conditional-formats.md](development/conditional-formats.md) | 条件格式/DXF、精确读取、网格/复制/HTML验证及XLSX后续设计 |
 | [development/upstream-research.md](development/upstream-research.md) | 上游算法、功能和写入方案调研 |
+| [releases/1.21.0.md](releases/1.21.0.md) | 六种界面语言、粗边框修复与发布验证 |
 | [releases/1.20.3.md](releases/1.20.3.md) | 数据引擎性能与大型台账验证 |
 | [releases/1.20.2.md](releases/1.20.2.md) | 界面控件统一样式、超链接已访问变色与提示文案清理 |
 | [releases/1.19.1.md](releases/1.19.1.md) | 工作表视口、分组聚合与缓存兼容性 |

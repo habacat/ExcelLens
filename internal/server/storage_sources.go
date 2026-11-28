@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"excellens/internal/i18n"
 	"excellens/internal/localstore"
 )
 
@@ -16,7 +17,7 @@ func (a *App) handleSources(w http.ResponseWriter, r *http.Request) {
 	}
 	roots, err := dataRoots()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	var req struct {
@@ -26,35 +27,35 @@ func (a *App) handleSources(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 96<<10))
 		if err != nil || decodeSavedConfig(data, &req) != nil || !validExportDigest(req.Book) || !filepath.IsAbs(req.Path) {
-			writeError(w, 400, "来源定位参数无效")
+			writeMessage(w, 400, "service.storageSources.invalidSourceLocationParameter")
 			return
 		}
 	}
 	if r.Method == http.MethodGet {
 		if !a.storageView.TryRLock() {
-			writeError(w, 409, "数据传输进行中，可查看任务进度")
+			writeMessage(w, 409, "service.storageSources.dataTransferProgressCanView")
 			return
 		}
 		defer a.storageView.RUnlock()
 		if a.restoreState.pending() {
-			writeError(w, 409, "请先完成恢复事务")
+			writeMessage(w, 409, "service.storageSources.completeRestorationProcessFirst")
 			return
 		}
 		items, err := relocationSources(r.Context())
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		writeJSON(w, map[string]any{"items": items})
 		return
 	}
 	if !a.storageMu.TryLock() {
-		writeError(w, 409, "另一项数据管理操作正在进行")
+		writeMessage(w, 409, "service.storageSources.anotherDataManagementOperationProgress")
 		return
 	}
 	if a.restoreState.pending() {
 		a.storageMu.Unlock()
-		writeError(w, 409, "请先完成恢复事务")
+		writeMessage(w, 409, "service.storageSources.completeRestorationProcessFirst")
 		return
 	}
 	action := "verify-source"
@@ -62,21 +63,21 @@ func (a *App) handleSources(w http.ResponseWriter, r *http.Request) {
 		action = "relocate-source"
 	}
 	job, err := a.submitStorage(roots, action, func(ctx context.Context, options localstore.TransferOptions) (transferResult, error) {
-		options.Report(localstore.Progress{Phase: "核验来源指纹"})
+		options.Report(localstore.ProgressForStage("stage.task.verificationOfSourceFingerprint"))
 		item, err := a.verifyLocationWith(ctx, req.Book, req.Previous, req.Path, req.Confirm, options.BeginCommit)
 		if err != nil {
 			return transferResult{}, err
 		}
-		msg := "内容指纹相符"
+		notice := i18n.Message{Key: "service.transfer.sourceVerified"}
 		if req.Confirm {
-			msg = "已更新来源位置"
+			notice.Key = "service.transfer.sourceRelocated"
 		}
-		return transferResult{Message: msg, Candidate: item.Candidate}, nil
+		return transferResult{Notice: notice, Candidate: item.Candidate}, nil
 	})
 	if err != nil {
 		a.storageMu.Unlock()
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
-	writeJSONStatus(w, 202, job)
+	writeJSONStatus(w, 202, job.Localized(responseLocale(w)))
 }

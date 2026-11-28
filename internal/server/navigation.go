@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -18,7 +19,7 @@ type occupiedRun struct{ lo, hi int }
 
 const navigationCacheBudget = 64 << 20
 
-var errNavigationSourceChanged = errors.New("工作簿已切换或索引已变化，请重新定位")
+var errNavigationSourceChanged = i18n.Error("service.navigation.workbookSwitchedOrIndexesHave")
 
 // A dense column is represented by one run. A cold scan uses one descriptor;
 // cached jumps search runs rather than walking every cell of a dense region.
@@ -192,35 +193,35 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, 409, "尚未打开工作簿")
+		writeMessage(w, 409, "service.navigation.noWorkbookOpen")
 		return
 	}
 	meta, ok := wb.FindSheet(r.URL.Query().Get("sheet"))
 	if !ok {
-		writeError(w, 404, "工作表不存在")
+		writeMessage(w, 404, "service.navigation.worksheetDoesNotExist")
 		return
 	}
 	col, row, err := workbook.ParseCellRef(r.URL.Query().Get("ref"))
 	if err != nil {
-		writeError(w, 400, "单元格地址无效")
+		writeMessage(w, 400, "service.navigation.cellAddressInvalid")
 		return
 	}
 	dir := strings.ToLower(r.URL.Query().Get("direction"))
 	if dir != "left" && dir != "right" && dir != "up" && dir != "down" {
-		writeError(w, 400, "方向无效")
+		writeMessage(w, 400, "service.navigation.invalidDirection")
 		return
 	}
 	releaseCache := a.lockCacheRead()
 	defer releaseCache()
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
-		writeError(w, 409, "请先打开该工作表建立索引")
+		writeMessage(w, 409, "service.navigation.openWorksheetEstablishIndexFirst")
 		return
 	}
 	targetRow, targetCol := row, col
 	if dir == "up" || dir == "down" {
 		if idx.RowCount() > formats.LargeDataRows {
-			writeError(w, http.StatusBadRequest, "超大数据模式关闭纵向 Ctrl+方向键扫描；请使用地址框或 Ctrl+Home / Ctrl+End 定位")
+			writeMessage(w, http.StatusBadRequest, "service.navigation.ultraLargeDataModeTurn")
 			return
 		}
 		releaseCache()
@@ -230,10 +231,10 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if errors.Is(err, errNavigationSourceChanged) {
-				writeError(w, http.StatusConflict, err.Error())
+				writeFailure(w, http.StatusConflict, err)
 				return
 			}
-			writeError(w, 500, "定位列数据失败："+err.Error())
+			writeMessage(w, 500, "service.navigation.failedLocateColumnData", i18n.Args{"detail": err})
 			return
 		}
 		d := -1
@@ -252,7 +253,7 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 				if r.Context().Err() != nil {
 					return
 				}
-				writeError(w, 500, "定位行数据失败："+err.Error())
+				writeMessage(w, 500, "service.navigation.failedLocateRowData", i18n.Args{"detail": err})
 				return
 			}
 			if len(data) > 0 {
@@ -270,7 +271,7 @@ func (a *App) handleNavigate(w http.ResponseWriter, r *http.Request) {
 		targetCol = boundaryJump(occupied, col, d, 1, max(1, idx.MaxCol))
 	}
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换，请重新定位")
+		writeMessage(w, 409, "service.navigation.workbookSwitchedReposition")
 		return
 	}
 	writeJSON(w, map[string]any{"sheet": meta.Name, "ref": fmt.Sprintf("%s%d", workbook.ColumnName(targetCol), targetRow), "row": targetRow, "col": targetCol})

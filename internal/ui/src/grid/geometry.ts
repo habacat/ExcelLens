@@ -3,6 +3,7 @@
  * Overrides are in unzoomed CSS pixels stored in a compact prefix-delta index
  * so million-row worksheets never allocate per-row layout arrays.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { AxisRange, AxisSizeRange } from '../contracts/common.ts';
 
 export class Axis {
@@ -35,7 +36,7 @@ export class Axis {
         r.max < r.min ||
         r.max > this.max
       ) {
-        throw new Error('行显隐区间无效');
+        throw new Error(localize('ui.geometry.rowVisibilityRangeInvalid'));
       }
       const last = clean.at(-1);
       if (last && last.max + 1 === r.min) last.max = r.max;

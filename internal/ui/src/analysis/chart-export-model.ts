@@ -2,6 +2,7 @@
  * Pure bounded encoders for chart image + exact-data ZIP export.
  * All exact source/aggregate text remains a string.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisDisplayOptions,
   AnalysisField,
@@ -131,7 +132,7 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
 }
 
 export function chartExportCapacityError(): Error {
-  return new Error('图表导出超过容量，请缩小尺寸或使用结果数据导出');
+  return new Error(localize('ui.chartExportModel.chartExportExceedsCapacityReduce'));
 }
 
 export function boundedStringify(value: unknown, limit: number): string {
@@ -149,7 +150,7 @@ export function boundedStringify(value: unknown, limit: number): string {
   };
 
   function visit(item: unknown, depth = 0): void {
-    if (depth > 64) throw new Error('图表快照层级无效');
+    if (depth > 64) throw new Error(localize('ui.chartExportModel.invalidChartSnapshotLevel'));
     if (item === null) {
       emit('null');
       return;
@@ -163,15 +164,15 @@ export function boundedStringify(value: unknown, limit: number): string {
         emit(String(item));
         return;
       case 'number':
-        if (!Number.isFinite(item)) throw new Error('快照包含无效数值');
+        if (!Number.isFinite(item)) throw new Error(localize('ui.chartExportModel.snapshotContainsInvalidValues'));
         emit(String(item));
         return;
       case 'object':
         break;
       default:
-        throw new Error('快照包含不支持的数据类型');
+        throw new Error(localize('ui.chartExportModel.snapshotContainsDataTypesThat'));
     }
-    if (active.has(item)) throw new Error('图表快照存在循环引用');
+    if (active.has(item)) throw new Error(localize('ui.chartExportModel.chartSnapshotCircularReferences'));
     active.add(item);
     if (isUnknownArray(item)) {
       emit('[');
@@ -221,7 +222,7 @@ export function validateChartExportDimensions(
     (spec.type === 'svg' && spec.scale !== 1) ||
     (spec.background !== 'captured' && spec.background !== 'white')
   ) {
-    throw new Error('图表类型、尺寸或倍率无效');
+    throw new Error(localize('ui.chartExportModel.chartTypeSizeOrMagnification'));
   }
   const pixels = spec.width * spec.height * spec.scale * spec.scale;
   if (!Number.isSafeInteger(pixels) || pixels > limits.pixels) throw chartExportCapacityError();
@@ -230,7 +231,7 @@ export function validateChartExportDimensions(
 
 function selectionQuickSeriesChart(series: SelectionQuickChartSeries): ChartResultLike {
   return {
-    columnKeys: ['分段平均'],
+    columnKeys: [localize('ui.chartExportModel.segmentAverage')],
     rows: series.segments.map((p, i) => ({
       keys: [String(i + 1)],
       values: [{ exact: p.summary.average, display: p.summary.average, count: p.summary.count }],
@@ -251,7 +252,7 @@ export function resolveChartExportPlot(
     key === 'difference'
       ? payload.result.difference
       : payload.result.columns.find((c) => String(c.column) === key);
-  if (!series) throw new Error('图表系列已失效');
+  if (!series) throw new Error(localize('ui.chartExportModel.chartSeriesBecomeInvalid'));
   return selectionQuickSeriesChart(series);
 }
 
@@ -287,7 +288,7 @@ export function captureChartExportPayload(
   const result = resolveChartExportPlot(detached);
   const scope = describeChart(result, detached.chart.mode);
   if (scope.unrepresentable || !scope.drawableCells) {
-    throw new Error('当前图表没有可导出的有效绘图数值，请核对指标或精确结果');
+    throw new Error(localize('ui.chartExportModel.currentChartDoesNotHave'));
   }
   return {
     ...detached,
@@ -319,7 +320,7 @@ export async function buildZipBlob(
   limit: number,
   checkpoint: () => Promise<void> = () => Promise.resolve(),
 ): Promise<Blob> {
-  if (!files.length || files.length > 16) throw new Error('下载包文件数量无效');
+  if (!files.length || files.length > 16) throw new Error(localize('ui.chartExportModel.numberDownloadPackageFilesInvalid'));
   let total = 22;
   const names = new Set<string>();
   const items: {
@@ -334,7 +335,7 @@ export async function buildZipBlob(
       names.has(file.name) ||
       !(file.bytes instanceof Uint8Array)
     ) {
-      throw new Error('下载包文件无效');
+      throw new Error(localize('ui.chartExportModel.downloadPackageFileInvalid'));
     }
     names.add(file.name);
     const nameBytes = encoder.encode(file.name);
@@ -395,7 +396,7 @@ export async function buildZipBlob(
   e.setUint32(16, offset, true);
 
   const blob = new Blob([...chunks, ...directory, end], { type: 'application/zip' });
-  if (blob.size !== total) throw new Error('下载包长度校验失败');
+  if (blob.size !== total) throw new Error(localize('ui.chartExportModel.downloadPackageLengthVerificationFailed'));
   return blob;
 }
 

@@ -2,6 +2,7 @@
  * ExcelLens audit bookmarks: stored outside disposable caches.
  * No changes are made to the original workbook.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { Bookmark, BookmarkStore } from '../contracts/features.ts';
 import type { SourceNote } from '../contracts/workbook.ts';
@@ -69,6 +70,7 @@ export class Bookmarks {
     notes: readonly BookmarkNotePayload[],
   ) => Promise<void> | void;
   private readonly confirm: (options: ConfirmOverlayOptions) => Promise<boolean>;
+  private readonly tagNames: ReadonlyMap<string, string>;
 
   private request = 0;
   private pending: AbortController | null = null;
@@ -92,6 +94,7 @@ export class Bookmarks {
     this.canNotes = options.canNotes ?? (() => false);
     this.applyNotes = options.applyNotes;
     this.confirm = options.confirm ?? ((opts) => confirmOverlay(opts));
+    this.tagNames = new Map(Array.from(requireSelect('bookmarkTag').options, (option) => [option.value, option.text]));
 
     requireButton('bookmarkOpenBtn').addEventListener('click', () => this.open());
     requireButton('bookmarkSaveBtn').addEventListener('click', () => {
@@ -126,7 +129,7 @@ export class Bookmarks {
     requireEl('sourceNotesPanel').hidden = false;
     this.notes = [];
     this.drawNotes(0);
-    requireEl('sourceNotesStatus').textContent = '正在读取批注…';
+    requireEl('sourceNotesStatus').textContent = localize('ui.bookmarks.readingAnnotations');
     try {
       const data = await this.api(
         `/api/notes?${new URLSearchParams({ book, sheet }).toString()}`,
@@ -170,8 +173,8 @@ export class Bookmarks {
     }
     const statusText =
       (items.length
-        ? `${start + 1}–${Math.min(start + 50, items.length)} / ${items.length} 条批注`
-        : '本表没有批注') + (this.noteThreaded ? '，另含对话式批注' : '');
+        ? localize('ui.bookmarks.annotations', { start: start + 1, count: Math.min(start + 50, items.length), count2: items.length })
+        : localize('ui.bookmarks.noAnnotationsOnThisSheet')) + (this.noteThreaded ? localize('ui.bookmarks.alsoIncludesConversationalAnnotations') : '');
     requireEl('sourceNotesStatus').textContent = statusText;
     requireButton('sourceNotesPrev').hidden = this.notePage <= 0;
     requireButton('sourceNotesNext').hidden = start + 50 >= items.length;
@@ -183,10 +186,10 @@ export class Bookmarks {
       .map((item) => ({
         sheet: item.sheet,
         ref: item.ref,
-        text: item.note ? `${item.tag}\n${item.note}` : item.tag,
+        text: [this.tagNames.get(item.tag) ?? item.tag, item.note].filter(Boolean).join('\n'),
       }));
     if (!notes.length) {
-      this.toast('请先勾选要写入的标记', 'warning');
+      this.toast(localize('ui.bookmarks.checkMarkersWantWrite'), 'warning');
       return;
     }
     const book = this.s.book;
@@ -222,7 +225,7 @@ export class Bookmarks {
     this.items = data.items ? [...data.items] : [];
     this.loadedBook = book;
     this.keys = new Set(this.items.map((x) => `${x.sheet}!${x.ref}`));
-    requireButton('bookmarkOpenBtn').title = `标记（${this.items.length}）`;
+    requireButton('bookmarkOpenBtn').title = localize('ui.bookmarks.marked', { count: this.items.length });
     this.onChange();
     this.render();
     return true;
@@ -244,7 +247,7 @@ export class Bookmarks {
       return this.accept(response, book);
     } catch (e: unknown) {
       if (!ctrl.signal.aborted && ticket === this.request && book === this.s.workbookKey) {
-        this.toast(`读取标记失败：${errorMessage(e)}`, 'error');
+        this.toast(localize('ui.bookmarks.markingReadingFailed', { errorMessage: errorMessage(e) }), 'error');
       }
       return false;
     } finally {
@@ -261,7 +264,7 @@ export class Bookmarks {
     requireEl('sourceNotesPanel').hidden = true;
     this.noteThreaded = false;
     if (!this.s.sheet || !this.s.selected) {
-      this.toast('请先选中单元格', 'warning');
+      this.toast(localize('ui.bookmarks.selectCellsFirst'), 'warning');
       return;
     }
     this.prepareCurrent();
@@ -293,7 +296,7 @@ export class Bookmarks {
     noteEl.dataset.id = existing?.id ?? '';
     noteEl.value = existing?.note ?? '';
     requireSelect('bookmarkTag').value = existing?.tag ?? '待复核';
-    requireButton('bookmarkSaveBtn').textContent = existing ? '更新标记' : '添加标记';
+    requireButton('bookmarkSaveBtn').textContent = existing ? localize('ui.bookmarks.updateMarker') : localize('ui.bookmarks.addMarkings');
   }
 
   refreshCurrent(note: string, tag: string): boolean {
@@ -313,7 +316,7 @@ export class Bookmarks {
   async save(): Promise<void> {
     if (this.saving) return;
     if (this.targetBook !== this.s.workbookKey) {
-      this.toast('工作簿已切换，请重新打开标记', 'warning');
+      this.toast(localize('ui.bookmarks.workbookSwitchedReopenMarkingProcess'), 'warning');
       return;
     }
     const cell = this.s.selected;
@@ -322,7 +325,7 @@ export class Bookmarks {
     const tagEl = requireSelect('bookmarkTag');
     const note = noteEl.value.trim();
     if (Array.from(note).length > 800) {
-      this.toast('标记说明不能超过800字', 'warning');
+      this.toast(localize('ui.bookmarks.descriptionExcellensSoftwareInterfaceCannot'), 'warning');
       return;
     }
     const request = {
@@ -352,7 +355,7 @@ export class Bookmarks {
         request.ref === this.s.selected?.ref &&
         this.refreshCurrent(note, request.tag);
       this.toast(
-        draftPending ? '已保存先前备注；当前修改尚未保存' : '已保存标记',
+        draftPending ? localize('ui.bookmarks.previousRemarksHaveSavedCurrent') : localize('ui.bookmarks.savedMarker'),
         draftPending ? 'warning' : 'success',
       );
     } catch (err: unknown) {
@@ -375,9 +378,9 @@ export class Bookmarks {
     const book = this.s.workbookKey;
     if (this.saving || this.loadedBook !== book) return;
     const confirmed = await this.confirm({
-      title: '删除标记',
-      message: `删除 ${bookmark.sheet}!${bookmark.ref} 的标记？`,
-      confirmLabel: '删除',
+      title: localize('ui.bookmarks.deletionMarker'),
+      message: localize('ui.bookmarks.removeMarkerFrom', { sheet: bookmark.sheet, ref: bookmark.ref }),
+      confirmLabel: localize('ui.common.delete'),
       danger: true,
     });
     if (!confirmed) return;
@@ -423,7 +426,7 @@ export class Bookmarks {
     for (const b of this.items) {
       if (
         q &&
-        !`${b.sheet} ${b.ref} ${b.tag} ${b.note} ${b.value ?? ''}`.toLocaleLowerCase().includes(q)
+        !`${b.sheet} ${b.ref} ${this.tagNames.get(b.tag) ?? b.tag} ${b.note} ${b.value ?? ''}`.toLocaleLowerCase().includes(q)
       ) {
         continue;
       }
@@ -437,10 +440,10 @@ export class Bookmarks {
       head.textContent = `${b.sheet}!${b.ref}`;
       const tag = document.createElement('span');
       tag.className = 'bookmark-tag';
-      tag.textContent = b.tag;
+      tag.textContent = this.tagNames.get(b.tag) ?? b.tag;
       const desc = document.createElement('span');
       desc.className = 'bookmark-desc';
-      desc.textContent = b.note || b.value || '（无说明）';
+      desc.textContent = b.note || b.value || localize('ui.bookmarks.noDescription');
       main.append(head, tag, desc);
       main.addEventListener('click', () => {
         requireDialog('bookmarkDialog').close();
@@ -452,7 +455,7 @@ export class Bookmarks {
       del.type = 'button';
       del.className = 'bookmark-remove';
       del.textContent = '×';
-      del.title = '删除此标记';
+      del.title = localize('ui.bookmarks.deleteThisMarker');
       del.addEventListener('click', () => {
         void this.remove(b);
       });
@@ -460,7 +463,7 @@ export class Bookmarks {
         const check = document.createElement('input');
         check.type = 'checkbox';
         check.checked = this.checked.has(b.id);
-        check.setAttribute('aria-label', `选中 ${b.sheet}!${b.ref} 的标记`);
+        check.setAttribute('aria-label', localize('ui.bookmarks.selectMarkers', { sheet: b.sheet, ref: b.ref }));
         check.onchange = (): void => {
           if (check.checked) this.checked.add(b.id);
           else this.checked.delete(b.id);
@@ -474,23 +477,23 @@ export class Bookmarks {
     if (!count) {
       const empty = document.createElement('div');
       empty.className = 'dialog-summary';
-      empty.textContent = '暂无匹配的标记';
+      empty.textContent = localize('ui.bookmarks.noMatchingMarkersFound');
       frag.append(empty);
     }
     list.replaceChildren(frag);
-    requireEl('bookmarkCount').textContent = `已保存 ${this.items.length} 个标记`;
+    requireEl('bookmarkCount').textContent = localize('ui.bookmarks.markersHaveSaved', { count: this.items.length });
   }
 
   exportCSV(): void {
     const headers = [
-      '工作表',
-      '单元格',
-      '分类',
-      '备注',
-      '保存值快照',
-      '公式快照',
-      '创建时间',
-      '更新时间',
+      localize('ui.bookmarks.worksheet'),
+      localize('ui.common.cell'),
+      localize('ui.common.classification'),
+      localize('ui.bookmarks.notesComments'),
+      localize('ui.bookmarks.saveValueSnapshot'),
+      localize('ui.bookmarks.formulaSnapshot'),
+      localize('ui.bookmarks.creationTime'),
+      localize('ui.bookmarks.updateTime'),
     ];
     const rows = this.items.map((b) => [
       b.sheet,
@@ -518,9 +521,9 @@ export class Bookmarks {
     const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'ExcelLens_审计标记.csv';
+    link.download = localize('ui.bookmarks.excellensAuditmarkingCsv');
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
-    this.toast('标记清单已导出', 'success');
+    this.toast(localize('ui.bookmarks.markedListExported'), 'success');
   }
 }

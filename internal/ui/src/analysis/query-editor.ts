@@ -1,3 +1,4 @@
+import { t as localize } from '../core/i18n.ts';
 import type {
   AnalysisAggregateKind,
   AnalysisField,
@@ -25,43 +26,43 @@ const VALID_COMPARISON_MODES = new Set<string>([
 ]);
 
 const FILTER_OPERATIONS: readonly (readonly [AnalysisFilterOp, string])[] = Object.freeze([
-  ['eq', '等于'] as const,
-  ['neq', '不等于'] as const,
-  ['contains', '包含'] as const,
-  ['notcontains', '不包含'] as const,
-  ['startswith', '开头是'] as const,
-  ['endswith', '结尾是'] as const,
-  ['gt', '大于'] as const,
-  ['gte', '大于等于'] as const,
-  ['lt', '小于'] as const,
-  ['lte', '小于等于'] as const,
-  ['between', '在区间内'] as const,
-  ['in', '多值匹配'] as const,
-  ['blank', '为空'] as const,
-  ['notblank', '非空'] as const,
+  ['eq', localize('ui.common.equal')] as const,
+  ['neq', localize('ui.common.notEqual')] as const,
+  ['contains', localize('ui.common.including')] as const,
+  ['notcontains', localize('ui.common.notIncluded')] as const,
+  ['startswith', localize('ui.common.beginning')] as const,
+  ['endswith', localize('ui.common.ending')] as const,
+  ['gt', localize('ui.common.greaterThan')] as const,
+  ['gte', localize('ui.common.greaterThanOrEqual')] as const,
+  ['lt', localize('ui.common.lessThan')] as const,
+  ['lte', localize('ui.common.lessThanOrEqual')] as const,
+  ['between', localize('ui.queryEditor.withinRange')] as const,
+  ['in', localize('ui.queryEditor.multipleValueMatching')] as const,
+  ['blank', localize('ui.common.ifEmptyThenLeaveEmpty')] as const,
+  ['notblank', localize('ui.common.notEmpty')] as const,
 ]);
 
 const VALID_FILTER_OPS = new Set<string>(FILTER_OPERATIONS.map((x) => x[0]));
 
 const TRANSFORM_OPERATIONS: readonly (readonly [AnalysisTransformOp, string])[] = Object.freeze([
-  ['date', '转日期'] as const,
-  ['time', '转时间'] as const,
-  ['datetime', '转日期时间'] as const,
-  ['text', '转文本'] as const,
-  ['number', '转数值'] as const,
-  ['trim', '去空格'] as const,
-  ['upper', '大写'] as const,
-  ['lower', '小写'] as const,
-  ['year', '提取年份'] as const,
-  ['month', '提取月份'] as const,
-  ['yearmonth', '提取年月'] as const,
-  ['abs', '绝对值'] as const,
-  ['multiply', '乘常数'] as const,
-  ['divide', '除常数'] as const,
-  ['prefix', '添加前缀'] as const,
-  ['suffix', '添加后缀'] as const,
-  ['replace', '替换文本'] as const,
-  ['length', '文本长度'] as const,
+  ['date', localize('ui.queryEditor.convertDate')] as const,
+  ['time', localize('ui.queryEditor.convertTime')] as const,
+  ['datetime', localize('ui.queryEditor.transferDateTime')] as const,
+  ['text', localize('ui.queryEditor.convertText')] as const,
+  ['number', localize('ui.queryEditor.conversionValue')] as const,
+  ['trim', localize('ui.queryEditor.goSpace')] as const,
+  ['upper', localize('ui.queryEditor.capital')] as const,
+  ['lower', localize('ui.queryEditor.lowercase')] as const,
+  ['year', localize('ui.queryEditor.extractYears')] as const,
+  ['month', localize('ui.queryEditor.extractMonths')] as const,
+  ['yearmonth', localize('ui.queryEditor.extractMonthsYears')] as const,
+  ['abs', localize('ui.queryEditor.absoluteValue')] as const,
+  ['multiply', localize('ui.queryEditor.constantMultiplier')] as const,
+  ['divide', localize('ui.queryEditor.divideConstant')] as const,
+  ['prefix', localize('ui.queryEditor.addPrefix')] as const,
+  ['suffix', localize('ui.queryEditor.addSuffix')] as const,
+  ['replace', localize('ui.queryEditor.replaceText')] as const,
+  ['length', localize('ui.queryEditor.textLength')] as const,
 ]);
 
 const VALID_TRANSFORM_OPS = new Set<string>([
@@ -126,7 +127,7 @@ export class QueryEditor {
   }
 
   private fieldName(id: string | undefined): string {
-    if (!id) return '记录数';
+    if (!id) return localize('ui.common.numberRecords');
     const f =
       this.state.query?.transforms.find((x) => x.id === id) ??
       this.state.fields.find((x) => x.id === id);
@@ -153,7 +154,7 @@ export class QueryEditor {
       q.metrics.push({ field: q.value, aggregate: q.aggregate, name: '' });
     }
     if (q.metrics.length >= 6) {
-      this.toast('一次分析最多6个指标', 'warning');
+      this.toast(localize('ui.queryEditor.upIndicatorsPerAnalysis'), 'warning');
       return;
     }
     const fields = this.allFields();
@@ -181,8 +182,8 @@ export class QueryEditor {
     metrics.forEach((metric, i) => {
       const row = document.createElement('div');
       row.className = 'analysis-metric-row';
-      const field = this.fieldSelect(metric.field || '', '记录数');
-      field.title = '参与统计的字段';
+      const field = this.fieldSelect(metric.field || '', localize('ui.common.numberRecords'));
+      field.title = localize('ui.queryEditor.fieldsInvolvedStatistics');
       field.onchange = (): void => {
         adopt();
         metric.field = field.value;
@@ -202,7 +203,7 @@ export class QueryEditor {
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = '×';
-      remove.title = '移除指标';
+      remove.title = localize('ui.queryEditor.removeMetrics');
       remove.onclick = (): void => {
         adopt();
         q.metrics.splice(i, 1);
@@ -218,10 +219,10 @@ export class QueryEditor {
       const presentation = document.createElement('div');
       presentation.className = 'analysis-metric-comparison';
       const compareLabel = document.createElement('label');
-      compareLabel.textContent = '结果显示';
+      compareLabel.textContent = localize('ui.queryEditor.resultDisplay');
       const compare = document.createElement('select');
       compare.className = 'analysis-control analysis-comparison-mode';
-      compare.setAttribute('aria-label', `指标 ${i + 1} 结果显示`);
+      compare.setAttribute('aria-label', localize('ui.queryEditor.metricResultDisplay', { i: i + 1 }));
       for (const [value, label] of COMPARISON_MODES) compare.append(new Option(label, value));
       compare.value = metric.comparison || '';
       compare.onchange = (): void => {
@@ -235,11 +236,11 @@ export class QueryEditor {
       presentation.append(compareLabel);
       if (isRunningComparison(metric)) {
         const axisLabel = document.createElement('label');
-        axisLabel.textContent = '累计方向';
+        axisLabel.textContent = localize('ui.queryEditor.cumulativeDirection');
         const axis = document.createElement('select');
         axis.className = 'analysis-control analysis-comparison-axis';
-        axis.setAttribute('aria-label', `指标 ${i + 1} 累计方向`);
-        axis.append(new Option('沿行（按分类排序）', 'rows'), new Option('沿列（按列标签排序）', 'columns'));
+        axis.setAttribute('aria-label', localize('ui.queryEditor.metricCumulativeDirection', { i: i + 1 }));
+        axis.append(new Option(localize('ui.queryEditor.alongRowSortedCategory'), 'rows'), new Option(localize('ui.queryEditor.sortColumnSortedColumnLabel'), 'columns'));
         axis.value = metric.comparisonAxis || 'rows';
         axis.onchange = (): void => {
           adopt();
@@ -264,7 +265,7 @@ export class QueryEditor {
 
   private fieldSelect(
     value = '',
-    emptyLabel = '选择字段',
+    emptyLabel = localize('ui.common.selectFields'),
     choices: readonly { readonly id: string; readonly name: string }[] = this.allFields(),
   ): HTMLSelectElement {
     const el = document.createElement('select');
@@ -288,7 +289,7 @@ export class QueryEditor {
       chip.type = 'button';
       chip.className = 'analysis-field-chip';
       chip.draggable = true;
-      chip.title = '拖到行、列、汇总区域；单击按类型分配';
+      chip.title = localize('ui.queryEditor.dragRowsColumnsOrSummary');
       chip.dataset.field = field.id;
       const type = document.createElement('span');
       type.className = 'analysis-type';
@@ -308,8 +309,8 @@ export class QueryEditor {
           const info = document.createElement('button');
           info.type = 'button';
           info.className = 'analysis-field-info-btn';
-          info.title = '查看字段统计与常见值';
-          info.setAttribute('aria-label', `查看字段统计：${field.name}`);
+          info.title = localize('ui.queryEditor.viewFieldStatisticsCommonValues');
+          info.setAttribute('aria-label', localize('ui.queryEditor.viewFieldStatistics', { name: field.name }));
           info.innerHTML = icon('info', 'icon icon-small');
           info.onclick = (): void => {
             void this.loadFieldProfile(sourceField);
@@ -333,7 +334,7 @@ export class QueryEditor {
     }
     if (zone === 'rows') {
       if (q.rows.length >= 3) {
-        this.toast('行维度最多支持3个', 'warning');
+        this.toast(localize('ui.queryEditor.supportsUpRowDimensions'), 'warning');
         return;
       }
       q.rows.push(id);
@@ -388,7 +389,7 @@ export class QueryEditor {
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = '×';
-        remove.title = '移除字段';
+        remove.title = localize('ui.queryEditor.removeFields');
         remove.addEventListener('click', () => {
           if (zone === 'values') {
             if (metrics.length) {
@@ -438,7 +439,7 @@ export class QueryEditor {
       box.className = 'analysis-rule';
       const h = document.createElement('div');
       h.className = 'analysis-rule-header';
-      const select = this.fieldSelect(f.field, '字段');
+      const select = this.fieldSelect(f.field, localize('ui.common.field'));
       select.onchange = (): void => {
         f.field = select.value;
       };
@@ -475,10 +476,10 @@ export class QueryEditor {
         input.disabled = f.op === 'blank' || f.op === 'notblank';
         input.placeholder =
           f.op === 'between'
-            ? '100..200 或 日期..日期'
+            ? localize('ui.queryEditor.orDateDate')
             : f.op === 'in'
-              ? '多项用 | 分隔'
-              : '匹配值';
+              ? localize('ui.queryEditor.multipleItemsSeparated')
+              : localize('ui.queryEditor.matchValue');
       };
       op.onchange = syncOp;
       syncOp();
@@ -521,10 +522,10 @@ export class QueryEditor {
       row.className = 'analysis-rule-header';
       const name = document.createElement('input');
       name.className = 'analysis-control';
-      name.placeholder = '新列名';
+      name.placeholder = localize('ui.queryEditor.newColumnName');
       name.value = t.name;
       name.oninput = (): void => {
-        t.name = name.value || '新列';
+        t.name = name.value || localize('ui.queryEditor.newColumn');
         this.renderFields();
       };
       row.append(name);
@@ -532,13 +533,13 @@ export class QueryEditor {
       remove.type = 'button';
       remove.className = 'analysis-rule-remove';
       remove.textContent = '×';
-      remove.title = '移除计算列';
+      remove.title = localize('ui.queryEditor.removeCalculationColumn');
       remove.onclick = (): void => this.removeTransform(t.id);
       row.append(remove);
 
       const temporal = TEMPORAL_TRANSFORM_OPS.has(t.op);
       const operations: (readonly [AnalysisTransformOp, string])[] = [...TRANSFORM_OPERATIONS];
-      if (t.op === 'map_text') operations.push(['map_text', '文本映射']);
+      if (t.op === 'map_text') operations.push(['map_text', localize('ui.queryEditor.textMapping')]);
       const ops = document.createElement('select');
       ops.className = 'analysis-control';
       for (const [val, label] of operations) ops.append(new Option(label, val));
@@ -555,7 +556,7 @@ export class QueryEditor {
         ...this.state.fields.map((f) => ({ id: f.id, name: f.name })),
         ...q.transforms.slice(0, i).map((step) => ({ id: step.id, name: step.name })),
       ];
-      const source = this.fieldSelect(t.source, '来源列', sourceChoices);
+      const source = this.fieldSelect(t.source, localize('ui.queryEditor.sourceColumn'), sourceChoices);
       source.onchange = (): void => {
         t.source = source.value;
       };
@@ -564,12 +565,12 @@ export class QueryEditor {
       if (temporal) {
         const sel = document.createElement('select');
         sel.className = 'analysis-control';
-        sel.setAttribute('aria-label', '日期或时间的输入格式');
+        sel.setAttribute('aria-label', localize('ui.queryEditor.dateOrTimeInputFormat'));
         const dateFormats: readonly (readonly [string, string])[] = [
-          ['auto', '年在前 / 时间（自动识别）'],
-          ['compact', '年月日紧排：20261111'],
-          ['dmy', '日/月/年：11/12/2026'],
-          ['mdy', '月/日/年：11/12/2026'],
+          ['auto', localize('ui.queryEditor.yearAtFrontTimeAutomatically')],
+          ['compact', localize('ui.queryEditor.dateYearMonthArrangedClosely')],
+          ['dmy', localize('ui.queryEditor.dayMonthYear')],
+          ['mdy', localize('ui.queryEditor.monthDayYear')],
         ];
         for (const [val, label] of dateFormats) sel.append(new Option(label, val));
         sel.value = t.arg || 'auto';
@@ -580,8 +581,8 @@ export class QueryEditor {
       } else {
         const inp = document.createElement('input');
         inp.className = 'analysis-control';
-        inp.setAttribute('aria-label', '转换参数');
-        inp.placeholder = '常数 / 查找=>替换';
+        inp.setAttribute('aria-label', localize('ui.queryEditor.conversionParameters'));
+        inp.placeholder = localize('ui.queryEditor.constantFindReplace');
         inp.value = t.arg || '';
         inp.hidden = ARGLESS_TRANSFORM_OPS.has(t.op);
         inp.onchange = (): void => {
@@ -601,14 +602,14 @@ export class QueryEditor {
       if (temporal) {
         const note = document.createElement('small');
         note.className = 'analysis-conversion-note';
-        note.textContent = '运行分析时转换；无效或含糊的值保留原文并计数。';
+        note.textContent = localize('ui.queryEditor.convertDuringAnalysisInvalidOr');
         box.append(note);
       }
       if (t.op === 'map_text') {
         const detail = document.createElement('details');
         detail.className = 'analysis-mapping-details';
         const summary = document.createElement('summary');
-        summary.textContent = `${t.mapping?.length ?? 0} 条精确文本映射 · 查看原文`;
+        summary.textContent = localize('ui.queryEditor.textMappingViewOriginal', { detail: t.mapping?.length ?? 0 });
         const content = document.createElement('pre');
         detail.append(summary, content);
         detail.addEventListener('toggle', () => {

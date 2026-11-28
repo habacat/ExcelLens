@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"iter"
 	"net/http"
@@ -15,6 +15,7 @@ import (
 
 	"excellens/internal/archives"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -81,7 +82,7 @@ func (a *App) handleReconcileSources(w http.ResponseWriter, r *http.Request) {
 		if id == focus {
 			workspace, err := a.loadAnalysis(wb)
 			if err != nil {
-				writeError(w, 409, "读取来源分析工作区失败："+err.Error())
+				writeMessage(w, 409, "service.reconcileSource.failedReadSourceAnalysisWorkspace", i18n.Args{"detail": err})
 				return
 			}
 			for _, sheet := range workspace.Sheets {
@@ -104,19 +105,19 @@ func (a *App) handleReconcileUploaded(w http.ResponseWriter, r *http.Request, pa
 		}
 	}()
 	if archives.IsPath(name) {
-		writeError(w, 400, "压缩包请先打开所需成员，再从已打开来源中选择")
+		writeMessage(w, 400, "service.reconcileSource.compressedPackagesOpenRequiredMembers")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	primary := a.currentWorkbook()
 	if primary == nil || primary.Fingerprint != r.FormValue("workbookKey") || sourceBookID(primary) != r.FormValue("primaryBook") {
-		writeError(w, 409, "当前工作簿已切换，请重新添加核对来源")
+		writeMessage(w, 409, "service.reconcileSource.currentWorkbookSwitchedReAdd")
 		return
 	}
 	book, err := workbook.OpenWorkbook(path)
 	if err != nil {
-		writeError(w, 400, "无法打开核对来源："+err.Error())
+		writeMessage(w, 400, "service.reconcileSource.unableOpenVerificationSource", i18n.Args{"detail": err})
 		return
 	}
 	book.SetDisplayName(name)
@@ -124,13 +125,13 @@ func (a *App) handleReconcileUploaded(w http.ResponseWriter, r *http.Request, pa
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if a.wb != primary || a.maintenance {
-		writeError(w, 409, "工作簿已切换或正在维护缓存")
+		writeMessage(w, 409, "service.reconcileSource.workbookSwitchedOrCurrentlyUnder")
 		return
 	}
 	a.reconcileMu.Lock()
 	defer a.reconcileMu.Unlock()
 	if len(a.reconcileBooks) >= maxReconcileAttachments {
-		writeError(w, 429, fmt.Sprintf("最多添加%d个来源文件，请先移除不用的来源", maxReconcileAttachments))
+		writeMessage(w, 429, "service.reconcileSource.upSourceFilesCanBe", i18n.Args{"maxReconcileAttachments": maxReconcileAttachments})
 		return
 	}
 	a.reconcileBooks[id] = &reconcileAttachment{book: book, release: a.pinWorkbooks(book)}
@@ -147,7 +148,7 @@ func (a *App) handleReconcileRemoveSource(w http.ResponseWriter, r *http.Request
 		Book string `json:"book"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "来源参数无效")
+		writeMessage(w, 400, "service.reconcileSource.invalidSourceParameters")
 		return
 	}
 	a.reconcileMu.Lock()
@@ -199,18 +200,18 @@ func (a *App) buildReconcileSourceWithHeaderBudget(ctx context.Context, wb *work
 // and source interpretation are unchanged.
 func (a *App) buildTypedTableSource(ctx context.Context, wb *workbook.Workbook, ref reconcileSourceRef, columns []int, headerBudget int64, columnLimit int) (reconcile.Source, error) {
 	if wb == nil || sourceBookID(wb) != ref.Book || len(ref.Source) > 512 {
-		return reconcile.Source{}, errors.New("核对来源已关闭或标识无效")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.sourceVerificationClosedOrIdentifier")
 	}
 	if wb.SourceInfo.Incomplete || wb.ArchiveOrigin != nil && wb.ArchiveOrigin.Partial {
-		return reconcile.Source{}, errors.New("此来源有不完整读取状态，不能进行完整对账")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.thisSourceIncompleteReadStatus")
 	}
 	for _, column := range columns {
 		if column < 1 || column > formats.ExcelColumns {
-			return reconcile.Source{}, errors.New("核对字段列号无效")
+			return reconcile.Source{}, i18n.Error("service.reconcileSource.verificationFieldColumnNumberInvalid")
 		}
 	}
 	if len(columns) > columnLimit {
-		return reconcile.Source{}, errors.New("一次核对引用字段过多")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.excessiveReferencedFieldsDuringVerification")
 	}
 	if strings.HasPrefix(ref.Source, "scratch:") {
 		return a.reconcileScratchSource(wb, ref, columns)
@@ -219,11 +220,11 @@ func (a *App) buildTypedTableSource(ctx context.Context, wb *workbook.Workbook, 
 		return reconcile.Source{}, err
 	}
 	if !strings.HasPrefix(ref.Source, "wb:") {
-		return reconcile.Source{}, errors.New("核对来源类型无效")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.invalidSourceTypeVerification")
 	}
 	meta, found := wb.FindSheet(strings.TrimPrefix(ref.Source, "wb:"))
 	if !found {
-		return reconcile.Source{}, errors.New("核对工作表不存在")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.verificationWorksheetDoesNotExist")
 	}
 	idx := wb.GetCachedIndex(meta.Path)
 	if idx == nil {
@@ -239,7 +240,7 @@ func (a *App) buildTypedTableSource(ctx context.Context, wb *workbook.Workbook, 
 		}
 	}
 	if ref.HeaderRow < 0 || ref.HeaderRow > idx.MaxRow {
-		return reconcile.Source{}, errors.New("核对表头行号超出来源范围")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.rowNumberVerificationHeaderExceeds")
 	}
 	if headerBudget > 0 && ref.HeaderRow > 0 {
 		if err := sourceRowsWithinBudget(idx, []int{ref.HeaderRow}, headerBudget); err != nil {
@@ -276,11 +277,11 @@ func (a *App) buildTypedTableSource(ctx context.Context, wb *workbook.Workbook, 
 	hash := sha256.Sum256(stamp)
 	info.Stamp = fmt.Sprintf("%x", hash[:])
 	if ref.Stamp != "" && ref.Stamp != info.Stamp {
-		return reconcile.Source{}, errors.New("核对来源或表头已变化，请重新载入字段")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.sourceOrHeaderChangedReload")
 	}
 	read := func(ctx context.Context, positions iter.Seq[int], cols []int, visit func(reconcile.Record) error) error {
 		if len(cols) == 0 {
-			return errors.New("未选择核对字段")
+			return i18n.Error("service.reconcileSource.noVerificationFieldsSelected")
 		}
 		// Native visitor preserves source coordinates; the position iterator's
 		// current entry is captured before each synchronous row callback.
@@ -338,12 +339,12 @@ func (a *App) reconcileScratchSource(wb *workbook.Workbook, ref reconcileSourceR
 	}
 	sheet := workspace.Sheet(strings.TrimPrefix(ref.Source, "scratch:"))
 	if sheet == nil {
-		return reconcile.Source{}, errors.New("分析编辑表不存在")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.analysisEditTableDoesNot")
 	}
 	info := reconcile.SourceInfo{ID: ref.Book + "/" + ref.Source, Name: workbookDisplayName(wb), Sheet: sheet.Name, Kind: "analysis", Fingerprint: wb.Fingerprint, Total: len(sheet.Rows)}
 	info.Stamp = analysisSheetStamp(sheet)
 	if ref.Stamp != "" && ref.Stamp != info.Stamp {
-		return reconcile.Source{}, errors.New("分析编辑表已修改，请重新载入字段后核对")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.analysisEditingTableModifiedReload")
 	}
 	for col, name := range sheet.Columns {
 		info.Fields = append(info.Fields, sourceField(col+1, name, true))
@@ -354,20 +355,20 @@ func (a *App) reconcileScratchSource(wb *workbook.Workbook, ref reconcileSourceR
 	} // metadata requests do not retain rows
 	bytes := int64(len(sheet.Rows)) * int64(32+len(columns)*96)
 	if bytes > maxReconcileProjectionBytes {
-		return reconcile.Source{}, errors.New("分析编辑表核对快照超过16MiB，请减少比较字段")
+		return reconcile.Source{}, i18n.Error("service.reconcileSource.analysisEditingTableSnapshotThat")
 	}
 	projection := make([][]reconcile.Value, len(sheet.Rows))
 	for pos, row := range sheet.Rows {
 		values := make([]reconcile.Value, len(columns))
 		for slot, col := range columns {
 			if col > len(sheet.Columns) {
-				return reconcile.Source{}, errors.New("分析编辑表字段已变化")
+				return reconcile.Source{}, i18n.Error("service.reconcileSource.analysisEditTableFieldsHave")
 			}
 			if col <= len(row) {
 				text := row[col-1]
 				bytes += int64(len(text))*5/4 + 16
 				if bytes > maxReconcileProjectionBytes {
-					return reconcile.Source{}, errors.New("分析编辑表核对快照超过16MiB，请减少比较字段或拆分编辑表")
+					return reconcile.Source{}, i18n.Error("service.reconcileSource.analysisEditTableSnapshotExceeds")
 				}
 				text = strings.Clone(text)
 				values[slot] = reconcile.Value{Raw: text, Display: text, Type: "s", Exists: true}
@@ -382,7 +383,7 @@ func (a *App) reconcileScratchSource(wb *workbook.Workbook, ref reconcileSourceR
 				return err
 			}
 			if pos < 0 || pos >= len(projection) {
-				return errors.New("分析编辑表核对位置无效")
+				return i18n.Error("service.reconcileSource.editingTableAnalysisNotCorrect")
 			}
 			values := make(map[int]reconcile.Value, len(columns))
 			for slot, col := range columns {
@@ -418,7 +419,7 @@ func (a *App) handleReconcileFields(w http.ResponseWriter, r *http.Request) {
 	}
 	var ref reconcileSourceRef
 	if decodeAnalysis(r, &ref) != nil {
-		writeError(w, 400, "核对来源参数无效")
+		writeMessage(w, 400, "service.reconcileSource.verificationSourceParametersInvalid")
 		return
 	}
 	a.cacheMu.RLock()
@@ -426,7 +427,7 @@ func (a *App) handleReconcileFields(w http.ResponseWriter, r *http.Request) {
 	wb := a.resolveReconcileBook(ref.Book)
 	source, err := a.buildReconcileSource(r.Context(), wb, ref, nil)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	markReconcileHeaders(source.Info)

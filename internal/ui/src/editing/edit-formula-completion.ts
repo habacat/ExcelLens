@@ -3,6 +3,7 @@
  * Excel table names, and structured table-column selector completions with
  * virtualized option rendering and active argument hints.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient } from '../contracts/common.ts';
 import type { EditAddress, FormulaSymbol } from '../contracts/edit.ts';
 import { parseRef } from '../core/cell-address.ts';
@@ -154,7 +155,7 @@ export class WorksheetCompletion {
       return (table.columns ?? []).map((name) => ({
         name,
         kind: 'column',
-        signature: `${table.name} · 表列`,
+        signature: localize('ui.editFormulaCompletion.tableColumns', { name: table.name }),
       }));
     }
     const found = new Map<string, FormulaCompletionItem>();
@@ -165,7 +166,7 @@ export class WorksheetCompletion {
         found.set(upper, {
           name: x.name,
           kind: x.kind,
-          signature: x.kind === 'table' ? 'Excel 表格' : `${x.scope || '工作簿'} · 定义名称`,
+          signature: x.kind === 'table' ? localize('ui.editFormulaCompletion.excelTable') : localize('ui.editFormulaCompletion.definedName', { scope: x.scope || localize('ui.common.workbook') }),
         });
       }
     }

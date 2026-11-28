@@ -2,6 +2,7 @@
  * Saved analysis plans contain only declared operations and field bindings.
  * Capture, preview and replay share the normal cancellable analysis jobs.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { AsyncJobStatusEnvelope } from '../core/async-jobs.ts';
 import type {
   AnalysisQueryStatusResponse,
@@ -126,14 +127,14 @@ interface RecipeCaptureDraft {
 }
 
 const MATCH_LABELS: Readonly<Record<string, string>> = {
-  match: '已匹配',
-  missing: '名称未匹配，请选择',
-  manual: '需手动选择',
-  ambiguous: '名称重复，请选择',
-  uncertain: '读取类型不确定',
-  untyped: '样本为空，请选择',
-  type_mismatch: '读取类型不兼容',
-  mixed: '混合类型，请核对后选择',
+  match: localize('ui.recipes.matchedSuccessfully'),
+  missing: localize('ui.recipes.nameDoesNotMatchSelect'),
+  manual: localize('ui.recipes.needManualSelection'),
+  ambiguous: localize('ui.recipes.nameDuplicationSelect'),
+  uncertain: localize('ui.recipes.uncertainReadingType'),
+  untyped: localize('ui.recipes.sampleEmptySelect'),
+  type_mismatch: localize('ui.recipes.incompatibleReadingType'),
+  mixed: localize('ui.recipes.mixedTypesCheckSelect'),
 };
 
 function isAbortError(error: unknown): boolean {
@@ -164,13 +165,13 @@ export function validateRecipeMapping(
   preview: Pick<RecipePreviewResponse, 'recipe' | 'fields'> | null | undefined,
   mapping: Readonly<Record<string, string>>,
 ): string {
-  if (!preview) return '请先读取字段';
+  if (!preview) return localize('ui.recipes.readFieldsFirst');
   const used = new Set<string>();
   for (const field of preview.recipe.fields) {
     const target = preview.fields.find((item) => item.id === mapping[field.id]);
-    if (!target) return '请逐项选择目标字段';
-    if (used.has(target.id)) return '每个目标字段只能使用一次';
-    if (!isRecipeFieldCompatible(field, target)) return '目标字段的读取类型不兼容';
+    if (!target) return localize('ui.recipes.selectTargetFieldItemItem');
+    if (used.has(target.id)) return localize('ui.recipes.eachTargetFieldCanBe');
+    if (!isRecipeFieldCompatible(field, target)) return localize('ui.recipes.readingTypeTargetFieldIncompatible');
     used.add(target.id);
   }
   return '';
@@ -181,7 +182,7 @@ export function recipeSummary(value: Recipe | null | undefined): string {
   const steps = value.steps;
   const group = steps.find((step) => step.kind === 'group')?.group;
   const exportFormat = steps.find((step) => step.kind === 'export')?.export?.format.toUpperCase() ?? '';
-  return `${group?.layout === 'tree' ? '层级展开 · ' : ''}${steps.filter((step) => step.kind === 'transform').length}项转换 · ${steps.filter((step) => step.kind === 'filter').length}项筛选 · ${(group?.rows.length ?? 0) + (group?.columns.length ?? 0)}个维度 · ${group?.metrics.length || 1}个指标 · ${exportFormat}`;
+  return localize('ui.recipes.itemsConvertedItemsFilteredDimensions', { detail: group?.layout === 'tree' ? `${localize('ui.recipes.expandLevels')} ` : '', count: steps.filter((step) => step.kind === 'transform').length, count2: steps.filter((step) => step.kind === 'filter').length, detail2: (group?.rows.length ?? 0) + (group?.columns.length ?? 0), detail3: group?.metrics.length || 1, exportFormat });
 }
 
 export const RecipesModel = Object.freeze({
@@ -232,9 +233,9 @@ export class RecipesController {
       readonly total?: number;
     }): void => {
       this.status(
-        `${status.stage || '正在分析'}${
+        `${status.stage || localize('ui.recipes.analyzing')}${
           status.total
-            ? ` · ${(status.progress ?? 0).toLocaleString()} / ${status.total.toLocaleString()}行`
+            ? ` ${localize('ui.recipes.rows', { detail: (status.progress ?? 0).toLocaleString(interfaceLocale()), total: status.total.toLocaleString(interfaceLocale()) })}`
             : ''
         }`,
       );
@@ -250,10 +251,10 @@ export class RecipesController {
       endpoint: '/api/recipes/capture',
       decodeStatus: decodeRecipeCaptureStatus,
       resultFromStatus: status => {
-        if (!status.result) throw new Error('方案字段核对缺少已完成的结果');
+        if (!status.result) throw new Error(localize('ui.recipes.comparisonSchemeFieldsLacksCompleted'));
         return status.result;
       },
-      label: '方案字段核对',
+      label: localize('ui.recipes.verifySchemeFields'),
     });
 
     this.runJobs = new AsyncJobs<
@@ -268,7 +269,7 @@ export class RecipesController {
       onProgress,
       endpoint: '/api/recipes/run',
       decodeStatus: decodeAnalysisQueryStatusResponse,
-      label: '方案分析',
+      label: localize('ui.recipes.scenarioAnalysis'),
       resultFromStatus: (status) => status,
     });
 
@@ -424,7 +425,7 @@ export class RecipesController {
   async open(): Promise<void> {
     const c = this.context();
     if (!c.opened || !c.bookKey) {
-      this.toast('请先打开分析工作区', 'warning');
+      this.toast(localize('ui.recipes.openAnalysisWorkspaceFirst'), 'warning');
       return;
     }
     this.opened = true;
@@ -436,7 +437,7 @@ export class RecipesController {
     target.value = c.source;
     requireInput('analysisPlanHeader').value = String(c.headerRow || 1);
     requireSelect('analysisPlanScope').value = 'full';
-    requireEl('analysisPlanSaveHint').textContent = c.resultJob ? '' : '请先运行分析';
+    requireEl('analysisPlanSaveHint').textContent = c.resultJob ? '' : localize('ui.recipes.runAnalysisFirst');
     if (!this.dialog.open) this.dialog.showModal();
     this.clearPreview();
     await this.refresh();
@@ -448,7 +449,7 @@ export class RecipesController {
     const list = requireSelect('analysisPlanList');
     const previous = selected || list.value;
     list.replaceChildren();
-    list.append(new Option(this.store.items.length ? '选择分析方案' : '尚无分析方案', ''));
+    list.append(new Option(this.store.items.length ? localize('ui.recipes.selectAnalysisScheme') : localize('ui.recipes.noAnalysisPlanYet'), ''));
     for (const value of this.store.items) list.append(new Option(value.name, value.id));
     list.value = this.store.items.some((value) => value.id === previous) ? previous : '';
     this.select();
@@ -485,8 +486,8 @@ export class RecipesController {
       this.setCatalog(data);
       this.status(
         this.draft
-          ? '列表已刷新，可重试保存已核对的方案。'
-          : `${this.store?.items.length ?? 0}个方案`,
+          ? localize('ui.recipes.listRefreshedTrySavingVerified')
+          : localize('ui.recipes.solutions', { detail: this.store?.items.length ?? 0 }),
       );
     } catch (error: unknown) {
       if (
@@ -513,7 +514,7 @@ export class RecipesController {
     const nameInput = requireInput('analysisPlanName');
     const name = nameInput.value.trim();
     if (!name || Array.from(name).length > 80 || /[\r\n\0]/.test(name)) {
-      this.status('请输入1至80字的方案名称', true);
+      this.status(localize('ui.recipes.enterProposalNameCharacters'), true);
       nameInput.focus();
       return;
     }
@@ -540,7 +541,7 @@ export class RecipesController {
         this.draft.format !== captured.format ||
         this.draft.key !== key
       ) {
-        this.status('正在核对完整输入的字段类型…');
+        this.status(localize('ui.recipes.verifyingFieldTypeFullyEntered'));
         const completed = await this.captureJobs.execute(
           { ...captured, book: this.book, workbookKey: key },
           { main: true },
@@ -555,7 +556,7 @@ export class RecipesController {
       }
       this.mode = 'commit';
       this.controls();
-      this.status('正在保存分析方案…');
+      this.status(localize('ui.recipes.savingAnalysisPlan'));
       const saved = await this.post('/api/recipes/capture/commit', {
         id: this.draft.id,
         name,
@@ -570,14 +571,14 @@ export class RecipesController {
         const data = await this.api('/api/recipes', undefined, decodeRecipeCatalogResponse);
         if (current()) this.setCatalog(data, saved.id);
       } catch {
-        if (current()) this.status('方案已保存；刷新列表后查看。');
+        if (current()) this.status(localize('ui.recipes.schemeSavedViewAfterRefreshing'));
         return;
       }
-      if (current()) this.status('分析方案已保存到本机');
+      if (current()) this.status(localize('ui.recipes.analysisPlanSavedLocally'));
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
         this.status(
-          errorMessage(error) + (this.draft ? '；可刷新列表或更名后重试。' : ''),
+          errorMessage(error) + (this.draft ? localize('ui.recipes.tryAgainAfterRefreshingList') : ''),
           true,
         );
       }
@@ -608,7 +609,7 @@ export class RecipesController {
       }).then(decodeRecipeCatalogResponse);
       if (this.current(serial, epoch, key)) {
         this.setCatalog(data);
-        this.status('已删除所选分析方案');
+        this.status(localize('ui.recipes.selectedAnalysisSchemeDeleted'));
       }
     } catch (error: unknown) {
       if (this.current(serial, epoch, key)) this.status(errorMessage(error), true);
@@ -641,17 +642,17 @@ export class RecipesController {
     this.busy = true;
     this.mode = 'preview';
     this.clearPreview();
-    this.status('正在读取字段与类型样本…');
+    this.status(localize('ui.recipes.readingSampleFieldsTypesProgress'));
     try {
       const target = this.target();
       if (!Number.isInteger(target.headerRow) || target.headerRow < 1) {
-        throw new Error('表头行号须为正整数');
+        throw new Error(localize('ui.recipes.rowNumbersHeaderMustBe'));
       }
       const c = this.context();
       const useCurrent = requireSelect('analysisPlanScope').value === 'current';
       const sourceId = useCurrent ? c.sourceId : '';
       if (useCurrent && (!sourceId || c.source !== target.source || !c.sourceScope)) {
-        throw new Error('当前分析范围已变化，请重新选择');
+        throw new Error(localize('ui.recipes.currentAnalysisRangeChangedReselect'));
       }
       const data = await this.post(
         '/api/recipes/preview',
@@ -667,7 +668,7 @@ export class RecipesController {
       if (!this.current(serial, epoch, key)) return;
       this.preview = { ...data, sourceId, ref: { ...target, stamp: data.target.stamp } };
       this.renderPreview();
-      this.status('核对字段映射后运行');
+      this.status(localize('ui.recipes.runAfterVerifyingFieldMapping'));
     } catch (error: unknown) {
       if (this.current(serial, epoch, key) && !isAbortError(error)) {
         this.status(errorMessage(error), true);
@@ -689,10 +690,10 @@ export class RecipesController {
     host.replaceChildren();
     requireEl('analysisPlanMapping').hidden = false;
     requireEl('analysisPlanSample').textContent =
-      `预览 ${preview.sampled} / ${preview.target.total.toLocaleString()} 行${preview.fieldsTruncated ? ' · 仅前256列' : ''}`;
+      localize('ui.recipes.previewRow', { sampled: preview.sampled, total: preview.target.total.toLocaleString(interfaceLocale()), detail: preview.fieldsTruncated ? ` ${localize('ui.recipes.onlyFirstColumns')}` : '' });
     if (!preview.recipe.fields.length) {
       const note = document.createElement('p');
-      note.textContent = '此方案只统计记录数，无需绑定字段。';
+      note.textContent = localize('ui.recipes.thisSolutionOnlyCountsNumber');
       host.append(note);
       return;
     }
@@ -712,7 +713,7 @@ export class RecipesController {
       select.dataset.field = field.id;
       select.id = `analysisPlanField_${field.id}`;
       label.htmlFor = select.id;
-      select.append(new Option('选择目标字段', ''));
+      select.append(new Option(localize('ui.recipes.selectTargetField'), ''));
       for (const target of preview.fields) {
         const option = new Option(
           `${target.name} · ${target.id} · ${preview.targetTypes[target.id] ?? ''}`,
@@ -724,14 +725,14 @@ export class RecipesController {
       select.value = match?.status === 'match' ? match.target : '';
 
       const note = document.createElement('small');
-      const defaultNote = (match ? MATCH_LABELS[match.status] : undefined) ?? '需手动选择';
+      const defaultNote = (match ? MATCH_LABELS[match.status] : undefined) ?? localize('ui.recipes.needManualSelection');
       note.textContent = defaultNote;
       select.addEventListener('change', () => {
-        note.textContent = select.value ? '已手动选择，请核对读取类型' : defaultNote;
+        note.textContent = select.value ? localize('ui.recipes.manualSelectionMadeCheckReading') : defaultNote;
         this.controls();
         const error = validateRecipeMapping(preview, this.mapping());
         if (error) this.status(error, true);
-        else this.status('字段映射已就绪');
+        else this.status(localize('ui.recipes.fieldMappingCompleted'));
       });
       const control = document.createElement('div');
       control.append(select, note);
@@ -748,7 +749,7 @@ export class RecipesController {
     this.runJobs.cancelMain();
     this.busy = false;
     this.mode = '';
-    this.status('已请求取消，当前分析结果保留');
+    this.status(localize('ui.recipes.applicationRequestedBeCanceledCurrent'));
     this.controls();
   }
 
@@ -771,7 +772,7 @@ export class RecipesController {
     this.busy = true;
     this.mode = 'run';
     this.controls();
-    this.status('正在核对来源并运行分析…');
+    this.status(localize('ui.recipes.sourceBeingVerifiedAnalysisBeing'));
     try {
       const completed = await this.runJobs.execute(
         {
@@ -788,7 +789,7 @@ export class RecipesController {
       );
       if (!current() || !completed.current()) return;
       if (!isQueryStatusResponse(completed.result)) {
-        throw new Error('方案运行状态响应无效');
+        throw new Error(localize('ui.recipes.planExecutionStatusResponseInvalid'));
       }
       this.mode = 'adopt';
       this.controls();
@@ -799,7 +800,7 @@ export class RecipesController {
       );
       if (!adopted) return;
       if (this.current(serial, epoch, key)) {
-        this.toast(`已运行分析方案：${preview.recipe.name}`, 'success');
+        this.toast(localize('ui.recipes.analysisPlansHaveRun', { name: preview.recipe.name }), 'success');
         this.dialog.close();
       }
     } catch (error: unknown) {

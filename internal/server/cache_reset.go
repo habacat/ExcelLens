@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
+
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"excellens/internal/archives"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -19,17 +20,18 @@ import (
 // workbook users before removing their files. Keep the listener and the user's
 // uploads, preferences, edit documents and exports available for reopening.
 func (a *App) ClearAllCaches() (string, error) {
+	locale := a.DisplayLocale()
 	root := a.rootApp()
 	root.cacheResetMu.Lock()
 	defer root.cacheResetMu.Unlock()
 	if root.restoreState.pending() {
-		return "", errors.New("请先完成恢复事务")
+		return "", i18n.Error("service.cacheReset.completeRestorationProcessFirst")
 	}
 	root.closeDatabaseImport()
 	dir := workbook.CacheRoot()
 	keep, err := root.cacheSourceProtection(dir)
 	if err != nil {
-		return "", fmt.Errorf("无法核对缓存目录中的源文件：%w", err)
+		return "", i18n.Wrap("service.cacheReset.unableVerifySourceFileCache", err)
 	}
 	// Closing sessions joins index, query, edit and archive workers and releases
 	// their leases. Do not hold the cache or archive lock while waiting for them.
@@ -47,12 +49,12 @@ func (a *App) ClearAllCaches() (string, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		_, statsErr := workbook.ClearAllConditionalStats()
 		if statsErr != nil {
-			return "已关闭当前工作簿，部分条件统计缓存未能清理。", statsErr
+			return locale.Text("native.cleanup.statisticsCleanupIncomplete"), statsErr
 		}
-		return "缓存目录为空，已返回首页。", nil
+		return locale.Text("native.cleanup.emptyCacheReturnedHome"), nil
 	}
 	if err != nil {
-		return "已关闭当前工作簿。", err
+		return locale.Text("native.cleanup.workbooksClosed"), err
 	}
 	defer cache.Close()
 	// Large immutable indices and shared strings release their OS mappings
@@ -63,10 +65,10 @@ func (a *App) ClearAllCaches() (string, error) {
 		_, statsErr := workbook.ClearAllConditionalStats()
 		err = errors.Join(err, statsErr)
 		if err == nil {
-			return "已清除全部工作簿缓存，已返回首页。", nil
+			return locale.Text("native.cleanup.allCachesCleared"), nil
 		}
 		if runtime.GOOS != "windows" || attempt == 4 {
-			return "部分缓存未能清理，已返回首页。", err
+			return locale.Text("native.cleanup.cacheCleanupIncomplete"), err
 		}
 		runtime.GC()
 		time.Sleep(time.Duration(attempt+1) * 75 * time.Millisecond)
@@ -80,7 +82,7 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 			return nil, err
 		}
 		if err == nil && !st.IsDir() {
-			return nil, fmt.Errorf("缓存目录不是普通目录：%s", path)
+			return nil, i18n.Error("service.cacheReset.cacheDirectoryNotRegularDirectory", i18n.Args{"path": path})
 		}
 	}
 	if dir == workbook.CacheRoot() {
@@ -94,7 +96,7 @@ func (root *App) cacheSourceProtection(dir string) (map[string]bool, error) {
 	}
 	sources, err := editBasePaths()
 	if err != nil {
-		return nil, fmt.Errorf("无法核对已保存的编辑来源：%w", err)
+		return nil, i18n.Wrap("service.cacheReset.unableVerifySavedEditingSource", err)
 	}
 	taskPaths, err := savedTaskSources()
 	if err != nil {
@@ -252,7 +254,7 @@ func clearCacheEntries(root *os.Root, dir string, keep map[string]bool) error {
 		case protected:
 			continue
 		case dir == "." && (archives.CachePinned(absolute) || workbook.QueryFilesInUse(absolute)):
-			err = fmt.Errorf("缓存仍被使用：%s", name)
+			err = i18n.Error("service.cacheReset.cacheStillUse", i18n.Args{"name": name})
 		case ancestor && entry.IsDir():
 			err = clearCacheEntries(root, name, keep)
 		default:

@@ -4,13 +4,14 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -61,7 +62,7 @@ func loadSearchCache(wb *workbook.Workbook, sheet, query, mode, scope string) (*
 		return nil, err
 	}
 	if c.Version != searchCacheSchema || searchCacheKey(c.Sheet, c.Query, c.Mode, c.Scope) != searchCacheKey(sheet, query, mode, scope) || len(c.Matches) > 500 {
-		return nil, fmt.Errorf("搜索缓存版本或检索条件不匹配")
+		return nil, i18n.Error("service.searchCache.searchCachedVersionsOrRetrieval")
 	}
 	return &c, nil
 }

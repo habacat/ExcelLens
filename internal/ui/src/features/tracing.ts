@@ -3,6 +3,7 @@
  * Results and origin survive minimization. Arrival rectangles live above the
  * grid layer, never inside grid layout geometry.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ActivityHandle, ApiClient, CellRef, MergeRange, ToastFn } from '../contracts/common.ts';
 import type { CellData, SearchHit, SearchStatusResponse, SelectedCell } from '../contracts/workbook.ts';
 import { beginActivity } from '../core/activity.ts';
@@ -104,8 +105,8 @@ export interface TracingOptions {
 }
 
 const NAMES: Readonly<Record<TraceKind, string>> = {
-  precedents: '追踪引用',
-  dependents: '追踪从属',
+  precedents: localize('ui.tracing.trackingReferences'),
+  dependents: localize('ui.tracing.tracingSubordinateRelations'),
 };
 
 export class Tracing {
@@ -169,7 +170,7 @@ export class Tracing {
     options.end.addEventListener('click', () => this.reset());
     options.cancel.addEventListener('click', () => {
       this.stopRun();
-      options.summary.textContent = '已取消 · 已找到的结果仍可定位';
+      options.summary.textContent = localize('ui.tracing.canceledFoundResultsCanStill');
       options.cancel.hidden = true;
     });
     options.scope.addEventListener('change', () => {
@@ -247,10 +248,10 @@ export class Tracing {
   updateDock(): void {
     this.o.restore.textContent = `${NAMES[this.kind]} · ${this.refs.length}`;
     this.o.restore.title = this.source
-      ? `${this.source.sheet}!${this.source.ref} · 展开追踪结果`
+      ? localize('ui.tracing.expandTrackingResults', { sheet: this.source.sheet, ref: this.source.ref })
       : '';
     this.o.origin.title = this.source
-      ? `回到起点：${this.source.sheet}!${this.source.ref}`
+      ? localize('ui.tracing.returnStartPoint', { sheet: this.source.sheet, ref: this.source.ref })
       : '';
   }
 
@@ -319,7 +320,7 @@ export class Tracing {
     this.o.scope.value = this.o.readScope?.() || this.o.scope.value || 'current';
     this.o.list.replaceChildren();
     this.o.summary.textContent =
-      kind === 'dependents' ? '正在查找直接引用此单元格的公式…' : '读取当前公式的直接引用…';
+      kind === 'dependents' ? localize('ui.tracing.currentlyFindingFormulasThatDirectly') : localize('ui.tracing.failedReadDirectReferenceCurrent');
     this.o.cancel.hidden = kind !== 'dependents';
     this.restore();
 
@@ -334,10 +335,10 @@ export class Tracing {
       this.o.setRefs(this.refs);
       this.render(ticket);
       this.o.summary.textContent = this.refs.length
-        ? `${this.refs.length} 个直接引用 · 点击定位后可从底部继续追踪`
-        : '未识别到 A1 引用；名称、结构化引用和外部工作簿引用暂不展开';
+        ? localize('ui.tracing.directReferencesClickLocateContinue', { count: this.refs.length })
+        : localize('ui.tracing.a1ReferenceNotRecognizedNames');
       this.updateDock();
-      this.pulse(this.refs, `${NAMES[kind]} · ${this.refs.length} 处`);
+      this.pulse(this.refs, localize('ui.tracing.where', { value: NAMES[kind], count: this.refs.length }));
       return;
     }
 
@@ -346,7 +347,7 @@ export class Tracing {
       scope === 'all'
         ? `'${this.source.sheet.replaceAll("'", "''")}'!${this.source.ref}`
         : this.source.ref;
-    const activity = beginActivity('正在追踪从属公式');
+    const activity = beginActivity(localize('ui.tracing.trackingDependentFormulas'));
     this.activity = activity;
     try {
       const start = await this.o.api('/api/search/start', {
@@ -406,23 +407,23 @@ export class Tracing {
           this.render(ticket);
           this.updateDock();
         }
-        const incomplete = data.truncated ? ' · 结果已截断（最多500条）' : '';
+        const incomplete = data.truncated ? ` ${localize('ui.tracing.resultsHaveTruncatedUpItems')}` : '';
         if (data.status !== 'running') {
           this.job = null;
           this.o.cancel.hidden = true;
           this.o.summary.textContent =
             data.status === 'error'
-              ? `未完成：${data.error || '追踪失败'} · 已找到 ${this.refs.length} 处`
+              ? localize('ui.tracing.notCompletedFound', { detail: data.error || localize('ui.tracing.trackingFailed'), count: this.refs.length })
               : data.status === 'cancelled'
-                ? `已取消 · 已找到 ${this.refs.length} 处`
-                : `找到 ${this.refs.length} 个直接从属公式${incomplete}`;
+                ? localize('ui.tracing.canceledFound', { count: this.refs.length })
+                : localize('ui.tracing.foundDirectDependentFormulasFrom', { count: this.refs.length, incomplete });
           if (data.status === 'done' && !this.isMuted() && !this.hasLocated()) {
-            this.pulse(this.refs, `${NAMES[kind]} · ${this.refs.length} 处`);
+            this.pulse(this.refs, localize('ui.tracing.where', { value: NAMES[kind], count: this.refs.length }));
           }
           return;
         }
         this.o.summary.textContent =
-          `${data.stage || '查找中'} · ${Math.round(data.progress || 0)}% · ${this.refs.length} 处`;
+          localize('ui.tracing.location', { stage: data.stage || localize('ui.tracing.searching'), round: Math.round(data.progress || 0), count: this.refs.length });
         await new Promise<void>((resolve) => {
           this.waiting = {
             resolve,
@@ -436,7 +437,7 @@ export class Tracing {
     } catch (error: unknown) {
       if (ticket === this.request) {
         this.stopRun();
-        this.o.summary.textContent = `追踪失败：${errorMessage(error)}`;
+        this.o.summary.textContent = localize('ui.tracing.trackingFailed0ff1996', { detail: errorMessage(error) });
         this.o.cancel.hidden = true;
       }
     } finally {
@@ -458,17 +459,17 @@ export class Tracing {
       if (ref.formula) {
         value.textContent = ref.formula;
       } else if (ref.range) {
-        value.textContent = '区域引用 · 定位左上角';
+        value.textContent = localize('ui.tracing.regionReferencePositioningAtTop');
       } else if (ref.sheet !== this.o.state.sheet) {
-        value.textContent = '跨工作表引用 · 按需定位';
+        value.textContent = localize('ui.tracing.crossSheetReferencePositionAs');
       } else {
-        value.textContent = '读取中…';
+        value.textContent = localize('ui.tracing.reading');
         this.o
           .getCell(ref.sheet, ref.start.ref)
           .then((cell) => {
             if (ticket !== this.request) return;
-            const shown = cell.display === '' ? '空白' : cell.display;
-            value.textContent = cell.cacheMissing ? '无缓存' : shown;
+            const shown = cell.display === '' ? localize('ui.common.blank') : cell.display;
+            value.textContent = cell.cacheMissing ? localize('ui.common.noCachingAvailable') : shown;
             value.title = cell.formula || value.textContent;
           })
           .catch((error: unknown) => {
@@ -478,7 +479,7 @@ export class Tracing {
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'trace-go';
-      go.textContent = '定位';
+      go.textContent = localize('ui.tracing.positioning');
       go.addEventListener('click', () => {
         void this.locate(ref);
       });
@@ -489,7 +490,7 @@ export class Tracing {
       const more = document.createElement('button');
       more.type = 'button';
       more.className = 'trace-go trace-more';
-      more.textContent = `显示更多（${this.count}/${this.refs.length}）`;
+      more.textContent = localize('ui.tracing.showMore', { count: this.count, count2: this.refs.length });
       more.addEventListener('click', () => {
         this.count += 100;
         this.render(ticket);
@@ -515,10 +516,10 @@ export class Tracing {
       await Promise.all([this.minimize(), this.o.navigate(ref.sheet, ref.start.ref, current)]);
       if (!current()) return;
       if (!this.o.atTarget(ref)) {
-        this.o.notify('目标未能显示，请检查筛选或工作表状态', 'warning');
+        this.o.notify(localize('ui.tracing.targetNotDisplayedCheckFilters'), 'warning');
         return;
       }
-      const label = `${origin ? '追踪起点' : NAMES[this.kind]} · ${ref.label ?? ''}`;
+      const label = `${origin ? localize('ui.tracing.trackingStartPoint') : NAMES[this.kind]} · ${ref.label ?? ''}`;
       this.pulse([ref], label, true, current);
     } catch (error: unknown) {
       if (current()) this.o.notify(errorMessage(error), 'error');

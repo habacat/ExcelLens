@@ -1,6 +1,7 @@
 /**
  * Exact relation envelopes and bounded source presentation, without IO or DOM.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { CompositionField, CompositionSourceInfo, TableRef } from '../contracts/analysis.ts';
 import type {
   ReconcileField,
@@ -95,13 +96,13 @@ const COUNT_KEYS = [
 ] as const;
 
 export const RELATION_MODES: readonly RelationModeInfo[] = Object.freeze([
-  { id: 'left', label: '左表全部', sides: [0, 1] },
-  { id: 'inner', label: '匹配明细', sides: [0, 1] },
-  { id: 'left_matched', label: '左表已匹配', sides: [0] },
-  { id: 'left_unmatched', label: '左表未匹配', sides: [0] },
-  { id: 'right_unmatched', label: '右表未匹配', sides: [1] },
-  { id: 'left_invalid', label: '左表无效键', sides: [0] },
-  { id: 'right_invalid', label: '右表无效键', sides: [1] },
+  { id: 'left', label: localize('ui.relationsModel.leftTableEntirely'), sides: [0, 1] },
+  { id: 'inner', label: localize('ui.relationsModel.matchDetails'), sides: [0, 1] },
+  { id: 'left_matched', label: localize('ui.relationsModel.leftTableMatched'), sides: [0] },
+  { id: 'left_unmatched', label: localize('ui.relationsModel.leftTableNotMatched'), sides: [0] },
+  { id: 'right_unmatched', label: localize('ui.relationsModel.rightTableNotMatched'), sides: [1] },
+  { id: 'left_invalid', label: localize('ui.relationsModel.leftTableInvalidKey'), sides: [0] },
+  { id: 'right_invalid', label: localize('ui.relationsModel.rightTableInvalidKey'), sides: [1] },
 ]);
 
 export function relationMode(id: string): RelationModeInfo | undefined {
@@ -109,7 +110,7 @@ export function relationMode(id: string): RelationModeInfo | undefined {
 }
 
 function fail(): never {
-  throw new Error('关联响应与当前来源或查询不一致，请重新运行');
+  throw new Error(localize('ui.relationsModel.correlationResponseDoesNotMatch'));
 }
 
 export function parseRelationCount(value: unknown): bigint {
@@ -139,7 +140,7 @@ export function relationTotal(counts: RelationCounts, id: string): string {
 }
 
 export function formatRelationCount(value: string | number | bigint): string {
-  return parseRelationCount(String(value)).toLocaleString('zh-CN');
+  return parseRelationCount(String(value)).toLocaleString(interfaceLocale());
 }
 
 export function relationFieldRef(info: CompositionSourceInfo): ReconcileSourceRef {
@@ -166,7 +167,7 @@ function queryKey(query: RelationQuery): string {
 }
 
 export function validateRelationLimits(value: unknown): RelationLimits {
-  if (!isRecord(value)) throw new Error('关联容量配置无效');
+  if (!isRecord(value)) throw new Error(localize('ui.common.associatedCapacityConfigurationInvalid'));
   const keys = [
     'keys',
     'columns',
@@ -182,7 +183,7 @@ export function validateRelationLimits(value: unknown): RelationLimits {
   ] as const;
   for (const key of keys) {
     if (!integer(value[key], 1, Number.MAX_SAFE_INTEGER)) {
-      throw new Error('关联容量配置无效');
+      throw new Error(localize('ui.common.associatedCapacityConfigurationInvalid'));
     }
   }
   const keysLimit = value.keys as number;
@@ -205,7 +206,7 @@ export function validateRelationLimits(value: unknown): RelationLimits {
     defaultRows > maximumRows ||
     (zipRows !== undefined && !integer(zipRows, 1, maximumRows))
   ) {
-    throw new Error('关联容量配置无效');
+    throw new Error(localize('ui.common.associatedCapacityConfigurationInvalid'));
   }
   return {
     keys: keysLimit,
@@ -305,7 +306,7 @@ export function validateRelationQuery(
   limits: Pick<RelationLimits, 'keys' | 'columns'>,
 ): RelationQuery {
   if (!isRecord(query) || !isUnknownArray(query.keys) || query.keys.length < 1 || query.keys.length > limits.keys) {
-    throw new Error('请选择关联键');
+    throw new Error(localize('ui.relationsModel.selectAssociatedKey'));
   }
   const leftColsRaw = query.leftColumns;
   const rightColsRaw = query.rightColumns;
@@ -316,23 +317,23 @@ export function validateRelationQuery(
   for (let side = 0; side < 2; side++) {
     const columnsRaw = side === 1 ? rightColsRaw : leftColsRaw;
     if (!isUnknownArray(columnsRaw) || columnsRaw.length > limits.columns) {
-      throw new Error('结果字段超出容量');
+      throw new Error(localize('ui.relationsModel.resultFieldsExceedCapacity'));
     }
     const sideInfo = infos[side];
-    if (!sideInfo) throw new Error('结果字段不存在或重复');
+    if (!sideInfo) throw new Error(localize('ui.relationsModel.resultFieldsDoNotExist'));
     const available = new Set((sideInfo.fields ?? []).map((field) => field.column));
     const used = new Set<number>();
     const keys = new Set<number>();
     for (const column of columnsRaw) {
       if (typeof column !== 'number' || !available.has(column) || used.has(column)) {
-        throw new Error('结果字段不存在或重复');
+        throw new Error(localize('ui.relationsModel.resultFieldsDoNotExist'));
       }
       used.add(column);
       if (side === 0) leftColumns.push(column);
       else rightColumns.push(column);
     }
     for (const pair of query.keys) {
-      if (!isRecord(pair)) throw new Error('关联键无效或重复');
+      if (!isRecord(pair)) throw new Error(localize('ui.common.associatedKeysInvalidOrDuplicate'));
       const column = side === 1 ? pair.right : pair.left;
       const modeVal = pair.mode;
       if (
@@ -344,15 +345,15 @@ export function validateRelationQuery(
         (pair.trim !== undefined && typeof pair.trim !== 'boolean') ||
         (pair.ignoreCase !== undefined && typeof pair.ignoreCase !== 'boolean')
       ) {
-        throw new Error('关联键无效或重复');
+        throw new Error(localize('ui.common.associatedKeysInvalidOrDuplicate'));
       }
       keys.add(column);
     }
   }
-  if (!leftColumns.length && !rightColumns.length) throw new Error('请选择结果字段');
+  if (!leftColumns.length && !rightColumns.length) throw new Error(localize('ui.relationsModel.selectResultField'));
   for (const pair of query.keys) {
     if (!isRecord(pair) || typeof pair.left !== 'number' || typeof pair.right !== 'number') {
-      throw new Error('关联键无效或重复');
+      throw new Error(localize('ui.common.associatedKeysInvalidOrDuplicate'));
     }
     validatedKeys.push({
       left: pair.left,

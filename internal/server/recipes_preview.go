@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"excellens/internal/analysis"
+	"excellens/internal/i18n"
 	"excellens/internal/recipe"
 	"excellens/internal/reconcile"
 	"excellens/internal/sourceview"
@@ -47,7 +48,7 @@ func recipeSourceFields(info reconcile.SourceInfo) []recipe.Field {
 // At most eight records are previewed; replay guards the complete input.
 func (a *App) recipeTargetSchema(ctx context.Context, wb *workbook.Workbook, ref reconcileSourceRef, captured ...*analysisSourceSnapshot) (recipeTargetSchema, error) {
 	if ref.Book != sourceBookID(wb) {
-		return recipeTargetSchema{}, errors.New("分析方案目标来源已切换")
+		return recipeTargetSchema{}, i18n.Error("service.recipesPreview.targetSourceAnalysisSchemeSwitched")
 	}
 	scratch := strings.HasPrefix(ref.Source, "scratch:")
 	header := ref.HeaderRow
@@ -55,7 +56,7 @@ func (a *App) recipeTargetSchema(ctx context.Context, wb *workbook.Workbook, ref
 		ref.HeaderRow = 0
 		header = 1
 	} else if header < 1 {
-		return recipeTargetSchema{}, errors.New("分析方案表头行号须为正数")
+		return recipeTargetSchema{}, i18n.Error("service.recipesPreview.headerRowNumbersAnalyzedScheme")
 	}
 	source, err := a.buildReconcileSource(ctx, wb, ref, nil)
 	if err != nil {
@@ -113,11 +114,11 @@ func (a *App) recipeTargetSchema(ctx context.Context, wb *workbook.Workbook, ref
 		}
 		sheet := workspace.Sheet(strings.TrimPrefix(ref.Source, "scratch:"))
 		if sheet == nil {
-			return out, errors.New("目标编辑表不存在")
+			return out, i18n.Error("service.recipesPreview.targetEditingTableDoesNot")
 		}
 		stamp := analysisSheetStamp(sheet)
 		if stamp != source.Info.Stamp {
-			return out, errors.New("目标编辑表在读取字段时发生变化，请重新读取")
+			return out, i18n.Error("service.recipesPreview.targetEditTableChangedWhen")
 		}
 		out.Stamp = stamp
 		for _, row := range sheet.Rows[:min(len(sheet.Rows), 8)] {
@@ -160,7 +161,7 @@ func (a *App) recipeTargetSchema(ctx context.Context, wb *workbook.Workbook, ref
 		meta, _ := wb.FindSheet(source.Info.Sheet)
 		idx := wb.GetCachedIndex(meta.Path)
 		if idx == nil {
-			return out, errors.New("目标索引已失效")
+			return out, i18n.Error("service.recipesPreview.targetIndexBecomeInvalid")
 		}
 		first := idx.FindRowOffset(header + 1)
 		if first < idx.RowCount() {
@@ -195,24 +196,24 @@ func (a *App) handleRecipePreview(w http.ResponseWriter, r *http.Request) {
 		SourceID    string             `json:"sourceId,omitempty"`
 	}
 	if decodeAnalysis(r, &req) != nil {
-		writeError(w, 400, "分析方案预览参数无效")
+		writeMessage(w, 400, "service.recipesPreview.analysisPlanPreviewParametersInvalid")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.Book != sourceBookID(wb) || req.WorkbookKey != wb.Fingerprint || req.Target.Book != req.Book {
-		writeError(w, 409, "工作簿已切换，请重新选择分析方案目标")
+		writeMessage(w, 409, "service.recipesPreview.workbookSwitchedReselectAnalysisPlan")
 		return
 	}
 	value, err := findRecipe(req.ID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	var captured *analysisSourceSnapshot
 	if req.SourceID != "" {
 		captured, err = a.analysisSourceSnapshot(req.SourceID, wb)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer captured.close()
@@ -221,11 +222,11 @@ func (a *App) handleRecipePreview(w http.ResponseWriter, r *http.Request) {
 	defer a.cacheMu.RUnlock()
 	target, err := a.recipeTargetSchema(r.Context(), wb, req.Target, captured)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if a.currentWorkbook() != wb {
-		writeError(w, 409, "工作簿已切换，预览未发布")
+		writeMessage(w, 409, "service.recipesPreview.workbookSwitchedPreviewNotPublished")
 		return
 	}
 	labels := func(fields []recipe.Field) map[string]string {
@@ -257,28 +258,28 @@ func (a *App) handleRecipeRunStart(w http.ResponseWriter, r *http.Request) {
 		SourceID    string             `json:"sourceId,omitempty"`
 	}
 	if decodeAnalysis(r, &req) != nil || len(req.Mapping) > analysis.MaxSourceFields || req.Stamp == "" {
-		writeError(w, 400, "分析方案运行参数或字段映射无效")
+		writeMessage(w, 400, "service.recipesPreview.analysisPlanSRunningParameters")
 		return
 	}
 	wb := a.currentWorkbook()
 	if wb == nil || req.Book != sourceBookID(wb) || req.WorkbookKey != wb.Fingerprint || req.Target.Book != req.Book {
-		writeError(w, 409, "工作簿已切换，请重新预览目标来源")
+		writeMessage(w, 409, "service.recipesPreview.workbookSwitchedPreviewTargetSource")
 		return
 	}
 	value, err := findRecipe(req.ID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if req.Digest != recipeDigest(value) {
-		writeError(w, 409, "分析方案定义已变化，请重新读取映射预览")
+		writeMessage(w, 409, "service.recipesPreview.analysisPlanDefinitionChangedReread")
 		return
 	}
 	var captured *analysisSourceSnapshot
 	if req.SourceID != "" {
 		captured, err = a.analysisSourceSnapshot(req.SourceID, wb)
 		if err != nil {
-			writeError(w, 409, err.Error())
+			writeFailure(w, 409, err)
 			return
 		}
 		defer captured.close()
@@ -287,20 +288,20 @@ func (a *App) handleRecipeRunStart(w http.ResponseWriter, r *http.Request) {
 	target, err := a.recipeTargetSchema(r.Context(), wb, req.Target, captured)
 	a.cacheMu.RUnlock()
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if req.Stamp != target.Stamp || req.Target.Stamp == "" || req.Target.Stamp != target.Info.Stamp {
-		writeError(w, 409, "分析方案目标或表头已变化，请重新读取映射")
+		writeMessage(w, 409, "service.recipesPreview.analysisPlanTargetOrHeader")
 		return
 	}
 	if err := recipe.ValidateMapping(value.Fields, target.Fields, req.Mapping); err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	query, output, err := value.Query(req.Target.Source, target.Header, req.Mapping)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeFailure(w, 400, err)
 		return
 	}
 	query.SourceScope = target.Scope
@@ -311,7 +312,7 @@ func (a *App) handleRecipeRunStart(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := a.startAnalysisTask(wb, query, &recipeRunPlan{Stamp: target.Stamp, Masks: masks, RecipeID: value.ID, ExportFormat: output.Format}, captured)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, map[string]string{"jobId": job.ID})

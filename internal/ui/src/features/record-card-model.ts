@@ -2,6 +2,7 @@
  * Bounded presentation and strict response validation for single-record cards.
  * Never performs numeric or type conversion on source values.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { RecordCardResponse } from '../contracts/features.ts';
 import type { RecordCardLimits, SourceCapabilities } from '../contracts/formats.ts';
 import type { CellData } from '../contracts/workbook.ts';
@@ -39,7 +40,7 @@ function isIntegerInRange(value: unknown, first: number, last: number): value is
 }
 
 function fail(): never {
-  throw new Error('记录卡响应与当前来源或字段页不一致，请重新读取');
+  throw new Error(localize('ui.recordCardModel.responseFromRecordCardDoes'));
 }
 
 function isValidRecordCell(
@@ -179,14 +180,14 @@ export function validateRecordCard(
     fail();
   }
   if (new TextEncoder().encode(JSON.stringify(page)).length > limits.bytes) {
-    throw new Error('记录卡响应超过显示容量，请减少每页字段数');
+    throw new Error(localize('ui.recordCardModel.recordCardResponseExceedsDisplay'));
   }
   return page;
 }
 
 export function recordTextOffsets(text: string, units: number): number[] {
   if (!isIntegerInRange(units, 2, Number.MAX_SAFE_INTEGER)) {
-    throw new Error('记录卡文本容量无效');
+    throw new Error(localize('ui.recordCardModel.textCapacityRecordCardInvalid'));
   }
   const result: number[] = [0];
   let at = 0;

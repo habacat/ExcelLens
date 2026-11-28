@@ -1,6 +1,7 @@
 /**
  * Non-modal Excel-style column AutoFilter checklist dropdown UI.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { AutoFilterState, DistinctValue } from '../contracts/workbook.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
@@ -188,10 +189,10 @@ export class AutoFilterDropdown {
     this.panel.hidden = false;
     this.position(anchor);
     requireEl('autoFilterTitle').textContent =
-      c.table && c.names?.[col - 1] ? (c.names[col - 1] ?? '') : `${this.colName(col)} 列筛选`;
+      c.table && c.names?.[col - 1] ? (c.names[col - 1] ?? '') : localize('ui.autofilter.columnFiltering', { colName: this.colName(col) });
     requireInput('autoFilterFind').value = '';
     requireEl('autoFilterOptions').replaceChildren();
-    requireEl('autoFilterSummary').textContent = '正在读取本列选项…';
+    requireEl('autoFilterSummary').textContent = localize('ui.autofilter.readingColumnOptions');
     requireButton('autoFilterApply').disabled = true;
     requireButton('autoFilterMore').hidden = true;
     const abort = new AbortController();
@@ -232,7 +233,7 @@ export class AutoFilterDropdown {
     } catch (err: unknown) {
       if (abort.signal.aborted) return;
       this.pending = null;
-      requireEl('autoFilterSummary').textContent = `读取失败：${errorMessage(err)}`;
+      requireEl('autoFilterSummary').textContent = localize('ui.autofilter.readingFailed', { detail: errorMessage(err) });
       requireButton('autoFilterApply').disabled = true;
     }
   }
@@ -254,7 +255,7 @@ export class AutoFilterDropdown {
       });
       const name = document.createElement('span');
       name.className = 'auto-filter-value';
-      name.textContent = item.value === '' ? '（空白）' : item.value;
+      name.textContent = item.value === '' ? localize('ui.common.empty') : item.value;
       name.title = name.textContent;
       const count = document.createElement('span');
       count.className = 'auto-filter-count';
@@ -265,10 +266,10 @@ export class AutoFilterDropdown {
     holder.replaceChildren(frag);
     const more = requireButton('autoFilterMore');
     more.hidden = visible.length <= this.displayLimit;
-    more.textContent = `显示更多（剩余 ${Math.max(0, visible.length - this.displayLimit)} 项）`;
+    more.textContent = localize('ui.autofilter.showMoreItemsRemainingItems', { value: Math.max(0, visible.length - this.displayLimit) });
     requireEl('autoFilterSummary').textContent = this.truncated
-      ? '选项未全部列出；请使用条件筛选缩小范围'
-      : `${visible.length.toLocaleString()} 个选项 · ${this.selected.size.toLocaleString()} 已勾选`;
+      ? localize('ui.autofilter.notAllOptionsListedUse')
+      : localize('ui.autofilter.optionsSelected', { count: visible.length.toLocaleString(interfaceLocale()), size: this.selected.size.toLocaleString(interfaceLocale()) });
     this.updateAllCheckbox();
   }
 
@@ -292,11 +293,11 @@ export class AutoFilterDropdown {
       return;
     }
     if (!this.selected.size) {
-      this.toast('至少勾选一个值；要清除条件，请点击「清除此列」', 'warning');
+      this.toast(localize('ui.autofilter.selectAtLeastOneValue'), 'warning');
       return;
     }
     if (this.selected.size > 2500) {
-      this.toast('勾选值超过2500项，请先清除此列或缩小选择范围', 'warning');
+      this.toast(localize('ui.autofilter.ifThereMoreThanSelected'), 'warning');
       return;
     }
     const full =

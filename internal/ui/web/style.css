@@ -34,6 +34,9 @@
   --warn: #7d5306;
   --warn-soft: #fff5d9;
   --warn-line: #ecd596;
+  --warn-badge-bg: #f6c445;
+  --warn-badge-ink: #5c3a00;
+  --warn-badge-line: #d49b1a;
   --ok: #1a7648;
   --ok-soft: #e7f5ec;
   --ok-line: #bcdfca;
@@ -110,6 +113,15 @@
 }
 
 /* ---------- Base ---------- */
+:root:lang(zh-Hant) {
+  --font-ui: "Segoe UI", "Microsoft JhengHei UI", "PingFang TC", "Noto Sans CJK TC", system-ui, sans-serif;
+}
+:root:lang(ja) {
+  --font-ui: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Noto Sans CJK JP", system-ui, sans-serif;
+}
+:root:lang(ko) {
+  --font-ui: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", system-ui, sans-serif;
+}
 * { box-sizing: border-box; }
 * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -437,7 +449,36 @@ dialog [hidden] { display: none; }
   margin: 0; padding: 8px 14px; border: 1px solid var(--warn-line); background: var(--warn-soft); color: var(--warn);
   font-size: var(--fs-2); line-height: 1.6; overflow-wrap: anywhere;
 }
-.source-integrity-notice { flex: none; max-height: 104px; overflow: auto; border-width: 0 0 1px; }
+.source-integrity-notice {
+  flex: none; display: flex; align-items: flex-start; gap: 8px;
+  max-height: 104px; overflow: auto; padding: 7px 10px 7px 14px; border-width: 0 0 1px;
+}
+.source-integrity-icon, .source-integrity-badge {
+  flex: none; width: 16px; height: 16px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--warn-badge-line); border-radius: 50%;
+  background: var(--warn-badge-bg); color: var(--warn-badge-ink);
+}
+.source-integrity-icon { margin-top: 2px; }
+:is(.source-integrity-icon, .source-integrity-badge) .icon { width: 12px; height: 12px; stroke-width: 2.1; }
+:is(.source-integrity-icon, .source-integrity-badge) .dot { fill: currentColor; stroke: none; }
+.source-integrity-message { flex: 1 1 auto; min-width: 0; }
+.source-integrity-actions { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.source-integrity-actions #retainDatabaseSnapshot { margin-inline-start: 0; }
+.source-integrity-close {
+  flex: none; width: 22px; height: 22px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: var(--r-1); background: transparent; color: var(--warn); cursor: pointer;
+}
+.source-integrity-close .icon { width: 13px; height: 13px; }
+.source-integrity-close:hover { background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.source-integrity-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.source-integrity-flight {
+  position: fixed; z-index: var(--z-popover); pointer-events: none; box-sizing: border-box;
+  border: 1px solid var(--warn-line); background: var(--warn-soft);
+  box-shadow: 0 2px 10px rgb(var(--shadow-rgb) / .12);
+  will-change: left, top, width, height, border-radius, background-color, opacity;
+}
 
 /* ---------- Application bar ---------- */
 .appbar { position: relative; z-index: var(--z-appbar); flex: none; background: var(--surface); border-bottom: 1px solid var(--line); user-select: none; }
@@ -450,7 +491,15 @@ body.home-view .appbar { display: none; }
 .brand-button:hover { background: var(--hover); }
 .brand-mark { display: block; width: 22px; height: 22px; border-radius: 5px; }
 .brand-area { flex: 0 1 auto; min-width: 0; max-width: 36%; display: flex; align-items: center; gap: 8px; margin-right: 6px; }
+.file-title-wrap { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 3px; }
 .file-badge { min-width: 0; overflow: hidden; color: var(--ink); font-size: var(--fs-3); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.source-integrity-badge {
+  align-self: flex-start; margin-top: -2px;
+  box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / .14); cursor: pointer;
+}
+.source-integrity-badge:hover { filter: brightness(.95); transform: scale(1.08); }
+.source-integrity-badge:active { transform: scale(.95); }
+.source-integrity-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mode-badge {
   flex: none; padding: 1px 7px; border: 1px solid var(--line); border-radius: 10px;
   color: var(--muted); font-size: var(--fs-1); line-height: 1.5; white-space: nowrap;
@@ -813,9 +862,10 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
    the browser round its origin separately and bury its border under the next fill. */
 .rows-layer { position: absolute; top: var(--header-height); bottom: 0; left: 0; width: var(--canvas-width); overflow: clip; overflow-anchor: none; contain: layout style; }
 .grid-row { position: absolute; left: 0; width: var(--canvas-width); height: var(--row-height); border-bottom: 0 !important; pointer-events: none; }
-.row-head { position: sticky; left: 0; z-index: 8; width: var(--row-header-width); height: var(--row-height); display: flex; align-items: center; justify-content: flex-end; padding: 0 7px 0 3px; border-right: .4px solid var(--grid-head-line); background: var(--grid-head); color: var(--grid-head-ink); font-family: Consolas, monospace; font-size: 10px; user-select: none; pointer-events: auto; }
+.row-head { position: sticky; left: 0; z-index: 8; width: var(--row-header-width); height: var(--row-height); display: flex; align-items: center; justify-content: flex-end; padding: 0 7px 0 3px; --grid-default-seam: .4px solid var(--grid-head-line); border-right: var(--grid-default-seam); background: var(--grid-head); color: var(--grid-head-ink); font-family: Consolas, monospace; font-size: 10px; user-select: none; pointer-events: auto; }
 /* Fractional row heights can leave a subpixel seam between sticky headers. */
-.row-head::before { content: ""; position: absolute; inset: -1px -.5px -1px 0; z-index: -1; background: inherit; border-right: inherit; pointer-events: none; }
+.row-head::before { content: ""; position: absolute; inset: -1px -.5px -1px 0; z-index: -1; background: inherit; border-right: var(--grid-default-seam); pointer-events: none; }
+.row-head.row-head-bordered::before { right: 0; border-right: 0; }
 .grid-row.active-row .row-head { font-weight: 700; }
 .grid-row.whole-row-selected .grid-cell { background-image: linear-gradient(color-mix(in srgb, var(--selection-color) 15%, transparent), color-mix(in srgb, var(--selection-color) 15%, transparent)) !important; }
 .row-head:hover { background: color-mix(in srgb, var(--selection-color) 14%, var(--grid-head)); color: var(--ink); cursor: row-resize; }
@@ -853,15 +903,17 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 
 /* Frozen panes are display only; the source file is never changed. */
 .freeze-top, .freeze-left, .freeze-corner, .freeze-header { position: absolute; display: block; overflow: hidden; background: var(--grid-paper); pointer-events: auto; contain: layout paint; }
-.freeze-top { left: 0; right: var(--grid-v-scrollbar, 0px); z-index: 15; border-bottom: 2px solid var(--grid-freeze-line); }
+/* Freeze guides sit outside the pane. A border on a border-box pane shrinks
+   its content clip and hides the worksheet strokes at the last pinned cell. */
+.freeze-top { left: 0; right: var(--grid-v-scrollbar, 0px); z-index: 15; box-shadow: 0 2px 0 var(--grid-freeze-line); }
 .freeze-top-body { position: absolute; top: 0; right: 0; bottom: 0; overflow: hidden; }
 .freeze-top-cells, .freeze-left-cells { position: absolute; inset: 0; will-change: transform; }
-.freeze-row-heads { position: absolute; left: 0; top: 0; bottom: 0; border-right: 1px solid var(--grid-head-line); background: var(--grid-head); }
-.pinned-row-head { position: absolute; left: 0; width: 100%; height: var(--row-height); display: flex; align-items: center; justify-content: flex-end; padding: 0 7px; border-bottom: 1px solid var(--grid-head-line); color: var(--grid-head-ink); font: 10px Consolas, monospace; }
+.freeze-row-heads { position: absolute; left: 0; top: 0; bottom: 0; background: var(--grid-head); }
+.pinned-row-head { position: absolute; left: 0; width: 100%; height: var(--row-height); display: flex; align-items: center; justify-content: flex-end; padding: 0 7px; --grid-default-seam: .4px solid var(--grid-head-line); border-right: var(--grid-default-seam); box-shadow: inset 0 -1px var(--grid-head-line); color: var(--grid-head-ink); font: 10px Consolas, monospace; }
 .pinned-row-head.active { font-weight: bold; }
-.freeze-left { bottom: var(--grid-h-scrollbar, 0px); z-index: 16; border-right: 2px solid var(--grid-freeze-line); }
-.freeze-corner { z-index: 18; border-right: 2px solid var(--grid-freeze-line); border-bottom: 2px solid var(--grid-freeze-line); }
-.freeze-header { top: 0; z-index: 20; border-right: 2px solid var(--grid-freeze-line); border-bottom: 1px solid var(--grid-head-line); background: var(--grid-head); }
+.freeze-left { bottom: var(--grid-h-scrollbar, 0px); z-index: 16; box-shadow: 2px 0 0 var(--grid-freeze-line); }
+.freeze-corner { z-index: 18; box-shadow: 2px 2px 0 var(--grid-freeze-line); }
+.freeze-header { top: 0; z-index: 20; box-shadow: 2px 0 0 var(--grid-freeze-line); border-bottom: 1px solid var(--grid-head-line); background: var(--grid-head); }
 .freeze-top, .freeze-left { background-color: color-mix(in srgb, var(--grid-paper) 50%, var(--grid-head)); }
 .pinned-cell { position: absolute; background-color: var(--xl-fill, var(--grid-paper)); border-bottom: .4px solid var(--grid-line-color); }
 .pinned-cell.formula-cell { color: var(--xl-color, var(--cell-formula-ink)); }
@@ -922,7 +974,7 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 .worksheet-picture:hover { outline: 1px solid color-mix(in srgb, var(--accent) 76%, transparent); }
 .worksheet-picture:focus-visible { outline: 2px solid var(--accent); }
 .worksheet-picture.picture-load-failed { background: var(--inset); outline: 1px dashed var(--line-strong); }
-.worksheet-picture.picture-load-failed::after { content: '无法预览'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+.worksheet-picture.picture-load-failed::after { content: attr(data-error-label); position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--muted); }
 /* Source workbook links without DOM <a> navigation or layout changes. */
 .grid-region .grid-cell.hyperlink-cell { cursor: pointer; color: var(--xl-color, var(--ref)); text-decoration: underline; text-decoration-thickness: .6px; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, currentColor 62%, transparent); }
 .grid-region .grid-cell.hyperlink-cell:hover { text-decoration-color: currentColor; }
@@ -935,8 +987,10 @@ body.editing-copy :is(#selectionStatus, .auto-filter-button, #cellTooltip) { dis
 /* One owner per grid seam. Fractional CSS borders stay one device pixel on
    common panels; source borders override these defaults. */
 .grid-cell { --grid-default-seam: .4px solid var(--grid-line-color); }
-.grid-border-segments, .grid-default-right, .grid-default-bottom { position: absolute; inset: 0; pointer-events: none; }
-.grid-border-segments { z-index: 1; }
+.grid-border-segments, .grid-default-right, .grid-default-bottom, .grid-inset-border, .grid-border-corners { position: absolute; inset: 0; pointer-events: none; }
+.grid-border-segments, .grid-inset-border { z-index: 1; }
+.grid-border-corners { z-index: 2; }
+.grid-border-corner { position: absolute; right: 0; bottom: 0; width: 0; height: 0; box-sizing: content-box; pointer-events: none; z-index: 2; }
 .grid-default-right { border-right: var(--grid-default-seam); }
 .grid-default-bottom { border-bottom: var(--grid-default-seam); }
 .grid-border-segments > i { position: absolute; pointer-events: none; }

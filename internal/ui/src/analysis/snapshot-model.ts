@@ -1,6 +1,7 @@
 /**
  * Pure validation and description helpers for Comparison Snapshots.
  */
+import { interfaceLocale, t as localize } from '../core/i18n.ts';
 import type {
   AnalysisCell,
   ComparisonSnapshot,
@@ -20,29 +21,29 @@ export interface ValidatedSnapshotComparison extends SnapshotComparison {
 const encoder = new TextEncoder();
 
 const AGGREGATE_LABELS: Readonly<Record<string, string>> = {
-  sum: '求和',
-  average: '平均',
-  count: '计数',
-  distinct: '去重计数',
-  min: '最小',
-  max: '最大',
+  sum: localize('ui.common.sum'),
+  average: localize('ui.common.average'),
+  count: localize('ui.common.count'),
+  distinct: localize('ui.snapshotModel.deductionDuplicateCounts'),
+  min: localize('ui.common.minimum'),
+  max: localize('ui.common.maximum'),
 };
 
 const FILTER_OP_LABELS: Readonly<Record<string, string>> = {
-  eq: '等于',
-  neq: '不等于',
-  contains: '包含',
-  notcontains: '不包含',
-  startswith: '开头是',
-  endswith: '结尾是',
-  blank: '为空',
-  notblank: '不为空',
-  gt: '大于',
-  gte: '大于等于',
-  lt: '小于',
-  lte: '小于等于',
-  between: '介于',
-  in: '属于',
+  eq: localize('ui.common.equal'),
+  neq: localize('ui.common.notEqual'),
+  contains: localize('ui.common.including'),
+  notcontains: localize('ui.common.notIncluded'),
+  startswith: localize('ui.common.beginning'),
+  endswith: localize('ui.common.ending'),
+  blank: localize('ui.common.ifEmptyThenLeaveEmpty'),
+  notblank: localize('ui.snapshotModel.notEmpty'),
+  gt: localize('ui.common.greaterThan'),
+  gte: localize('ui.common.greaterThanOrEqual'),
+  lt: localize('ui.common.lessThan'),
+  lte: localize('ui.common.lessThanOrEqual'),
+  between: localize('ui.common.between'),
+  in: localize('ui.snapshotModel.belong'),
 };
 
 function inIntegerRange(n: unknown, min: number, max: number): n is number {
@@ -58,7 +59,7 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
 }
 
 function failInvalid(): never {
-  throw new Error('快照数据无效，请刷新后重试');
+  throw new Error(localize('ui.snapshotModel.snapshotDataInvalidTryAgain'));
 }
 
 function ensureBounded(value: unknown, limit: number): void {
@@ -262,7 +263,7 @@ export function snapshotMetricLabel(s: ComparisonSnapshot): string {
     q.transforms?.find((f) => f.id === id)?.name ||
     s.fields.find((f) => f.id === id)?.name ||
     id ||
-    '记录数';
+    localize('ui.common.numberRecords');
   const baseName = m.name || `${field(m.field)} ${AGGREGATE_LABELS[m.aggregate] ?? m.aggregate}`;
   return baseName + (m.comparison ? ` ${comparisonLabel(m)}` : '');
 }
@@ -282,25 +283,25 @@ export function snapshotDescription(s: ComparisonSnapshot): string {
   const field = (id: string): string =>
     q.transforms?.find((f) => f.id === id)?.name ||
     s.fields.find((f) => f.id === id)?.name ||
-    '字段';
+    localize('ui.common.field');
   const source =
-    q.composition?.name || (q.source.startsWith('wb:') ? q.source.slice(3) : '分析工作表');
+    q.composition?.name || (q.source.startsWith('wb:') ? q.source.slice(3) : localize('ui.snapshotModel.analyzeWorksheet'));
   const lines: string[] = [
     `${s.file} / ${source}`,
-    `分析时间：${new Date(s.analysisAt || s.created).toLocaleString()}`,
-    `参与记录：${s.result.included.toLocaleString()}`,
+    localize('ui.snapshotModel.analysisTime', { analysisAt: new Date(s.analysisAt || s.created).toLocaleString(interfaceLocale()) }),
+    localize('ui.snapshotModel.participatedRecord', { included: s.result.included.toLocaleString(interfaceLocale()) }),
   ];
-  if (q.sourceScope) lines.push(`范围：${sourceScopeCaption(q.sourceScope)}`);
-  if (q.headerRow) lines.push(`表头：第 ${q.headerRow} 行`);
-  if (q.rows?.length) lines.push(`分类：${q.rows.map(field).join(' / ')}`);
-  if (q.columns?.length) lines.push(`系列：${q.columns.map(field).join(' / ')}`);
+  if (q.sourceScope) lines.push(localize('ui.snapshotModel.range', { sourceScopeCaption: sourceScopeCaption(q.sourceScope) }));
+  if (q.headerRow) lines.push(localize('ui.snapshotModel.headerRow', { headerRow: q.headerRow }));
+  if (q.rows?.length) lines.push(localize('ui.snapshotModel.classification', { rows: q.rows.map(field).join(' / ') }));
+  if (q.columns?.length) lines.push(localize('ui.snapshotModel.series', { columns: q.columns.map(field).join(' / ') }));
   for (const f of q.filters ?? []) {
     lines.push(
-      `筛选：${field(f.field)} ${FILTER_OP_LABELS[f.op] ?? f.op}${f.value ? ` ${f.value}` : ''}`,
+      localize('ui.snapshotModel.filtering', { field: field(f.field), detail: FILTER_OP_LABELS[f.op] ?? f.op, detail2: f.value ? ` ${f.value}` : '' }),
     );
   }
   for (const t of q.transforms ?? []) {
-    lines.push(`计算列：${t.name}`);
+    lines.push(localize('ui.snapshotModel.calculateColumn', { name: t.name }));
   }
   return lines.join('\n');
 }

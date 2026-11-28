@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
+
 	"io"
 	"net/http"
 	"path/filepath"
@@ -10,6 +10,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 type comparisonSnapshotStore struct {
@@ -32,12 +33,12 @@ func readComparisonSnapshots(path string) (comparisonSnapshotStore, error) {
 		return store, err
 	}
 	if store.Version != 1 || store.Revision < 0 || store.Revision >= maxConfigRevision || store.Items == nil || len(store.Items) > formats.SnapshotEntries {
-		return store, errors.New("比较快照目录无效，原文件已保留")
+		return store, i18n.Error("service.comparisonSnapshots.comparisonSnapshotDirectoryInvalidOriginal")
 	}
 	ids := make(map[string]bool)
 	for _, item := range store.Items {
 		if ids[item.ID] {
-			return store, errors.New("比较快照编号重复，原文件已保留")
+			return store, i18n.Error("service.comparisonSnapshots.comparisonSnapshotNumbersDuplicatedOriginal")
 		}
 		ids[item.ID] = true
 		if err := analysis.ValidateComparisonSnapshot(item); err != nil {
@@ -78,28 +79,28 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 	if r.Method == http.MethodPost {
 		data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, formats.SnapshotRequestBytes))
 		if err != nil || decodeSavedConfig(data, &req) != nil || req.ExpectedRevision == nil || *req.ExpectedRevision < 0 || *req.ExpectedRevision >= maxConfigRevision {
-			writeError(w, 400, "快照参数或修订号无效")
+			writeMessage(w, 400, "service.comparisonSnapshots.invalidSnapshotParameterOrRevision")
 			return
 		}
 		if req.Op != "capture" && req.Op != "rename" && req.Op != "delete" || req.Op != "delete" && (!analysis.NameValid(req.Name) || len(req.Name) > 240) {
-			writeError(w, 400, "请选择有效操作并填写快照名称")
+			writeMessage(w, 400, "service.comparisonSnapshots.selectValidOperationFillSnapshot")
 			return
 		}
 		if req.Op == "capture" {
 			wb := a.currentWorkbook()
 			if wb == nil || wb.Fingerprint != req.WorkbookKey || sourceBookID(wb) != req.Book {
-				writeError(w, 409, "分析来源已切换，请重新打开当前结果")
+				writeMessage(w, 409, "service.comparisonSnapshots.analysisSourceSwitchedReopenCurrent")
 				return
 			}
 			job := a.getAnalysisJob(req.JobID)
 			if job == nil || job.Workbook != wb {
-				writeError(w, 404, "分析结果已过期，请重新运行分析")
+				writeMessage(w, 404, "service.comparisonSnapshots.analysisResultsHaveExpiredRun")
 				return
 			}
 			job.mu.RLock()
 			if job.Status != "done" {
 				job.mu.RUnlock()
-				writeError(w, 409, "请先完成分析再保存快照")
+				writeMessage(w, 409, "service.comparisonSnapshots.completeAnalysisBeforeSavingSnapshot")
 				return
 			}
 			metric, result, err := analysis.ProjectSnapshotMetric(job.Query, job.Result, req.MetricIndex)
@@ -113,7 +114,7 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 				err = analysis.ValidateComparisonSnapshot(item)
 			}
 			if err != nil {
-				writeError(w, 422, err.Error())
+				writeFailure(w, 422, err)
 				return
 			}
 			candidate = &item
@@ -121,7 +122,7 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 	}
 	path, err := savedConfigPath("snapshots", "comparisons")
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	// Release the file lock before encoding/writing a response to a slow client.
@@ -144,19 +145,19 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 						return
 					}
 				}
-				err, code = errors.New("快照已不存在，请刷新目录"), 404
+				err, code = i18n.Error("service.comparisonSnapshots.snapshotNoLongerExistsRefresh"), 404
 				return
 			}
 			response = snapshotCatalog(store)
 			return
 		}
 		if store.Revision != *req.ExpectedRevision || store.Revision+1 >= maxConfigRevision {
-			err, code = errors.New("快照目录已变化，请刷新后重试"), 409
+			err, code = i18n.Error("service.comparisonSnapshots.snapshotDirectoryChangedRefreshTry"), 409
 			return
 		}
 		if candidate != nil {
 			if len(store.Items) >= formats.SnapshotEntries {
-				err, code = errors.New("快照数量已达上限，请先删除不用的快照"), 422
+				err, code = i18n.Error("service.comparisonSnapshots.numberSnapshotsReachedLimitDelete"), 422
 				return
 			}
 			store.Items = append(store.Items, *candidate)
@@ -169,7 +170,7 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 			if index < 0 {
-				err, code = errors.New("快照已不存在，请刷新目录"), 404
+				err, code = i18n.Error("service.comparisonSnapshots.snapshotNoLongerExistsRefresh"), 404
 				return
 			}
 			if req.Op == "delete" {
@@ -186,7 +187,7 @@ func (a *App) handleComparisonSnapshots(w http.ResponseWriter, r *http.Request) 
 		response = snapshotCatalog(store)
 	}()
 	if err != nil {
-		writeError(w, code, err.Error())
+		writeFailure(w, code, err)
 		return
 	}
 	writeJSON(w, response)
@@ -213,7 +214,7 @@ func (a *App) handleSnapshotComparison(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	path, err := savedConfigPath("snapshots", "comparisons")
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	lock := persistentFileLock(path)
@@ -221,7 +222,7 @@ func (a *App) handleSnapshotComparison(w http.ResponseWriter, r *http.Request) {
 	store, err := readComparisonSnapshots(path)
 	lock.RUnlock()
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	var left, right *analysis.ComparisonSnapshot
@@ -235,17 +236,17 @@ func (a *App) handleSnapshotComparison(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if left == nil || right == nil {
-		writeError(w, 404, "快照已不存在，请刷新目录")
+		writeMessage(w, 404, "service.comparisonSnapshots.snapshotNoLongerExistsRefresh")
 		return
 	}
 	comparison, err := analysis.CompareSnapshotsContext(r.Context(), *left, *right)
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	data, err := json.Marshal(comparison)
 	if err != nil || len(data) > 8*formats.SnapshotBytes {
-		writeError(w, 422, "比较结果超出容量，请缩小分析范围后重新保存快照")
+		writeMessage(w, 422, "service.comparisonSnapshots.comparisonResultsExceedCapacityNarrow")
 		return
 	}
 	release()

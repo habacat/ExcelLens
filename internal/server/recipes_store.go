@@ -2,12 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
+
 	"net/http"
 	"reflect"
 	"strings"
 
+	"excellens/internal/i18n"
 	"excellens/internal/recipe"
 )
 
@@ -16,8 +16,8 @@ const maxRecipeBytes = 256 << 10
 const maxRecipesBytes = 4 << 20
 const recipeKnownTypes = recipeNumber | recipeText | recipeAmountText | recipeBoolean | recipeDate | recipeError | recipeMissingCache | recipeInvalidNumber | recipeUnknown | recipeTypeMissing
 
-var errRecipeRevision = errors.New("分析方案目录已被其他页面修改，请刷新后重试保存")
-var errRecipeName = errors.New("已有同名分析方案，请更换名称")
+var errRecipeRevision = i18n.Error("service.recipesStore.analysisPlanDirectoryModifiedOn")
+var errRecipeName = i18n.Error("service.recipesStore.thereAlreadyAnalysisSchemeSame")
 
 type recipeStore struct {
 	Version  int             `json:"version"`
@@ -29,17 +29,17 @@ func recipesPath() (string, error) { return savedConfigPath("recipes", "catalog"
 
 func validateSavedRecipe(value recipe.Recipe) error {
 	if !validSessionID(value.ID) || !recipe.ValidName(value.Name) {
-		return errors.New("分析方案标识或名称无效")
+		return i18n.Error("service.recipesStore.analysisSchemeIdentifierOrName")
 	}
 	encoded, err := json.Marshal(value)
 	if err != nil || len(encoded) > maxRecipeBytes {
-		return errors.New("分析方案超过256KiB配置容量")
+		return i18n.Error("service.recipesStore.analysisPlanExceedsKibConfiguration")
 	}
 	mapping := make(map[string]string, len(value.Fields))
 	for _, field := range value.Fields {
 		mask := recipeTypeMask(field.Mask)
 		if mask == 0 || mask&^recipeKnownTypes != 0 || field.Uncertain != mask.uncertain() {
-			return errors.New("分析方案字段读取类型无效")
+			return i18n.Error("service.recipesStore.invalidReadingTypeAnalyzedScheme")
 		}
 		mapping[field.ID] = field.ID
 	}
@@ -54,16 +54,16 @@ func readRecipes(path string) (recipeStore, error) {
 		return store, err
 	}
 	if store.Version != 1 || store.Revision < 0 || store.Revision >= maxConfigRevision || len(store.Items) > maxRecipes {
-		return store, errors.New("分析方案目录版本、修订或数量无效，原文件已保留")
+		return store, i18n.Error("service.recipesStore.versionRevisionOrQuantityAnalysis")
 	}
 	ids, names := make(map[string]bool), make(map[string]bool)
 	for _, value := range store.Items {
 		name := strings.ToLower(value.Name)
 		if ids[value.ID] || names[name] {
-			return store, errors.New("分析方案目录存在重复标识或名称，原文件已保留")
+			return store, i18n.Error("service.recipesStore.thereDuplicatesOrIdenticalNames")
 		}
 		if err := validateSavedRecipe(value); err != nil {
-			return store, fmt.Errorf("分析方案目录结构无效，原文件已保留：%w", err)
+			return store, i18n.Wrap("service.recipesStore.analysisSchemeDirectoryStructureInvalid", err)
 		}
 		ids[value.ID], names[name] = true, true
 	}
@@ -90,14 +90,14 @@ func saveCapturedRecipe(value recipe.Recipe, revision int64) (int64, error) {
 			if reflect.DeepEqual(old, value) {
 				return store.Revision, nil
 			}
-			return 0, errors.New("此保存请求已完成，不能用不同内容重试")
+			return 0, i18n.Error("service.recipesStore.thisSaveRequestCompleteCannot")
 		}
 	}
 	if store.Revision != revision {
 		return 0, errRecipeRevision
 	}
 	if len(store.Items) >= maxRecipes {
-		return 0, errors.New("最多保存64个分析方案，请先删除不用的分析方案")
+		return 0, i18n.Error("service.recipesStore.onlyAnalysisPlansCanBe")
 	}
 	for _, old := range store.Items {
 		if strings.EqualFold(old.Name, value.Name) {
@@ -105,7 +105,7 @@ func saveCapturedRecipe(value recipe.Recipe, revision int64) (int64, error) {
 		}
 	}
 	if store.Revision+1 >= maxConfigRevision {
-		return 0, errors.New("分析方案修订号达到上限，原文件已保留")
+		return 0, i18n.Error("service.recipesStore.analysisPlanRevisionNumberReached")
 	}
 	store.Items = append(store.Items, value)
 	store.Revision++
@@ -132,7 +132,7 @@ func findRecipe(id string) (recipe.Recipe, error) {
 			return value, nil
 		}
 	}
-	return recipe.Recipe{}, errors.New("分析方案已移除，请刷新目录")
+	return recipe.Recipe{}, i18n.Error("service.recipesStore.analysisPlanRemovedRefreshDirectory")
 }
 
 func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +142,7 @@ func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
 	}
 	path, err := recipesPath()
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -151,7 +151,7 @@ func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
 		store, err := readRecipes(path)
 		lock.RUnlock()
 		if err != nil {
-			writeError(w, 422, err.Error())
+			writeFailure(w, 422, err)
 			return
 		}
 		writeJSON(w, map[string]any{"book": sourceBookID(a.currentWorkbook()), "store": store})
@@ -163,7 +163,7 @@ func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
 		ExpectedRevision *int64 `json:"expectedRevision"`
 	}
 	if decodeAnalysis(r, &req) != nil || req.Action != "delete" || !validSessionID(req.ID) || req.ExpectedRevision == nil {
-		writeError(w, 400, "分析方案目录操作无效")
+		writeMessage(w, 400, "service.recipesStore.analysisPlanDirectoryOperationsInvalid")
 		return
 	}
 	lock := persistentFileLock(path)
@@ -171,11 +171,11 @@ func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
 	defer lock.Unlock()
 	store, err := readRecipes(path)
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	if store.Revision != *req.ExpectedRevision {
-		writeError(w, 409, "分析方案目录已被其他页面修改，请刷新后重试")
+		writeMessage(w, 409, "service.recipesStore.analysisSchemeDirectoryModifiedAnother")
 		return
 	}
 	found := -1
@@ -186,17 +186,17 @@ func (a *App) handleRecipes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if found < 0 {
-		writeError(w, 404, "分析方案已移除，请刷新目录")
+		writeMessage(w, 404, "service.recipesStore.analysisPlanRemovedRefreshDirectory")
 		return
 	}
 	if store.Revision+1 >= maxConfigRevision {
-		writeError(w, 409, "分析方案修订号达到上限，原文件已保留")
+		writeMessage(w, 409, "service.recipesStore.analysisPlanRevisionNumberReached")
 		return
 	}
 	store.Items = append(store.Items[:found], store.Items[found+1:]...)
 	store.Revision++
 	if err := writeSavedConfig(path, maxRecipesBytes, store, durableConfigOps); err != nil {
-		writeError(w, 500, "删除分析方案失败："+err.Error())
+		writeMessage(w, 500, "service.recipesStore.failedDeleteAnalyzedScheme", i18n.Args{"detail": err})
 		return
 	}
 	writeJSON(w, map[string]any{"book": sourceBookID(a.currentWorkbook()), "store": store})

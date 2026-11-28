@@ -2,6 +2,7 @@
  * Analytics Dashboard (lazy-loaded report cards, drag-and-drop ordering) and
  * Metadata-driven Template Gallery controller.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type {
   AnalysisAggregateKind,
   AnalysisField,
@@ -23,7 +24,7 @@ import {
   type AnalysisResultSnapshot,
   type WorkspaceAnalysisQuery,
 } from './results.ts';
-import type { AnalysisTemplate } from './templates.ts';
+import { templateCategoryLabel, type AnalysisTemplate } from './templates.ts';
 
 export interface MutableAnalysisWorkspace {
   readonly sheets: AnalysisWorkspaceResponse['sheets'];
@@ -162,7 +163,7 @@ export class AnalysisDashboardController {
     if (!reports.length) {
       const el = document.createElement('div');
       el.className = 'analysis-empty';
-      el.textContent = '还没有报表。在“透视分析”里点“保存报表”，报表会出现在这里。';
+      el.textContent = localize('ui.dashboard.thereNoReportsYetClick');
       host.append(el);
       return;
     }
@@ -193,8 +194,8 @@ export class AnalysisDashboardController {
       card.className = 'analysis-dashboard-card';
       card.dataset.reportId = report.id;
       card.draggable = true;
-      card.title = '拖动调整仪表盘顺序';
-      card.innerHTML = `<div class="analysis-dashboard-card-head"><h3><span class="analysis-dashboard-grip" aria-hidden="true"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-grip"/></svg></span><span>${escapeHtml(report.name)}</span></h3><div class="analysis-dashboard-actions"><button type="button" data-report-image disabled title="导出已加载图表及精确附件">图片</button><button type="button" data-report-open>打开 ↗</button><button type="button" class="analysis-dashboard-remove" data-report-remove title="删除该报表" aria-label="删除报表">×</button></div></div><div class="analysis-dashboard-plot"><canvas></canvas><div class="analysis-chart-tooltip" hidden></div></div>`;
+      card.title = localize('ui.dashboard.dragAdjustDashboardOrder');
+      card.innerHTML = `<div class="analysis-dashboard-card-head"><h3><span class="analysis-dashboard-grip" aria-hidden="true"><svg class="icon icon-small" aria-hidden="true" focusable="false"><use href="#i-grip"/></svg></span><span>${escapeHtml(report.name)}</span></h3><div class="analysis-dashboard-actions"><button type="button" data-report-image disabled title="${localizeHTML('ui.dashboard.exportingLoadedChartsPreciseAttachments')}">${localizeHTML('ui.dashboard.images')}</button><button type="button" data-report-open>${localizeHTML('ui.dashboard.open')}</button><button type="button" class="analysis-dashboard-remove" data-report-remove title="${localizeHTML('ui.dashboard.deleteReport')}" aria-label="${localizeHTML('ui.dashboard.deleteReport98c7fb0')}">×</button></div></div><div class="analysis-dashboard-plot"><canvas></canvas><div class="analysis-chart-tooltip" hidden></div></div>`;
       host.append(card);
 
       card.addEventListener('dragstart', (event: DragEvent) => {
@@ -237,10 +238,10 @@ export class AnalysisDashboardController {
         void post('/api/analysis/dashboard/order', { ids })
           .then(() => {
             if (state.workspace) state.workspace.dashboardOrder = ids;
-            toast('仪表盘顺序已保存', 'success');
+            toast(localize('ui.dashboard.dashboardOrderSaved'), 'success');
           })
           .catch((e: unknown) => {
-            toast(`排序保存失败：${errorMessage(e)}`, 'error');
+            toast(localize('ui.dashboard.sortingSavingFailed', { errorMessage: errorMessage(e) }), 'error');
             this.renderDashboard();
           });
       });
@@ -249,12 +250,12 @@ export class AnalysisDashboardController {
       if (removeButton) {
         removeButton.onclick = (): void => {
           void (async () => {
-            const typed = await askText('删除分析报表', '', `输入“${report.name}”以确认`);
+            const typed = await askText(localize('ui.dashboard.deleteAnalysisReport'), '', localize('ui.dashboard.enterConfirm', { name: report.name }));
             if (typed !== report.name) return;
             try {
               await post('/api/analysis/delete', { kind: 'report', id: report.id });
               await refreshWorkspace();
-              toast('报表已删除', 'success');
+              toast(localize('ui.dashboard.reportDeleted'), 'success');
             } catch (e: unknown) {
               toast(errorMessage(e), 'error');
             }
@@ -271,7 +272,7 @@ export class AnalysisDashboardController {
 
       const info = document.createElement('span');
       info.className = 'analysis-card-loading';
-      info.textContent = '滚动到可见区域时加载';
+      info.textContent = localize('ui.dashboard.loadWhenScrollingVisibleArea');
       const plot = card.querySelector('.analysis-dashboard-plot');
       plot?.append(info);
 
@@ -290,7 +291,7 @@ export class AnalysisDashboardController {
         chartImageToken = null;
         if (imageButton) imageButton.disabled = true;
         revalidateChartExport();
-        info.textContent = '正在计算…';
+        info.textContent = localize('ui.dashboard.calculating');
         try {
           let snapshot = state.reportCache.get(book, viewQuery);
           if (!snapshot) {
@@ -344,7 +345,7 @@ export class AnalysisDashboardController {
           }
         } catch (e: unknown) {
           if (isCardConnected()) {
-            info.textContent = `无法更新：${errorMessage(e)}`;
+            info.textContent = localize('ui.dashboard.unableUpdate', { errorMessage: errorMessage(e) });
             info.classList.add('analysis-card-error');
           }
         }
@@ -368,13 +369,13 @@ export class AnalysisDashboardController {
 
   renderTemplates(): void {
     const { state, templates } = this.d;
-    const categories = ['全部', ...new Set(templates.map((t) => t.category))];
+    const categories = ['all', ...new Set(templates.map((t) => t.category))];
     const cats = requireEl('analysisTemplateCategories');
     cats.replaceChildren();
     for (const name of categories) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = name;
+      btn.textContent = name === 'all' ? localize('ui.common.all') : templateCategoryLabel(name);
       btn.className = name === state.templateCategory ? 'is-active' : '';
       btn.onclick = (): void => {
         state.templateCategory = name;
@@ -388,7 +389,7 @@ export class AnalysisDashboardController {
     const search = state.templateText.toLocaleLowerCase();
     for (const t of templates) {
       if (
-        (state.templateCategory !== '全部' && t.category !== state.templateCategory) ||
+        (state.templateCategory !== 'all' && t.category !== state.templateCategory) ||
         (search && !`${t.title} ${t.description}`.toLocaleLowerCase().includes(search))
       ) {
         continue;
@@ -405,7 +406,7 @@ export class AnalysisDashboardController {
   applyTemplate(template: AnalysisTemplate): void {
     const { state, toast, setTab, queryBase, renderFields, renderBuilder, run } = this.d;
     if (!state.fields.length) {
-      toast('请先选择一张包含数据的工作表', 'warning');
+      toast(localize('ui.dashboard.selectWorksheetContainingDataFirst'), 'warning');
       void setTab('pivot');
       return;
     }
@@ -431,13 +432,13 @@ export class AnalysisDashboardController {
     q.title = template.title;
     if (
       main &&
-      (template.title.includes('月度') || template.title.includes('到期年份')) &&
+      template.dateGrouping &&
       /日期|时间|日|月|年/.test(main.name)
     ) {
       const fieldID = 'D_template_date';
-      const op: AnalysisTransformOp = template.title.includes('到期年份') ? 'year' : 'yearmonth';
+      const op: AnalysisTransformOp = template.dateGrouping;
       q.transforms = [
-        { id: fieldID, name: op === 'year' ? '年份' : '年月', source: main.id, op, arg: '' },
+        { id: fieldID, name: op === 'year' ? localize('ui.dashboard.years') : localize('ui.dashboard.monthYear'), source: main.id, op, arg: '' },
       ];
       q.rows = [fieldID];
     }
@@ -449,7 +450,7 @@ export class AnalysisDashboardController {
       void run();
     } else {
       toast(
-        `模板已载入；没有匹配到${!main ? '分类字段' : !metric ? '数值指标' : '必需字段'}，请在左侧确认字段后运行`,
+        localize('ui.dashboard.templateLoadedNoMatchFound', { detail: !main ? localize('ui.dashboard.categoryField') : !metric ? localize('ui.dashboard.valueMetrics') : localize('ui.dashboard.requiredFields') }),
         'warning',
       );
     }

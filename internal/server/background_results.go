@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"maps"
 	"time"
 
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -166,7 +167,7 @@ func (s *browserSession) manageResult(action, kind, id string, protect, otherPag
 				inUse := j.Results != nil
 				j.mu.RUnlock()
 				if inUse {
-					return errors.New("活动页面正在使用全量搜索结果，请先关闭该页")
+					return i18n.Error("service.backgroundResults.activityPageUsingAllSearch")
 				}
 			}
 			done, cancel = j.done, j.cancel
@@ -182,7 +183,7 @@ func (s *browserSession) manageResult(action, kind, id string, protect, otherPag
 				inUse := set.orders[j.ResultID] != nil
 				j.mu.RUnlock()
 				if inUse {
-					return errors.New("活动页面正在使用此筛选，请先清除筛选或关闭该页")
+					return i18n.Error("service.backgroundResults.activityPageUsingThisFilter")
 				}
 			}
 			done, cancel = j.done, j.cancel
@@ -210,17 +211,17 @@ func (s *browserSession) manageResult(action, kind, id string, protect, otherPag
 		}
 	}
 	if done == nil {
-		return errors.New("任务已到期或不存在")
+		return i18n.Error("service.backgroundResults.taskExpiredOrDoesNot")
 	}
 	select {
 	case <-done:
 		if action != "discard" {
-			return errors.New("任务已结束，可丢弃结果")
+			return i18n.Error("service.backgroundResults.taskCompletedResultsCanBe")
 		}
 		remove()
 	default:
 		if action != "cancel" {
-			return errors.New("请先取消或等待任务完成")
+			return i18n.Error("service.backgroundResults.cancelOrWaitTaskBe")
 		}
 		cancel()
 	}

@@ -1,6 +1,7 @@
 /**
  * Lazy viewport worksheet picture overlay and modal image gallery viewer.
  */
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { ImageDTO, ImageMarker } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -130,11 +131,11 @@ export class Pictures {
     const btn = requireButton('imagesBtn');
     btn.hidden = this.items.length === 0;
     btn.innerHTML =
-      '<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg>图片<span class="image-count"></span>';
+      `<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image"/></svg>${localizeHTML('ui.images.images')}<span class="image-count"></span>`;
     const countEl = btn.querySelector('.image-count');
     if (countEl) countEl.textContent = String(this.items.length);
     btn.setAttribute('aria-pressed', String(this.enabled));
-    btn.title = `图片（${this.items.length} 张）`;
+    btn.title = localize('ui.images.numberImages', { count: this.items.length });
     this.schedule();
   }
 
@@ -287,7 +288,8 @@ export class Pictures {
         node = document.createElement('button');
         node.type = 'button';
         node.className = 'worksheet-picture';
-        node.setAttribute('aria-label', `查看图片：${im.description || im.name || `图片 ${im.id + 1}`}`);
+        node.dataset.errorLabel = localize('ui.images.previewUnavailable');
+        node.setAttribute('aria-label', localize('ui.images.viewImages', { description: im.description || im.name || localize('ui.images.pictures', { id: im.id + 1 }) }));
         const img = document.createElement('img');
         img.src = im.src;
         img.alt = im.description || im.name || '';
@@ -352,7 +354,7 @@ export class Pictures {
     } else {
       this.schedule();
     }
-    btn.title = this.enabled ? '隐藏工作表图片' : '显示工作表图片';
+    btn.title = this.enabled ? localize('ui.images.hideWorksheetImages') : localize('ui.images.displayWorksheetImage');
   }
 
   open(id: number): void {
@@ -376,9 +378,9 @@ export class Pictures {
       }
     };
     this.preview.onerror = (): void => {
-      requireEl('pictureCaption').textContent = '该图片格式无法预览';
+      requireEl('pictureCaption').textContent = localize('ui.images.thisImageFormatCannotBe');
     };
-    this.preview.alt = im.description || im.name || `图片 ${index + 1}`;
+    this.preview.alt = im.description || im.name || localize('ui.images.picturesb66a8e5', { index: index + 1 });
     this.preview.src = im.src;
     this.viewer.hidden = false;
     this.viewer.focus({ preventScroll: true });
@@ -402,7 +404,7 @@ export class Pictures {
   private setCaption(): void {
     const im = this.items[this.active];
     if (!im) return;
-    requireEl('pictureCaption').textContent = im.description || im.name || `图片 ${this.active + 1}`;
+    requireEl('pictureCaption').textContent = im.description || im.name || localize('ui.images.pictures917dd2b', { active: this.active + 1 });
     requireEl('pictureIndex').textContent = `${this.active + 1} / ${this.items.length}`;
     requireButton('picturePrevious').disabled = this.items.length < 2;
     requireButton('pictureNext').disabled = this.items.length < 2;
@@ -467,7 +469,7 @@ export class Pictures {
     try {
       const blob = await (await fetch(im.src)).blob();
       if (typeof navigator.clipboard.write !== 'function' || typeof ClipboardItem === 'undefined') {
-        throw new Error('当前环境不支持复制图片');
+        throw new Error(localize('ui.images.currentEnvironmentDoesNotSupport'));
       }
       let png = blob;
       if (blob.type !== 'image/png') {
@@ -476,17 +478,17 @@ export class Pictures {
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('图片转换失败');
+        if (!ctx) throw new Error(localize('ui.images.imageConversionFailed'));
         ctx.drawImage(bitmap, 0, 0);
         bitmap.close();
         png = await new Promise<Blob>((resolve, reject) =>
-          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('图片转换失败'))), 'image/png'),
+          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(localize('ui.images.imageConversionFailed')))), 'image/png'),
         );
       }
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
-      this.o.toast('图片已复制', 'success');
+      this.o.toast(localize('ui.images.imageCopied'), 'success');
     } catch (err: unknown) {
-      this.o.toast(`复制图片失败：${errorMessage(err)}`, 'error');
+      this.o.toast(localize('ui.images.imageCopyingFailed', { detail: errorMessage(err) }), 'error');
     }
   }
 

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"excellens/internal/checkpoint"
+	"excellens/internal/i18n"
 	"excellens/internal/searchresults"
 	"excellens/internal/searchservice"
 	"excellens/internal/workbook"
@@ -29,7 +30,7 @@ func (a *App) runFullSearch(wb *workbook.Workbook, j *SearchJob) {
 	defer j.mu.Unlock()
 	if err != nil {
 		if errors.Is(err, context.Canceled) || j.ctx.Err() != nil {
-			j.Status, j.Stage = "cancelled", "已取消"
+			j.Status, j.Stage = "cancelled", "stage.task.cancelled"
 		} else {
 			j.Status, j.Error = "error", err.Error()
 		}
@@ -37,7 +38,7 @@ func (a *App) runFullSearch(wb *workbook.Workbook, j *SearchJob) {
 	}
 	j.Results, j.HitCount = results, results.Count()
 	results = nil
-	j.Status, j.Stage, j.Progress = "done", "搜索完成", 100
+	j.Status, j.Stage, j.Progress = "done", "stage.task.searchCompleted", 100
 	j.SheetsDone = j.SheetsTotal
 }
 func (a *App) scanFullSearch(wb *workbook.Workbook, j *SearchJob, result *searchresults.Store) error {
@@ -87,7 +88,7 @@ func (a *App) scanFullSearch(wb *workbook.Workbook, j *SearchJob, result *search
 			return idx, nil
 		}
 		if stamp != "" && !policy.rebuild {
-			return nil, errors.New("搜索恢复所需索引已被清理")
+			return nil, i18n.Error("service.searchFull.indexRequiredSearchRecoveryCleared")
 		}
 		release, err := a.backgroundIndex(j.ctx)
 		if err != nil {
@@ -106,7 +107,7 @@ func (a *App) scanFullSearch(wb *workbook.Workbook, j *SearchJob, result *search
 		j.SheetsDone, j.SheetsTotal = sheet, len(p.Sheets)
 		j.Scanned, j.Total = before+next, before+rows
 		j.Progress = (float64(sheet) + float64(next)/float64(max(rows, 1))) * 100 / float64(len(p.Sheets))
-		j.Stage = "全量搜索 · " + p.Sheets[sheet].Name
+		j.Stage = "stage.task.fullSearch" + p.Sheets[sheet].Name
 	}
 	return p.Scan(j.ctx, wb, result)
 }
@@ -120,7 +121,7 @@ func (a *App) handleSearchResults(w http.ResponseWriter, r *http.Request) {
 	j := a.searchJobs[q.Get("id")]
 	a.mu.RUnlock()
 	if j == nil {
-		writeError(w, 404, "搜索结果已释放")
+		writeMessage(w, 404, "service.searchFull.searchResultsReleased")
 		return
 	}
 	j.mu.RLock()
@@ -134,7 +135,7 @@ func (a *App) handleSearchResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ready || set == nil {
-		writeError(w, 409, "全量搜索结果尚未就绪")
+		writeMessage(w, 409, "service.searchFull.fullSearchResultsNotYet")
 		return
 	}
 	filter := searchresults.Filter{Text: q.Get("text"), Sheet: q.Get("sheet")}
@@ -151,13 +152,13 @@ func (a *App) handleSearchResults(w http.ResponseWriter, r *http.Request) {
 		var err error
 		start, err = strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			writeError(w, 400, "无效的分页游标")
+			writeMessage(w, 400, "service.searchFull.invalidPagingCursor")
 			return
 		}
 	}
 	page, err := set.Page(r.Context(), start, filter)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	writeJSON(w, page)

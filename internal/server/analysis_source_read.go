@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"iter"
 	"sort"
 	"strconv"
@@ -10,6 +10,7 @@ import (
 
 	"excellens/internal/analysis"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/sourceview"
 	"excellens/internal/workbook"
 )
@@ -31,7 +32,7 @@ func scanWorkbookAnalysisRows(ctx context.Context, wb *workbook.Workbook, idx *w
 		columns = []int{1}
 	}
 	if len(columns) > analysis.MaxSourceFields {
-		return errors.New("一次分析最多引用80个原始字段，请移除部分维度或筛选条件")
+		return i18n.Error("service.analysisSourceRead.maximumOriginalFieldsCanBe")
 	}
 	sort.Ints(columns)
 	ids := make(map[int]string, len(columns))
@@ -76,7 +77,7 @@ func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis
 	}
 	if q.SourceScope == nil {
 		if borrowed != nil {
-			return analysisSource{}, errors.New("分析来源快照缺少范围规则")
+			return analysisSource{}, i18n.Error("service.analysisSourceRead.analysisSourceSnapshotLacksRange")
 		}
 		return a.sourceObserved(wb, q.Source, q.HeaderRow, observer)
 	}
@@ -87,11 +88,11 @@ func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis
 	var snapshot *analysisSourceSnapshot
 	if borrowed != nil {
 		if borrowed.isClosed() || borrowed.data.wb != wb || borrowed.data.source != q.Source || borrowed.data.scope.Digest() != scope.Digest() {
-			return analysisSource{}, errors.New("分析来源快照与范围规则不一致，请重新捕获")
+			return analysisSource{}, i18n.Error("service.analysisSourceRead.analysisSourceSnapshotDoesNot")
 		}
 		meta, found := wb.FindSheet(strings.TrimPrefix(q.Source, "wb:"))
 		if !found || wb.GetCachedIndex(meta.Path) != borrowed.data.index {
-			return analysisSource{}, errors.New("分析来源索引已变化")
+			return analysisSource{}, i18n.Error("service.analysisSourceRead.analysisSourceIndexChanged")
 		}
 		snapshot, err = borrowed.retain()
 	} else {
@@ -136,7 +137,7 @@ func (a *App) sourceQuery(ctx context.Context, wb *workbook.Workbook, q analysis
 			for _, id := range need {
 				column, _ := strconv.Atoi(strings.TrimPrefix(id, "C"))
 				if column > 0 && (column < selection.StartColumn || column > selection.EndColumn) {
-					return errors.New("分析字段不在捕获的选区内")
+					return i18n.Error("service.analysisSourceRead.analyzedFieldsNotWithinCaptured")
 				}
 			}
 		}
@@ -192,25 +193,25 @@ func (a *App) sourceRequestObserved(ctx context.Context, wb *workbook.Workbook, 
 func (a *App) sourceResult(ctx context.Context, wb *workbook.Workbook, q analysis.Query, id string) (analysisSource, error) {
 	if id == "" {
 		if q.Composition != nil {
-			return analysisSource{}, errors.New("联合来源明细请从已完成的分析结果打开")
+			return analysisSource{}, i18n.Error("service.analysisSourceRead.openCombinedSourceDetailsFrom")
 		}
 		return a.sourceQuery(ctx, wb, q, nil, nil)
 	}
 	job := a.getAnalysisJob(id)
 	if job == nil {
-		return analysisSource{}, errors.New("分析结果已过期，请重新运行分析")
+		return analysisSource{}, i18n.Error("service.analysisSourceRead.analysisResultsHaveExpiredRun")
 	}
 	job.mu.RLock()
 	if job.Workbook != wb || job.Status != "done" || job.Query.Source != q.Source || job.Query.HeaderRow != q.HeaderRow || scopeDigest(job.Query) != scopeDigest(q) {
 		job.mu.RUnlock()
-		return analysisSource{}, errors.New("分析结果与明细来源范围不一致")
+		return analysisSource{}, i18n.Error("service.analysisSourceRead.analysisResultDoesNotMatch")
 	}
 	var captured *analysisSourceSnapshot
 	var err error
 	if job.SourceRows != nil {
 		captured, err = job.SourceRows.retain()
 	} else if q.SourceScope != nil || q.Composition != nil {
-		err = errors.New("分析结果的来源快照已释放，请重新运行分析")
+		err = i18n.Error("service.analysisSourceRead.sourceSnapshotAnalysisResultsReleased")
 	}
 	job.mu.RUnlock()
 	if err != nil {
@@ -229,18 +230,18 @@ func scopeDigest(q analysis.Query) string {
 
 func normalizedAnalysisScope(wb *workbook.Workbook, source string, input sourceview.Scope) (sourceview.Scope, error) {
 	if wb == nil || !strings.HasPrefix(source, "wb:") || input.Fingerprint != wb.Fingerprint {
-		return sourceview.Scope{}, errors.New("分析来源范围与原始工作表不一致")
+		return sourceview.Scope{}, i18n.Error("service.analysisSourceRead.analysisSourceRangeDoesNot")
 	}
 	capability, ok := formats.Lookup(wb.Format)
 	if !ok {
-		return sourceview.Scope{}, errors.New("分析来源格式无效")
+		return sourceview.Scope{}, i18n.Error("service.analysisSourceRead.analysisSourceFormatInvalid")
 	}
 	scope, err := input.Normalized(capability.MaxRows, capability.MaxColumns)
 	if err != nil {
 		return sourceview.Scope{}, err
 	}
 	if scope.Selection != nil && scope.Selection.EndColumn > analysis.MaxSourceColumns {
-		return sourceview.Scope{}, errors.New("分析选区超出前256个源字段，未截断范围")
+		return sourceview.Scope{}, i18n.Error("service.analysisSourceRead.analysisSelectionExceedsFirstSource")
 	}
 	return scope, nil
 }

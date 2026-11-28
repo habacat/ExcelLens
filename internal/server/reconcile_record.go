@@ -5,12 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+
 	"io"
 	"time"
 
 	"excellens/internal/buildinfo"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 	"excellens/internal/workbook"
 )
@@ -52,7 +53,7 @@ func captureReconcileRecord(job *reconcileTask, sources [2]reconcile.Source) (*r
 		input.Fields = nil
 		for _, col := range reconcile.NeededColumns(job.Query, i == 1) {
 			if col < 1 || col > len(source.Info.Fields) {
-				return nil, fmt.Errorf("核对字段 %d 超出范围", col)
+				return nil, i18n.Error("service.reconcileRecord.fieldExceedsRange", i18n.Args{"col": col})
 			}
 			input.Fields = append(input.Fields, source.Info.Fields[col-1])
 		}
@@ -61,7 +62,7 @@ func captureReconcileRecord(job *reconcileTask, sources [2]reconcile.Source) (*r
 			if digests[book] == "" {
 				digest, err := book.SourceFileSHA256(job.ctx)
 				if err != nil {
-					return nil, fmt.Errorf("核验 %s 的文件摘要失败：%w", input.Name, err)
+					return nil, i18n.Wrap("service.reconcileRecord.failedVerifyFileSummary", err, i18n.Args{"name": input.Name})
 				}
 				digests[book] = digest
 			}

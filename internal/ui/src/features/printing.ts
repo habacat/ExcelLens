@@ -1,3 +1,4 @@
+import { t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { AsyncJobProgress } from '../contracts/common.ts';
 import { decodePrintingJobStatus } from '../core/http-decoders.generated.ts';
 /**
@@ -80,38 +81,38 @@ function isAbortError(error: unknown): boolean {
 }
 
 const ORIGIN_LABELS: Readonly<Record<string, string>> = {
-  source: '源设置',
-  'preview-override': '本次覆盖',
-  'preview-default': '预览默认',
-  'schema-default': '格式默认',
-  'indexed-data-range': '源数据范围',
-  'office-compatible-source': '源手工分页',
+  source: localize('ui.printing.sourceSettings'),
+  'preview-override': localize('ui.printing.thisCover'),
+  'preview-default': localize('ui.printing.previewDefault'),
+  'schema-default': localize('ui.printing.defaultFormat'),
+  'indexed-data-range': localize('ui.printing.sourceDataRange'),
+  'office-compatible-source': localize('ui.printing.sourceManualPagination'),
 };
 
 const SETTING_LABELS: readonly (readonly [string, string])[] = [
-  ['paper', '纸张'],
-  ['orientation', '方向'],
-  ['areas', '打印区域'],
-  ['repeatRows', '重复行'],
-  ['repeatColumns', '重复列'],
-  ['firstPageNumber', '起始页码'],
+  ['paper', localize('ui.printing.paper')],
+  ['orientation', localize('ui.printing.direction')],
+  ['areas', localize('ui.printing.printArea')],
+  ['repeatRows', localize('ui.printing.repeatingLines')],
+  ['repeatColumns', localize('ui.printing.duplicateColumns')],
+  ['firstPageNumber', localize('ui.printing.startingPageNumber')],
 ];
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
-  pageSetup: '源页面设置',
-  pageMargins: '源页边距',
-  pageSetUpPr: '源适配设置',
-  printOptions: '源打印选项',
-  headerFooter: '源页眉页脚定义',
+  pageSetup: localize('ui.printing.sourcePageSettings'),
+  pageMargins: localize('ui.printing.sourceMargin'),
+  pageSetUpPr: localize('ui.printing.sourceAdaptationSettings'),
+  printOptions: localize('ui.printing.sourcePrintingOptions'),
+  headerFooter: localize('ui.printing.definitionSourcePageHeadersFooters'),
 };
 
 const MARGIN_NAMES: readonly (readonly [string, string])[] = [
-  ['left', '左'],
-  ['right', '右'],
-  ['top', '上'],
-  ['bottom', '下'],
-  ['header', '页眉'],
-  ['footer', '页脚'],
+  ['left', localize('ui.common.left')],
+  ['right', localize('ui.common.right')],
+  ['top', localize('ui.printing.above')],
+  ['bottom', localize('ui.printing.below')],
+  ['header', localize('ui.printing.header')],
+  ['footer', localize('ui.printing.footer')],
 ];
 
 export class Printing {
@@ -150,7 +151,7 @@ export class Printing {
     this.source = options.source;
     this.limits = options.limits;
     if (!options.limits.pages || !options.limits.domPixels) {
-      throw new Error('分页预览容量不可用');
+      throw new Error(localize('ui.printing.paginationPreviewCapacityUnavailable'));
     }
     const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.renderer = new PrintingRenderer({
@@ -166,12 +167,12 @@ export class Printing {
       requestIdentity: () => this.s.workbookKey,
       sleep,
       endpoint: '/api/printing',
-      label: '分页预览',
+      label: localize('ui.printing.pageBreakPreview'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
       onProgress: (status) => {
         this.validSource(status);
-        this.status(status.stage || '正在准备预览');
+        this.status(status.stage || localize('ui.printing.preparingPreview947975f'));
       },
     });
 
@@ -264,22 +265,22 @@ export class Printing {
     const d = makeEl('dialog', 'float-dialog printing-dialog');
     d.id = 'printPreviewDialog';
     d.setAttribute('aria-labelledby', 'printPreviewTitle');
-    d.innerHTML = `<div class="dialog-head"><div id="printPreviewTitle" class="dialog-title">分页预览</div><button id="printPreviewClose" class="dialog-close" type="button" aria-label="关闭分页预览">×</button></div>
-        <p id="printPreviewSource" class="print-source"></p><div class="print-main"><details id="printSettings" class="print-settings" open><summary>页面设置</summary><form id="printSettingsForm">
-        <label>纸张<select id="printPaper" class="field-control"><option value="source">按原表设置</option><option value="a4">A4</option><option value="a3">A3</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="custom">自定义尺寸</option></select></label>
-        <div id="printCustomPaper" class="print-pair" hidden><label>宽（mm）<input id="printPaperWidth" class="field-control" value="210" inputmode="decimal"></label><label>高（mm）<input id="printPaperHeight" class="field-control" value="297" inputmode="decimal"></label></div>
-        <label>方向<select id="printOrientation" class="field-control"><option value="">按原表设置</option><option value="portrait">纵向</option><option value="landscape">横向</option></select></label>
-        <label>打印缩放<select id="printScaleMode" class="field-control"><option value="source">按原表设置</option><option value="percent">指定比例</option><option value="fit">适配页数</option></select></label>
-        <label id="printPercentRow" hidden>比例（%）<input id="printPercent" class="field-control" value="100" inputmode="decimal"></label>
-        <div id="printFitRow" class="print-pair" hidden><label>横向页数<input id="printFitWidth" class="field-control" value="1" inputmode="numeric"></label><label>纵向页数<input id="printFitHeight" class="field-control" value="0" inputmode="numeric"></label><small>0 表示该方向不限。</small></div>
-        <label>打印区域<input id="printArea" class="field-control" placeholder="A1:H50, J1:L50（留空按原表）" autocomplete="off"></label>
-        <details class="print-advanced"><summary>更多页面设置</summary><label>重复行<input id="printRepeatRows" class="field-control" placeholder="留空按原表，如 1:2"></label><label class="print-toggle"><input id="printClearRepeatRows" type="checkbox">不重复行</label><label>重复列<input id="printRepeatColumns" class="field-control" placeholder="留空按原表，如 A:B"></label><label class="print-toggle"><input id="printClearRepeatColumns" type="checkbox">不重复列</label>
-        <label>页边距<select id="printMarginMode" class="field-control"><option value="source">按原表设置</option><option value="custom">自定义（mm）</option></select></label><div id="printMargins" class="print-pair" hidden></div>
-        <label>页序<select id="printPageOrder" class="field-control"><option value="">按原表设置</option><option value="downThenOver">先向下，后向右</option><option value="overThenDown">先向右，后向下</option></select></label><label>起始页码<input id="printFirstPage" class="field-control" placeholder="留空按原表" inputmode="numeric"></label>
-        <div class="print-pair"><label>默认行高（磅）<input id="printRowHeight" class="field-control" placeholder="留空按原表" inputmode="decimal"></label><label>默认列宽（磅）<input id="printColumnWidth" class="field-control" placeholder="留空按原表" inputmode="decimal"></label></div><label class="print-toggle"><input id="printIgnoreBreaks" type="checkbox">忽略原表手工分页</label></details>
-        <label class="print-toggle"><input id="printUseDefaults" type="checkbox" checked>补足缺失的页面设置</label><button id="printPreviewUpdate" class="primary-button" type="button">更新预览</button><p id="printPendingNote" class="print-pending" hidden>设置已更改，点击更新预览。</p></form></details>
-        <section class="print-view"><div class="print-page-tools"><button id="printPreviewPrev" class="mini-button" type="button" aria-label="上一页">上一页</button><label class="print-page-number">第<input id="printPreviewPage" class="field-control" type="number" min="1" value="1" aria-label="预览页序">页<span id="printPreviewCount">/ 0</span></label><button id="printPreviewNext" class="mini-button" type="button" aria-label="下一页">下一页</button><label class="print-screen-zoom">屏幕缩放<select id="printScreenZoom" class="field-control"><option value="fit">适合页面</option><option value="width">适合宽度</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div><p id="printEffective" class="print-effective"></p><div id="printPreviewCanvas" class="print-canvas" tabindex="0" aria-label="纸张预览，PageUp和PageDown翻页"><div id="printPaperWrap" class="print-paper-wrap"></div><p id="printPreviewEmpty" class="print-empty">正在准备预览…</p></div><p id="printPageCaption" class="print-caption"></p></section></div>
-        <details id="printSourceDetails" class="print-source-details"><summary>页面详情</summary><ul id="printWarnings"></ul><div id="printRawSettings"></div></details><div class="print-footer"><select id="printOutputMode" class="field-control" aria-label="底稿页段"><option value="current">当前页</option><option value="range">指定页段</option><option value="sheet">本表全部页</option><option value="book">整本可见表</option></select><input id="printOutputRange" class="field-control" placeholder="1-3,5" aria-label="底稿页段范围" hidden><button id="printOutput" class="mini-button" type="button">导出打印底稿</button><p id="printPreviewStatus" role="status"></p><button id="printPreviewCancel" class="mini-button" type="button" hidden>取消</button></div>`;
+    d.innerHTML = `<div class="dialog-head"><div id="printPreviewTitle" class="dialog-title">${localizeHTML('ui.printing.pageBreakPreview')}</div><button id="printPreviewClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.printing.closePaginationPreview')}">×</button></div>
+        <p id="printPreviewSource" class="print-source"></p><div class="print-main"><details id="printSettings" class="print-settings" open><summary>${localizeHTML('ui.printing.pageSettings')}</summary><form id="printSettingsForm">
+        <label>${localizeHTML('ui.printing.paper')}<select id="printPaper" class="field-control"><option value="source">${localizeHTML('ui.printing.setAccordingOriginalTableConfiguration')}</option><option value="a4">A4</option><option value="a3">A3</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="custom">${localizeHTML('ui.printing.customSize')}</option></select></label>
+        <div id="printCustomPaper" class="print-pair" hidden><label>${localizeHTML('ui.printing.widthMm')}<input id="printPaperWidth" class="field-control" value="210" inputmode="decimal"></label><label>${localizeHTML('ui.printing.heightMm')}<input id="printPaperHeight" class="field-control" value="297" inputmode="decimal"></label></div>
+        <label>${localizeHTML('ui.printing.direction')}<select id="printOrientation" class="field-control"><option value="">${localizeHTML('ui.printing.setAccordingOriginalTableConfiguration')}</option><option value="portrait">${localizeHTML('ui.printing.vertical')}</option><option value="landscape">${localizeHTML('ui.printing.horizontal')}</option></select></label>
+        <label>${localizeHTML('ui.printing.printScaling')}<select id="printScaleMode" class="field-control"><option value="source">${localizeHTML('ui.printing.setAccordingOriginalTableConfiguration')}</option><option value="percent">${localizeHTML('ui.printing.specifyRatio')}</option><option value="fit">${localizeHTML('ui.printing.adaptNumberPages')}</option></select></label>
+        <label id="printPercentRow" hidden>${localizeHTML('ui.printing.percentage')}<input id="printPercent" class="field-control" value="100" inputmode="decimal"></label>
+        <div id="printFitRow" class="print-pair" hidden><label>${localizeHTML('ui.printing.horizontalPages')}<input id="printFitWidth" class="field-control" value="1" inputmode="numeric"></label><label>${localizeHTML('ui.printing.verticalPages')}<input id="printFitHeight" class="field-control" value="0" inputmode="numeric"></label><small>${localizeHTML('ui.printing.indicatesNoLimitThisDirection')}</small></div>
+        <label>${localizeHTML('ui.printing.printArea')}<input id="printArea" class="field-control" placeholder="${localizeHTML('ui.printing.a1H50J1L50Leave')}" autocomplete="off"></label>
+        <details class="print-advanced"><summary>${localizeHTML('ui.printing.morePageSettings')}</summary><label>${localizeHTML('ui.printing.repeatingLines')}<input id="printRepeatRows" class="field-control" placeholder="${localizeHTML('ui.printing.leaveBlankAsOriginalTable82521ed')}"></label><label class="print-toggle"><input id="printClearRepeatRows" type="checkbox">${localizeHTML('ui.printing.noDuplicationRows')}</label><label>${localizeHTML('ui.printing.duplicateColumns')}<input id="printRepeatColumns" class="field-control" placeholder="${localizeHTML('ui.printing.leaveBlankAsOriginalTable')}"></label><label class="print-toggle"><input id="printClearRepeatColumns" type="checkbox">${localizeHTML('ui.printing.noDuplicationColumns')}</label>
+        <label>${localizeHTML('ui.printing.margins')}<select id="printMarginMode" class="field-control"><option value="source">${localizeHTML('ui.printing.setAccordingOriginalTableConfiguration')}</option><option value="custom">${localizeHTML('ui.printing.customMm')}</option></select></label><div id="printMargins" class="print-pair" hidden></div>
+        <label>${localizeHTML('ui.printing.pageOrder')}<select id="printPageOrder" class="field-control"><option value="">${localizeHTML('ui.printing.setAccordingOriginalTableConfiguration')}</option><option value="downThenOver">${localizeHTML('ui.printing.downFirstThenRight')}</option><option value="overThenDown">${localizeHTML('ui.printing.firstMoveRightThenDown')}</option></select></label><label>${localizeHTML('ui.printing.startingPageNumber')}<input id="printFirstPage" class="field-control" placeholder="${localizeHTML('ui.printing.leaveFieldsEmptyAsThey')}" inputmode="numeric"></label>
+        <div class="print-pair"><label>${localizeHTML('ui.printing.defaultRowHeightPounds')}<input id="printRowHeight" class="field-control" placeholder="${localizeHTML('ui.printing.leaveFieldsEmptyAsThey')}" inputmode="decimal"></label><label>${localizeHTML('ui.printing.defaultColumnWidthPounds')}<input id="printColumnWidth" class="field-control" placeholder="${localizeHTML('ui.printing.leaveFieldsEmptyAsThey')}" inputmode="decimal"></label></div><label class="print-toggle"><input id="printIgnoreBreaks" type="checkbox">${localizeHTML('ui.printing.ignoringManualPaginationOriginalTable')}</label></details>
+        <label class="print-toggle"><input id="printUseDefaults" type="checkbox" checked>${localizeHTML('ui.printing.fillMissingPageSettings')}</label><button id="printPreviewUpdate" class="primary-button" type="button">${localizeHTML('ui.printing.updatePreview')}</button><p id="printPendingNote" class="print-pending" hidden>${localizeHTML('ui.printing.settingsHaveChangedClickUpdate')}</p></form></details>
+        <section class="print-view"><div class="print-page-tools"><button id="printPreviewPrev" class="mini-button" type="button" aria-label="${localizeHTML('ui.printing.previousPage')}">${localizeHTML('ui.printing.previousPage')}</button><label class="print-page-number">${localizeHTML('ui.printing.weeks')}<input id="printPreviewPage" class="field-control" type="number" min="1" value="1" aria-label="${localizeHTML('ui.printing.previewPageOrder')}">${localizeHTML('ui.printing.trillions')}<span id="printPreviewCount">/ 0</span></label><button id="printPreviewNext" class="mini-button" type="button" aria-label="${localizeHTML('ui.printing.nextPage')}">${localizeHTML('ui.printing.nextPage')}</button><label class="print-screen-zoom">${localizeHTML('ui.printing.screenZoom')}<select id="printScreenZoom" class="field-control"><option value="fit">${localizeHTML('ui.printing.suitablePage')}</option><option value="width">${localizeHTML('ui.printing.suitableWidth')}</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div><p id="printEffective" class="print-effective"></p><div id="printPreviewCanvas" class="print-canvas" tabindex="0" aria-label="${localizeHTML('ui.printing.paperPreviewPageupPagedownPage')}"><div id="printPaperWrap" class="print-paper-wrap"></div><p id="printPreviewEmpty" class="print-empty">${localizeHTML('ui.printing.preparingPreview')}</p></div><p id="printPageCaption" class="print-caption"></p></section></div>
+        <details id="printSourceDetails" class="print-source-details"><summary>${localizeHTML('ui.printing.pageDetails')}</summary><ul id="printWarnings"></ul><div id="printRawSettings"></div></details><div class="print-footer"><select id="printOutputMode" class="field-control" aria-label="${localizeHTML('ui.printing.draftParagraphs')}"><option value="current">${localizeHTML('ui.printing.currentPage')}</option><option value="range">${localizeHTML('ui.printing.specifyPageSegment')}</option><option value="sheet">${localizeHTML('ui.printing.allPagesThisTable')}</option><option value="book">${localizeHTML('ui.printing.tablesVisibleAcrossBook')}</option></select><input id="printOutputRange" class="field-control" placeholder="1-3,5" aria-label="${localizeHTML('ui.printing.draftParagraphRange')}" hidden><button id="printOutput" class="mini-button" type="button">${localizeHTML('ui.printing.exportPrintout')}</button><p id="printPreviewStatus" role="status"></p><button id="printPreviewCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.printing.cancel')}</button></div>`;
     document.body.append(d);
     const marginsHost = requireEl('printMargins');
     for (const [key, label] of MARGIN_NAMES) {
@@ -331,7 +332,7 @@ export class Printing {
       value.book !== this.s.book ||
       value.sheet !== this.s.sheet
     ) {
-      throw new Error('预览来源已切换，请重新准备');
+      throw new Error(localize('ui.printing.previewSourceSwitchedPrepareAgain'));
     }
   }
 
@@ -423,7 +424,7 @@ export class Printing {
     this.dirty = true;
     this.fields();
     this.controls();
-    this.status('设置已更改，点击更新预览。');
+    this.status(localize('ui.printing.settingsHaveChangedClickUpdate'));
   }
 
   stop(clear = false): void {
@@ -452,7 +453,7 @@ export class Printing {
       requireEl('printRawSettings').replaceChildren();
       const empty = requireEl('printPreviewEmpty');
       empty.hidden = false;
-      empty.textContent = '点击更新预览，准备本表分页。';
+      empty.textContent = localize('ui.printing.clickUpdatePreviewPrepareTable');
     }
     this.controls();
   }
@@ -476,18 +477,18 @@ export class Printing {
 
   cancel(): void {
     this.stop(false);
-    this.status(this.job ? '已取消更新，保留上一次预览。' : '已取消，可重新准备预览。');
+    this.status(this.job ? localize('ui.printing.updateCanceledRetainingLastPreview') : localize('ui.printing.cancelledReadyRePreviewing'));
   }
 
   async open(): Promise<void> {
     if (!this.enabled()) {
-      this.toast('请先打开并完成支持打印设置的工作表加载', 'warning');
+      this.toast(localize('ui.printing.openCompleteWorksheetLoadingPrinting'), 'warning');
       return;
     }
     const bound = JSON.stringify(this.binding());
     if (this.bound && this.bound !== bound) this.resetBook();
     this.bound = bound;
-    requireEl('printPreviewSource').textContent = `${this.s.fileName || '当前工作簿'} / ${this.s.sheet ?? ''}`;
+    requireEl('printPreviewSource').textContent = `${this.s.fileName || localize('ui.common.currentWorkbook')} / ${this.s.sheet ?? ''}`;
     if (!this.dialog.open) {
       requireDetails('printSettings').open =
         typeof matchMedia === 'undefined' || !matchMedia('(max-width:680px)').matches;
@@ -513,7 +514,7 @@ export class Printing {
     const binding = this.binding();
     this.busy = true;
     this.controls();
-    this.status('正在准备纸张分页…');
+    this.status(localize('ui.printing.preparingPaperPagination'));
     let owned = '';
     let adopted = false;
     const current = (): boolean =>
@@ -551,7 +552,7 @@ export class Printing {
       this.release(old);
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
-        this.status(`${this.job ? '保留上一次预览。' : ''}${errorMessage(error)}`, true);
+        this.status(`${this.job ? localize('ui.printing.lastPreviewRetained') : ''}${errorMessage(error)}`, true);
       }
     } finally {
       if (owned && !adopted) this.release(owned);
@@ -600,7 +601,7 @@ export class Printing {
     this.pageController = controller;
     this.loading = true;
     this.controls();
-    this.status(`正在读取第 ${index + 1} 页…`);
+    this.status(localize('ui.printing.readingPage', { index: index + 1 }));
     const current = (): boolean =>
       serial === this.pageRequest &&
       identity === this.identity() &&
@@ -617,7 +618,7 @@ export class Printing {
       this.commit();
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
-        this.status(`保留上一次预览。${errorMessage(error)}`, true);
+        this.status(localize('ui.printing.retainLastPreview', { detail: errorMessage(error) }), true);
         requireInput('printPreviewPage').value = String(this.index + 1);
       }
     } finally {
@@ -648,7 +649,7 @@ export class Printing {
       requestIdentity: () => binding.workbookKey,
       sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
       endpoint: '/api/printing',
-      label: '底稿分页',
+      label: localize('ui.printing.draftPagination'),
       maxPolls: 0,
       resultFromStatus: (status) => status,
     });
@@ -661,7 +662,7 @@ export class Printing {
         mode === 'book'
           ? this.s.sheets.filter((s) => !s.state || s.state === 'visible').map((s) => s.name)
           : [binding.sheet];
-      const title = `${this.s.fileName} · ${mode === 'book' ? '可见工作表' : binding.sheet}`;
+      const title = `${this.s.fileName} · ${mode === 'book' ? localize('ui.printing.visibleWorksheets') : binding.sheet}`;
       const output = new PrintOutput(title, this.limits);
       for (const sheet of sheets) {
         const sourceBinding: PrintBinding = { ...binding, sheet };
@@ -699,20 +700,20 @@ export class Printing {
                   this.limits.outputPages - output.parts.length,
                 );
           for (const index of pages) {
-            this.status(`${sheet} · 正在输出第 ${index + 1} 页`);
+            this.status(localize('ui.printing.currentlyOutputtingPage', { sheet, index: index + 1 }));
             const page = await this.readPage(id, index, summary, sourceBinding, controller.signal);
             if (!current()) return;
             const rendered = this.renderer.build(summary, page);
             const notes = [...summary.summary.notices, ...(summary.sourceNotices ?? [])];
             if (!summary.sourceComplete || summary.summary.approximate) {
-              notes.push('部分页面设置采用默认值或近似值。');
+              notes.push(localize('ui.printing.somePageSettingsUseDefault'));
             }
             if (
               Object.values(summary.sourceProperties.headerFooter ?? {}).some(
                 (v) => v.type === 'text' && Boolean(v.value),
               )
             ) {
-              notes.push('源页眉页脚字段未绘制。');
+              notes.push(localize('ui.printing.sourcePageHeaderFooterFields'));
             }
             output.add(rendered, sheet, index + 1, notes);
           }
@@ -731,10 +732,10 @@ export class Printing {
       const url = URL.createObjectURL(output.file());
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}_分页底稿.html`;
+      link.download = localize('ui.printing.paginationDraftHtml', { detail: title.replace(/[\\/:*?"<>|]/g, '_') });
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      this.status(`已导出 ${output.parts.length} 页，可打开底稿打印或另存为 PDF`);
+      this.status(localize('ui.printing.pageExportedCanPrintDraft', { count: output.parts.length }));
     } catch (error: unknown) {
       if (current()) this.status(errorMessage(error), true);
     } finally {
@@ -750,7 +751,7 @@ export class Printing {
     const value = Number(requireInput('printPreviewPage').value);
     const pages = this.summary?.summary.pages ?? 0;
     if (!Number.isSafeInteger(value) || value < 1 || value > pages) {
-      this.status(`页序请输入1到${pages}之间的整数`, true);
+      this.status(localize('ui.printing.enterIntegerBetweenPageOrder', { pages }), true);
       requireInput('printPreviewPage').value = String(this.index + 1);
       return undefined;
     }
@@ -763,7 +764,7 @@ export class Printing {
     requireEl('printPaperWrap').replaceChildren(...(this.rendered ? [this.rendered.node] : []));
     const empty = requireEl('printPreviewEmpty');
     empty.hidden = this.rendered !== null;
-    empty.textContent = '当前打印范围没有可见内容，可调整区域或重复标题。';
+    empty.textContent = localize('ui.printing.thereNoVisibleContentCurrent');
     requireInput('printPreviewPage').value = String(this.index + 1);
 
     const s = summaryResp.summary;
@@ -772,23 +773,23 @@ export class Printing {
     const percent = s.pages ? (Number(s.scale.numerator) / Number(s.scale.denominator)) * 100 : 0;
     const percentText = percent < 0.0001 ? percent.toExponential(3) : String(Number(percent.toPrecision(6)));
     requireEl('printEffective').textContent = s.pages
-      ? `${mm(s.paper.width)} × ${mm(s.paper.height)} mm · 打印缩放 ${percentText}%`
-      : '没有可预览的页面';
+      ? localize('ui.printing.mmPrintingScale', { mm: mm(s.paper.width), mm2: mm(s.paper.height), percentText })
+      : localize('ui.printing.noPagesPreview');
     requireEl('printPageCaption').textContent = this.page
-      ? `第 ${this.index + 1} / ${s.pages} 页` +
-        (this.page.content.page.number === this.index + 1 ? '' : ` · 源页码 ${this.page.content.page.number}`) +
-        ` · 区域 ${this.page.content.page.area}`
+      ? localize('ui.printing.page', { index: this.index + 1, pages: s.pages }) +
+        (this.page.content.page.number === this.index + 1 ? '' : ` ${localize('ui.printing.sourcePageNumber', { number: this.page.content.page.number })}`) +
+        ` ${localize('ui.printing.area', { area: this.page.content.page.area })}`
       : '';
     this.explain();
     this.zoom();
     this.status(
       this.dirty
-        ? '设置已更改，请更新预览。'
+        ? localize('ui.printing.settingChangedUpdatePreview')
         : s.pages
           ? this.noticeCount
-            ? `${this.noticeCount} 项提示，见页面详情`
+            ? localize('ui.printing.tipsSeePageDetails', { noticeCount: this.noticeCount })
             : ''
-          : '没有可预览的页面',
+          : localize('ui.printing.noPagesPreview'),
     );
     this.controls();
   }
@@ -801,17 +802,17 @@ export class Printing {
       ...(s.sourceNotices ?? []),
       ...(this.rendered?.warnings ?? []),
     ]);
-    if (!s.sourceComplete) notes.add('源打印设置有未完整解释的项目，原始属性保留。');
-    if (s.summary.approximate) notes.add('此预览包含推导或近似设置，请核对源文件的实际分页。');
+    if (!s.sourceComplete) notes.add(localize('ui.printing.sourcePrintingSettingsHaveIncomplete'));
+    if (s.summary.approximate) notes.add(localize('ui.printing.thisPreviewIncludesDerivedOr'));
     if (
       Object.values(s.sourceProperties.headerFooter ?? {}).some(
         (value) => value.type === 'text' && Boolean(value.value),
       )
     ) {
-      notes.add('保存的页眉或页脚含文字/字段，当前纸张中未绘制，可在源定义中核对。');
+      notes.add(localize('ui.printing.headerOrFooterSavedDocument'));
     }
     this.noticeCount = notes.size;
-    notes.add('本视图显示单元格分页；图形、页眉页脚字段和打印机效果未绘制，原定义在下方列示。');
+    notes.add(localize('ui.printing.thisViewDisplaysCellsPagination'));
     const list = requireEl('printWarnings');
     list.replaceChildren();
     for (const text of notes) list.append(makeEl('li', '', text));
@@ -831,7 +832,7 @@ export class Printing {
         const line = makeEl('p', '', `${name}：`);
         const definition = makeEl('span', '', value.value);
         line.append(definition);
-        if (value.status !== 'stored') line.append(makeEl('small', '', value.reason || '未确认'));
+        if (value.status !== 'stored') line.append(makeEl('small', '', value.reason || localize('ui.printing.unconfirmed')));
         detail.append(line);
       }
       raw.append(detail);

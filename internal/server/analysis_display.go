@@ -1,9 +1,10 @@
 package server
 
 import (
-	"errors"
 	"io"
 	"net/http"
+
+	"excellens/internal/i18n"
 )
 
 const analysisDisplayBytes = 4096
@@ -48,7 +49,7 @@ func readAnalysisDisplay(path string) (analysisDisplayConfig, error) {
 	}
 	options, valid := input.Options.options()
 	if input.Version != 1 || input.Revision == nil || *input.Revision < 0 || *input.Revision >= maxConfigRevision || !valid {
-		return config, errors.New("分析显示设置无效，原文件已保留")
+		return config, i18n.Error("service.analysisDisplay.analysisDisplaySettingsInvalidOriginal")
 	}
 	config.Revision, config.Options = *input.Revision, options
 	return config, nil
@@ -73,13 +74,13 @@ func (a *App) handleAnalysisDisplay(w http.ResponseWriter, r *http.Request) {
 			options, valid = req.Options.options()
 		}
 		if !valid || req.ExpectedRevision == nil || *req.ExpectedRevision < 0 || *req.ExpectedRevision >= maxConfigRevision {
-			writeError(w, 400, "请完整提供分析显示设置和有效修订号")
+			writeMessage(w, 400, "service.analysisDisplay.provideCompleteAnalysisDisplaySettings")
 			return
 		}
 	}
 	path, err := savedConfigPath("settings", "analysis-display")
 	if err != nil {
-		writeError(w, 500, err.Error())
+		writeFailure(w, 500, err)
 		return
 	}
 	lock := persistentFileLock(path)
@@ -87,22 +88,22 @@ func (a *App) handleAnalysisDisplay(w http.ResponseWriter, r *http.Request) {
 	defer lock.Unlock()
 	config, err := readAnalysisDisplay(path)
 	if err != nil {
-		writeError(w, 422, err.Error())
+		writeFailure(w, 422, err)
 		return
 	}
 	if r.Method == http.MethodPost {
 		if config.Revision != *req.ExpectedRevision {
-			writeError(w, 409, "设置已被其他页面修改，请重新载入后重试")
+			writeMessage(w, 409, "service.analysisDisplay.settingsHaveModifiedAnotherPage")
 			return
 		}
 		if config.Revision+1 >= maxConfigRevision {
-			writeError(w, 409, "设置修订号已达到上限，原文件已保留")
+			writeMessage(w, 409, "service.analysisDisplay.revisionNumberSettingReachedLimit")
 			return
 		}
 		config.Revision++
 		config.Options = options
 		if err := writeSavedConfig(path, analysisDisplayBytes, config, durableConfigOps); err != nil {
-			writeError(w, 500, "保存显示设置失败："+err.Error())
+			writeMessage(w, 500, "service.analysisDisplay.failedSaveDisplaySettings", i18n.Args{"detail": err})
 			return
 		}
 	}

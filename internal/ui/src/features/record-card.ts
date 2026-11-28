@@ -2,6 +2,7 @@
  * Single-record vertical card dialog with bounded field pagination,
  * full-text chunk viewer, and source cell navigation.
  */
+import { interfaceLocale, t as localize, th as localizeHTML } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import type { RecordCardResponse } from '../contracts/features.ts';
 import type { RecordCardLimits, SourceCapabilities } from '../contracts/formats.ts';
@@ -135,7 +136,7 @@ export class RecordCard {
       !this.limits.bytes ||
       !this.limits.requestBytes
     ) {
-      throw new Error('记录卡容量配置不可用');
+      throw new Error(localize('ui.recordCard.recordCardCapacityConfigurationUnavailable'));
     }
 
     this.dialog = this.create();
@@ -215,10 +216,10 @@ export class RecordCard {
     d.id = 'recordCardDialog';
     d.setAttribute('aria-labelledby', 'recordCardTitle');
     // All source strings use textContent; this template is static.
-    d.innerHTML = `<div class="dialog-head"><div id="recordCardTitle" class="dialog-title">记录卡片</div><button id="recordCardClose" class="dialog-close" type="button" aria-label="关闭记录卡片">×</button></div>
-        <p id="recordCardSource" class="record-card-source"></p><div class="record-card-tools"><form id="recordCardForm"><label>表头行<input id="recordHeaderRow" class="field-control" type="number" min="0" value="1" title="0 表示使用列字母"></label><label>起始列<input id="recordStartColumn" class="field-control" value="A" autocomplete="off" aria-label="起始列字母或列号"></label><label>每页字段<select id="recordPageSize" class="field-control"></select></label><button id="recordCardApply" class="mini-button" type="submit">读取字段</button></form><label>内容<select id="recordCardMode" class="field-control"><option value="display">显示值</option><option value="raw">原值</option></select></label></div>
-        <div class="record-card-position"><strong id="recordCardPosition"></strong><span id="recordCardHeader"></span></div><div id="recordCardFields" class="record-card-fields" tabindex="0" aria-label="当前记录字段"></div><p id="recordCardNotices" class="record-card-notices" hidden></p>
-        <div class="record-card-paging"><div><button id="recordCardPrevious" class="mini-button" type="button">上一条</button><button id="recordCardNext" class="mini-button" type="button">下一条</button></div><div><button id="recordFieldPrevious" class="mini-button" type="button">上一页字段</button><span id="recordFieldCount"></span><button id="recordFieldNext" class="mini-button" type="button">下一页字段</button></div></div><div class="record-card-footer"><p id="recordCardStatus" role="status" aria-live="polite"></p><button id="recordCardCancel" class="mini-button" type="button" hidden>取消读取</button><span>PageUp / PageDown</span></div>`;
+    d.innerHTML = `<div class="dialog-head"><div id="recordCardTitle" class="dialog-title">${localizeHTML('ui.recordCard.recordCards')}</div><button id="recordCardClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.recordCard.closeRecordCard')}">×</button></div>
+        <p id="recordCardSource" class="record-card-source"></p><div class="record-card-tools"><form id="recordCardForm"><label>${localizeHTML('ui.recordCard.headerRow')}<input id="recordHeaderRow" class="field-control" type="number" min="0" value="1" title="${localizeHTML('ui.recordCard.indicatesUseColumnLetters')}"></label><label>${localizeHTML('ui.recordCard.startingColumn')}<input id="recordStartColumn" class="field-control" value="A" autocomplete="off" aria-label="${localizeHTML('ui.recordCard.startingColumnLetterOrColumn')}"></label><label>${localizeHTML('ui.recordCard.fieldsPerPage')}<select id="recordPageSize" class="field-control"></select></label><button id="recordCardApply" class="mini-button" type="submit">${localizeHTML('ui.recordCard.readingFields')}</button></form><label>${localizeHTML('ui.recordCard.content')}<select id="recordCardMode" class="field-control"><option value="display">${localizeHTML('ui.recordCard.displayValue')}</option><option value="raw">${localizeHTML('ui.recordCard.originalValue')}</option></select></label></div>
+        <div class="record-card-position"><strong id="recordCardPosition"></strong><span id="recordCardHeader"></span></div><div id="recordCardFields" class="record-card-fields" tabindex="0" aria-label="${localizeHTML('ui.recordCard.currentRecordField')}"></div><p id="recordCardNotices" class="record-card-notices" hidden></p>
+        <div class="record-card-paging"><div><button id="recordCardPrevious" class="mini-button" type="button">${localizeHTML('ui.recordCard.previousItem')}</button><button id="recordCardNext" class="mini-button" type="button">${localizeHTML('ui.recordCard.nextItem')}</button></div><div><button id="recordFieldPrevious" class="mini-button" type="button">${localizeHTML('ui.recordCard.previousPageField')}</button><span id="recordFieldCount"></span><button id="recordFieldNext" class="mini-button" type="button">${localizeHTML('ui.recordCard.nextPageField')}</button></div></div><div class="record-card-footer"><p id="recordCardStatus" role="status" aria-live="polite"></p><button id="recordCardCancel" class="mini-button" type="button" hidden>${localizeHTML('ui.recordCard.cancelReading')}</button><span>PageUp / PageDown</span></div>`;
     document.body.append(d);
     const sizes = [
       ...new Set([
@@ -239,7 +240,7 @@ export class RecordCard {
     d.id = 'recordTextDialog';
     d.setAttribute('aria-labelledby', 'recordTextTitle');
     d.innerHTML =
-      '<div class="dialog-head"><div id="recordTextTitle" class="dialog-title">完整内容</div><button id="recordTextClose" class="dialog-close" type="button" aria-label="关闭完整内容">×</button></div><p id="recordTextSource" class="record-card-source"></p><pre id="recordTextValue" class="record-text-value" tabindex="0"></pre><div class="record-card-paging"><button id="recordTextPrevious" class="mini-button" type="button">上一段</button><span id="recordTextPosition"></span><button id="recordTextNext" class="mini-button" type="button">下一段</button><button id="recordTextCopy" class="mini-button" type="button">复制完整内容</button></div><p id="recordTextStatus" role="status" aria-live="polite"></p>';
+      `<div class="dialog-head"><div id="recordTextTitle" class="dialog-title">${localizeHTML('ui.recordCard.completeContent')}</div><button id="recordTextClose" class="dialog-close" type="button" aria-label="${localizeHTML('ui.recordCard.disableFullContent')}">×</button></div><p id="recordTextSource" class="record-card-source"></p><pre id="recordTextValue" class="record-text-value" tabindex="0"></pre><div class="record-card-paging"><button id="recordTextPrevious" class="mini-button" type="button">${localizeHTML('ui.recordCard.previousParagraph')}</button><span id="recordTextPosition"></span><button id="recordTextNext" class="mini-button" type="button">${localizeHTML('ui.recordCard.nextParagraph')}</button><button id="recordTextCopy" class="mini-button" type="button">${localizeHTML('ui.recordCard.copyCompleteContent')}</button></div><p id="recordTextStatus" role="status" aria-live="polite"></p>`;
     document.body.append(d);
     return d;
   }
@@ -326,7 +327,7 @@ export class RecordCard {
   async open(): Promise<void> {
     this.controls();
     if (!this.enabled() || !this.s.selected) {
-      this.toast('请先在已完成加载的工作表中选择一条可见记录', 'warning');
+      this.toast(localize('ui.recordCard.selectVisibleRecordWorksheetThat'), 'warning');
       return;
     }
     if (this.dialog.open) return;
@@ -345,8 +346,8 @@ export class RecordCard {
     requireInput('recordStartColumn').value = this.colName(
       Math.floor((column - 1) / columns) * columns + 1,
     );
-    requireEl('recordCardSource').textContent = `${this.s.fileName || '当前工作簿'} / ${this.s.sheet ?? ''}`;
-    requireEl('recordCardFields').textContent = '正在读取记录…';
+    requireEl('recordCardSource').textContent = `${this.s.fileName || localize('ui.common.currentWorkbook')} / ${this.s.sheet ?? ''}`;
+    requireEl('recordCardFields').textContent = localize('ui.recordCard.readingRecords');
     this.dialog.showModal();
     await this.apply(this.s.selected.row);
     if (this.isDialogOpen()) requireEl('recordCardFields').focus({ preventScroll: true });
@@ -395,8 +396,8 @@ export class RecordCard {
 
   cancel(): void {
     this.stop();
-    if (!this.page) requireEl('recordCardFields').textContent = '读取已取消，可重新读取字段。';
-    this.status(this.page ? '已取消读取，保留上一次完整记录' : '已取消读取');
+    if (!this.page) requireEl('recordCardFields').textContent = localize('ui.recordCard.readingCanceledCanReadField');
+    this.status(this.page ? localize('ui.recordCard.readingCanceledRetainingLastComplete') : localize('ui.recordCard.readCanceled'));
     this.controls();
   }
 
@@ -421,7 +422,7 @@ export class RecordCard {
       columns < 1 ||
       columns > this.limits.columns
     ) {
-      this.status('请输入有效字段行和已用范围内的起始列；字段行 0 表示列字母', true);
+      this.status(localize('ui.recordCard.enterValidFieldRowsStarting'), true);
       return;
     }
     await this.load({ row, headerRow, firstColumn, columns });
@@ -444,7 +445,7 @@ export class RecordCard {
     this.busy = true;
     this.closeDetail();
     this.controls();
-    this.status('正在读取记录…');
+    this.status(localize('ui.recordCard.readingRecords'));
     const current = (): boolean =>
       serial === this.serial &&
       !controller.signal.aborted &&
@@ -453,7 +454,7 @@ export class RecordCard {
     try {
       const body = JSON.stringify(request);
       if (new TextEncoder().encode(body).length > this.limits.requestBytes) {
-        throw new Error('记录卡请求超过容量');
+        throw new Error(localize('ui.recordCard.requestFromRecordCardExceeds'));
       }
       const rawPage = await this.api('/api/record', {
         method: 'POST',
@@ -478,9 +479,9 @@ export class RecordCard {
     } catch (error: unknown) {
       if (current() && !isAbortError(error)) {
         if (!this.page) {
-          requireEl('recordCardFields').textContent = '未能读取记录，请调整设置后重试。';
+          requireEl('recordCardFields').textContent = localize('ui.recordCard.recordsNotBeReadAdjust');
         }
-        this.status(`${this.page ? '保留上一次完整记录。' : ''}${errorMessage(error)}`, true);
+        this.status(`${this.page ? localize('ui.recordCard.retainingLastCompleteRecord') : ''}${errorMessage(error)}`, true);
       }
     } finally {
       if (serial === this.serial) {
@@ -531,18 +532,18 @@ export class RecordCard {
       const label =
         header === null
           ? page.headerRow
-            ? `列 ${column}（字段名无保存结果）`
-            : `列 ${column}`
+            ? localize('ui.recordCard.columnNoSavedResultsField', { column })
+            : localize('ui.recordCard.column', { column })
           : header === ''
-            ? `列 ${column}（空白字段名）`
+            ? localize('ui.recordCard.columnBlankFieldName', { column })
             : previewText(header, this.limits.textUnits);
       name.append(
         makeEl('span', 'record-field-label', label),
-        makeEl('small', 'record-field-column', `源列 ${column}`),
+        makeEl('small', 'record-field-column', localize('ui.recordCard.sourceColumn', { column })),
       );
       if (header !== null && header.length > this.limits.textUnits) {
         name.append(
-          this.button('查看完整字段名', () => this.full(field, 'header'), 'record-header-full'),
+          this.button(localize('ui.recordCard.viewCompleteFieldNames'), () => this.full(field, 'header'), 'record-header-full'),
         );
       }
 
@@ -552,15 +553,15 @@ export class RecordCard {
         'pre',
         'record-field-value',
         text === null
-          ? '公式未保存计算结果'
+          ? localize('ui.recordCard.formulasDoNotSaveCalculation')
           : text === ''
-            ? '（空白）'
+            ? localize('ui.common.empty')
             : previewText(text, this.limits.textUnits),
       );
       content.append(value);
       if (text !== null && text.length > this.limits.textUnits) {
         content.append(
-          makeEl('span', 'record-field-preview-note', '当前显示首段；查看全文可逐段核对。'),
+          makeEl('span', 'record-field-preview-note', localize('ui.recordCard.onlyFirstSectionDisplayedCurrently')),
         );
       }
 
@@ -569,12 +570,12 @@ export class RecordCard {
         makeEl(
           'span',
           'record-field-type',
-          recordCellType(field.cell) + (field.cell.hasFormula ? ' · 公式' : ''),
+          recordCellType(field.cell) + (field.cell.hasFormula ? ` ${localize('ui.recordCard.formulas')}` : ''),
         ),
       );
       const formulaText = recordCellFormula(field.cell);
       if (field.cell.hasFormula && !formulaText) {
-        meta.append(makeEl('span', 'record-field-notice', '公式无法还原'));
+        meta.append(makeEl('span', 'record-field-notice', localize('ui.recordCard.formulasCannotBeRestored')));
       }
       if (field.cell.conditional?.notice) {
         meta.append(
@@ -599,7 +600,7 @@ export class RecordCard {
       const actions = makeEl('div', 'record-field-actions');
       actions.append(
         this.button(
-          `定位 ${field.cell.ref}`,
+          localize('ui.recordCard.locate', { ref: field.cell.ref }),
           () => {
             void this.locate(field.column);
           },
@@ -607,7 +608,7 @@ export class RecordCard {
         ),
       );
       const copyBtn = this.button(
-        `复制${this.mode === 'raw' ? '原值' : '显示值'}`,
+        localize('ui.recordCard.copy', { detail: this.mode === 'raw' ? localize('ui.common.originalValue') : localize('ui.common.displayValue') }),
         () => {
           void this.copyField(field);
         },
@@ -618,7 +619,7 @@ export class RecordCard {
       actions.append(copyBtn);
 
       const fullBtn = this.button(
-        '查看全文',
+        localize('ui.recordCard.viewFullText'),
         () => this.full(field, 'value'),
         'record-field-full',
       );
@@ -628,7 +629,7 @@ export class RecordCard {
 
       if (formulaText) {
         actions.append(
-          this.button('公式文字', () => this.full(field, 'formula'), 'record-field-formula'),
+          this.button(localize('ui.recordCard.formulaText'), () => this.full(field, 'formula'), 'record-field-formula'),
         );
       }
       content.append(actions);
@@ -653,12 +654,12 @@ export class RecordCard {
     host.replaceChildren(fields);
     host.scrollTop = 0;
     requireEl('recordCardPosition').textContent =
-      `第 ${page.position.toLocaleString()} / ${page.totalRecords.toLocaleString()} 条 · 源行 ${page.row}`;
+      localize('ui.recordCard.itemNoSourceRow', { position: page.position.toLocaleString(interfaceLocale()), totalRecords: page.totalRecords.toLocaleString(interfaceLocale()), row: page.row });
     requireEl('recordCardHeader').textContent = page.headerRow
-      ? `字段行 ${page.headerRow}`
-      : '字段名使用列字母';
+      ? localize('ui.recordCard.fieldLines', { headerRow: page.headerRow })
+      : localize('ui.recordCard.fieldNamesUseColumnLetters');
     requireEl('recordFieldCount').textContent =
-      `${this.colName(page.firstColumn)}–${this.colName(page.firstColumn + page.columns - 1)} / ${page.totalColumns.toLocaleString()} 列`;
+      localize('ui.recordCard.column7fee8a0', { colName: this.colName(page.firstColumn), colName2: this.colName(page.firstColumn + page.columns - 1), totalColumns: page.totalColumns.toLocaleString(interfaceLocale()) });
     requireInput('recordHeaderRow').value = String(page.headerRow);
     requireInput('recordStartColumn').value = this.colName(page.firstColumn);
     requireSelect('recordPageSize').value = String(accepted.columns);
@@ -691,13 +692,13 @@ export class RecordCard {
       const ok = await this.copy(text);
       if (this.page === page && this.sameSource(bound) && this.mode === mode) {
         this.status(
-          ok === true ? `已复制完整${mode === 'raw' ? '原值' : '显示值'}` : '复制失败，请重试',
+          ok === true ? localize('ui.recordCard.completeCopied', { detail: mode === 'raw' ? localize('ui.common.originalValue') : localize('ui.common.displayValue') }) : localize('ui.recordCard.copyFailureTryAgain'),
           ok !== true,
         );
       }
     } catch (error: unknown) {
       if (this.page === page && this.sameSource(bound) && this.mode === mode) {
-        this.status(`复制失败：${errorMessage(error)}`, true);
+        this.status(localize('ui.recordCard.copyFailed', { detail: errorMessage(error) }), true);
       }
     }
   }
@@ -723,10 +724,10 @@ export class RecordCard {
     };
     requireEl('recordTextTitle').textContent =
       kind === 'header'
-        ? '完整字段名'
+        ? localize('ui.recordCard.completeFieldName')
         : kind === 'formula'
-          ? '公式文字'
-          : `完整${this.mode === 'raw' ? '原值' : '显示值'}`;
+          ? localize('ui.recordCard.formulaText')
+          : localize('ui.recordCard.complete', { detail: this.mode === 'raw' ? localize('ui.common.originalValue') : localize('ui.common.displayValue') });
     const ref = kind === 'header' ? (field.header?.ref ?? field.cell.ref) : field.cell.ref;
     requireEl('recordTextSource').textContent = `${this.s.sheet ?? ''}!${ref}`;
     this.renderText();
@@ -740,7 +741,7 @@ export class RecordCard {
     const start = d.offsets[d.index] ?? 0;
     const end = d.offsets[d.index + 1] ?? start;
     requireEl('recordTextValue').textContent = d.text.slice(start, end);
-    requireEl('recordTextPosition').textContent = `第 ${d.index + 1} / ${d.offsets.length - 1} 段`;
+    requireEl('recordTextPosition').textContent = localize('ui.recordCard.section', { index: d.index + 1, count: d.offsets.length - 1 });
     requireButton('recordTextPrevious').disabled = d.index === 0;
     requireButton('recordTextNext').disabled = d.index + 2 === d.offsets.length;
     requireEl('recordTextStatus').textContent = '';
@@ -770,13 +771,13 @@ export class RecordCard {
       const ok = await this.copy(d.text);
       if (this.detail === d) {
         const status = requireEl('recordTextStatus');
-        status.textContent = ok === true ? '已复制完整内容' : '复制失败，请重试';
+        status.textContent = ok === true ? localize('ui.recordCard.completeContentCopied') : localize('ui.recordCard.copyFailureTryAgain');
         status.setAttribute('role', ok === true ? 'status' : 'alert');
       }
     } catch (error: unknown) {
       if (this.detail === d) {
         const status = requireEl('recordTextStatus');
-        status.textContent = `复制失败：${errorMessage(error)}`;
+        status.textContent = localize('ui.recordCard.copyFailed', { detail: errorMessage(error) });
         status.setAttribute('role', 'alert');
       }
     }

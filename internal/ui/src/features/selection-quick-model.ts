@@ -1,6 +1,7 @@
 /**
  * Strict wire response validator and chart data builder for Selection Quick Analysis.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { QuickSegment, QuickSummary } from '../contracts/analysis.ts';
 import type { QuickCounts, SelectionQuickResponse } from '../contracts/features.ts';
 import type { SelectionQuickLimits } from '../contracts/formats.ts';
@@ -47,7 +48,7 @@ export interface SelectionQuickSeries {
 }
 
 export interface SelectionQuickChartData {
-  readonly columnKeys: readonly ['分段平均'];
+  readonly columnKeys: readonly [string];
   readonly rows: readonly {
     readonly keys: readonly [string];
     readonly values: readonly [
@@ -85,7 +86,7 @@ function normalizeOptional(value: unknown): unknown {
 }
 
 function fail(): never {
-  throw new Error('快速分析结果与当前选区不符，请重新运行');
+  throw new Error(localize('ui.selectionQuickModel.quickAnalysisResultsDoNot'));
 }
 
 const EXACT_MATCH_KEYS = [
@@ -327,7 +328,7 @@ export function validateSelectionQuick(
 
 export function buildSelectionQuickChart(series: SelectionQuickSeries): SelectionQuickChartData {
   return {
-    columnKeys: ['分段平均'],
+    columnKeys: [localize('ui.selectionQuickModel.segmentAverage')],
     rows: series.segments.map((p, i) => ({
       keys: [String(i + 1)],
       values: [

@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 
 	excelExport "excellens/internal/export"
+	"excellens/internal/i18n"
 	"excellens/internal/workbook"
 )
 
@@ -21,7 +22,7 @@ func (a *App) prepareExportSelections(ctx context.Context, wb *workbook.Workbook
 	if req.Scope != "all" {
 		meta, found := wb.FindSheet(req.Sheet)
 		if !found {
-			return nil, errors.New("导出工作表不存在")
+			return nil, i18n.Error("service.exportSelection.exportWorksheetDoesNotExist")
 		}
 		metas = []workbook.SheetMeta{meta}
 	}
@@ -38,7 +39,7 @@ func (a *App) prepareExportSelections(ctx context.Context, wb *workbook.Workbook
 		var index *workbook.SheetIndex
 		if rows != nil {
 			if rows.path != meta.Path {
-				return nil, errors.New("导出行流与工作表来源不匹配")
+				return nil, i18n.Error("service.exportSelection.exportedFlowDoesNotMatch")
 			}
 			index = rows.index
 		} else {
@@ -56,7 +57,7 @@ func (a *App) prepareExportSelections(ctx context.Context, wb *workbook.Workbook
 				if ctx.Err() != nil {
 					return nil, ctx.Err()
 				}
-				return nil, fmt.Errorf("索引 %s：%w", meta.Name, err)
+				return nil, i18n.Wrap("service.exportSelection.index", err, i18n.Args{"name": meta.Name})
 			}
 		}
 		s := excelExport.Selection{Sheet: meta, Index: index, FirstRow: 1, LastRow: max(1, index.MaxRow), FirstCol: 1, LastCol: max(1, index.MaxCol)}
@@ -74,7 +75,7 @@ func (a *App) prepareExportSelections(ctx context.Context, wb *workbook.Workbook
 			s.Compact = true
 		} else if req.Scope == "filtered" {
 			if rows == nil || rows.snapshot.filter == nil {
-				return nil, errors.New("完整筛选导出缺少匹配结果")
+				return nil, i18n.Error("service.exportSelection.completeFilterExportLacksMatching")
 			}
 			s.Filtered, s.Order, s.Compact = true, rows.snapshot.filter.Rows, true
 		}

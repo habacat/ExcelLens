@@ -2,6 +2,7 @@
  * Grid pointer/drag selection, keyboard routing, ribbon access sequences,
  * toolbar/dialog event bindings, drag-and-drop, and DPR/resize observers.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { CellPoint, CellRef, MergeRange, SelectionArea } from '../contracts/common.ts';
 import type { CellData, CellHyperlink } from '../contracts/workbook.ts';
 import { errorMessage, isComposing } from '../core/display-format.ts';
@@ -266,7 +267,7 @@ export class GridInteractions {
           S.multiRanges = removed.slice(0, -1);
           S.range = last;
           requireEl('selectionStatus').textContent =
-            removed.length > 1 ? `${removed.length} 处选区` : '1 处选区';
+            removed.length > 1 ? localize('ui.gridInteractions.votingDistrictLocatedAt', { count: removed.length }) : localize('ui.gridInteractions.selectedArea');
           applySelectionClasses();
           panels.selectionStats?.schedule();
         }
@@ -274,7 +275,7 @@ export class GridInteractions {
       }
     }
     if (previous.length >= MultiSelection.LIMIT) {
-      toast('最多同时选择256处区域', 'warning');
+      toast(localize('ui.gridInteractions.upRegionsCanBeSelected'), 'warning');
       return;
     }
     if (extend && oldAnchor && panels.editCopy?.grid.active && !additive) {
@@ -287,7 +288,7 @@ export class GridInteractions {
       extendRange(oldAnchor, point.row, point.col, point.visual);
     } else if (additive) {
       S.range = MultiSelection.rectangle(point, point, S.filtered);
-      requireEl('selectionStatus').textContent = `${previous.length + 1} 处选区`;
+      requireEl('selectionStatus').textContent = localize('ui.gridInteractions.votingDistrictLocatedAt', { count: previous.length + 1 });
       applySelectionClasses();
       panels.selectionStats?.schedule();
     }
@@ -414,7 +415,7 @@ export class GridInteractions {
           : [];
     if (this.dragBase.length >= MultiSelection.LIMIT) {
       this.dragAnchor = null;
-      toast('最多同时选择256处区域', 'warning');
+      toast(localize('ui.gridInteractions.upRegionsCanBeSelected'), 'warning');
       return;
     }
     this.dragPending = null;
@@ -641,8 +642,8 @@ export class GridInteractions {
     };
     const readOnlyHint = (): string =>
       requireEl('editCopyOpen').hidden
-        ? '当前是只读浏览，原文件不会被修改'
-        : '当前是只读浏览。要修改内容，请选择“编辑副本”';
+        ? localize('ui.gridInteractions.currentlyReadOnlyBrowsingMode')
+        : localize('ui.gridInteractions.currentlyReadOnlyBrowsingMode1854545');
 
     if (!modal && ctrl && alt && !shift && key === 'c') {
       take(() => panels.calculator?.toggle());
@@ -723,7 +724,7 @@ export class GridInteractions {
       take(() =>
         S.selected?.hasFormula
           ? clipboard.copyText(S.selected.formula ?? '')
-          : toast('当前单元格不是公式'),
+          : toast(localize('ui.gridInteractions.currentCellNotFormula')),
       );
       return;
     }
@@ -799,7 +800,7 @@ export class GridInteractions {
       const col = S.selected.col;
       take(() => {
         if (!S.autoFilter) {
-          toast('先按 Ctrl+Shift+L 开启自动筛选', 'warning');
+          toast(localize('ui.gridInteractions.pressCtrlShiftLEnable'), 'warning');
           return undefined;
         }
         const bounds = requireEl('grid').getBoundingClientRect();
@@ -869,7 +870,7 @@ export class GridInteractions {
               })
             : null;
         if (anchor && S.filtered) {
-          toast('筛选后请通过可见行拖选扩展区域', 'warning');
+          toast(localize('ui.gridInteractions.afterFilteringDragSelectExtended'), 'warning');
           return;
         }
         if (!S.sheet) return;
@@ -947,7 +948,7 @@ export class GridInteractions {
     requireEl('openLocalMenuBtn').addEventListener('click', () => workbookIO.chooseFile());
     for (const id of ['openDatabaseBtn', 'openDatabaseHome']) {
       requireEl(id).addEventListener('click', () => {
-        if (workbookIO.canOpenWorkbook('连接数据库')) void panels.databasePanel.open();
+        if (workbookIO.canOpenWorkbook(localize('ui.gridInteractions.databaseConnection'))) void panels.databasePanel.open();
       });
     }
     for (const id of ['databaseSnapshotsBtn', 'databaseSnapshotsHome']) {
@@ -957,7 +958,7 @@ export class GridInteractions {
       panels.databaseSnapshots.show(S.workbookKey);
     });
     requireEl('homeBtn').addEventListener('click', () => {
-      if (workbookIO.canOpenWorkbook('返回首页')) {
+      if (workbookIO.canOpenWorkbook(localize('ui.gridInteractions.backHome'))) {
         showWelcome();
         void panels.recentManager.load();
       }
@@ -972,13 +973,13 @@ export class GridInteractions {
     });
     for (const id of ['exitBtn', 'homeExitBtn']) {
       requireEl(id).addEventListener('click', () => {
-        if (!workbookIO.canOpenWorkbook('退出程序')) return;
+        if (!workbookIO.canOpenWorkbook(localize('ui.gridInteractions.exitProgram'))) return;
         api('/api/exit', { method: 'POST' })
           .catch(() => {
             // Process may close immediately.
           })
           .finally(() => {
-            setStatus('程序已退出');
+            setStatus(localize('ui.gridInteractions.programExited'));
           });
       });
     }
@@ -1114,7 +1115,7 @@ export class GridInteractions {
     requireEl('cancelFilterJobBtn').addEventListener('click', () => {
       const jobID = S.filterJob;
       void cancelFilter(jobID).then(() => {
-        requireEl('filterProgressText').textContent = '已请求取消筛选任务';
+        requireEl('filterProgressText').textContent = localize('ui.gridInteractions.requestCancelingFilterTasksReceived');
         requireButton('applyFilterBtn').disabled = false;
         requireEl('cancelFilterJobBtn').hidden = true;
       });

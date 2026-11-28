@@ -2,6 +2,7 @@
  * Multi-level sort UI: collects at most five keys and delegates scanning plus
  * stable sorting to Go. Never loads a whole sheet into browser memory.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ToastFn } from '../contracts/common.ts';
 import type { SourceSortKey } from '../contracts/workbook.ts';
 import { errorMessage } from '../core/display-format.ts';
@@ -68,7 +69,7 @@ export class MultiSort {
 
   add(key: Partial<SourceSortKey> = { column: 1, descending: false }): void {
     if (this.holder.children.length >= 5) {
-      this.toast('最多5级排序', 'warning');
+      this.toast(localize('ui.multiSort.sortUpLevels'), 'warning');
       return;
     }
     const row = document.createElement('div');
@@ -77,18 +78,18 @@ export class MultiSort {
     number.className = 'sort-level-number';
     const col = document.createElement('input');
     col.className = 'field-control sort-column';
-    col.placeholder = '列字母 / 序号';
-    col.title = '例如 A、AB 或 28';
+    col.placeholder = localize('ui.multiSort.columnLettersSerialNumbers');
+    col.title = localize('ui.multiSort.exampleAbOr');
     col.value = this.colName(key.column || 1);
-    col.setAttribute('aria-label', '排序列');
+    col.setAttribute('aria-label', localize('ui.multiSort.sort'));
     col.spellcheck = false;
 
     const dir = document.createElement('select');
     dir.className = 'field-control sort-direction';
-    dir.setAttribute('aria-label', '排序方向');
+    dir.setAttribute('aria-label', localize('ui.multiSort.sortingDirection'));
     for (const [value, label] of [
-      ['asc', '从小到大 ↑'],
-      ['desc', '从大到小 ↓'],
+      ['asc', localize('ui.multiSort.fromSmallestLargest')],
+      ['desc', localize('ui.multiSort.fromLargestSmallest')],
     ] as const) {
       const opt = document.createElement('option');
       opt.value = value;
@@ -99,12 +100,12 @@ export class MultiSort {
 
     const mode = document.createElement('select');
     mode.className = 'field-control sort-mode';
-    mode.setAttribute('aria-label', '排序方式');
+    mode.setAttribute('aria-label', localize('ui.multiSort.sortingMethod'));
     for (const [value, label] of [
-      ['', '按原始类型'],
-      ['number', '按数值（金额）'],
-      ['text', '按显示文本'],
-      ['natural', '自然顺序（文本数字）'],
+      ['', localize('ui.multiSort.originalType')],
+      ['number', localize('ui.multiSort.adjustAccordingValuesAmounts')],
+      ['text', localize('ui.common.pressDisplayText')],
+      ['natural', localize('ui.multiSort.naturalOrderTextNumbers')],
     ] as const) {
       const opt = document.createElement('option');
       opt.value = value;
@@ -117,10 +118,10 @@ export class MultiSort {
     remove.type = 'button';
     remove.className = 'sort-level-remove';
     remove.textContent = '×';
-    remove.title = '删除排序条件';
+    remove.title = localize('ui.multiSort.deleteSortingConditions');
     remove.addEventListener('click', () => {
       if (this.holder.children.length === 1) {
-        this.toast('请至少保留一个排序条件', 'warning');
+        this.toast(localize('ui.multiSort.retainAtLeastOneSorting'), 'warning');
         return;
       }
       row.remove();
@@ -148,9 +149,9 @@ export class MultiSort {
       const raw = colInput instanceof HTMLInputElement ? colInput.value : '';
       const column = this.parseColumn(raw);
       if (!column || column > this.s.usedMaxCol) {
-        throw new Error(`排序列「${raw}」无效或超出有效范围`);
+        throw new Error(localize('ui.multiSort.sortingInvalidOrOutValid', { raw }));
       }
-      if (seen.has(column)) throw new Error(`排序列 ${this.colName(column)} 重复`);
+      if (seen.has(column)) throw new Error(localize('ui.multiSort.sortDuplicate', { colName: this.colName(column) }));
       seen.add(column);
       keys.push({
         column,
@@ -160,7 +161,7 @@ export class MultiSort {
     }
     const header = Number(requireInput('sortHeaderRow').value);
     if (!Number.isInteger(header) || header < 0 || header >= this.s.usedMaxRow) {
-      throw new Error('表头行必须小于数据区域最后一行，可填0表示无表头');
+      throw new Error(localize('ui.multiSort.headerRowMustBeLess'));
     }
     return { keys, header };
   }

@@ -1,6 +1,7 @@
 /**
  * Column-header span selection, drag selection, and serialized column visibility overrides.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, ToastFn } from '../contracts/common.ts';
 import { errorMessage } from '../core/display-format.ts';
 import { requireButton, requireEl, requireInput } from '../core/dom.ts';
@@ -146,7 +147,7 @@ export class ColumnController {
     const span = this.selectedSpan();
     if (span) {
       requireEl('selectionStatus').textContent =
-        `${this.spanLabel(span)} · ${span.end - span.start + 1} 列`;
+        localize('ui.columns.column', { spanLabel: this.spanLabel(span), end: span.end - span.start + 1 });
     }
     this.selectionStats()?.clear();
     this.paintSelection();
@@ -266,13 +267,13 @@ export class ColumnController {
     hideBtn.disabled = !this.hasOfType(span, false);
     showBtn.disabled = !this.hasOfType(span, true);
     const multiple = Boolean(span && span.start !== span.end);
-    hideBtn.textContent = multiple ? '隐藏选中列' : '隐藏此列';
-    showBtn.textContent = '显示隐藏列';
+    hideBtn.textContent = multiple ? localize('ui.columns.hideSelectedColumns') : localize('ui.columns.hideThisColumn');
+    showBtn.textContent = localize('ui.columns.displayHiddenColumns');
   }
 
   targetSpan(): ColumnSelectionSpan | null {
     const span = this.parseSpan(requireInput('columnTarget').value);
-    if (!span) this.toast('请输入有效的列或区域，如 A、AB、A:C', 'warning');
+    if (!span) this.toast(localize('ui.columns.enterValidColumnOrRange'), 'warning');
     return span;
   }
 
@@ -283,7 +284,7 @@ export class ColumnController {
     }
     const selectedCol = this.s.selected?.col || this.nextVisible(1);
     const label = this.spanLabel(this.selectedSpan()) || this.colName(selectedCol);
-    requireEl('columnMenuSelection').textContent = '选择列';
+    requireEl('columnMenuSelection').textContent = localize('ui.columns.selectColumns');
     requireInput('columnTarget').value = label;
     this.refreshMenuTarget();
   }
@@ -362,7 +363,7 @@ export class ColumnController {
         this.applyVisibility();
         this.relayoutGrid();
       }
-      this.toast(`保存列显隐失败：${errorMessage(error)}`, 'error');
+      this.toast(localize('ui.columns.failedSaveColumnDisplay', { detail: errorMessage(error) }), 'error');
     }
   }
 

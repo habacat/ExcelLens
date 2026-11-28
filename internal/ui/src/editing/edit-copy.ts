@@ -3,6 +3,7 @@
  * commits, revision refresh, what-if goal-seek/data-table trials, generated file saving,
  * and coordination with the direct in-grid `SheetEditor` and `EditTools`.
  */
+import { t as localize } from '../core/i18n.ts';
 import type { ApiClient, HttpError } from '../contracts/common.ts';
 import type {
   EditAddress,
@@ -401,7 +402,7 @@ export class EditCopy {
       return true;
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        this.status('已请求取消。可刷新核对保存状态。');
+        this.status(localize('ui.editCopy.requestCancelMadeCanRefresh'));
       } else {
         this.status(errorMessage(error), true);
       }
@@ -417,11 +418,11 @@ export class EditCopy {
 
   close(): void {
     if (this.abort) {
-      this.status('请等待当前操作完成');
+      this.status(localize('ui.editCopy.waitCurrentOperationComplete'));
       return;
     }
     if (this.dirty || this.pending) {
-      this.status('请先应用或放弃当前输入', true);
+      this.status(localize('ui.editCopy.applyOrAbandonCurrentInput'), true);
       return;
     }
     dialogEl().close();
@@ -443,7 +444,7 @@ export class EditCopy {
 
   async whatIf(): Promise<void> {
     if (this.pending || this.dirty || this.abort || !this.data) {
-      this.status('请先确认或放弃当前输入');
+      this.status(localize('ui.editCopy.confirmOrAbandonCurrentInput'));
       return;
     }
     const dataSnapshot = this.data;
@@ -453,7 +454,7 @@ export class EditCopy {
       const parts = /^(?:(.+)!)?\$?([A-Za-z]+)\$?([1-9]\d*)$/.exec(value.trim());
       const letters = parts?.[2];
       const digits = parts?.[3];
-      if (!parts || !letters || !digits) throw new Error('请输入有效的单元格地址');
+      if (!parts || !letters || !digits) throw new Error(localize('ui.editCopy.enterValidCellAddress'));
       const sheetName = parts[1] ?? selectEl('Sheet').value;
       const sheet =
         sheetName.startsWith("'") && sheetName.endsWith("'")
@@ -466,7 +467,7 @@ export class EditCopy {
       readField(id)
         .split(/[，,;；\s]+/)
         .filter(Boolean);
-    await this.run('正在试算…', async (signal) => {
+    await this.run(localize('ui.editCopy.trialCalculation'), async (signal) => {
       el('TrialOutput').replaceChildren();
       el('TrialStatus').textContent = '';
       const secondText = mode === 'seek' ? '' : readField('Second');
@@ -491,12 +492,12 @@ export class EditCopy {
         signal,
       ).then(decodeWhatIfResult);
       el('TrialStatus').textContent =
-        `${result.status} · ${result.iterations} 次计算` +
-        `${result.residual !== undefined ? ` · 误差 ${result.residual}` : ''} · 修订 ${doc.revision}`;
+        localize('ui.editCopy.calculations', { status: result.status, iterations: result.iterations }) +
+        localize('ui.editCopy.revised', { detail: result.residual !== undefined ? ` ${localize('ui.editCopy.error', { residual: result.residual })}` : '', revision: doc.revision });
       const table = document.createElement('table');
       const tr = table.insertRow();
       const hasSecond = Boolean(secondText);
-      for (const name of hasSecond ? ['输入', '第二输入', '目标结果'] : ['输入', '目标结果']) {
+      for (const name of hasSecond ? [localize('ui.editCopy.enter'), localize('ui.editCopy.secondInput'), localize('ui.editCopy.targetResult')] : [localize('ui.editCopy.enter'), localize('ui.editCopy.targetResult')]) {
         const th = document.createElement('th');
         th.textContent = name;
         tr.append(th);
@@ -520,11 +521,11 @@ export class EditCopy {
     const openBtn = buttonEl('Open');
     const label = byId('editCopyOpenLabel') ?? openBtn;
     openBtn.disabled = true;
-    label.textContent = '正在检查…';
-    const ok = await this.run('正在检查编辑源…', async (signal) => {
+    label.textContent = localize('ui.editCopy.checkingProgress');
+    const ok = await this.run(localize('ui.editCopy.checkingSourceDataEditing'), async (signal) => {
       const data = await this.post('start', { book }, signal).then(decodeEditStateResponse);
       if (this.context().book !== book || document.body.classList.contains('home-view')) {
-        throw new Error('当前文件已切换');
+        throw new Error(localize('ui.editCopy.currentFileSwitched'));
       }
       if (!(await this.bindGridBase(data, signal, sheet, ref))) {
         await this.activate(data, sheet, ref, signal, false);
@@ -533,9 +534,9 @@ export class EditCopy {
     });
     this.starting = false;
     openBtn.disabled = false;
-    label.textContent = '编辑副本';
+    label.textContent = localize('ui.common.editCopy');
     if (!ok && this.context().book === book && !document.body.classList.contains('home-view')) {
-      el('Title').textContent = '编辑副本';
+      el('Title').textContent = localize('ui.common.editCopy');
       el('Work').hidden = true;
       el('ListView').hidden = false;
       this.openDialog('editCopyDialog');
@@ -550,16 +551,16 @@ export class EditCopy {
     const pivot = !sheetAction && !table && !range ? this.tools.pivotAt(this.grid.selected) : null;
     this.tools.contextualPivot = Boolean(pivot);
     const sheetTitle =
-      tool === 'renameSheet' ? '重命名工作表' : tool === 'deleteSheet' ? '删除工作表' : '工作表操作';
+      tool === 'renameSheet' ? localize('ui.editCopy.renameWorksheets') : tool === 'deleteSheet' ? localize('ui.editCopy.deleteWorksheet') : localize('ui.editCopy.worksheetOperations');
     el('Title').textContent = sheetAction
       ? sheetTitle
       : table
-        ? '调整表格范围'
+        ? localize('ui.editCopy.adjustTableRange')
         : range
-          ? '区域编辑'
+          ? localize('ui.editCopy.regionalEditing')
           : pivot
-            ? '透视布局'
-            : '更多编辑';
+            ? localize('ui.editCopy.pivotLayout')
+            : localize('ui.editCopy.moreEditors');
     this.openDialog('editCopyDialog');
     el('Work').hidden = false;
     el('ListView').hidden = true;
@@ -583,7 +584,7 @@ export class EditCopy {
       this.tools.chooseRangeKind = true;
       selectEl('StructureKind').value = this.grid.view.merged() ? 'unmergeCells' : 'mergeCells';
     }
-    return this.run('正在读取选区…', (signal) => this.fetchCell(signal)).then((ok) => {
+    return this.run(localize('ui.editCopy.readingSelection'), (signal) => this.fetchCell(signal)).then((ok) => {
       if (ok && sheetAction && !el('NewNameField').hidden) {
         const newName = inputEl('NewName');
         newName.focus();
@@ -602,25 +603,25 @@ export class EditCopy {
     if (this.abort || this.dirty || this.pending) return;
     el('Work').hidden = true;
     el('ListView').hidden = false;
-    el('Title').textContent = '已保存的编辑';
-    void this.run('正在读取编辑副本…', async (signal) => {
+    el('Title').textContent = localize('ui.editCopy.savedEdits');
+    void this.run(localize('ui.editCopy.readingEditCopies'), async (signal) => {
       const { items } = await this.api('/api/edits', { signal }, decodeEditListResponse);
       const listEl = el('List');
       listEl.replaceChildren();
       for (const item of items) {
         const line = this.item(
-          item.name || '编辑副本',
-          item.error ?? (item.busy ? '正在使用' : `修订 ${item.revision}`),
+          item.name || localize('ui.common.editCopy'),
+          item.error ?? (item.busy ? localize('ui.common.use') : localize('ui.editCopy.revise', { revision: item.revision })),
         );
-        if (!item.error) line.append(this.button('继续编辑', () => this.resume(item)));
+        if (!item.error) line.append(this.button(localize('ui.editCopy.continueEditing'), () => this.resume(item)));
         listEl.append(line);
       }
-      this.status(items.length ? '' : '暂无已保存的编辑');
+      this.status(items.length ? '' : localize('ui.editCopy.noSavedEditsAvailable'));
     });
   }
 
   resume(item: EditKey): void {
-    void this.run('正在恢复编辑修订…', async (signal) => {
+    void this.run(localize('ui.editCopy.restoringEditingRevisions'), async (signal) => {
       const data = await this.post('state', { document: keyOf(item) }, signal).then(decodeEditStateResponse);
       const { sheet, ref } = this.context();
       if (!(await this.bindGridBase(data, signal, sheet, ref))) {
@@ -697,7 +698,7 @@ export class EditCopy {
     const encodingSelect = selectEl('Encoding');
     const firstOpt = encodingSelect.options[0];
     if (firstOpt) {
-      firstOpt.textContent = data.encoding ? `源编码（${data.encoding}）` : '源编码';
+      firstOpt.textContent = data.encoding ? localize('ui.editCopy.sourceCode', { encoding: data.encoding }) : localize('ui.editCopy.sourceEncoding');
     }
     encodingSelect.value = 'source';
     inputEl('Protect').checked = true;
@@ -757,7 +758,7 @@ export class EditCopy {
       busy || Boolean(this.pending) || !this.editable || kindSelect.value === 'blank';
     kindSelect.disabled = busy || Boolean(this.pending) || !this.editable;
     const applyBtn = buttonEl('Apply');
-    applyBtn.textContent = this.pending ? '核对提交' : '应用修改';
+    applyBtn.textContent = this.pending ? localize('ui.editCopy.reviewSubmit') : localize('ui.editCopy.applyModifications');
     applyBtn.hidden = Boolean(this.cell?.readOnly) && !this.pending;
     applyBtn.disabled = busy || (!this.pending && (!this.editable || !dirty));
     const discardBtn = buttonEl('DiscardInput');
@@ -799,13 +800,13 @@ export class EditCopy {
     if (!shape?.firstRow || !shape.firstCol) {
       this.cell = null;
       el('CellPanel').hidden = true;
-      this.status('此工作表没有可编辑的单元格');
+      this.status(localize('ui.editCopy.thisWorksheetNoEditableCells'));
       return;
     }
     const addressInput = inputEl('Address');
     if (this.grid.active && !addressInput.value) {
       this.setCell(null);
-      this.status('当前工作表没有选中的单元格');
+      this.status(localize('ui.editCopy.noCellsOnCurrentWorksheet'));
       return;
     }
     if (!this.data) return;
@@ -823,13 +824,13 @@ export class EditCopy {
     ).then(decodeEditReadResponse);
     this.invalidated = false;
     this.setCell(cell);
-    this.status(this.data.encoding && cell.value.kind === 'missing' ? '该记录缺少此列' : '');
+    this.status(this.data.encoding && cell.value.kind === 'missing' ? localize('ui.editCopy.thisRecordLacksThisColumn') : '');
   }
 
   read(): void {
     if (this.dirty || this.pending) return;
     this.clearPreview();
-    void this.run('正在读取单元格…', (signal) => this.fetchCell(signal));
+    void this.run(localize('ui.editCopy.readingCells'), (signal) => this.fetchCell(signal));
   }
 
   setCell(cell: EditReadResponse | null): void {
@@ -841,7 +842,7 @@ export class EditCopy {
     originRef.textContent = cell?.ref ?? inputEl('Address').value;
     originRef.hidden = !originRef.textContent;
     if (!cell) return;
-    el('ValueLabel').textContent = `${cell.ref} 的内容`;
+    el('ValueLabel').textContent = localize('ui.editCopy.content', { ref: cell.ref });
     inputEl('Address').value = cell.ref;
     this.escaped = cell.value.raw.includes('\r');
     this.initialText = EditModel.encode(
@@ -857,23 +858,23 @@ export class EditCopy {
     kindSelect.hidden = Boolean(this.data?.encoding);
     el('TextHint').hidden = !this.escaped;
     let stateText =
-      kind === 'missing' ? '原单元格为空' : kind === 'blank' ? '空字段' : kind === 'error' ? '错误值' : '';
+      kind === 'missing' ? localize('ui.editCopy.originalCellEmpty') : kind === 'blank' ? localize('ui.editCopy.nullField') : kind === 'error' ? localize('ui.editCopy.errorValues') : '';
     if (kind === 'formula') {
-      if (cell.formulaState === 'pending') stateText = '待重算';
-      else if (cell.formulaState === 'cycle') stateText = '循环引用';
-      else if (cell.formulaState === 'missing') stateText = '缺少保存结果';
+      if (cell.formulaState === 'pending') stateText = localize('ui.common.beRecalculatedLater');
+      else if (cell.formulaState === 'cycle') stateText = localize('ui.editCopy.cyclicReferences');
+      else if (cell.formulaState === 'missing') stateText = localize('ui.editCopy.missingSavedResults');
       else {
         const value = cell.calculatedResult ?? cell.savedResult;
         if (value) {
-          const preview = Array.from(value.raw).slice(0, 48).join('') || '空文本';
-          stateText = `${cell.calculatedResult ? '计算结果' : '原保存结果'} ${preview}`;
+          const preview = Array.from(value.raw).slice(0, 48).join('') || localize('ui.editCopy.nullText');
+          stateText = `${cell.calculatedResult ? localize('ui.editCopy.calculationResult') : localize('ui.editCopy.originalSavedResult')} ${preview}`;
         }
       }
     }
     el('CellState').textContent = [
-      cell.readOnly ? `只读（${cell.readOnly}）` : '',
+      cell.readOnly ? localize('ui.editCopy.readOnly', { readOnly: cell.readOnly }) : '',
       cell.generatedStatus ?? stateText,
-      cell.base.style !== cell.value.style ? '格式已修改' : '',
+      cell.base.style !== cell.value.style ? localize('ui.editCopy.formatModified') : '',
     ]
       .filter(Boolean)
       .join(' · ');
@@ -881,7 +882,7 @@ export class EditCopy {
     baseDetails.hidden = equalsValue(cell.base, cell.value);
     baseDetails.open = false;
     el('BaseText').textContent =
-      cell.base.raw || (cell.base.kind === 'missing' ? '原单元格为空' : '空白');
+      cell.base.raw || (cell.base.kind === 'missing' ? localize('ui.editCopy.originalCellEmpty') : localize('ui.common.blank'));
     this.setRule(cell);
     this.controls();
   }
@@ -904,7 +905,7 @@ export class EditCopy {
     const ruleDraft =
       ruleInput && JSON.stringify(ruleInput) !== this.initialRule ? ruleInput : null;
     this.clearPreview();
-    void this.run('正在读取最新修订…', async (signal) => {
+    void this.run(localize('ui.editCopy.readingLatestRevisions'), async (signal) => {
       const data = await this.post(
         'state',
         { document: keyOf(currentData.document) },
@@ -932,7 +933,7 @@ export class EditCopy {
         textAreaEl('Value').value = draft.raw;
         selectEl('Kind').value = draft.kind;
         el('TextHint').hidden = !this.escaped;
-        this.status('已刷新修订，当前输入已保留');
+        this.status(localize('ui.editCopy.revisionRefreshedCurrentInputRetained'));
       }
       if (ruleDraft && this.cell) {
         RULE_INPUTS.forEach((id, index) => {
@@ -951,7 +952,7 @@ export class EditCopy {
           }
         });
         this.ruleControls();
-        this.status('已刷新修订，当前输入已保留');
+        this.status(localize('ui.editCopy.revisionRefreshedCurrentInputRetained'));
       }
     });
   }
@@ -1020,7 +1021,7 @@ export class EditCopy {
         },
       } satisfies PendingCommitRequest);
     this.pending = request;
-    return this.run('正在保存编辑…', async (signal) => {
+    return this.run(localize('ui.editCopy.savingEditsProgress'), async (signal) => {
       let result: EditCommitResponse;
       try {
         result = await this.post('commit', request, signal).then(decodeEditCommitResponse);
@@ -1081,11 +1082,11 @@ export class EditCopy {
       } catch (error: unknown) {
         this.invalidated = true;
         this.grid.stale = true;
-        throw new Error(`已保存修订 ${result.committed}。${errorMessage(error)}，请刷新修订`, {
+        throw new Error(localize('ui.editCopy.savedRevisionsHaveSavedRefresh', { committed: result.committed, detail: errorMessage(error) }), {
           cause: error,
         });
       }
-      this.status(`已保存修订 ${result.committed}`);
+      this.status(localize('ui.editCopy.editsSaved', { committed: result.committed }));
     });
   }
 
@@ -1130,7 +1131,7 @@ export class EditCopy {
       this.grid.leave();
       return true;
     }
-    return this.run('正在打开原工作簿…', async (signal) => {
+    return this.run(localize('ui.editCopy.openingOriginalWorkbook'), async (signal) => {
       const base = await this.post(
         'base',
         {
@@ -1155,7 +1156,7 @@ export class EditCopy {
     readonly sheet: string;
     readonly ref: string;
   } {
-    if (!this.data || !this.cell) throw new Error('尚未读取单元格');
+    if (!this.data || !this.cell) throw new Error(localize('ui.editCopy.cellsNotYetRead'));
     const doc = this.data.document;
     return {
       document: keyOf(doc),
@@ -1167,7 +1168,7 @@ export class EditCopy {
 
   copy(): void {
     if (!this.editable || this.dirty || this.abort || this.pending) return;
-    void this.run('正在读取复制区域…', async (signal) => {
+    void this.run(localize('ui.editCopy.readingCopyArea'), async (signal) => {
       const clip = await this.post(
         'copy',
         { ...this.editTarget(), end: inputEl('CopyEnd').value.trim().toUpperCase() },
@@ -1176,14 +1177,14 @@ export class EditCopy {
       const text = JSON.stringify(clip);
       try {
         await navigator.clipboard.writeText(text);
-        this.status(`已复制 ${clip.rows * clip.cols} 格`);
+        this.status(localize('ui.editCopy.cellsCopied', { rows: clip.rows * clip.cols }));
       } catch {
         this.clearPreview();
         this.pasteRaw = text;
         textAreaEl('BatchText').value = text;
         selectEl('PasteMode').value = 'values';
         this.tools.select('Paste');
-        this.status('剪贴板不可用，已将数据放入粘贴框');
+        this.status(localize('ui.editCopy.clipboardUnavailableDataPlacedPaste'));
       }
     });
   }
@@ -1216,7 +1217,7 @@ export class EditCopy {
     }
     const choiceSelect = selectEl('Choice');
     choiceSelect.replaceChildren(
-      new Option('请选择', ''),
+      new Option(localize('ui.editCopy.select'), ''),
       ...choices.map((value) => new Option(value, value)),
     );
     choiceSelect.value =
@@ -1231,11 +1232,11 @@ export class EditCopy {
     }
     const target = this.editTarget();
     this.setChoices([]);
-    void this.run('正在读取列表选项…', async (signal) => {
+    void this.run(localize('ui.editCopy.readingListOptions'), async (signal) => {
       const result = await this.post('choices', target, signal).then(decodeEditChoicesResponse);
-      if (result.revision !== target.revision) throw new Error('编辑修订已变化，请刷新后重试');
+      if (result.revision !== target.revision) throw new Error(localize('ui.editCopy.editedRevisionChangedTryAgain'));
       this.setChoices(result.choices);
-      this.status(`已读取 ${result.choices.length} 项`);
+      this.status(localize('ui.editCopy.itemsRead', { count: result.choices.length }));
     });
   }
 
@@ -1262,7 +1263,7 @@ export class EditCopy {
     const op = selectEl('RuleOperator').value;
     const second = inputEl('RuleSecond');
     second.hidden = op !== 'between' && op !== 'notBetween';
-    const placeholder = type === 'date' ? 'YYYY-MM-DD 或序号' : '条件值';
+    const placeholder = type === 'date' ? localize('ui.editCopy.yyyyMmDdOrSerial') : localize('ui.editCopy.conditionValues');
     inputEl('RuleFirst').placeholder = placeholder;
     second.placeholder = placeholder;
   }
@@ -1271,11 +1272,11 @@ export class EditCopy {
     const mode = selectEl('FillMode').value;
     const unit =
       mode === 'number'
-        ? '步长'
+        ? localize('ui.editCopy.bucheng')
         : mode === 'date'
-          ? '步长（天）'
+          ? localize('ui.editCopy.stepSizeDays')
           : mode === 'time'
-            ? '步长（秒）'
+            ? localize('ui.editCopy.stepSizeSeconds')
             : '';
     inputEl('FillStep').hidden = !unit;
     el('StepLabel').hidden = !unit;
@@ -1313,7 +1314,7 @@ export class EditCopy {
         second: list || secondEl.hidden ? '' : secondEl.value.trim(),
         allowBlank: inputEl('AllowBlank').checked,
       };
-      void this.run('正在核对规则范围…', async (signal) => {
+      void this.run(localize('ui.editCopy.verifyingRuleRange'), async (signal) => {
         const plan = await this.post(
           'preview',
           { ...this.editTarget(), mode: 'rule', rule },
@@ -1340,10 +1341,10 @@ export class EditCopy {
       : changes.length;
     const sameFormat = mode === 'fill' && changes.some((change) => change.value.style !== undefined);
     el('BatchSummary').textContent =
-      `${ref(first)} → ${ref(last)}，${count} 格` +
-      (mode === 'fill' && tail ? `，末值 ${Array.from(tail).slice(0, 48).join('')}` : '') +
-      (sameFormat ? '，沿用起点格式' : '');
-    buttonEl('ApplyBatch').textContent = rule ? '应用规则' : '应用此批';
+      localize('ui.editCopy.cell', { ref: ref(first), ref2: ref(last), count }) +
+      (mode === 'fill' && tail ? localize('ui.editCopy.finalValue', { from: Array.from(tail).slice(0, 48).join('') }) : '') +
+      (sameFormat ? localize('ui.editCopy.followStartingPointFormat') : '');
+    buttonEl('ApplyBatch').textContent = rule ? localize('ui.editCopy.applyRules') : localize('ui.editCopy.applyThisBatch');
     const parent = rule ? el('Rules') : el(mode === 'fill' ? 'PaneFill' : 'PanePaste');
     const batchPreview = el('BatchPreview');
     parent.append(batchPreview);
@@ -1367,7 +1368,7 @@ export class EditCopy {
         (fillMode === 'date' || fillMode === 'time' || fillMode === 'formula-fill')
       ) {
         const last = EditModel.target(inputEl('FillEnd').value, shape);
-        void this.run('正在核对填充区域…', async (signal) => {
+        void this.run(localize('ui.editCopy.verifyingFillingArea'), async (signal) => {
           const plan = await this.post(
             'preview',
             {
@@ -1384,15 +1385,15 @@ export class EditCopy {
       }
       if (mode === 'paste' && pasteMode !== 'plain') {
         if (new TextEncoder().encode(raw).length + 1024 > this.limits.requestBytes) {
-          throw new Error('粘贴内容超出容量，请缩小范围');
+          throw new Error(localize('ui.editCopy.pasteContentExceedsCapacityReduce'));
         }
         let clipboard: unknown;
         try {
           clipboard = JSON.parse(raw);
         } catch {
-          throw new Error('请粘贴有类型数据');
+          throw new Error(localize('ui.editCopy.pasteTypeData'));
         }
-        void this.run('正在核对粘贴区域…', async (signal) => {
+        void this.run(localize('ui.editCopy.verifyingPasteArea'), async (signal) => {
           const plan = await this.post(
             'preview',
             {
@@ -1426,7 +1427,7 @@ export class EditCopy {
               Boolean(this.data?.encoding),
               this.limits,
             );
-      void this.run('正在核对目标区域…', async (signal) => {
+      void this.run(localize('ui.editCopy.verifyingTargetArea'), async (signal) => {
         const checked = await this.post(
           'preview',
           {
@@ -1470,25 +1471,25 @@ export class EditCopy {
     if (!this.data) return;
     const doc = this.data.document;
     el('Revision').textContent =
-      `修订 ${doc.revision} · ${doc.changed} 格修改` +
-      (doc.structuresChanged ? ` · ${doc.structuresChanged} 项结构操作` : '') +
-      (doc.rulesChanged ? ` · ${doc.rulesChanged} 条规则` : '');
+      localize('ui.editCopy.revisionCellModifications', { revision: doc.revision, changed: doc.changed }) +
+      (doc.structuresChanged ? ` ${localize('ui.editCopy.itemStructureOperation', { structuresChanged: doc.structuresChanged })}` : '') +
+      (doc.rulesChanged ? ` ${localize('ui.editCopy.rule', { rulesChanged: doc.rulesChanged })}` : '');
     this.grid.controls();
     const outputs = el('Outputs');
     outputs.replaceChildren();
     for (const artifact of this.data.artifacts) {
       const detail = [
-        `修订 ${artifact.revision}`,
+        localize('ui.editCopy.revise', { revision: artifact.revision }),
         this.fmtBytes(artifact.bytes),
         artifact.encoding,
-        artifact.protected ? `${artifact.protected} 格添加保护前缀` : null,
+        artifact.protected ? localize('ui.editCopy.cellsProtectedPrefix', { protected: artifact.protected }) : null,
         artifact.nativeRecalc
-          ? '公式将在 Excel 中重算'
+          ? localize('ui.editCopy.formulasWillBeRecalculatedExcel')
           : artifact.formulasPending
-            ? `${artifact.formulasPending} 个公式待重算`
+            ? localize('ui.editCopy.formulasNeedBeRecalculated', { formulasPending: artifact.formulasPending })
             : null,
-        artifact.pivotCachesPending ? `${artifact.pivotCachesPending} 个透视缓存待刷新` : null,
-        artifact.pivotCachesAfterCalc ? '请在 Excel 中先重算再刷新' : null,
+        artifact.pivotCachesPending ? localize('ui.editCopy.pivotTablesWaitingBeRefreshed', { pivotCachesPending: artifact.pivotCachesPending }) : null,
+        artifact.pivotCachesAfterCalc ? localize('ui.editCopy.recalculateExcelThenRefreshPage') : null,
       ]
         .filter(Boolean)
         .join(' · ');
@@ -1496,11 +1497,11 @@ export class EditCopy {
       const link = document.createElement('a');
       link.className = 'mini-button';
       link.href = artifact.downloadUrl;
-      link.textContent = '下载';
+      link.textContent = localize('ui.editCopy.download');
       link.download = artifact.name;
       item.append(
         link,
-        this.button('打开副本', () => this.openFile(artifact)),
+        this.button(localize('ui.editCopy.openDuplicate'), () => this.openFile(artifact)),
       );
       outputs.append(item);
     }
@@ -1513,7 +1514,7 @@ export class EditCopy {
     const options = dataSnapshot.encoding
       ? { encoding: selectEl('Encoding').value, protect: inputEl('Protect').checked }
       : {};
-    return this.run('正在生成并核对副本…', async (signal) => {
+    return this.run(localize('ui.editCopy.generatingVerifyingCopies'), async (signal) => {
       const artifact = await this.post(
         'save',
         { document: keyOf(doc), revision: doc.revision, options },
@@ -1527,17 +1528,17 @@ export class EditCopy {
       }
       this.renderState();
       this.status(
-        `已生成修订 ${artifact.revision}${artifact.pivotCachesAfterCalc ? '，请在 Excel 中重算后刷新透视表' : ''}`,
+        localize('ui.editCopy.revisionsHaveGenerated', { revision: artifact.revision, detail: artifact.pivotCachesAfterCalc ? localize('ui.editCopy.recalculateExcelRefreshPivotTable') : '' }),
       );
     });
   }
 
   openFile(artifact: EditArtifact): void {
-    if (this.dirty || this.pending || !this.data || !this.canOpen('打开副本')) return;
+    if (this.dirty || this.pending || !this.data || !this.canOpen(localize('ui.editCopy.openDuplicate'))) return;
     const { book } = this.context();
     const doc = this.data.document;
     void this.run(
-      '正在打开生成的副本…',
+      localize('ui.editCopy.openingGeneratedCopies'),
       async (signal) => {
         const data = await this.post(
           'open',

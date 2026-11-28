@@ -2,6 +2,7 @@
  * Pivot table date filter sub-controller supporting relative dates, fixed date
  * comparisons/ranges with optional time precision, and annual quarter/month filters.
  */
+import { t as localize } from '../core/i18n.ts';
 import type {
   PivotDateFilter as PivotDateFilterSpec,
   PivotInfo,
@@ -9,38 +10,38 @@ import type {
 import { requireButton, requireEl, requireInput, requireSelect } from '../core/dom.ts';
 
 const FIXED_KINDS: Readonly<Record<string, string>> = {
-  dateEqual: '等于',
-  dateNotEqual: '不等于',
-  dateOlderThan: '早于',
-  dateOlderThanOrEqual: '早于或等于',
-  dateNewerThan: '晚于',
-  dateNewerThanOrEqual: '晚于或等于',
-  dateBetween: '介于',
-  dateNotBetween: '不介于',
+  dateEqual: localize('ui.common.equal'),
+  dateNotEqual: localize('ui.common.notEqual'),
+  dateOlderThan: localize('ui.editPivotDateFilter.earlierThan'),
+  dateOlderThanOrEqual: localize('ui.editPivotDateFilter.earlierThanOrEqual'),
+  dateNewerThan: localize('ui.editPivotDateFilter.laterThan'),
+  dateNewerThanOrEqual: localize('ui.editPivotDateFilter.laterThanOrEqual'),
+  dateBetween: localize('ui.common.between'),
+  dateNotBetween: localize('ui.common.neither'),
 };
 
 const RELATIVE_KINDS: Readonly<Record<string, string>> = {
-  today: '今天',
-  yesterday: '昨天',
-  tomorrow: '明天',
-  thisWeek: '本周',
-  lastWeek: '上周',
-  nextWeek: '下周',
-  thisMonth: '本月',
-  lastMonth: '上月',
-  nextMonth: '下月',
-  thisQuarter: '本季度',
-  lastQuarter: '上季度',
-  nextQuarter: '下季度',
-  thisYear: '今年',
-  lastYear: '去年',
-  nextYear: '明年',
-  yearToDate: '年初至今',
+  today: localize('ui.editPivotDateFilter.today'),
+  yesterday: localize('ui.editPivotDateFilter.yesterday'),
+  tomorrow: localize('ui.editPivotDateFilter.tomorrow'),
+  thisWeek: localize('ui.editPivotDateFilter.thisWeek'),
+  lastWeek: localize('ui.editPivotDateFilter.lastWeek'),
+  nextWeek: localize('ui.editPivotDateFilter.nextWeek'),
+  thisMonth: localize('ui.editPivotDateFilter.thisMonth'),
+  lastMonth: localize('ui.editPivotDateFilter.lastMonth'),
+  nextMonth: localize('ui.editPivotDateFilter.nextMonth'),
+  thisQuarter: localize('ui.editPivotDateFilter.thisQuarter'),
+  lastQuarter: localize('ui.editPivotDateFilter.lastQuarter'),
+  nextQuarter: localize('ui.editPivotDateFilter.nextQuarter'),
+  thisYear: localize('ui.editPivotDateFilter.thisYear'),
+  lastYear: localize('ui.editPivotDateFilter.lastYear'),
+  nextYear: localize('ui.editPivotDateFilter.nextYear'),
+  yearToDate: localize('ui.editPivotDateFilter.yearDate'),
 };
 
 const ANNUAL_KINDS: Record<string, string> = {};
-for (let i = 1; i <= 4; i++) ANNUAL_KINDS[`Q${i}`] = `第${i}季度`;
-for (let i = 1; i <= 12; i++) ANNUAL_KINDS[`M${i}`] = `${i}月`;
+for (let i = 1; i <= 4; i++) ANNUAL_KINDS[`Q${i}`] = localize('ui.editPivotDateFilter.quarter', { i });
+for (let i = 1; i <= 12; i++) ANNUAL_KINDS[`M${i}`] = localize('ui.editPivotDateFilter.month', { i });
 
 const ALL_NAMES: Readonly<Record<string, string>> = {
   ...FIXED_KINDS,
@@ -59,7 +60,7 @@ function describe(f: PivotDateFilterSpec): string {
   const bounds = [f.start, f.end]
     .filter((v): v is string => Boolean(v))
     .map((v) => v.replace('T', ' '));
-  return [f.field, ALL_NAMES[f.kind], bounds.join(' 至 ')].filter(Boolean).join(' ');
+  return [f.field, ALL_NAMES[f.kind], bounds.join(` ${localize('ui.editPivotDateFilter.until')} `)].filter(Boolean).join(' ');
 }
 
 function requireDetails(id: string): HTMLDetailsElement {
@@ -95,9 +96,9 @@ export class PivotDateFilter {
     this.end = requireInput('editCopyPivotDateFilterEnd');
     this.time = requireInput('editCopyPivotDateFilterTime');
     const groups: readonly (readonly [string, Readonly<Record<string, string>>])[] = [
-      ['相对日期', RELATIVE_KINDS],
-      ['指定日期', FIXED_KINDS],
-      ['每年的指定时段', ANNUAL_KINDS],
+      [localize('ui.editPivotDateFilter.relativeDate'), RELATIVE_KINDS],
+      [localize('ui.editPivotDateFilter.specifyDate'), FIXED_KINDS],
+      [localize('ui.editPivotDateFilter.specifiedTimePeriodEachYear'), ANNUAL_KINDS],
     ];
     for (const [name, items] of groups) {
       const group = document.createElement('optgroup');
@@ -140,7 +141,7 @@ export class PivotDateFilter {
     const active = (info?.dateFilters ?? []).filter((f) => fields.includes(f.field));
     this.field.replaceChildren(
       ...fields.map(
-        (name) => new Option(active.some((f) => f.field === name) ? `${name} · 已筛选` : name, name),
+        (name) => new Option(active.some((f) => f.field === name) ? localize('ui.editPivotDateFilter.filtered', { name }) : name, name),
       ),
     );
     this.field.value = fields.includes(previous)
@@ -151,10 +152,10 @@ export class PivotDateFilter {
     if (summary) {
       summary.textContent =
         active.length === 1 && firstActive
-          ? `日期筛选 · ${describe(firstActive)}`
+          ? localize('ui.editPivotDateFilter.dateFilteringf3131b8', { describe: describe(firstActive) })
           : active.length
-            ? `日期筛选 · ${active.length} 项`
-            : '日期筛选';
+            ? localize('ui.editPivotDateFilter.dateFilterItem', { count: active.length })
+            : localize('ui.editPivotDateFilter.dateFiltering');
     }
     this.load();
   }
@@ -223,7 +224,7 @@ export class PivotDateFilter {
     const range = spec.end !== undefined;
     requireEl('editCopyPivotDateFilterBounds').hidden = !bounded;
     if (this.end.parentElement) this.end.parentElement.hidden = !range;
-    requireEl('editCopyPivotDateFilterStartLabel').textContent = range ? '开始日期' : '日期';
+    requireEl('editCopyPivotDateFilterStartLabel').textContent = range ? localize('ui.editPivotDateFilter.startDate') : localize('ui.common.date');
     const reversed = range && Boolean(spec.start) && Boolean(spec.end) && (spec.end ?? '') < (spec.start ?? '');
     const first = iso('0001-01-01', this.withTime);
     const last = this.withTime ? '9999-12-31T23:59:59' : '9999-12-31';
@@ -237,9 +238,9 @@ export class PivotDateFilter {
     requireEl('editCopyPivotDateFilterError').textContent = !bounded
       ? ''
       : reversed
-        ? '结束日期不能早于开始日期'
+        ? localize('ui.editPivotDateFilter.endDateCannotBeEarlier')
         : outside
-          ? '请输入 1 至 9999 年之间的日期'
+          ? localize('ui.editPivotDateFilter.enterDateBetweenYears')
           : '';
     this.valid =
       Boolean(spec.field) &&

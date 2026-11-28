@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"excellens/internal/i18n"
 )
 
 type Progress struct {
@@ -12,7 +14,22 @@ type Progress struct {
 	Total int64  `json:"total"`
 	Files int    `json:"files"`
 	Items int    `json:"items"`
+	stage string
 }
+
+// ProgressForStage retains the established callback and history text alongside
+// the stage ID. This keeps older histories readable by both versions.
+func ProgressForStage(stage string) Progress {
+	return Progress{Phase: i18n.Default.Stage(stage), stage: stage}
+}
+
+func (p Progress) Localized(locale i18n.Locale) Progress {
+	if p.stage != "" {
+		p.Phase = locale.Stage(p.stage)
+	}
+	return p
+}
+
 type TransferOptions struct {
 	Password   string
 	spaceProbe spaceProbe
@@ -46,7 +63,8 @@ func (o TransferOptions) start(ctx context.Context) context.Context {
 }
 func phase(ctx context.Context, name string, total int64, items int) {
 	if m, _ := ctx.Value(meterKey{}).(*meter); m != nil {
-		m.Progress = Progress{Phase: name, Total: total, Items: items}
+		m.Progress = ProgressForStage(name)
+		m.Total, m.Items = total, items
 		m.notify(true)
 	}
 }

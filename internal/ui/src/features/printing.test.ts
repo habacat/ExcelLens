@@ -474,3 +474,119 @@ test('unsupported/unprepared sources stay disabled and empty previews fetch no f
     e.restore();
   }
 });
+
+test('print preview closes all four outer corners of thick borders without adding interior cross caps', async () => {
+  const thick = '3px solid #000000';
+  const box = {
+    borderTop: thick,
+    borderRight: thick,
+    borderBottom: thick,
+    borderLeft: thick,
+  };
+  const h = setupPrinting((route) => {
+    if (!route.includes('/page?')) return undefined;
+    const base = h.page('print-1', 0);
+    return {
+      ...base,
+      content: {
+        ...base.content,
+        page: {
+          ...base.content.page,
+          content: { width: '150000000000', height: '15000000000' },
+          body: { width: '150000000000', height: '15000000000' },
+          rows: [{ first: 1, last: 2, offset: '0', length: '30000000000', repeated: false }],
+          columns: [{ first: 1, last: 2, offset: '0', length: '300000000000', repeated: false }],
+        },
+        rows: [
+          {
+            number: 1,
+            part: 0,
+            start: '0',
+            size: '15000000000',
+            clipStart: '0',
+            clipSize: '15000000000',
+            repeated: false,
+          },
+          {
+            number: 2,
+            part: 0,
+            start: '15000000000',
+            size: '15000000000',
+            clipStart: '15000000000',
+            clipSize: '15000000000',
+            repeated: false,
+          },
+        ],
+        columns: [
+          {
+            number: 1,
+            part: 0,
+            start: '0',
+            size: '150000000000',
+            clipStart: '0',
+            clipSize: '150000000000',
+            repeated: false,
+          },
+          {
+            number: 2,
+            part: 0,
+            start: '150000000000',
+            size: '150000000000',
+            clipStart: '150000000000',
+            clipSize: '150000000000',
+            repeated: false,
+          },
+        ],
+        cells: [
+          {
+            row: 1,
+            col: 1,
+            ref: 'A1',
+            style: 1,
+            box: { x: '0', y: '0', width: '150000000000', height: '15000000000' },
+            clip: { x: '0', y: '0', width: '150000000000', height: '15000000000' },
+          },
+          {
+            row: 1,
+            col: 2,
+            ref: 'B1',
+            style: 1,
+            box: { x: '150000000000', y: '0', width: '150000000000', height: '15000000000' },
+            clip: { x: '150000000000', y: '0', width: '150000000000', height: '15000000000' },
+          },
+          {
+            row: 2,
+            col: 1,
+            ref: 'A2',
+            style: 1,
+            box: { x: '0', y: '15000000000', width: '150000000000', height: '15000000000' },
+            clip: { x: '0', y: '15000000000', width: '150000000000', height: '15000000000' },
+          },
+          {
+            row: 2,
+            col: 2,
+            ref: 'B2',
+            style: 1,
+            box: { x: '150000000000', y: '15000000000', width: '150000000000', height: '15000000000' },
+            clip: { x: '150000000000', y: '15000000000', width: '150000000000', height: '15000000000' },
+          },
+        ],
+        styles: { '0': {}, '1': box },
+      },
+    };
+  });
+  try {
+    await h.printing.open();
+    const corners = [
+      ...(document.getElementById('printPaperWrap')?.querySelectorAll('.print-edge-corner') ?? []),
+    ] as HTMLElement[];
+    assert.equal(corners.length, 4, 'only the four outer corners of a uniform 2x2 grid need caps');
+    for (const cap of corners) {
+      assert.equal(cap.style.backgroundColor, '#000000');
+      assert.equal(cap.style.width, '0.75px');
+      assert.equal(cap.style.height, '0.75px');
+    }
+  } finally {
+    h.restore();
+  }
+});

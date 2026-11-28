@@ -2,8 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
+
 	"io"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"excellens/internal/archives"
 	"excellens/internal/buildinfo"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 	"excellens/internal/ui"
 	"excellens/internal/workbook"
 )
@@ -25,10 +25,13 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	root := a.rootApp()
+	locale := root.pageLocale(r)
+	w.Header().Set("Content-Language", string(locale))
+	w.Header().Add("Vary", "Accept-Language")
 	if root.restoreState.pending() {
-		page, err := ui.RecoveryIndex(root.token)
+		page, err := ui.RecoveryIndex(root.token, locale)
 		if err != nil {
-			http.Error(w, "恢复界面不可用", 500)
+			http.Error(w, locale.Text("service.language.recoveryUnavailable"), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -36,9 +39,9 @@ func (a *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ribbon, _ := root.RibbonLayout() // keep the page usable if a preference is unreadable
-	b, err := ui.IndexWithLayout(a.token, ribbon, root.cacheEpoch.Load())
+	b, err := ui.IndexLocalized(a.token, ribbon, root.cacheEpoch.Load(), locale)
 	if err != nil {
-		http.Error(w, "界面资源不可用", http.StatusInternalServerError)
+		http.Error(w, locale.Text("service.language.interfaceUnavailable"), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -94,7 +97,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 		a.mu.RLock()
 		startupError := a.startupError
 		a.mu.RUnlock()
-		writeJSON(w, ClosedWorkbookResponse{Version: buildinfo.Version, Error: startupError, Archive: a.archiveSummary()})
+		writeJSON(w, ClosedWorkbookResponse{Version: buildinfo.Version, Error: responseLocale(w).ErrorText(startupError), Archive: a.archiveSummary()})
 		return
 	}
 	a.writeWorkbookStatus(w, wb)
@@ -124,7 +127,7 @@ func (a *App) handleStyles(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.handlers.noWorkbookOpen")
 		return
 	}
 	writeJSON(w, StylesResponse{Styles: wb.VisualStyles, RichTextNotice: wb.RichTextNotice()})
@@ -145,7 +148,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	const maxFileSize = formats.MaxUploadBytes
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+(64<<20))
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "读取文件失败："+err.Error())
+		writeMessage(w, http.StatusBadRequest, "service.handlers.fileReadingFailed", i18n.Args{"detail": err})
 		return
 	}
 	if r.MultipartForm != nil {
@@ -153,28 +156,28 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	f, h, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "请先选择 Excel、CSV、TXT 或 SQLite 数据文件")
+		writeMessage(w, http.StatusBadRequest, "service.handlers.selectExcelCsvTxtOr")
 		return
 	}
 	defer f.Close()
 	if h.Size <= 0 {
-		writeError(w, http.StatusBadRequest, "文件为空")
+		writeMessage(w, http.StatusBadRequest, "service.handlers.fileEmpty")
 		return
 	}
 	if h.Size > maxFileSize {
-		writeError(w, http.StatusRequestEntityTooLarge, "文件超过 1 TiB 上传限制；超大本机文件可直接通过右键菜单或命令行打开")
+		writeMessage(w, http.StatusRequestEntityTooLarge, "service.handlers.fileExceedsTibUploadLimit")
 		return
 	}
 	ext := strings.ToLower(filepath.Ext(h.Filename))
 	if !workbook.SupportedExtensions(ext) {
-		writeError(w, http.StatusBadRequest, "请选择受支持的数据文件或压缩包")
+		writeMessage(w, http.StatusBadRequest, "service.handlers.selectSupportedDataFileOr")
 		return
 	}
 	a.cacheMu.RLock()
 	tmpPath, err := persistUploadedFile(f, ext, h.Size)
 	if err != nil {
 		a.cacheMu.RUnlock()
-		writeError(w, http.StatusInternalServerError, "保存本机临时文件失败："+err.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.handlers.failedSaveLocalTemporaryFiles", i18n.Args{"detail": err})
 		return
 	}
 	releaseUpload := a.pinUploadPath(tmpPath)
@@ -187,7 +190,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	if archives.IsPath(h.Filename) {
 		if err := a.openArchive(r.Context(), tmpPath, filepath.Base(h.Filename), 0); err != nil {
 			_ = os.Remove(tmpPath)
-			writeError(w, 400, "无法读取压缩包："+err.Error())
+			writeMessage(w, 400, "service.handlers.unableReadCompressedFiles", i18n.Args{"detail": err})
 			return
 		}
 		writeJSON(w, ClosedWorkbookResponse{ArchiveOnly: true, Archive: a.archiveSummary()})
@@ -197,7 +200,7 @@ func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	wb, releaseBook, err := a.openPinnedWorkbook(tmpPath)
 	if err != nil {
 		_ = os.Remove(tmpPath)
-		writeError(w, http.StatusBadRequest, "无法打开工作簿："+err.Error())
+		writeMessage(w, http.StatusBadRequest, "service.handlers.unableOpenWorkbook", i18n.Args{"detail": err})
 		return
 	}
 	defer releaseBook()
@@ -250,7 +253,7 @@ func persistUploadedFile(src interface {
 		case closeErr != nil:
 			return "", closeErr
 		default:
-			return "", fmt.Errorf("文件复制长度不一致：期望 %d，实际 %d", expected, copied)
+			return "", i18n.Error("service.handlers.fileCopyLengthInconsistentExpected", i18n.Args{"expected": expected, "copied": copied})
 		}
 	}
 	return tmpPath, nil
@@ -279,21 +282,21 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	}
 	wb := a.currentWorkbook()
 	if wb == nil {
-		writeError(w, http.StatusConflict, "尚未打开工作簿")
+		writeMessage(w, http.StatusConflict, "service.handlers.noWorkbookOpen")
 		return
 	}
 	if wb.HasMappedIndexes() || workbook.QueryFilesInUse(wb.CacheDir) {
-		writeError(w, http.StatusConflict, "当前工作簿仍有在用索引或查询文件，请退出程序后清理本机缓存；在用数据不会被删除")
+		writeMessage(w, http.StatusConflict, "service.handlers.currentWorkbookStillUseOr")
 		return
 	}
 	if a.otherTabUsesCache(wb.CacheDir) {
-		writeError(w, http.StatusConflict, "其他页面、可见行视图或核对任务仍在使用此来源，请先关闭或清除相应结果")
+		writeMessage(w, http.StatusConflict, "service.handlers.otherPagesVisibleRowViews")
 		return
 	}
 	a.mu.Lock()
 	if a.maintenance {
 		a.mu.Unlock()
-		writeError(w, http.StatusConflict, "缓存维护正在进行")
+		writeMessage(w, http.StatusConflict, "service.handlers.cacheMaintenanceProgress")
 		return
 	}
 	a.maintenance = true
@@ -306,9 +309,9 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	var clearErr error
 	conflict := false
 	if a.currentWorkbook() != wb {
-		clearErr, conflict = errors.New("工作簿已切换，缓存清理已取消"), true
+		clearErr, conflict = i18n.Error("service.handlers.workbookSwitchedCacheCleanupCanceled"), true
 	} else if wb.HasMappedIndexes() || workbook.QueryFilesInUse(wb.CacheDir) || a.otherTabUsesCache(wb.CacheDir) {
-		clearErr, conflict = errors.New("缓存仍有在用索引或查询结果，未执行清理"), true
+		clearErr, conflict = i18n.Error("service.handlers.cacheStillContainsUsedIndexes"), true
 	} else {
 		roots, err := dataRoots()
 		clearErr = err
@@ -344,10 +347,10 @@ func (a *App) handleCacheClear(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	if clearErr != nil {
 		if conflict {
-			writeError(w, http.StatusConflict, clearErr.Error())
+			writeFailure(w, http.StatusConflict, clearErr)
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "清理缓存失败："+clearErr.Error())
+		writeMessage(w, http.StatusInternalServerError, "service.handlers.cacheCleanupFailed", i18n.Args{"detail": clearErr})
 		return
 	}
 	writeJSON(w, map[string]any{"cleared": true})
@@ -386,7 +389,7 @@ func directorySize(root string) (int64, int) {
 }
 
 func methodNotAllowed(w http.ResponseWriter) {
-	writeError(w, http.StatusMethodNotAllowed, "请求方法不允许")
+	writeMessage(w, http.StatusMethodNotAllowed, "service.handlers.requestMethodNotAllowed")
 }
 
 // Control requests are small. Validate the entire body before changing task state.
@@ -410,10 +413,6 @@ func writeJSONStatus(w http.ResponseWriter, status int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSONStatus(w, status, map[string]any{"error": message})
 }
 
 func parseIntDefault(s string, fallback int) int {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	excelExport "excellens/internal/export"
+	"excellens/internal/i18n"
 	"excellens/internal/reconcile"
 )
 
@@ -24,19 +25,19 @@ func (a *App) handleReconcileExport(w http.ResponseWriter, r *http.Request) {
 		Status     string `json:"status"`
 	}
 	if decodeAnalysis(r, &req) != nil || (req.Format != "" && req.Format != "csv" && req.Format != "zipcsv") || !validReconcileDetailStatus(req.Status) || req.Status != "" && req.Format != "zipcsv" {
-		writeError(w, 400, "核对导出参数无效")
+		writeMessage(w, 400, "service.reconcileExport.verificationExportParametersInvalid")
 		return
 	}
 	a.cacheMu.RLock()
 	defer a.cacheMu.RUnlock()
 	snapshot, release, err := a.snapshotReconcile(req.JobID)
 	if err != nil {
-		writeError(w, 409, err.Error())
+		writeFailure(w, 409, err)
 		return
 	}
 	if a.currentWorkbook() != snapshot.book {
 		release()
-		writeError(w, 409, "工作簿已切换")
+		writeMessage(w, 409, "service.reconcileExport.workbookSwitched")
 		return
 	}
 	book := snapshot.book
@@ -45,11 +46,11 @@ func (a *App) handleReconcileExport(w http.ResponseWriter, r *http.Request) {
 		ext = "zip"
 		if snapshot.record == nil || req.Status == "equal" && !snapshot.query.IncludeEqual {
 			release()
-			reason := snapshot.recordError
-			if reason == "" {
-				reason = "该结果没有可用的核查记录，或本次未包含一致记录"
+			if snapshot.recordError == "" {
+				writeMessage(w, 409, "service.reconcileExport.auditRecordUnavailable")
+			} else {
+				writeFailure(w, 409, errors.New(snapshot.recordError))
 			}
-			writeError(w, 409, reason)
 			return
 		}
 	}
@@ -78,7 +79,7 @@ func (a *App) handleReconcileExport(w http.ResponseWriter, r *http.Request) {
 		a.cacheMu.RLock()
 		defer a.cacheMu.RUnlock()
 		exportJob.mu.Lock()
-		exportJob.Status, exportJob.Stage = "running", "导出完整核对清单"
+		exportJob.Status, exportJob.Stage = "running", "stage.task.exportingCompleteChecklist"
 		exportJob.mu.Unlock()
 		name := safeExportBase(book.DisplayName) + "_双表核对_" + time.Now().Format("20060102_150405") + "_" + exportJob.ID[:6] + "." + ext
 		var rows int64
@@ -99,7 +100,7 @@ func (a *App) handleReconcileExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		exportJob.mu.Lock()
-		exportJob.Status, exportJob.Stage, exportJob.Progress = "done", "完整核对清单已导出", 100
+		exportJob.Status, exportJob.Stage, exportJob.Progress = "done", "stage.task.completeChecklistExported", 100
 		exportJob.DoneRows, exportJob.TotalRows, exportJob.Finished = rows, rows, time.Now()
 		exportJob.mu.Unlock()
 	}()
@@ -152,7 +153,7 @@ func writeReconcileCSV(job *ExportJob, dst io.Writer, snapshot reconcileSnapshot
 		return 0, err
 	}
 	if result.Counts != snapshot.counts {
-		return 0, errors.New("核对来源或结果数量与快照不一致，请重新核对")
+		return 0, i18n.Error("service.reconcileExport.numberSourcesOrResultsDoes")
 	}
 	return writer.Rows, writer.Flush()
 }

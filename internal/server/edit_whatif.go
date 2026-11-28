@@ -2,8 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
 	"maps"
 	"math/big"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"excellens/internal/editdoc"
 	"excellens/internal/editfile"
 	"excellens/internal/formats"
+	"excellens/internal/i18n"
 )
 
 type whatIfSpec struct {
@@ -37,11 +37,11 @@ type whatIfResult struct {
 func trialNumber(raw string) (*big.Rat, error) {
 	raw = strings.TrimSpace(raw)
 	if len(raw) > formats.TrialDigits || strings.Contains(raw, "/") {
-		return nil, errors.New("请输入有效的有限十进制数")
+		return nil, i18n.Error("service.editWhatif.enterValidFiniteDecimalNumber")
 	}
 	v, ok := analysis.Decimal(raw)
 	if !ok || v.Num().BitLen() > 1024 || v.Denom().BitLen() > 1024 {
-		return nil, errors.New("试算数值无效或超出精度范围")
+		return nil, i18n.Error("service.editWhatif.trialCalculationValueInvalidOr")
 	}
 	return v, nil
 }
@@ -51,13 +51,13 @@ func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout edit
 	}
 	s := req.Trial
 	if s == nil || layout.XLSX == nil {
-		return nil, errors.New("试算需要已确认的工作簿编辑修订")
+		return nil, i18n.Error("service.editWhatif.trialCalculationsRequireWorkbookBe")
 	}
 	if s.Mode != "seek" && s.Mode != "table" {
-		return nil, errors.New("试算方式无效")
+		return nil, i18n.Error("service.editWhatif.calculationMethodInvalid")
 	}
 	if s.Input == s.Target || s.Input == s.Second || s.Second == s.Target {
-		return nil, errors.New("输入格与公式目标格须各不相同")
+		return nil, i18n.Error("service.editWhatif.inputCellFormulaTargetCell")
 	}
 	f, err := openEditBase(ctx, doc)
 	if err != nil {
@@ -68,15 +68,15 @@ func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout edit
 	second := s.Second != (editdoc.Address{})
 	if second {
 		if s.Mode != "table" || len(s.SecondValues) == 0 {
-			return nil, errors.New("第二个输入格只用于双变量试算")
+			return nil, i18n.Error("service.editWhatif.secondInputCellOnlyUsed")
 		}
 		addresses = append(addresses, s.Second)
 	} else if len(s.SecondValues) > 0 {
-		return nil, errors.New("未指定第二个输入格")
+		return nil, i18n.Error("service.editWhatif.noSecondInputCellSpecified")
 	}
 	for _, addr := range addresses {
 		if !layout.XLSX.HasSheet(addr.Sheet) || addr.Col < 1 || addr.Col > formats.ExcelColumns || addr.Row < 1 || addr.Row > formats.ExcelRows {
-			return nil, errors.New("试算源地址无效")
+			return nil, i18n.Error("service.editWhatif.invalidSourceAddressCalculation")
 		}
 	}
 	cells, err := layout.Read(ctx, f, addresses)
@@ -88,7 +88,7 @@ func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout edit
 		return nil, err
 	}
 	if entry.book == nil || entry.indexErr != nil {
-		return nil, errors.New("此工作簿的计算设置或规模超出本机试算能力")
+		return nil, i18n.Error("service.editWhatif.calculationSettingsOrScaleThis")
 	}
 	patches := maps.Clone(entry.patches)
 	if patches == nil {
@@ -96,13 +96,13 @@ func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout edit
 	}
 	target := patches[s.Target].Apply(cells[s.Target].Value)
 	if target.Kind != "formula" {
-		return nil, errors.New("目标单元格必须是公式")
+		return nil, i18n.Error("service.editWhatif.targetCellMustBeFormula")
 	}
 	for _, input := range append(addresses[:1:1], addresses[2:]...) {
 		source := cells[input]
 		actual := patches[input].Apply(source.Value)
 		if actual.Kind != "number" || source.Array != nil {
-			return nil, errors.New("输入格必须是独立的数值常量")
+			return nil, i18n.Error("service.editWhatif.inputCellsMustBeIndependent")
 		}
 	}
 	// Mark the target as an explicit formula, even when neither input affects
@@ -122,13 +122,13 @@ func (a *App) editWhatIf(ctx context.Context, doc *editdoc.Document, layout edit
 		}
 		cell, ok := result.Cells[s.Target]
 		if ok && cell.State == "cycle" {
-			return "", errors.New("目标公式含循环引用")
+			return "", i18n.Error("service.editWhatif.targetFormulaContainsCircularReferences")
 		}
 		if !ok || cell.State != "calculated" {
-			return "", errors.New("目标公式或依赖尚不支持本机重算")
+			return "", i18n.Error("service.editWhatif.targetFormulaOrDependenciesDo")
 		}
 		if cell.Value.Kind != "number" {
-			return "", fmt.Errorf("目标没有数值结果：%s", cell.Value.Raw)
+			return "", i18n.Error("service.editWhatif.targetNoNumericalResults", i18n.Args{"raw": cell.Value.Raw})
 		}
 		return cell.Value.Raw, nil
 	}
@@ -151,7 +151,7 @@ func tableTrial(ctx context.Context, s whatIfSpec, evaluate func(string, string)
 		ys = []string{""}
 	}
 	if len(s.Values) == 0 || len(ys) > formats.TrialPoints || len(s.Values) > formats.TrialPoints/len(ys) {
-		return out, errors.New("试算组合为空或超过 256 组")
+		return out, i18n.Error("service.editWhatif.trialCalculationsEmptyOrExceed")
 	}
 	for _, v := range append(append([]string{}, s.Values...), s.SecondValues...) {
 		if _, err := trialNumber(v); err != nil {
@@ -192,7 +192,7 @@ func seekTrial(ctx context.Context, s whatIfSpec, evaluate func(string, string) 
 	}
 	tol, err := trialNumber(s.Tolerance)
 	if err != nil || tol.Sign() <= 0 || hi.Cmp(lo) <= 0 {
-		return out, errors.New("上界须大于下界，允许残差须为正数")
+		return out, i18n.Error("service.editWhatif.upperLimitMustBeGreater")
 	}
 	var best *big.Rat
 	probe := func(x *big.Rat) (*big.Rat, bool, error) {
@@ -204,7 +204,7 @@ func seekTrial(ctx context.Context, s whatIfSpec, evaluate func(string, string) 
 		}
 		number, ok := analysis.Decimal(value)
 		if !ok {
-			return nil, false, errors.New("公式结果无法精确比较")
+			return nil, false, i18n.Error("service.editWhatif.formulaResultsCannotBeAccurately")
 		}
 		res := new(big.Rat).Sub(number, goal)
 		distance := new(big.Rat).Abs(res)
